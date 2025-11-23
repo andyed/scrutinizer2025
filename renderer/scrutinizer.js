@@ -420,8 +420,27 @@ class Scrutinizer {
                 this.ctx.drawImage(this.sharpCanvas, 0, 0);
             }
 
-            // 5. Add binocular foveal overlay for extra sharpness at very center
+            // 5. Add progressive desaturation gradient (real-time, follows mouse)
             const bioRadius = this.config.fovealRadius * 0.45;
+            
+            this.ctx.save();
+            this.ctx.globalCompositeOperation = 'saturation';
+            
+            const desatGradient = this.ctx.createRadialGradient(
+                this.mouseX, this.mouseY, bioRadius * 0.8,
+                this.mouseX, this.mouseY, this.config.fovealRadius * 2.5
+            );
+            // Full saturation at center, gradually reduce outward
+            desatGradient.addColorStop(0, 'rgba(255,255,255,1)');    // full color
+            desatGradient.addColorStop(0.3, 'rgba(220,220,220,1)');  // slight reduction
+            desatGradient.addColorStop(0.7, 'rgba(160,160,160,1)');  // more gray
+            desatGradient.addColorStop(1, 'rgba(128,128,128,0.3)');  // grayscale periphery
+            
+            this.ctx.fillStyle = desatGradient;
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.restore();
+
+            // 6. Add binocular foveal overlay for extra sharpness at very center
             const eyeOffset = bioRadius * 0.6;
             const totalWidth = (bioRadius * 2) + (eyeOffset * 2);
             const totalHeight = bioRadius * 2;
