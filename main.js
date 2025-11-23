@@ -2,9 +2,10 @@ const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 const { buildMenuTemplate, RADIUS_OPTIONS } = require('./menu-template');
 
-// Track current settings for menu state
+// Track current settings for menu state and new windows
 let currentRadius = 180;
 let currentBlur = 10;
+let currentEnabled = false; // Default state
 
 let mainWindow;
 
@@ -31,31 +32,42 @@ ipcMain.on('settings:blur-changed', (event, blur) => {
     rebuildMenu();
 });
 
+ipcMain.on('settings:enabled-changed', (event, enabled) => {
+    currentEnabled = enabled;
+    // rebuildMenu(); // If menu had a toggle state, we'd update it here
+});
+
 function createScrutinizerWindow(startUrl) {
-  const win = new BrowserWindow({
-    width: 1200,
-    height: 900,
-    webPreferences: {
-      // Host window needs node access for app.js to use require('electron')
-      nodeIntegration: true,
-      contextIsolation: false,
-      // Enable webview tag - embedded content runs isolated via preload.js
-      webviewTag: true
-    }
-  });
-
-  win.loadFile('renderer/index.html');
-
-  win.webContents.once('did-finish-load', () => {
-    win.webContents.send('settings:radius-options', RADIUS_OPTIONS);
-  });
-
-  // Once renderer is ready, tell it to navigate the webview
-  if (startUrl) {
-    win.webContents.once('did-finish-load', () => {
-      win.webContents.send('popup:navigate', startUrl);
+    const win = new BrowserWindow({
+        width: 1200,
+        height: 900,
+        webPreferences: {
+            // Host window needs node access for app.js to use require('electron')
+            nodeIntegration: true,
+            contextIsolation: false,
+            // Enable webview tag - embedded content runs isolated via preload.js
+            webviewTag: true
+        }
     });
-  }
+
+    win.loadFile('renderer/index.html');
+
+    win.webContents.once('did-finish-load', () => {
+        win.webContents.send('settings:radius-options', RADIUS_OPTIONS);
+        // Pass current state to new window
+        win.webContents.send('settings:init-state', {
+            radius: currentRadius,
+            blur: currentBlur,
+            enabled: currentEnabled
+        });
+    });
+
+    // Once renderer is ready, tell it to navigate the webview
+    if (startUrl) {
+        win.webContents.once('did-finish-load', () => {
+            win.webContents.send('popup:navigate', startUrl);
+        });
+    }
 
   win.on('closed', () => {
     // Let GC reclaim window; nothing else to do

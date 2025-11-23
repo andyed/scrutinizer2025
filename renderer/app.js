@@ -20,11 +20,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const refreshBtn = document.getElementById('refresh-btn');
     const statusText = document.getElementById('status-text');
 
+    let pendingInitState = null;
+
     // Initialize Scrutinizer once webview is ready
     webview.addEventListener('dom-ready', () => {
         console.log('Webview ready');
         scrutinizer = new Scrutinizer(webview, CONFIG);
         statusText.textContent = 'Ready - Press Option+Space or click Enable to start';
+
+        // Apply pending state if any
+        if (pendingInitState) {
+            if (pendingInitState.radius) scrutinizer.updateFovealRadius(pendingInitState.radius);
+            if (pendingInitState.blur) scrutinizer.updateBlurRadius(pendingInitState.blur);
+            if (pendingInitState.enabled) toggleFoveal(true);
+            pendingInitState = null;
+        }
     });
 
     // Navigation controls
@@ -41,14 +51,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Toggle button
-    const toggleFoveal = async () => {
-        const enabled = await scrutinizer.toggle();
-        // toggleBtn.textContent = enabled ? 'Disable Foveal Mode' : 'Enable Foveal Mode'; // Keep icon only
+    const toggleFoveal = async (forceState = null) => {
+        let enabled;
+        if (forceState !== null) {
+            if (forceState) {
+                await scrutinizer.enable();
+                enabled = true;
+            } else {
+                await scrutinizer.disable();
+                enabled = false;
+            }
+        } else {
+            enabled = await scrutinizer.toggle();
+        }
+        
         toggleBtn.classList.toggle('active', enabled);
         statusText.textContent = enabled ? 'Foveal mode active' : 'Foveal mode disabled';
+        
+        // Notify main process of state change so new windows inherit it
+        ipcRenderer.send('settings:enabled-changed', enabled);
     };
 
-    toggleBtn.addEventListener('click', toggleFoveal);
+    toggleBtn.addEventListener('click', () => toggleFoveal());
 
     // URL navigation
     const navigate = () => {
@@ -115,6 +139,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     ipcRenderer.on('settings:radius-options', (event, options) => {
         radiusOptions = Array.isArray(options) && options.length ? options.slice().sort((a, b) => a - b) : null;
+    });
+
+    // Initialize state from main process (new windows inherit settings)
+    ipcRenderer.on('settings:init-state', (event, state) => {
+        if (scrutinizer) {
+            if (state.radius) scrutinizer.updateFovealRadius(state.radius);
+            if (state.blur) scrutinizer.updateBlurRadius(state.blur);
+            
+            // Apply enabled state
+            if (state.enabled) {
+                toggleFoveal(true);
+            }
+        } else {
+            // Store for initialization
+            pendingInitState = state;
+        }
     });
 
     // Toggle foveal mode
