@@ -583,3 +583,70 @@ function applyFovealState(view, state) {
 - Max frame rate: 240 fps for CPU bitmap mode
 - Offscreen windows are always frameless (no visible window chrome)
 - Dirty region provided to optimize processing
+
+
+## Attempt 1 (2025‑11) – Abandoned Prototype
+
+We tried a “big bang” migration on a `feature/webcontentsview` branch. The goal was:
+
+- Remove `<webview>` from [renderer/index.html](cci:7://file:///Users/andyed/Documents/dev/scrutinizer2025/renderer/index.html:0:0-0:0)
+- Create a `WebContentsView` in [main.js](cci:7://file:///Users/andyed/Documents/dev/scrutinizer2025/main.js:0:0-0:0)
+- Use offscreen rendering + `paint` events to drive the Scrutinizer pipeline
+
+This branch was **not** merged into `main` and should be treated as an experiment only.
+
+### What we learned
+
+- **You can’t treat `WebContentsView` like `<webview>`.**
+  - `<webview>` lives in the DOM and plays nicely with HTML/CSS layout.
+  - `WebContentsView` lives in the **native view hierarchy**, managed entirely by the main process (`setBounds`, child views, etc.).
+  - Mixing a normal `BrowserWindow` that calls `win.loadFile('renderer/index.html')` **and** adding a `WebContentsView` on top leads to layout conflicts (views fighting for the same rectangle, toolbar being covered, etc.).
+
+- **Offscreen mode in Electron 30 is non‑trivial.**
+  - Enabling `offscreen: true` on the content view repeatedly produced `No content under offscreen mode`.
+  - That meant the paint pipeline never produced valid frames.
+  - For a “safe” first step, we’d likely need:
+    - Non‑offscreen `WebContentsView` for content.
+    - `capturePage()` polling (like the current `<webview>` path) as a drop‑in replacement before chasing paint‑event optimization.
+
+- **Real WebContentsView architecture needs multi‑view design from day one.**
+  - The “toolbar HTML + one WebContentsView behind it” hack is fragile.
+  - The recommended pattern is:
+    - A `BrowserWindow` that acts only as a **container**.
+    - One `WebContentsView` for the toolbar/UI.
+    - One `WebContentsView` for the actual page content.
+    - All layout (positions, sizes, z‑order) controlled by the main process via `setBounds()` and the order of `addChildView()`.
+  - Trying to retrofit this on top of an existing `<webview>`/HTML architecture in one go was too disruptive.
+
+- **IPC routing gets more complex.**
+  - Once the toolbar and content are separate views, all of this has to be explicit:
+    - Toolbar → main → content (navigation commands).
+    - Content preload → main → toolbar (keyboard shortcuts, mutations, input‑change).
+    - Frame capture (from content) → toolbar (Scrutinizer) over IPC.
+  - This is solvable, but it’s a **full architecture project**, not a quick patch.
+
+### Decision
+
+- **1.0 shipped using the existing `<webview>` implementation.**
+- The `feature/webcontentsview` branch is kept for historical reference only.
+- A future WebContentsView migration should be planned as a multi‑phase effort:
+
+  1. **Phase 0 – Baseline**
+     - Keep `<webview>` for production.
+     - Introduce an experimental hidden `WebContentsView` window purely for R&D on:
+       - Offscreen rendering.
+       - `paint` event handling.
+       - Frame capture performance.
+
+  2. **Phase 1 – Dedicated WebContentsView prototype window**
+     - Build a *separate* window whose entire UI is composed of `WebContentsView` instances (toolbar + content).
+     - Do **not** touch the main `<webview>` window yet.
+     - Validate:
+       - Resizing, navigation, IPC routing.
+       - Offscreen vs. `capturePage()` tradeoffs.
+
+  3. **Phase 2 – Swap the main window**
+     - Once the prototype is solid, replace the main Scrutinizer window with the multi‑view architecture.
+     - Remove `<webview>` and legacy capture paths at this point only.
+
+- Until then, `<webview>` + `capturePage()` remain the supported, shippable path.
