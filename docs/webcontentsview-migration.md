@@ -74,37 +74,54 @@ BrowserWindow (main.js)
 
 2. **Create WebContentsView in main.js:**
 ```javascript
-const { BrowserWindow, WebContentsView } = require('electron');
+const { app, BrowserWindow, WebContentsView } = require('electron');
+const path = require('path');
 
-function createScrutinizerWindow() {
+// Disable hardware acceleration for CPU-based offscreen rendering (optional)
+// This is faster for frame generation but slower than GPU shared texture mode
+// app.disableHardwareAcceleration();
+
+function createScrutinizerWindow(startUrl) {
   const win = new BrowserWindow({
     width: 1200,
     height: 900,
     webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
+      nodeIntegration: true,
+      contextIsolation: false,
       preload: path.join(__dirname, 'renderer', 'host-preload.js')
     }
   });
 
-  // Create web view
+  // Create WebContentsView with offscreen rendering
+  // Note: WebContentsView inherits from View, has view.webContents property
   const view = new WebContentsView({
     webPreferences: {
       preload: path.join(__dirname, 'renderer', 'webview-preload.js'),
-      offscreen: true // Enable offscreen rendering
+      // Offscreen rendering options:
+      offscreen: true, // Enable offscreen rendering
+      // useSharedTexture: false (default) - CPU bitmap, slower but easier to use
+      // useSharedTexture: true - GPU texture, faster but requires native module
     }
   });
 
+  // Add view as child of window's contentView
   win.contentView.addChildView(view);
   
-  // Position view (account for toolbar)
+  // Position view (account for toolbar height)
+  // setBounds uses Rectangle {x, y, width, height}
   view.setBounds({ x: 0, y: 60, width: 1200, height: 840 });
   
-  // Load UI chrome
+  // Handle window resize to update view bounds
+  win.on('resize', () => {
+    const [width, height] = win.getSize();
+    view.setBounds({ x: 0, y: 60, width: width, height: height - 60 });
+  });
+  
+  // Load UI chrome in main window
   win.loadFile('renderer/index.html');
   
-  // Load web content
-  view.webContents.loadURL('https://example.com');
+  // Load web content in view
+  view.webContents.loadURL(startUrl || 'https://example.com');
   
   return { win, view };
 }
@@ -113,19 +130,34 @@ function createScrutinizerWindow() {
 3. **Offscreen rendering setup:**
 ```javascript
 // In main.js
+// Listen for 'paint' events from offscreen rendering
 view.webContents.on('paint', (event, dirty, image) => {
-  // image is NativeImage - can convert to buffer
-  const buffer = image.toBitmap();
+  // 'dirty' is Rectangle: the area that changed
+  // 'image' is NativeImage: the rendered frame
   
-  // Send to renderer for processing
+  // Option 1: Get raw bitmap buffer (BGRA format)
+  const buffer = image.toBitmap(); // Returns Buffer
+  const size = image.getSize(); // Returns {width, height}
+  
+  // Option 2: Get PNG for debugging
+  // const png = image.toPNG();
+  // fs.writeFileSync('debug.png', png);
+  
+  // Send to renderer for foveal processing
   win.webContents.send('frame-captured', {
     buffer: buffer,
-    size: image.getSize()
+    width: size.width,
+    height: size.height,
+    dirty: dirty // Optional: process only changed region
   });
 });
 
-// Start rendering
+// Set frame rate (1-240 fps, default: 60)
+// Higher frame rates = smoother but more CPU/GPU usage
 view.webContents.setFrameRate(60);
+
+// Note: paint events only fire when content changes
+// Static pages won't generate frames unnecessarily
 ```
 
 4. **Update preload scripts:**
@@ -188,24 +220,280 @@ class Scrutinizer {
 }
 ```
 
-### Phase 3: Testing & Optimization (1-2 weeks)
+### Phase 3: Offscreen Rendering Modes
 
-**Test matrix:**
-- [ ] Basic navigation works
-- [ ] Mouse tracking accurate
-- [ ] Scroll detection works
-- [ ] Popup windows work
-- [ ] Performance benchmarks
-- [ ] Memory usage comparison
-- [ ] Multi-window support
-- [ ] DevTools integration
+**Three rendering modes available:**
 
-**Performance targets:**
-- Frame capture: < 10ms (vs current ~30ms)
-- Mouse latency: < 16ms (60fps)
-- Memory usage: Similar or better
+#### Mode 1: CPU Shared Memory Bitmap (Default) ✅ RECOMMENDED
 
-### Phase 4: Migration & Release (1 week)
+**Setup:**
+```javascript
+const view = new WebContentsView({
+  webPreferences: {
+    offscreen: true,
+    // useSharedTexture: false (default)
+  }
+});
+```
+
+**Characteristics:**
+- ✅ Easy to use - works with NativeImage API (`image.toBitmap()`, `image.toPNG()`)
+- ✅ Supports GPU features (WebGL, 3D CSS)
+- ✅ Max frame rate: 240 fps
+- ⚠️ Moderate performance - GPU → CPU copy overhead
+- ✅ **Best for Scrutinizer**: Simple integration with existing canvas pipeline
+
+**Performance estimate:** ~10-15ms per frame capture
+
+#### Mode 2: GPU Shared Texture (Advanced) 🚀
+
+**Setup:**
+```javascript
+// Requires native node module for texture handling
+const view = new WebContentsView({
+  webPreferences: {
+    offscreen: true,
+    useSharedTexture: true
+  }
+});
+```
+
+**Characteristics:**
+- 🚀 Fastest - direct GPU texture access
+- ✅ No CPU-GPU copy overhead
+- ⚠️ Requires native module to import shared texture
+- ⚠️ More complex integration
+- 🔵 **Future consideration**: If Mode 1 performance insufficient
+
+**Performance estimate:** ~5-8ms per frame capture
+
+See [Electron OSR README](https://github.com/electron/electron/blob/main/shell/browser/osr/README.md) for implementation details.
+
+#### Mode 3: Software Output Device (CPU-only) 🐌
+
+**Setup:**
+```javascript
+// Disable GPU acceleration at app startup
+app.disableHardwareAcceleration();
+
+const view = new WebContentsView({
+  webPreferences: {
+    offscreen: true
+  }
+});
+```
+
+**Characteristics:**
+- ✅ Fast frame generation (no GPU involvement)
+- ❌ No WebGL or 3D CSS support
+- ⚠️ Lower visual quality
+- ❌ **Not recommended for Scrutinizer**: Many modern websites use GPU features
+
+**Performance estimate:** ~8-12ms per frame capture
+
+### Phase 4: Multi-Window Support
+
+**Benefits of WebContentsView for popups:**
+
+```javascript
+// Store all views in main process
+const viewsMap = new Map(); // windowId -> view
+
+function createScrutinizerWindow(startUrl, parentState = null) {
+  const { win, view } = createScrutinizerWindow(startUrl);
+  
+  // Store reference
+  viewsMap.set(win.id, view);
+  
+  // If parent state exists, apply immediately
+  if (parentState) {
+    // All views are in same process - no IPC timing issues!
+    applyFovealState(view, parentState);
+  }
+  
+  // Intercept new-window events
+  view.webContents.setWindowOpenHandler(({ url }) => {
+    // Create new window with inherited state
+    const currentState = getFovealState(view);
+    createScrutinizerWindow(url, currentState);
+    return { action: 'deny' };
+  });
+  
+  return { win, view };
+}
+
+function applyFovealState(view, state) {
+  // Direct control - no race conditions!
+  // Send state to renderer via view.webContents
+  view.webContents.send('apply-foveal-state', state);
+}
+```
+
+**Key advantages:**
+- ✅ All WebContentsViews managed by main process
+- ✅ No IPC timing issues between windows
+- ✅ Direct state control and synchronization
+- ✅ Popup windows inherit state reliably
+- ✅ Can share processing resources between views
+
+### Phase 6: Migration & Release (1 week)
+
+1. Merge feature branch
+2. Update documentation
+3. Beta test with users
+4. Release as v2.0
+
+## Timeline
+
+**Total: 7-9 weeks**
+
+| Phase | Duration | Tasks |
+|-------|----------|-------|
+| **Phase 1** | 1-2 weeks | Research, prototyping, benchmark offscreen rendering modes |
+| **Phase 2** | 2-3 weeks | Architecture changes, WebContentsView integration |
+| **Phase 3** | 3-5 days | Implement and test offscreen rendering mode |
+| **Phase 4** | 1 week | Multi-window support and state inheritance |
+| **Phase 5** | 1-2 weeks | Testing, optimization, performance tuning |
+| **Phase 6** | 1 week | Beta testing and release |
+
+**Recommended start:** After v1.0 stable release + 1 month of user feedback
+
+## Recommended Implementation Path
+
+### Option A: Full Migration (Recommended for v2.0)
+
+**Pros:**
+- ✅ Solves popup window inheritance issue
+- ✅ 2-3x performance improvement
+- ✅ Modern, future-proof API
+- ✅ Better multi-window architecture
+
+**Cons:**
+- ⚠️ 7-9 weeks development time
+- ⚠️ Significant architectural changes
+- ⚠️ Requires thorough testing
+
+**Decision:** **Proceed after v1.0 release is stable**
+
+### Option B: Hybrid Approach (Quick fix for v1.1)
+
+Keep `<webview>` but add workarounds:
+- Reduce capture frequency to 30 fps
+- Add timeout before `scrutinizer.enable()` in new windows
+- More aggressive state polling
+
+**Pros:**
+- ✅ Faster to implement (1-2 weeks)
+- ✅ Lower risk
+
+**Cons:**
+- ❌ Doesn't solve root cause
+- ❌ Still has timing issues
+- ❌ Technical debt accumulates
+- ❌ No performance gains
+
+**Decision:** **Not recommended** - better to do it right once
+
+### Option C: Incremental Migration (Not Recommended)
+
+Migrate one piece at a time while maintaining `<webview>` support.
+
+**Cons:**
+- ❌ Complex dual-path maintenance
+- ❌ Longer timeline overall
+- ❌ Risk of bugs in both paths
+
+**Decision:** **Skip this** - clean break is better
+
+## Implementation Considerations
+
+### API Changes Summary
+
+**From `<webview>` tag to WebContentsView:**
+
+| Feature | `<webview>` (v1.x) | WebContentsView (v2.0) |
+|---------|-------------------|------------------------|
+| **Creation** | HTML tag in renderer | JS object in main process |
+| **Process** | Separate | Same as parent |
+| **Frame capture** | `capturePage()` (~30ms) | `paint` event (~10ms) |
+| **Mouse tracking** | IPC from preload | Direct event access |
+| **Multi-window** | Complex IPC timing | Direct state control |
+| **Memory** | Higher (separate process) | Lower (shared memory) |
+| **API status** | ⚠️ Deprecated | ✅ Modern, maintained |
+
+### Key Differences to Handle
+
+1. **No HTML element**: WebContentsView is managed entirely in main process
+   - Renderer receives frame data via IPC instead of manipulating DOM
+   - Overlay canvas still lives in renderer
+
+2. **Event model changes**:
+   ```javascript
+   // OLD (<webview> tag)
+   webview.addEventListener('dom-ready', () => {...});
+   webview.addEventListener('ipc-message', (e) => {...});
+   
+   // NEW (WebContentsView)
+   view.webContents.on('dom-ready', () => {...});
+   view.webContents.on('ipc-message', (e) => {...});
+   ```
+
+3. **Frame capture pipeline**:
+   ```
+   OLD: webview → capturePage() → NativeImage → toBitmap() → Canvas
+   NEW: view → paint event → Buffer → IPC → Canvas
+   ```
+
+4. **Preload script injection**:
+   ```javascript
+   // OLD
+   <webview preload="./preload.js"></webview>
+   
+   // NEW
+   new WebContentsView({
+     webPreferences: {
+       preload: path.join(__dirname, 'renderer', 'preload.js')
+     }
+   })
+   ```
+
+### Performance Optimization Strategies
+
+1. **Dirty region optimization**: Only process changed areas
+   ```javascript
+   view.webContents.on('paint', (event, dirty, image) => {
+     // dirty is Rectangle {x, y, width, height}
+     // Only update overlay for changed region
+     if (scrutinizer.enabled) {
+       scrutinizer.updateRegion(dirty, image);
+     }
+   });
+   ```
+
+2. **Adaptive frame rate**: Adjust based on activity
+   ```javascript
+   // High activity (scrolling, animations)
+   view.webContents.setFrameRate(60);
+   
+   // Low activity (static page)
+   view.webContents.setFrameRate(30);
+   
+   // Idle (no foveal mode)
+   view.webContents.setFrameRate(10);
+   ```
+
+3. **Shared blur worker pool**: Reuse workers across windows
+   ```javascript
+   // Single worker pool for all views
+   const blurWorkerPool = new WorkerPool(navigator.hardwareConcurrency);
+   
+   // All views share workers
+   viewsMap.forEach(view => {
+     view.assignWorkerPool(blurWorkerPool);
+   });
+   ```
+
+### Phase 7: Migration & Release (1 week)
 
 1. Merge feature branch
 2. Update documentation
@@ -226,16 +514,7 @@ class Scrutinizer {
 ### Risk 4: User Disruption
 **Mitigation:** Auto-update with rollback capability
 
-## Timeline
 
-**Total: 6-8 weeks**
-
-- Week 1-2: Research & prototyping
-- Week 3-5: Implementation
-- Week 6-7: Testing & optimization
-- Week 8: Release prep & deployment
-
-**Recommended start:** After v1.0 stable release + 1 month of user feedback
 
 ## Alternative: Hybrid Approach
 
@@ -257,6 +536,27 @@ Keep `<webview>` but optimize capture:
 
 ## References
 
-- [WebContentsView API](https://www.electronjs.org/docs/latest/api/web-contents-view)
-- [Offscreen Rendering](https://www.electronjs.org/docs/latest/tutorial/offscreen-rendering)
-- [Context Isolation](https://www.electronjs.org/docs/latest/tutorial/context-isolation)
+### Official Electron Documentation
+
+- [WebContentsView API](https://www.electronjs.org/docs/latest/api/web-contents-view) - Main API reference
+- [View API](https://www.electronjs.org/docs/latest/api/view) - Parent class for WebContentsView
+- [WebContents API](https://www.electronjs.org/docs/latest/api/web-contents) - Accessed via `view.webContents`
+- [Offscreen Rendering](https://www.electronjs.org/docs/latest/tutorial/offscreen-rendering) - Tutorial and modes
+- [Offscreen Rendering README](https://github.com/electron/electron/blob/main/shell/browser/osr/README.md) - GPU shared texture details
+- [Context Isolation](https://www.electronjs.org/docs/latest/tutorial/context-isolation) - Security best practices
+
+### Key APIs Used
+
+- `new WebContentsView(options)` - Create view with offscreen rendering
+- `view.webContents.on('paint', handler)` - Listen for rendered frames
+- `view.setBounds(bounds)` - Position and size the view
+- `view.webContents.setFrameRate(fps)` - Control rendering frequency
+- `image.toBitmap()` - Convert NativeImage to Buffer (BGRA format)
+- `image.getSize()` - Get frame dimensions {width, height}
+
+### Performance Considerations
+
+- Paint events only fire when content changes (efficient!)
+- Max frame rate: 240 fps for CPU bitmap mode
+- Offscreen windows are always frameless (no visible window chrome)
+- Dirty region provided to optimize processing
