@@ -136,14 +136,18 @@ function createScrutinizerWindow(startUrl) {
         }
     });
 
-    // Attach view to window
-    win.contentView.addChildView(view);
-
-    // Position view below toolbar (50px height from CSS)
+    // PROBLEM: WebContentsView and renderer HTML can't coexist in same window easily
+    // The renderer's webContents and the WebContentsView compete for space
+    // 
+    // For now, position view below where toolbar should be (y: 50)
+    // and make toolbar background transparent so view shows through
     const updateViewBounds = () => {
         const [width, height] = win.getSize();
         view.setBounds({ x: 0, y: 50, width: width, height: height - 50 });
     };
+    
+    // Add view BEFORE loading renderer HTML, so renderer overlays it
+    win.contentView.addChildView(view);
     updateViewBounds();
 
     // Keep view bounds in sync on window resize
