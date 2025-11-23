@@ -21,21 +21,21 @@ self.onmessage = function(e) {
             // Level 0: Mild blur (preserves structure, removes fine text)
             const level0 = processor.blur(
                 new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height),
-                baseBlurRadius * 0.5
+                baseBlurRadius * 0.3
             );
             levels.push(level0);
             
             // Level 1: Moderate blur (removes detail, preserves shapes/layout)
             const level1 = processor.blur(
                 new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height),
-                baseBlurRadius * 1.0
+                baseBlurRadius * 0.7
             );
             levels.push(level1);
             
-            // Level 2: Heavy blur (keeps only gist/gross structure)
+            // Level 2: Heavy blur (keeps gist/gross structure, preserves low spatial frequencies)
             const level2 = processor.blur(
                 new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height),
-                baseBlurRadius * 2.0
+                baseBlurRadius * 1.3
             );
             levels.push(level2);
             

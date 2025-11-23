@@ -30,7 +30,8 @@ While the perceptual experience of vision feels stable and continuous, the under
 
 - 🎯 **Binocular foveal mask** that follows your mouse cursor with distinctive 16:9 shape
 - 🌫️ **Progressive peripheral blur** using multi-level pyramid (mild → moderate → heavy)
-- 🎨 **Desaturation** using ColorMatrix luminance weights from the original implementation
+- 🎨 **Progressive desaturation** with real-time radial gradient (color → grayscale) that follows cursor at 60fps
+- 🧬 **ColorMatrix luminance weights** preserved from the original implementation for accurate grayscale conversion
 - 📜 **Scroll detection** with automatic recapture
 - 🔄 **DOM mutation detection** for dynamic content
 - ⌨️ **Keyboard shortcuts** (Alt+Space to toggle, Alt+wheel to adjust size)
@@ -198,9 +199,11 @@ Scrutinizer2025 follows this lineage but focuses on **pixel-level, gaze-continge
 ### This Recreation (2025)
 - Modern Electron/Canvas API implementation with enhanced physiological accuracy
 - Multi-level blur pyramid for progressive spatial frequency filtering
+- Real-time progressive desaturation gradient (color → grayscale falloff with eccentricity)
 - Web Worker offloads blur computation for responsive UI
 - Preserves original ColorMatrix algorithm and binocular foveal signature
 - Progressive blur gradient better models hyperbolic acuity decay (steep at ~2°, gradual beyond ~5°)
+- Smooth 60fps tracking with GPU-accelerated Canvas compositing
 
 ## License
 

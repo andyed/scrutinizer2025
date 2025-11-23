@@ -203,20 +203,40 @@ For large/complex pages:
 - Session recording/playback
 - Heatmap generation from usage data
 
+#### Advanced Simulation Controls
+**Priority**: Medium  
+**Effort**: Medium
+
+Add user-facing controls for progressive blur tuning:
+- **Blur aggressiveness slider**: Adjusts pyramid level multipliers (0.3/0.7/1.3 → 0.5/1.0/2.0)
+- **Zone transition radii**: Controls r1/r2/r3 multipliers for gradient zones
+- **Presets**: "Gentle" (Magnocellular-preserving), "Standard", "Aggressive" (strict fidelity)
+- **Real-time preview**: Live adjustment without recapture
+- **Persistent profiles**: Save custom configurations
+
+**Implementation notes**:
+- Expose pyramid multipliers and zone radii as runtime config (not compile-time)
+- Worker can rebuild pyramid with new multipliers
+- Menu or panel UI for adjustment (possibly View → Simulation Fidelity submenu)
+- Useful for researchers comparing different acuity models or designers stress-testing layouts
+
 ### Simulation Fidelity
 
-- **Progressive eccentricity-based blur**
-  - Replace the hard transition between sharp foveal region and uniformly blurred periphery with a gradual acuity falloff that better matches empirical eccentricity curves (steep drop by ~2° and slower beyond ~5°).
-  - Implement a radial blur-strength function `B(E)` over eccentricity `E` using a fast-rising, saturating curve (e.g., hyperbolic / inverse-linear or logistic form) so that effective acuity is ~50% by ~2°.
-  - Use a multi-resolution pyramid (sharp + several increasingly blurred versions) and blend levels per pixel based on distance from fixation, rather than a single blur kernel.
-  - Initially approximate degrees of visual angle using heuristic pixel radii; longer term, parameterize inner/outer radii in calibrated visual-angle units once a distance/monitor calibration module exists.
-  - Gate the experimental foveated blur behind a configuration flag (e.g., `useFoveatedBlur`) so production builds can continue to use the simpler, robust uniform blur until the new model is validated.
+- **✅ Progressive eccentricity-based blur** (Implemented in 1.0)
+  - ✅ Multi-resolution pyramid (3 levels: mild/moderate/heavy blur)
+  - ✅ Gradual acuity falloff with radial gradient zones (0.3x/0.8x/1.5x fovealRadius)
+  - ✅ Web Worker offloads blur computation for non-blocking UI
+  - ✅ Binocular foveal overlay preserved (full color, 16:9 shape)
+  - ✅ Gentler blur multipliers (0.3/0.7/1.3 × baseBlurRadius) preserve Magnocellular info
+  - 🔵 **Future**: Calibrated visual-angle units with monitor distance/DPI calibration
+  - 🔵 **Future**: User-adjustable blur aggressiveness and zone transition controls (see Advanced Simulation Controls)
 
-- **Magnocellular-preserving low-pass filter**
-  - Ensure the peripheral filter behaves like a Magnocellular-preserving low-pass, not a generic blur that wipes out all structure.
-  - Design blur levels to aggressively attenuate high spatial frequencies (fine detail, text, texture) while preserving low spatial frequencies (gross shape and luminance contrast) needed for peripheral guidance and “gist” perception.
-  - Use multi-scale decompositions (e.g., Laplacian/wavelet-style pyramids or band-limited blurs) to suppress higher-frequency bands while retaining low-frequency content.
-  - Validate qualitatively against design tasks: icons and major layout regions should remain distinguishable peripherally, while detailed text becomes unreadable.
+- **✅ Magnocellular-preserving low-pass filter** (Implemented in 1.0)
+  - ✅ Multi-level pyramid attenuates high spatial frequencies while preserving low frequencies
+  - ✅ Icons and major layout regions remain distinguishable peripherally
+  - ✅ Text becomes unreadable while gross shape/contrast preserved
+  - 🔵 **Future**: Wavelet-based decomposition for more precise frequency-band control
+  - 🔵 **Future**: Validation against psychophysical acuity curves
 
 #### Analytics (Optional)
 - Anonymous usage statistics
@@ -229,10 +249,10 @@ For large/complex pages:
 
 Before 1.0 release, verify:
 
-- [ ] All keyboard shortcuts work
+- [ ] All keyboard shortcuts work (Alt+Space, Alt+wheel)
 - [ ] Navigation (back/forward/refresh) works correctly
 - [ ] Foveal mode toggles properly
-- [ ] Sliders update values in real-time
+- [ ] Menu controls update values in real-time
 - [ ] Scroll tracking maintains alignment
 - [ ] Bookmarks save and load correctly
 - [ ] Homepage setting persists across restarts

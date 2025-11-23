@@ -38,6 +38,22 @@ class ImageProcessor {
     }
 
     /**
+     * Build a simple multi-resolution pyramid from a base image.
+     * Levels[0] is sharp, higher indices are progressively more blurred.
+     * @param {ImageData} baseData
+     * @param {number[]} radii - blur radii for each additional level
+     * @returns {ImageData[]} array of ImageData levels
+     */
+    buildPyramid(baseData, radii) {
+        const levels = [baseData];
+        for (const r of radii) {
+            const copy = new ImageData(new Uint8ClampedArray(baseData.data), baseData.width, baseData.height);
+            levels.push(this.blur(copy, r));
+        }
+        return levels;
+    }
+
+    /**
      * Apply box blur to image data
      * Uses a simple box blur for performance (can be upgraded to Gaussian)
      * @param {ImageData} imageData - Canvas ImageData to blur
