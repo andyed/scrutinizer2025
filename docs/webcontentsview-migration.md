@@ -6,15 +6,19 @@
 - ❌ Separate process - IPC overhead for mouse tracking
 - ❌ `capturePage()` is slow (~16-50ms per capture)
 - ❌ Limited control over rendering pipeline
+- ❌ **Multi-window state inheritance broken** - popup windows don't apply foveal effect despite receiving state
 - ⚠️ Deprecated API (still works but not recommended)
 
 **Future (WebContentsView):**
 - ✅ Same process - direct memory access
 - ✅ Offscreen rendering - faster pixel access
 - ✅ Better integration with Electron's compositor
+- ✅ **Cleaner multi-window state management** - all views controlled by main process
 - ✅ Modern, actively maintained API
 
 **Performance gain estimate:** 2-3x faster frame capture, smoother foveal tracking
+
+**Multi-window fix:** Popup windows will correctly inherit and apply foveal state
 
 ## Migration Strategy
 

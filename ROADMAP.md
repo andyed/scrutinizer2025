@@ -131,14 +131,24 @@ Create:
 
 #### Popup Handling
 **Priority**: Medium  
-**Effort**: Medium
+**Effort**: Medium  
+**Status**: ⚠️ Partially Working - **Defer to v2.0 WebContentsView Migration**
 
-**Current issue**: `allowpopups` on webview may open popups uncontrolled
+**Current state**:
+- ✅ Popups open in new Scrutinizer windows (intercepts `new-window` events)
+- ✅ Settings inheritance works (radius, blur, enabled state passed to new windows)
+- ❌ **Known Issue**: Foveal effect not applying to popup windows despite state inheritance
+  - State is received and stored correctly
+  - Timing issue with webview initialization and scrutinizer.enable() call
+  - Related to `<webview>` tag's multi-process architecture
 
-**Solutions**:
-- Intercept `new-window` events on webview
-- Show popup in new Scrutinizer window (with foveal mode)
-- Or open in system browser with user confirmation
+**Recommendation**: **Defer fix to v2.0** (see `docs/webcontentsview-migration.md`)
+- Current `<webview>` architecture makes multi-window state sync complex
+- WebContentsView migration will provide same-process architecture
+- Much cleaner state management and initialization flow
+- Multi-window support explicitly listed as Phase 3 test item in migration plan
+
+**Workaround for users**: Manually press ESC to toggle foveal mode in popup windows
 
 ---
 
