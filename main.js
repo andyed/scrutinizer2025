@@ -1,6 +1,6 @@
 const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
-const { buildMenuTemplate } = require('./menu-template');
+const { buildMenuTemplate, RADIUS_OPTIONS } = require('./menu-template');
 
 // Track current settings for menu state
 let currentRadius = 180;
@@ -43,6 +43,10 @@ function createScrutinizerWindow(startUrl) {
   });
 
   win.loadFile('renderer/index.html');
+
+  win.webContents.once('did-finish-load', () => {
+    win.webContents.send('settings:radius-options', RADIUS_OPTIONS);
+  });
 
   // Once renderer is ready, tell it to navigate the webview
   if (startUrl) {

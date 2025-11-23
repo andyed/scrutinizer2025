@@ -111,6 +111,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // IPC from main process (menus, popups)
     const { ipcRenderer } = require('electron');
+    let radiusOptions = null;
+
+    ipcRenderer.on('settings:radius-options', (event, options) => {
+        radiusOptions = Array.isArray(options) && options.length ? options.slice().sort((a, b) => a - b) : null;
+    });
 
     // Toggle foveal mode
     ipcRenderer.on('menu:toggle-foveal', () => {
@@ -141,14 +146,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Mouse wheel to adjust foveal size when holding Alt/Option
+    // Mouse wheel to adjust foveal size when holding Alt/Option or Cmd
     document.addEventListener('wheel', (e) => {
-        if (scrutinizer && scrutinizer.enabled && e.altKey) {
-            e.preventDefault(); // prevent page scroll while adjusting radius
-            const delta = -e.deltaY;
-            const newRadius = Math.max(20, Math.min(300, scrutinizer.config.fovealRadius + delta));
+        if (scrutinizer && scrutinizer.enabled && (e.altKey || e.metaKey)) {
+            e.preventDefault();
+
+            const radiusSteps = (radiusOptions && radiusOptions.length) ? radiusOptions : [100, 180, 250];
+            const currentRadius = scrutinizer.config.fovealRadius;
+
+            let currentIndex = radiusSteps.findIndex(r => r === currentRadius);
+            if (currentIndex === -1) {
+                let nearestIndex = 0;
+                let nearestDiff = Math.abs(currentRadius - radiusSteps[0]);
+                for (let i = 1; i < radiusSteps.length; i++) {
+                    const diff = Math.abs(currentRadius - radiusSteps[i]);
+                    if (diff < nearestDiff) {
+                        nearestDiff = diff;
+                        nearestIndex = i;
+                    }
+                }
+                currentIndex = nearestIndex;
+            }
+
+            const direction = e.deltaY > 0 ? 1 : -1;
+            let nextIndex = currentIndex;
+            if (direction > 0 && currentIndex < radiusSteps.length - 1) {
+                nextIndex = currentIndex + 1;
+            } else if (direction < 0 && currentIndex > 0) {
+                nextIndex = currentIndex - 1;
+            }
+
+            const newRadius = radiusSteps[nextIndex];
+
             scrutinizer.updateFovealRadius(newRadius);
-            // Notify main process (won't match exact menu values, but that's ok)
             ipcRenderer.send('settings:radius-changed', newRadius);
         }
     }, { passive: false });

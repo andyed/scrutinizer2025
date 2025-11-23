@@ -1,5 +1,7 @@
 const { app } = require('electron');
 
+const RADIUS_OPTIONS = [100, 180, 250];
+
 function buildMenuTemplate(sendToRenderer, currentRadius = 180, currentBlur = 10) {
     const isMac = process.platform === 'darwin';
 
@@ -42,20 +44,20 @@ function buildMenuTemplate(sendToRenderer, currentRadius = 180, currentBlur = 10
                         {
                             label: 'Small (100px)',
                             type: 'radio',
-                            checked: currentRadius === 100,
-                            click: () => sendToRenderer('menu:set-radius', 100)
+                            checked: currentRadius === RADIUS_OPTIONS[0],
+                            click: () => sendToRenderer('menu:set-radius', RADIUS_OPTIONS[0])
                         },
                         {
                             label: 'Medium (180px)',
                             type: 'radio',
-                            checked: currentRadius === 180,
-                            click: () => sendToRenderer('menu:set-radius', 180)
+                            checked: currentRadius === RADIUS_OPTIONS[1],
+                            click: () => sendToRenderer('menu:set-radius', RADIUS_OPTIONS[1])
                         },
                         {
                             label: 'Large (250px)',
                             type: 'radio',
-                            checked: currentRadius === 250,
-                            click: () => sendToRenderer('menu:set-radius', 250)
+                            checked: currentRadius === RADIUS_OPTIONS[2],
+                            click: () => sendToRenderer('menu:set-radius', RADIUS_OPTIONS[2])
                         }
                     ]
                 },
@@ -99,4 +101,4 @@ function buildMenuTemplate(sendToRenderer, currentRadius = 180, currentBlur = 10
     ];
 }
 
-module.exports = { buildMenuTemplate };
+module.exports = { buildMenuTemplate, RADIUS_OPTIONS };

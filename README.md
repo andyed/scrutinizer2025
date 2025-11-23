@@ -1,4 +1,4 @@
-![Alpha Browser Screenshot](screenshots/alpha_browser.png)
+![Beta Browser Screenshot](screenshots/beta_browser.png)
 
 # Scrutinizer - Foveal Vision Simulator
 
