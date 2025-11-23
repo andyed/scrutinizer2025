@@ -45,9 +45,9 @@
       "icon": "renderer/scrutinizer_512x512_icon.png"
     },
     "publish": {
-      "provider": "s3",
-      "bucket": "scrutinizer-releases",
-      "region": "us-east-1"
+      "provider": "github",
+      "owner": "andyed",
+      "repo": "scrutinizer2025"
     }
   },
   "devDependencies": {
