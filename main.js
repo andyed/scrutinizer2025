@@ -138,10 +138,10 @@ function createScrutinizerWindow(startUrl) {
     // Attach view to window
     win.contentView.addChildView(view);
 
-    // Position view below toolbar (60px height)
+    // Position view below toolbar (50px height from CSS)
     const updateViewBounds = () => {
         const [width, height] = win.getSize();
-        view.setBounds({ x: 0, y: 60, width: width, height: height - 60 });
+        view.setBounds({ x: 0, y: 50, width: width, height: height - 50 });
     };
     updateViewBounds();
 
