@@ -43,12 +43,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Toggle button
-    toggleBtn.addEventListener('click', async () => {
+    const toggleFoveal = async () => {
         const enabled = await scrutinizer.toggle();
         // toggleBtn.textContent = enabled ? 'Disable Foveal Mode' : 'Enable Foveal Mode'; // Keep icon only
         toggleBtn.classList.toggle('active', enabled);
         statusText.textContent = enabled ? 'Foveal mode active' : 'Foveal mode disabled';
-    });
+    };
+
+    toggleBtn.addEventListener('click', toggleFoveal);
 
     // URL navigation
     const navigate = () => {
@@ -121,13 +123,37 @@ document.addEventListener('DOMContentLoaded', () => {
         // Space to toggle
         if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
             e.preventDefault();
-            toggleBtn.click();
+            toggleFoveal();
         }
 
         // Escape to disable
         if (e.code === 'Escape' && scrutinizer && scrutinizer.enabled) {
-            toggleBtn.click();
+            toggleFoveal();
         }
+    });
+
+    // IPC from main menu
+    const { ipcRenderer } = require('electron');
+
+    // Toggle foveal mode
+    ipcRenderer.on('menu:toggle-foveal', () => {
+        toggleFoveal();
+    });
+
+    // Set foveal radius from menu
+    ipcRenderer.on('menu:set-radius', (_event, radius) => {
+        if (!scrutinizer) return;
+        scrutinizer.config.fovealRadius = radius;
+        radiusSlider.value = radius;
+        radiusValue.textContent = radius + 'px';
+    });
+
+    // Set blur radius from menu
+    ipcRenderer.on('menu:set-blur', (_event, radius) => {
+        if (!scrutinizer) return;
+        scrutinizer.updateBlurRadius(radius);
+        blurSlider.value = radius;
+        blurValue.textContent = radius + 'px';
     });
 
     // Mouse wheel to adjust foveal size

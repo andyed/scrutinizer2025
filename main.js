@@ -1,7 +1,14 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
+const { buildMenuTemplate } = require('./menu-template');
 
 let mainWindow;
+
+function sendToRenderer(channel, ...args) {
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send(channel, ...args);
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -15,6 +22,10 @@ function createWindow() {
   });
 
   mainWindow.loadFile('renderer/index.html');
+
+  const template = buildMenuTemplate(sendToRenderer);
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
 
   // Open DevTools for debugging
   mainWindow.webContents.openDevTools();
