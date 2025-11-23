@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scrutinizer - Foveal Vision Simulator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div id="app">
+    <!-- Top toolbar -->
+    <div id="toolbar">
+      <!-- Nav Controls -->
+      <div class="nav-controls">
+        <button id="back-btn" class="nav-btn" title="Back">
+          <img src="scrutinizer_arrow_back.png" alt="Back">
+        </button>
+        <button id="forward-btn" class="nav-btn" title="Forward">
+          <img src="scrutinizer_arrow_forward.png" alt="Forward">
+        </button>
+      </div>
+
+      <!-- URL Bar -->
+      <div class="url-container">
+        <input type="text" id="url-input" value="https://boxesandarrows.com/icon-analysis/" placeholder="Enter URL">
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="action-controls">
+        <button id="go-btn" class="btn" title="Go/Stop">Go</button>
+        <button id="toggle-btn" class="icon-btn" title="Toggle Foveal Mode">
+          <img src="scrutinizer_logo_eyeball.png" alt="Toggle Foveal Mode" class="eye-logo" />
+        </button>
+      </div>
+    </div>
+
+    <!-- Webview container -->
+    <div id="webview-container">
+      <webview id="webview" src="https://boxesandarrows.com/icon-analysis/" allowpopups preload="./preload.js">
+      </webview>
+
+      <!-- Overlay canvas for foveal effect -->
+      <canvas id="overlay-canvas"></canvas>
+    </div>
+
+    <!-- Status bar -->
+    <div id="status-bar">
+      <span id="status-text">Ready</span>
+
+      <!-- Settings (Sliders) -->
+      <div class="settings-controls">
+        <div class="control-group">
+          <label>Foveal:</label>
+          <input type="range" id="radius-slider" min="20" max="300" value="180" />
+          <span id="radius-value">180px</span>
+        </div>
+        <div class="control-group">
+          <label>Blur:</label>
+          <input type="range" id="blur-slider" min="0" max="30" value="10" />
+          <span id="blur-value">10px</span>
+        </div>
+        <button id="refresh-btn" class="nav-btn" title="Refresh">↻</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="config.js"></script>
+  <script src="image-processor.js"></script>
+  <script src="scrutinizer.js"></script>
+  <script src="app.js"></script>
+</body>
+
+</html>

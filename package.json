@@ -1,0 +1,19 @@
+{
+  "name": "scrutinizer-electron",
+  "version": "1.0.0",
+  "description": "Foveal vision simulator - recreating the 2007 Scrutinizer browser",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging"
+  },
+  "keywords": ["electron", "foveal", "vision", "accessibility"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0"
+  },
+  "dependencies": {
+    "html2canvas": "^1.4.1"
+  }
+}
