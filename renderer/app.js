@@ -110,11 +110,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Listen for keyboard events forwarded from WebContentsView via main process
-    ipcRenderer.on('webview:keydown', (event, keyEvent) => {
-        handleKeyboardShortcut(keyEvent);
-    });
-
     // Keyboard shortcut handler (works for both document and webview events)
     const handleKeyboardShortcut = (e) => {
         // Escape to toggle foveal view on/off
@@ -172,6 +167,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Keyboard shortcuts from document (when focus is on toolbar/UI)
     document.addEventListener('keydown', handleKeyboardShortcut);
+
+    // Listen for keyboard events forwarded from WebContentsView via main process
+    ipcRenderer.on('webview:keydown', (event, keyEvent) => {
+        handleKeyboardShortcut(keyEvent);
+    });
 
     // IPC listeners for main process (menus, settings)
     ipcRenderer.on('settings:radius-options', (event, options) => {
