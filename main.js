@@ -63,6 +63,35 @@ ipcMain.on('window:create', (event, url) => {
     createScrutinizerWindow(url);
 });
 
+// Navigation IPC handlers for WebContentsView
+ipcMain.on('navigate:back', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && win.scrutinizerView) {
+        win.scrutinizerView.webContents.goBack();
+    }
+});
+
+ipcMain.on('navigate:forward', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && win.scrutinizerView) {
+        win.scrutinizerView.webContents.goForward();
+    }
+});
+
+ipcMain.on('navigate:reload', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && win.scrutinizerView) {
+        win.scrutinizerView.webContents.reload();
+    }
+});
+
+ipcMain.on('navigate:to', (event, url) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && win.scrutinizerView) {
+        win.scrutinizerView.webContents.loadURL(url);
+    }
+});
+
 function createScrutinizerWindow(startUrl) {
     console.log('[Main] Creating new Scrutinizer window', startUrl ? 'with URL: ' + startUrl : '(default URL)');
     
@@ -132,6 +161,17 @@ function createScrutinizerWindow(startUrl) {
             height: size.height,
             dirty: dirty
         });
+    });
+
+    // Forward IPC messages from WebContentsView preload to renderer
+    view.webContents.on('ipc-message', (event, channel, ...args) => {
+        if (channel === 'keydown') {
+            win.webContents.send('webview:keydown', args[0]);
+        } else if (channel === 'mousemove') {
+            // Mouse events are handled by renderer's own listeners
+        } else if (channel === 'scroll' || channel === 'mutation' || channel === 'input-change') {
+            // These events trigger paint automatically, no need to forward
+        }
     });
 
     // Set frame rate (60fps for smooth tracking)

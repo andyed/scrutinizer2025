@@ -4,8 +4,8 @@
  */
 
 class Scrutinizer {
-    constructor(webview, config) {
-        this.webview = webview;
+    constructor(config) {
+        // WebContentsView is managed by main process; we receive frames via IPC
         this.config = config;
         this.processor = new ImageProcessor(config);
 
@@ -88,97 +88,46 @@ class Scrutinizer {
         // Window resize handling
         window.addEventListener('resize', this.handleResize);
 
-        // Also track on the webview container specifically
+        // Track on the webview container for overlay mouse events
         const container = document.getElementById('webview-container');
         if (container) {
             container.addEventListener('mousemove', this.handleMouseMove);
         }
 
-        // Webview IPC listeners for mouse, scroll, mutations, and input changes
-        this.webview.addEventListener('ipc-message', (event) => {
-            if (event.channel === 'mousemove') {
-                this.targetMouseX = event.args[0];
-                this.targetMouseY = event.args[1];
-
-                // Debug: log occasionally
-                if (!this.mouseMoveCount) this.mouseMoveCount = 0;
-                this.mouseMoveCount++;
-                if (this.mouseMoveCount % 30 === 0) {
-                    console.log('Mouse from webview IPC:', this.targetMouseX.toFixed(0), this.targetMouseY.toFixed(0));
-                }
-            } else if (event.channel === 'scroll') {
-                this.handleScroll();
-            } else if (event.channel === 'mutation') {
-                this.handleMutation();
-            } else if (event.channel === 'input-change') {
-                console.log('[Scrutinizer] Received input-change event');
-                this.handleInputChange();
-            }
-        });
-
-        // Webview scroll detection and mouse tracking
-        // Note: Mouse tracking is handled by preload.js
-        this.webview.addEventListener('did-finish-load', () => {
-            // Initial capture
-            setTimeout(() => this.captureAndProcess(), 1000);
-        });
+        // IPC listeners for events from WebContentsView (via preload → main → renderer)
+        // These will be wired up in app.js via ipcRenderer.on()
 
 
     }
 
     handleResize() {
-        if (!this.enabled) return;
-
-        // Debounce resize capture
-        if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
-        this.resizeTimeout = setTimeout(() => {
-            this.captureAndProcess();
-        }, 200);
+        // Resize is handled automatically by paint events from WebContentsView
+        // No need to manually trigger capture
     }
 
     handleMouseMove(event) {
-        // Get mouse position relative to the webview container
+        // Get mouse position relative to the canvas
         const rect = this.canvas.getBoundingClientRect();
         this.targetMouseX = event.clientX - rect.left;
         this.targetMouseY = event.clientY - rect.top;
 
-        // Lightly debounce a recapture so foveal content tracks layout
-        if (this.enabled) {
-            if (this.mouseCaptureTimeout) clearTimeout(this.mouseCaptureTimeout);
-            this.mouseCaptureTimeout = setTimeout(() => {
-                this.captureAndProcess();
-            }, 120);
-        }
+        // Mouse tracking updates foveal position in render loop
+        // Paint events from WebContentsView provide frames automatically
     }
 
     handleScroll() {
-        if (!this.enabled) return;
-
-        clearTimeout(this.scrollTimeout);
-        this.scrollTimeout = setTimeout(() => {
-            this.captureAndProcess();
-        }, this.config.scrollDebounce);
+        // Scroll changes trigger paint events automatically from WebContentsView
+        // No manual capture needed
     }
 
     handleMutation() {
-        if (!this.enabled) return;
-
-        clearTimeout(this.mutationTimeout);
-        this.mutationTimeout = setTimeout(() => {
-            this.captureAndProcess();
-        }, this.config.mutationDebounce);
+        // DOM mutations trigger paint events automatically from WebContentsView
+        // No manual capture needed
     }
 
     handleInputChange() {
-        console.log('[Scrutinizer] handleInputChange called, enabled:', this.enabled);
-        if (!this.enabled) return;
-
-        // Short debounce for input changes to provide immediate visual feedback
-        clearTimeout(this.inputTimeout);
-        this.inputTimeout = setTimeout(() => {
-            console.log('[Scrutinizer] Input timeout fired, triggering capture');
-            this.captureAndProcess();
-        }, 50); // 50ms - fast enough to see what you're typing
+        // Input changes trigger paint events automatically from WebContentsView
+        // No manual capture needed
     }
 
     async toggle() {
@@ -200,13 +149,13 @@ class Scrutinizer {
         this.canvas.style.display = 'block';
 
         // Initialize foveal center to canvas center as a safe default
-        const rect = this.webview.getBoundingClientRect();
+        const rect = this.canvas.getBoundingClientRect();
         this.mouseX = rect.width / 2;
         this.mouseY = rect.height / 2;
         this.targetMouseX = this.mouseX;
         this.targetMouseY = this.mouseY;
 
-        await this.captureAndProcess();
+        // Frames will arrive via paint events; just start render loop
         this.startRenderLoop();
     }
 
@@ -249,17 +198,12 @@ class Scrutinizer {
         }
     }
 
-    async captureAndProcess() {
+    processFrame(buffer, width, height) {
         if (this.isCapturing) return;
         this.isCapturing = true;
 
         try {
-            // Resize canvas to match webview
-            const rect = this.webview.getBoundingClientRect();
-            const width = Math.ceil(rect.width);
-            const height = Math.ceil(rect.height);
-
-            // Ensure main canvas matches
+            // Ensure main canvas matches frame size
             if (this.canvas.width !== width || this.canvas.height !== height) {
                 this.canvas.width = width;
                 this.canvas.height = height;
@@ -284,31 +228,30 @@ class Scrutinizer {
                 this.blurredCanvas.height = height;
             }
 
-            // Capture webview content using Electron's native capturePage
-            const image = await this.webview.capturePage();
-            const dataUrl = image.toDataURL();
-
-            // Load captured image
-            const img = new Image();
-            await new Promise((resolve, reject) => {
-                img.onload = resolve;
-                img.onerror = reject;
-                img.src = dataUrl;
-            });
+            // Convert BGRA buffer to ImageData
+            // Note: Electron's toBitmap() returns BGRA, but ImageData expects RGBA
+            // We need to swap R and B channels
+            const imageData = new ImageData(width, height);
+            for (let i = 0; i < buffer.length; i += 4) {
+                imageData.data[i] = buffer[i + 2];     // R = B
+                imageData.data[i + 1] = buffer[i + 1]; // G = G
+                imageData.data[i + 2] = buffer[i];     // B = R
+                imageData.data[i + 3] = buffer[i + 3]; // A = A
+            }
 
             // Draw to offscreen canvases - preserve original for binocular overlay
-            this.originalCtx.clearRect(0, 0, this.originalCanvas.width, this.originalCanvas.height);
+            this.originalCtx.clearRect(0, 0, width, height);
             this.originalCtx.fillStyle = 'white';
-            this.originalCtx.fillRect(0, 0, this.originalCanvas.width, this.originalCanvas.height);
-            this.originalCtx.drawImage(img, 0, 0, this.originalCanvas.width, this.originalCanvas.height);
+            this.originalCtx.fillRect(0, 0, width, height);
+            this.originalCtx.putImageData(imageData, 0, 0);
 
-            this.sharpCtx.clearRect(0, 0, this.sharpCanvas.width, this.sharpCanvas.height);
+            this.sharpCtx.clearRect(0, 0, width, height);
             this.sharpCtx.fillStyle = 'white';
-            this.sharpCtx.fillRect(0, 0, this.sharpCanvas.width, this.sharpCanvas.height);
-            this.sharpCtx.drawImage(img, 0, 0, this.sharpCanvas.width, this.sharpCanvas.height);
+            this.sharpCtx.fillRect(0, 0, width, height);
+            this.sharpCtx.putImageData(imageData, 0, 0);
 
             // Get image data for processing from offscreen canvas
-            let baseData = this.sharpCtx.getImageData(0, 0, this.sharpCanvas.width, this.sharpCanvas.height);
+            let baseData = this.sharpCtx.getImageData(0, 0, width, height);
 
             // Apply desaturation first
             baseData = this.processor.desaturate(baseData);

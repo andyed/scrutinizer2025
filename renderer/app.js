@@ -4,7 +4,6 @@
  */
 
 let scrutinizer;
-let webview;
 
 // Wait for DOM to be ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,8 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const { ipcRenderer } = require('electron');
     let radiusOptions = null;
 
-    // Get elements
-    webview = document.getElementById('webview');
+    // Get elements (no webview element anymore)
     const toggleBtn = document.getElementById('toggle-btn');
     const urlInput = document.getElementById('url-input');
     const navigateBtn = document.getElementById('go-btn');
@@ -68,113 +66,53 @@ document.addEventListener('DOMContentLoaded', () => {
         ipcRenderer.send('settings:enabled-changed', enabled);
     };
 
-    // Initialize Scrutinizer once webview is ready
-    webview.addEventListener('dom-ready', () => {
-        console.log('Webview ready (dom-ready fired)');
-        
-        if (!scrutinizer) {
-            console.log('[Renderer] Initializing new Scrutinizer instance');
-            scrutinizer = new Scrutinizer(webview, CONFIG);
-            statusText.textContent = 'Ready - Press ESC or click Enable to start';
+    // Initialize Scrutinizer immediately (no webview element to wait for)
+    console.log('[Renderer] Initializing new Scrutinizer instance');
+    scrutinizer = new Scrutinizer(CONFIG);
+    statusText.textContent = 'Ready - Press ESC or click Enable to start';
 
-            // Apply pending state if any
-            if (pendingInitState) {
-                console.log('[Renderer] Applying pending init state:', pendingInitState);
-                if (pendingInitState.radius) scrutinizer.updateFovealRadius(pendingInitState.radius);
-                if (pendingInitState.blur) scrutinizer.updateBlurRadius(pendingInitState.blur);
-                if (pendingInitState.enabled) {
-                    console.log('[Renderer] Enabling foveal mode from pending state');
-                    toggleFoveal(true);
-                }
-                if (pendingInitState.showWelcome !== false) welcomePopup.style.display = 'flex';
-                pendingInitState = null;
-            }
-        } else {
-            console.log('[Renderer] Scrutinizer already initialized, skipping re-init');
+    // Wire up frame-captured IPC from main process (paint events)
+    ipcRenderer.on('frame-captured', (event, data) => {
+        if (scrutinizer && scrutinizer.enabled) {
+            // Convert Node Buffer to Uint8Array
+            const buffer = new Uint8Array(data.buffer);
+            scrutinizer.processFrame(buffer, data.width, data.height);
         }
     });
 
-    // Navigation controls
+    // Navigation controls - send to main process which controls the WebContentsView
     backBtn.addEventListener('click', () => {
-        if (webview.canGoBack()) webview.goBack();
+        ipcRenderer.send('navigate:back');
     });
 
     forwardBtn.addEventListener('click', () => {
-        if (webview.canGoForward()) webview.goForward();
+        ipcRenderer.send('navigate:forward');
     });
 
     refreshBtn.addEventListener('click', () => {
-        webview.reload();
+        ipcRenderer.send('navigate:reload');
     });
 
-    // Toggle button click handler
-    toggleBtn.addEventListener('click', () => toggleFoveal());
-
-    // URL navigation
-    const navigate = () => {
-        if (navigateBtn.textContent === 'Stop') {
-            webview.stop();
-            return;
+    navigateBtn.addEventListener('click', () => {
+        const url = urlInput.value.trim();
+        if (url) {
+            // Add protocol if missing
+            const fullUrl = url.startsWith('http') ? url : 'https://' + url;
+            ipcRenderer.send('navigate:to', fullUrl);
+            // Save as start page
+            ipcRenderer.send('settings:page-changed', fullUrl);
         }
+    });
 
-        let url = urlInput.value.trim();
-        if (!url) return;
-
-        // Add protocol if missing
-        if (!url.match(/^https?:\/\//)) {
-            url = 'https://' + url;
-        }
-
-        webview.src = url;
-    };
-
-    navigateBtn.addEventListener('click', navigate);
     urlInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') navigate();
-    });
-
-    // Update status and button when page loads
-    webview.addEventListener('did-start-loading', () => {
-        statusText.textContent = 'Loading...';
-        statusText.classList.add('loading');
-        navigateBtn.textContent = 'Stop';
-    });
-
-    // Intercept new windows (popups) from webview content
-    webview.addEventListener('new-window', (e) => {
-        e.preventDefault(); // Stop default Electron window
-        if (e.url) {
-            ipcRenderer.send('window:create', e.url);
+        if (e.key === 'Enter') {
+            navigateBtn.click();
         }
     });
 
-    // Listen for keyboard events from webview (forwarded by preload.js)
-    webview.addEventListener('ipc-message', (e) => {
-        if (e.channel === 'keydown') {
-            const keyEvent = e.args[0];
-            handleKeyboardShortcut(keyEvent);
-        }
-    });
-
-    webview.addEventListener('did-stop-loading', () => {
-        statusText.textContent = 'Page loaded';
-        statusText.classList.remove('loading');
-        const url = webview.getURL();
-        urlInput.value = url;
-        navigateBtn.textContent = 'Go';
-        
-        // Save current page as start page for next launch
-        if (url && url.startsWith('http')) {
-            ipcRenderer.send('settings:page-changed', url);
-        }
-    });
-
-    webview.addEventListener('did-fail-load', (event) => {
-        if (event.errorCode !== -3) { // Ignore aborted loads
-            statusText.textContent = 'Failed to load page';
-            statusText.classList.remove('loading');
-        }
-        navigateBtn.textContent = 'Go';
+    // Listen for keyboard events forwarded from WebContentsView via main process
+    ipcRenderer.on('webview:keydown', (event, keyEvent) => {
+        handleKeyboardShortcut(keyEvent);
     });
 
     // Keyboard shortcut handler (works for both document and webview events)
@@ -235,62 +173,29 @@ document.addEventListener('DOMContentLoaded', () => {
     // Keyboard shortcuts from document (when focus is on toolbar/UI)
     document.addEventListener('keydown', handleKeyboardShortcut);
 
-    // IPC listeners for main process (menus, popups)
+    // IPC listeners for main process (menus, settings)
     ipcRenderer.on('settings:radius-options', (event, options) => {
         radiusOptions = Array.isArray(options) && options.length ? options.slice().sort((a, b) => a - b) : null;
     });
 
-    // Initialize state from main process (new windows inherit settings)
     ipcRenderer.on('settings:init-state', (event, state) => {
-        console.log('[Renderer] Received settings:init-state', state);
-        if (scrutinizer) {
-            console.log('[Renderer] Scrutinizer ready, applying settings immediately');
-            if (state.radius) scrutinizer.updateFovealRadius(state.radius);
-            if (state.blur) scrutinizer.updateBlurRadius(state.blur);
-            
-            // Apply enabled state
-            if (state.enabled) {
-                console.log('[Renderer] Enabling foveal mode');
-                toggleFoveal(true);
-            }
-
-            // Show welcome popup if enabled
-            if (state.showWelcome !== false) {
-                welcomePopup.style.display = 'flex';
-            }
-        } else {
-            console.log('[Renderer] Scrutinizer NOT ready, queuing settings');
-            // Store for initialization
-            pendingInitState = state;
-        }
+        console.log('[Renderer] Received init-state:', state);
+        // Apply immediately since scrutinizer is already initialized
+        if (state.radius) scrutinizer.updateFovealRadius(state.radius);
+        if (state.blur) scrutinizer.updateBlurRadius(state.blur);
+        if (state.enabled) toggleFoveal(true);
+        if (state.showWelcome !== false) welcomePopup.style.display = 'flex';
     });
 
-    // Toggle foveal mode
+    // Menu IPC handlers
     ipcRenderer.on('menu:toggle-foveal', () => {
-        toggleFoveal();
+        if (scrutinizer) toggleFoveal();
     });
 
-    // Listen for menu commands
-    ipcRenderer.on('menu:set-radius', (event, value) => {
-        scrutinizer.updateFovealRadius(value);
-        // Notify main process to update menu checkmarks
-        ipcRenderer.send('settings:radius-changed', value);
-    });
-
-    // Set blur radius from menu
-    ipcRenderer.on('menu:set-blur', (event, value) => {
-        scrutinizer.updateBlurRadius(value);
-        // Notify main process to update menu checkmarks
-        ipcRenderer.send('settings:blur-changed', value);
-    });
-
-    // Navigate popup windows: main process sends 'popup:navigate' with URL
-    ipcRenderer.on('popup:navigate', (event, url) => {
-        if (webview) {
-            webview.loadURL(url);
-        }
-        if (urlInput) {
-            urlInput.value = url;
+    ipcRenderer.on('menu:set-radius', (event, radius) => {
+        if (scrutinizer) {
+            scrutinizer.updateFovealRadius(radius);
+            ipcRenderer.send('settings:radius-changed', radius);
         }
     });
 
