@@ -8,7 +8,9 @@
     "dev": "electron . --enable-logging",
     "build": "electron-builder --mac",
     "build:unsigned": "electron-builder --mac --config.mac.identity=null",
-    "release": "electron-builder --mac --publish always"
+    "release": "electron-builder --mac --publish always",
+    "build:win": "electron-builder --win",
+    "release:win": "electron-builder --win --publish always"
   },
   "keywords": [
     "electron",
@@ -43,6 +45,18 @@
       "sign": false,
       "title": "Scrutinizer ${version}",
       "icon": "renderer/scrutinizer_512x512_icon.png"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "icon": "renderer/scrutinizer_512x512_icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
     },
     "publish": {
       "provider": "github",

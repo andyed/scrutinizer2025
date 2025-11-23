@@ -62,7 +62,32 @@ Scrutinizer strips away the brain's post-processing to reveal the raw data your 
 - 🎚️ **Menu-based controls** for radius and blur presets
 - ⚡ **Web Worker** for non-blocking blur computation
 
-## Installation
+## Download & Installation
+
+### macOS (Recommended for most users)
+
+1. **Download** the latest `.dmg` from GitHub Releases:
+   - https://github.com/andyed/scrutinizer2025/releases/latest
+2. **Open the DMG** and drag **Scrutinizer** into your `Applications` folder.
+3. **First launch on macOS** (unsigned app):
+   - In Finder, right-click (or Ctrl+click) **Scrutinizer.app** → **Open**
+   - macOS will warn that this is from an unidentified developer
+   - Click **Open** to trust it
+
+After the first run, you can launch Scrutinizer normally from Spotlight or Launchpad.
+
+### Windows
+
+1. **Download** the latest Windows installer (`Scrutinizer Setup ... .exe`) from:
+   - https://github.com/andyed/scrutinizer2025/releases/latest
+2. Run the installer. On first run, Windows SmartScreen may warn that the app is from an unknown publisher (unsigned build).
+3. In the SmartScreen dialog:
+   - Click **More info**
+   - Click **Run anyway**
+
+Once installed, you can launch Scrutinizer from the Start Menu like any other app.
+
+### Developer Setup (run from source)
 
 ```bash
 # Install dependencies
