@@ -7,6 +7,7 @@ const settingsManager = require('./settings-manager');
 let currentRadius;
 let currentBlur;
 let currentEnabled;
+let currentShowWelcome;
 
 let mainWindow;
 
@@ -42,6 +43,11 @@ ipcMain.on('settings:enabled-changed', (event, enabled) => {
     currentEnabled = enabled;
     settingsManager.set('enabled', enabled);
     // rebuildMenu(); // If menu had a toggle state, we'd update it here
+});
+
+ipcMain.on('settings:welcome-changed', (event, show) => {
+    currentShowWelcome = show;
+    settingsManager.set('showWelcomePopup', show);
 });
 
 ipcMain.on('window:create', (event, url) => {
@@ -87,7 +93,8 @@ function createScrutinizerWindow(startUrl) {
         win.webContents.send('settings:init-state', {
             radius: currentRadius,
             blur: currentBlur,
-            enabled: currentEnabled
+            enabled: currentEnabled,
+            showWelcome: currentShowWelcome
         });
     });
 
@@ -112,6 +119,7 @@ function createWindow() {
     currentRadius = settingsManager.get('radius');
     currentBlur = settingsManager.get('blur');
     currentEnabled = settingsManager.get('enabled');
+    currentShowWelcome = settingsManager.get('showWelcomePopup');
 
     mainWindow = createScrutinizerWindow();
 

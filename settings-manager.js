@@ -9,7 +9,8 @@ class SettingsManager {
         this.defaults = {
             radius: 180,
             blur: 10,
-            enabled: false,
+            enabled: true, // Default to enabled
+            showWelcomePopup: true, // Default to showing popup
             windowBounds: { width: 1200, height: 900 }
         };
     }

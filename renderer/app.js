@@ -19,6 +19,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const forwardBtn = document.getElementById('forward-btn');
     const refreshBtn = document.getElementById('refresh-btn');
     const statusText = document.getElementById('status-text');
+    
+    // Welcome Popup elements
+    const welcomePopup = document.getElementById('welcome-popup');
+    const closePopupBtn = document.getElementById('close-popup');
+    const dontShowCheckbox = document.getElementById('dont-show-again');
+
+    const closePopup = () => {
+        welcomePopup.style.display = 'none';
+        // If "Don't show again" is checked, update settings
+        if (dontShowCheckbox.checked) {
+            ipcRenderer.send('settings:welcome-changed', false);
+        }
+    };
+
+    closePopupBtn.addEventListener('click', closePopup);
 
     let pendingInitState = null;
 
@@ -33,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (pendingInitState.radius) scrutinizer.updateFovealRadius(pendingInitState.radius);
             if (pendingInitState.blur) scrutinizer.updateBlurRadius(pendingInitState.blur);
             if (pendingInitState.enabled) toggleFoveal(true);
+            if (pendingInitState.showWelcome !== false) welcomePopup.style.display = 'flex';
             pendingInitState = null;
         }
     });
@@ -135,9 +151,13 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleFoveal();
         }
 
-        // Escape to disable
-        if (e.code === 'Escape' && scrutinizer && scrutinizer.enabled) {
-            toggleFoveal();
+        // Escape to close popup or disable foveal mode
+        if (e.code === 'Escape') {
+            if (welcomePopup.style.display !== 'none') {
+                closePopup();
+            } else if (scrutinizer && scrutinizer.enabled) {
+                toggleFoveal();
+            }
         }
     });
 
@@ -158,6 +178,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // Apply enabled state
             if (state.enabled) {
                 toggleFoveal(true);
+            }
+
+            // Show welcome popup if enabled
+            if (state.showWelcome !== false) {
+                welcomePopup.style.display = 'flex';
             }
         } else {
             // Store for initialization
