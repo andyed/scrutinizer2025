@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // IPC from main menu
+    // IPC from main process (menus, popups)
     const { ipcRenderer } = require('electron');
 
     // Toggle foveal mode
@@ -129,6 +129,16 @@ document.addEventListener('DOMContentLoaded', () => {
         scrutinizer.updateBlurRadius(value);
         // Notify main process to update menu checkmarks
         ipcRenderer.send('settings:blur-changed', value);
+    });
+
+    // Navigate popup windows: main process sends 'popup:navigate' with URL
+    ipcRenderer.on('popup:navigate', (event, url) => {
+        if (webview) {
+            webview.loadURL(url);
+        }
+        if (urlInput) {
+            urlInput.value = url;
+        }
     });
 
     // Mouse wheel to adjust foveal size when holding Alt/Option

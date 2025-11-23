@@ -31,10 +31,10 @@ ipcMain.on('settings:blur-changed', (event, blur) => {
     rebuildMenu();
 });
 
-function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 1000,
+function createScrutinizerWindow(startUrl) {
+  const win = new BrowserWindow({
+    width: 1200,
+    height: 900,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -42,13 +42,38 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile('renderer/index.html');
+  win.loadFile('renderer/index.html');
+
+  // Once renderer is ready, tell it to navigate the webview
+  if (startUrl) {
+    win.webContents.once('did-finish-load', () => {
+      win.webContents.send('popup:navigate', startUrl);
+    });
+  }
+
+  win.on('closed', () => {
+    // Let GC reclaim window; nothing else to do
+  });
+
+  return win;
+}
+
+function createWindow() {
+  mainWindow = createScrutinizerWindow();
 
   // Build and set application menu
   rebuildMenu();
 
   // Open DevTools for debugging
   mainWindow.webContents.openDevTools();
+
+  // Intercept popups from the main window's web contents
+  if (mainWindow && mainWindow.webContents && mainWindow.webContents.setWindowOpenHandler) {
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+      createScrutinizerWindow(url);
+      return { action: 'deny' };
+    });
+  }
 
   mainWindow.on('closed', function () {
     mainWindow = null;
