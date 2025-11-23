@@ -2,7 +2,7 @@
 
 # Scrutinizer - Foveal Vision Simulator
 
-A modern recreation of the 2007 Scrutinizer vision-simulating browser, built with Electron and Canvas API.
+A modern recreation of the 2007 Scrutinizer vision-simulating browser, built with Electron and the Canvas API, and positioned as a **design constraint model** for studying foveal vs. peripheral vision on the web.
 
 **Original project:** https://github.com/andyed/scrutinizer  
 
@@ -13,12 +13,14 @@ Scrutinizer simulates **foveal vision** - how your eyes actually see the world:
 - **Fovea (center)**: Sharp, full-color vision in a small area (~2° of visual field)
 - **Periphery**: Blurred and desaturated everywhere else
 
-This simulates what your brain is actually seeing at any moment in time -- high res and color for a small angle of vision, and lower resolution with less color in the wider angles.
+This approximates what reaches the eye at any moment in time: high resolution and color for a small angle of vision, and lower resolution with less color in the wider angles.
+
+While the perceptual experience of vision feels stable and continuous, the underlying physiology is highly inhomogeneous. Scrutinizer approximates the **retinal input constraint** (what reaches the eye), not the full cognitive integration the brain performs across eye movements. It is best understood as a **simulation of visual constraint**, not a literal recreation of subjective experience.
 
 ### What's it for?
-- In general, raising consciousness on the importance of visual design
-- Studying how your page design enables visual search
-- Observing users while using the browser to better enable you to understand their thought process
+- Using foveal/peripheral constraints as a **design stress test** for layouts and iconography
+- Evaluating how well a page **supports visual search and peripheral guidance** (can users find what matters when detail is limited?)
+- Providing observers and designers with a **qualitative window into constrained perception**, complementary to eye-tracking metrics rather than a replacement for them
 
 ## Features
 
@@ -46,16 +48,29 @@ npm start
 
 ## Usage
 
-1. **Navigate**: Enter a URL in the address bar and click "Go"
-2. **Enable**: Click "Enable Foveal Mode" or press `Space`
-3. **Adjust**: Use the slider or mouse wheel to change foveal size
-4. **Explore**: Move your mouse to see the foveal effect in action
+1. **Navigate**: Enter a URL in the address bar and click **Go**
+2. **Enable**: Click the eye icon or press `Space` to toggle foveal mode
+3. **Adjust**:
+   - Use the **View → Foveal Radius** menu to pick a radius preset
+   - Use **View → Blur Amount** to adjust peripheral blur
+   - Or hold `Alt` and use the **mouse wheel** while foveal mode is enabled
+4. **Observe**: Watch how easily key elements can be located using mostly peripheral vision
 
 ### Keyboard Shortcuts
 
 - `Space` - Toggle foveal mode on/off
 - `Escape` - Disable foveal mode
-- `Mouse Wheel` - Adjust foveal radius (when enabled)
+- `Mouse Wheel` (with `Alt`) - Adjust foveal radius (when enabled)
+
+## Limitations
+
+Scrutinizer is intentionally **approximate**:
+
+- It models **retinal input constraints** (blur/desaturation outside a foveal region), not the brain's transsaccadic integration that stabilizes perception.
+- It assumes a fixed relationship between screen pixels and **visual angle**; without calibration for viewing distance and display size, the simulated fovea may be larger or smaller than a physiological 1–2°.
+- Inter-individual biometric differences (eye geometry, etc.) are not modeled.
+
+As a result, Scrutinizer should be used as a **design constraint model and empathy tool**, not as a precise physiological instrument. It is ideal for stress-testing layouts and peripheral guidance, and should be complemented with real user studies when high-fidelity validation is needed.
 
 ## Technical Details
 
@@ -159,13 +174,17 @@ Edit `renderer/config.js` to customize:
 - `scrollDebounce`: Scroll event delay (default: 150ms)
 - `mutationDebounce`: DOM change delay (default: 200ms)
 
-## Related Works
+## Related Work
 
-- **Commercial Service**: http://www.attensee.com
-- **Academic Work**:
-  - Alex Faaborg's MS Work: http://alumni.media.mit.edu/~faaborg/research/cornell/cg_fovealvision_site/index.htm (2001)
-  - D. Lagun, E. Agichtein, "ViewSer: A Tool for Large-Scale Studies of Web Search Result Examination", CHI 2011
-  - The Flashlight Project @ http://vlab.ethz.ch/flashlight/index.php
+- **Commercial service**  
+  - Attensee: http://www.attensee.com
+
+- **Academic and research tools**  
+  - Alex Faaborg, *Icon Analysis* (Cornell MS): http://alumni.media.mit.edu/~faaborg/research/cornell/cg_fovealvision_site/index.htm (2001)  
+  - D. Lagun, E. Agichtein, *ViewSer: A tool for large-scale remote studies of web search result examination*, CHI 2011  
+  - Flashlight Project (ETH Zürich): http://vlab.ethz.ch/flashlight/index.php  
+
+Scrutinizer2025 follows this lineage but focuses on **pixel-level, gaze-contingent masking** as an approximation of retinal constraints for design evaluation.
 
 ## Contributors
 

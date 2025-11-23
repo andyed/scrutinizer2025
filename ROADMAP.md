@@ -203,6 +203,18 @@ For large/complex pages:
 - Session recording/playback
 - Heatmap generation from usage data
 
+### Simulation Fidelity
+
+- **Progressive eccentricity-based blur**
+  - Replace the hard transition between sharp foveal region and uniformly blurred periphery with a gradual acuity falloff that better matches empirical eccentricity curves.
+  - Use a radial weight field centered on the current fixation to blend multiple resolution layers (sharp + low-pass images), so blur strength increases with distance from the fovea.
+  - Parameterize inner/outer radii in visual-angle terms once calibration exists.
+
+- **Magnocellular-preserving low-pass filter**
+  - Ensure the peripheral filter behaves like a Magnocellular-preserving low-pass, not a generic blur that wipes out all structure.
+  - Specifically attenuate high spatial frequencies (fine detail, text) while preserving low spatial frequencies (gross shape and luminance contrast) that drive peripheral guidance.
+  - Explore multi-scale decompositions (e.g., Laplacian/wavelet-style pyramids) to suppress higher bands while retaining low-frequency content, guided by psychophysical data.
+
 #### Analytics (Optional)
 - Anonymous usage statistics
 - Crash reporting (Sentry, etc.)

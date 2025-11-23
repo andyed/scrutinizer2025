@@ -219,7 +219,7 @@ class Scrutinizer {
             // Apply desaturation
             imageData = this.processor.desaturate(imageData);
 
-            // Apply blur
+            // Apply uniform blur across the entire image
             imageData = this.processor.blur(imageData, this.config.blurRadius);
 
             // Store processed image in offscreen canvas

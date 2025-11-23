@@ -97,8 +97,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-        // Space to toggle
-        if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
+        // Option+Space (Alt+Space on Windows) to toggle
+        if (e.code === 'Space' && (e.altKey || e.metaKey) && e.target.tagName !== 'INPUT') {
             e.preventDefault();
             toggleFoveal();
         }
@@ -129,10 +129,10 @@ document.addEventListener('DOMContentLoaded', () => {
         scrutinizer.updateBlurRadius(radius);
     });
 
-    // Mouse wheel to adjust foveal size
+    // Mouse wheel to adjust foveal size when holding Alt/Option
     document.addEventListener('wheel', (e) => {
         if (scrutinizer && scrutinizer.enabled && e.altKey) {
-            e.preventDefault();
+            e.preventDefault(); // prevent page scroll while adjusting radius
             const delta = e.deltaY > 0 ? -5 : 5;
             scrutinizer.updateFovealRadius(delta);
         }
