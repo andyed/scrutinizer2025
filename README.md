@@ -58,7 +58,7 @@ Scrutinizer strips away the brain's post-processing to reveal the raw data your 
 - 🧬 **ColorMatrix luminance weights** preserved for accurate grayscale conversion
 - 📜 **Scroll detection** with automatic recapture
 - 🔄 **DOM mutation detection** for dynamic content
-- ⌨️ **Keyboard shortcuts** (Alt+Space to toggle, Alt+wheel to adjust size)
+- ⌨️ **Keyboard shortcuts** (ESC to toggle, Left/Right arrows to adjust size)
 - 🎚️ **Menu-based controls** for radius and blur presets
 - ⚡ **Web Worker** for non-blocking blur computation
 
@@ -75,20 +75,20 @@ npm start
 ## Usage
 
 1. **Navigate**: Enter a URL in the address bar and click **Go**
-2. **Enable**: Click the eye icon or press `Space` to toggle foveal mode
+2. **Enable**: Click the eye icon or press `Escape` to toggle foveal mode
 3. **Adjust**:
    - Use the **View → Foveal Radius** menu to pick a radius preset
    - Use **View → Blur Amount** to adjust peripheral blur
-   - Or hold `Alt` and use the **mouse wheel** while foveal mode is enabled
+   - Or use **Left/Right arrow keys** (<>) while foveal mode is enabled
 4. **Observe**: Watch how easily key elements can be located using mostly peripheral vision
 
 ### Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
-| `Space` | Toggle foveal mode on/off |
-| `Escape` | Disable foveal mode |
-| `Alt` + `Scroll` | Adjust foveal radius |
+| `Escape` | Toggle foveal mode on/off |
+| `Right Arrow` (>) | Increase foveal radius (when foveal mode is enabled) |
+| `Left Arrow` (<) | Decrease foveal radius (when foveal mode is enabled) |
 
 ## Limitations
 

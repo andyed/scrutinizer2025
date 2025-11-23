@@ -108,7 +108,7 @@ function createScrutinizerWindow(startUrl) {
             enabled: currentEnabled,
             showWelcome: currentShowWelcome
         };
-        console.log('[Main] Sending state:', state);
+        console.log('[Main] Sending state to new window:', JSON.stringify(state));
         win.webContents.send('settings:init-state', state);
     });
 
@@ -130,10 +130,10 @@ function createWindow() {
     // Initialize settings manager
     settingsManager.init();
     
-    // Load saved settings
+    // Load saved settings with defaults
     currentRadius = settingsManager.get('radius');
     currentBlur = settingsManager.get('blur');
-    currentEnabled = settingsManager.get('enabled');
+    currentEnabled = settingsManager.get('enabled') !== undefined ? settingsManager.get('enabled') : false;
     currentShowWelcome = settingsManager.get('showWelcomePopup');
     currentStartPage = settingsManager.get('startPage');
 

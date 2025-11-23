@@ -10,6 +10,10 @@ let webview;
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Initializing Scrutinizer...');
 
+    // IPC from main process
+    const { ipcRenderer } = require('electron');
+    let radiusOptions = null;
+
     // Get elements
     webview = document.getElementById('webview');
     const toggleBtn = document.getElementById('toggle-btn');
@@ -37,6 +41,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let pendingInitState = null;
 
+    // Toggle foveal mode function (defined early so it can be used in event handlers)
+    const toggleFoveal = async (forceState = null) => {
+        if (!scrutinizer) {
+            console.warn('[Renderer] Cannot toggle - scrutinizer not initialized');
+            return;
+        }
+        
+        let enabled;
+        if (forceState !== null) {
+            if (forceState) {
+                await scrutinizer.enable();
+                enabled = true;
+            } else {
+                await scrutinizer.disable();
+                enabled = false;
+            }
+        } else {
+            enabled = await scrutinizer.toggle();
+        }
+        
+        toggleBtn.classList.toggle('active', enabled);
+        statusText.textContent = enabled ? 'Foveal mode active' : 'Foveal mode disabled';
+        
+        // Notify main process of state change so new windows inherit it
+        ipcRenderer.send('settings:enabled-changed', enabled);
+    };
+
     // Initialize Scrutinizer once webview is ready
     webview.addEventListener('dom-ready', () => {
         console.log('Webview ready (dom-ready fired)');
@@ -44,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!scrutinizer) {
             console.log('[Renderer] Initializing new Scrutinizer instance');
             scrutinizer = new Scrutinizer(webview, CONFIG);
-            statusText.textContent = 'Ready - Press Option+Space or click Enable to start';
+            statusText.textContent = 'Ready - Press ESC or click Enable to start';
 
             // Apply pending state if any
             if (pendingInitState) {
@@ -76,28 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
         webview.reload();
     });
 
-    // Toggle button
-    const toggleFoveal = async (forceState = null) => {
-        let enabled;
-        if (forceState !== null) {
-            if (forceState) {
-                await scrutinizer.enable();
-                enabled = true;
-            } else {
-                await scrutinizer.disable();
-                enabled = false;
-            }
-        } else {
-            enabled = await scrutinizer.toggle();
-        }
-        
-        toggleBtn.classList.toggle('active', enabled);
-        statusText.textContent = enabled ? 'Foveal mode active' : 'Foveal mode disabled';
-        
-        // Notify main process of state change so new windows inherit it
-        ipcRenderer.send('settings:enabled-changed', enabled);
-    };
-
+    // Toggle button click handler
     toggleBtn.addEventListener('click', () => toggleFoveal());
 
     // URL navigation
@@ -138,6 +148,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Listen for keyboard events from webview (forwarded by preload.js)
+    webview.addEventListener('ipc-message', (e) => {
+        if (e.channel === 'keydown') {
+            const keyEvent = e.args[0];
+            handleKeyboardShortcut(keyEvent);
+        }
+    });
+
     webview.addEventListener('did-stop-loading', () => {
         statusText.textContent = 'Page loaded';
         statusText.classList.remove('loading');
@@ -159,28 +177,65 @@ document.addEventListener('DOMContentLoaded', () => {
         navigateBtn.textContent = 'Go';
     });
 
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-        // Option+Space (Alt+Space on Windows) to toggle
-        if (e.code === 'Space' && (e.altKey || e.metaKey) && e.target.tagName !== 'INPUT') {
-            e.preventDefault();
-            toggleFoveal();
-        }
-
-        // Escape to close popup or disable foveal mode
+    // Keyboard shortcut handler (works for both document and webview events)
+    const handleKeyboardShortcut = (e) => {
+        // Escape to toggle foveal view on/off
         if (e.code === 'Escape') {
             if (welcomePopup.style.display !== 'none') {
                 closePopup();
-            } else if (scrutinizer && scrutinizer.enabled) {
+            } else {
+                // Always try to toggle, toggleFoveal has its own guard
+                if (e.preventDefault) e.preventDefault();
                 toggleFoveal();
             }
+            return;
         }
-    });
 
-    // IPC from main process (menus, popups)
-    const { ipcRenderer } = require('electron');
-    let radiusOptions = null;
+        // Left/Right arrows (<>) to adjust fovea size (only when foveal mode is active)
+        if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+            // Skip if typing in input field
+            if (e.target && e.target.tagName === 'INPUT') return;
+            
+            if (scrutinizer && scrutinizer.enabled) {
+                if (e.preventDefault) e.preventDefault();
 
+                const radiusSteps = (radiusOptions && radiusOptions.length) ? radiusOptions : [100, 180, 250];
+                const currentRadius = scrutinizer.config.fovealRadius;
+
+                let currentIndex = radiusSteps.findIndex(r => r === currentRadius);
+                if (currentIndex === -1) {
+                    let nearestIndex = 0;
+                    let nearestDiff = Math.abs(currentRadius - radiusSteps[0]);
+                    for (let i = 1; i < radiusSteps.length; i++) {
+                        const diff = Math.abs(currentRadius - radiusSteps[i]);
+                        if (diff < nearestDiff) {
+                            nearestDiff = diff;
+                            nearestIndex = i;
+                        }
+                    }
+                    currentIndex = nearestIndex;
+                }
+
+                // Right arrow (>) increases, Left arrow (<) decreases
+                const direction = e.code === 'ArrowRight' ? 1 : -1;
+                let nextIndex = currentIndex;
+                if (direction > 0 && currentIndex < radiusSteps.length - 1) {
+                    nextIndex = currentIndex + 1;
+                } else if (direction < 0 && currentIndex > 0) {
+                    nextIndex = currentIndex - 1;
+                }
+
+                const newRadius = radiusSteps[nextIndex];
+                scrutinizer.updateFovealRadius(newRadius);
+                ipcRenderer.send('settings:radius-changed', newRadius);
+            }
+        }
+    };
+
+    // Keyboard shortcuts from document (when focus is on toolbar/UI)
+    document.addEventListener('keydown', handleKeyboardShortcut);
+
+    // IPC listeners for main process (menus, popups)
     ipcRenderer.on('settings:radius-options', (event, options) => {
         radiusOptions = Array.isArray(options) && options.length ? options.slice().sort((a, b) => a - b) : null;
     });
@@ -239,42 +294,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Mouse wheel to adjust foveal size when holding Alt/Option or Cmd
-    document.addEventListener('wheel', (e) => {
-        if (scrutinizer && scrutinizer.enabled && (e.altKey || e.metaKey)) {
-            e.preventDefault();
-
-            const radiusSteps = (radiusOptions && radiusOptions.length) ? radiusOptions : [100, 180, 250];
-            const currentRadius = scrutinizer.config.fovealRadius;
-
-            let currentIndex = radiusSteps.findIndex(r => r === currentRadius);
-            if (currentIndex === -1) {
-                let nearestIndex = 0;
-                let nearestDiff = Math.abs(currentRadius - radiusSteps[0]);
-                for (let i = 1; i < radiusSteps.length; i++) {
-                    const diff = Math.abs(currentRadius - radiusSteps[i]);
-                    if (diff < nearestDiff) {
-                        nearestDiff = diff;
-                        nearestIndex = i;
-                    }
-                }
-                currentIndex = nearestIndex;
-            }
-
-            const direction = e.deltaY > 0 ? 1 : -1;
-            let nextIndex = currentIndex;
-            if (direction > 0 && currentIndex < radiusSteps.length - 1) {
-                nextIndex = currentIndex + 1;
-            } else if (direction < 0 && currentIndex > 0) {
-                nextIndex = currentIndex - 1;
-            }
-
-            const newRadius = radiusSteps[nextIndex];
-
-            scrutinizer.updateFovealRadius(newRadius);
-            ipcRenderer.send('settings:radius-changed', newRadius);
-        }
-    }, { passive: false });
 
     console.log('Scrutinizer initialized');
 });
