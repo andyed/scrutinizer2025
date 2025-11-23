@@ -590,11 +590,8 @@ class Scrutinizer {
     updateBlurRadius(radius) {
         this.config.blurRadius = radius;
 
-        // Debounce reprocessing to avoid lag while dragging slider
-        if (this.blurUpdateTimeout) clearTimeout(this.blurUpdateTimeout);
-        this.blurUpdateTimeout = setTimeout(() => {
-            this.captureAndProcess();
-        }, 100);
+        // Paint events will automatically use the new blur radius
+        // No need to manually trigger capture
     }
 }
 
