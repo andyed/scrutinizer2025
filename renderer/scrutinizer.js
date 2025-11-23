@@ -43,6 +43,10 @@ class Scrutinizer {
         this.isCapturing = false;
         this.processedImage = null; // Blurred/desaturated background
 
+        // Track blur jobs so we can ignore stale worker results when blur
+        // radius or content changes rapidly while foveal mode is active.
+        this.blurJobId = 0;
+
         // Web Worker for blur computation
         if (this.config.useFoveatedBlur) {
             this.blurWorker = new Worker('blur-worker.js');
@@ -192,6 +196,13 @@ class Scrutinizer {
     }
 
     handleWorkerMessage(e) {
+        // Ignore stale worker results that belong to an older blur job.
+        if (typeof e.data.jobId === 'number' && e.data.jobId !== this.blurJobId) {
+            // Still clear capturing flag so future captures are not blocked.
+            this.isCapturing = false;
+            return;
+        }
+
         if (e.data.success) {
             if (e.data.pyramid) {
                 // Store multi-level pyramid
@@ -280,14 +291,26 @@ class Scrutinizer {
             // Apply desaturation first
             baseData = this.processor.desaturate(baseData);
 
-            if (this.config.useFoveatedBlur) {
+            // For very small blur radii (e.g., the "Light" preset), the
+            // foveated multi-level path can introduce visual artifacts
+            // without adding much perceptual benefit. In that case fall
+            // back to the stable uniform blur path.
+            const useFoveatedForThisFrame = this.config.useFoveatedBlur && this.config.blurRadius >= 8;
+
+            if (useFoveatedForThisFrame) {
                 // Hybrid path: simplified blur + real-time compositing
                 // Store sharp (desaturated) version immediately
                 this.sharpCtx.putImageData(baseData, 0, 0);
                 this.hasProcessedImage = true; // Allow rendering with just sharp while blur computes
 
+                // Invalidate any previous blur pyramid; until the new blur
+                // completes we fall back to drawing only the sharp layer.
+                this.hasPyramid = false;
+
                 // Offload blur pyramid to Web Worker (non-blocking)
                 if (this.blurWorker) {
+                    // Bump job id so we can ignore out-of-order worker results.
+                    const jobId = ++this.blurJobId;
                     const blurInput = new ImageData(
                         new Uint8ClampedArray(baseData.data), 
                         baseData.width, 
@@ -296,7 +319,8 @@ class Scrutinizer {
                     this.blurWorker.postMessage({
                         imageData: blurInput,
                         baseBlurRadius: this.config.blurRadius,
-                        buildPyramid: true
+                        buildPyramid: true,
+                        jobId
                     }, [blurInput.data.buffer]);
                     // Worker will call handleWorkerMessage when done
                     return; // Don't set isCapturing = false yet

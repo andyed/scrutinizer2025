@@ -10,7 +10,7 @@ importScripts('image-processor.js', 'config.js');
 const processor = new ImageProcessor(CONFIG);
 
 self.onmessage = function(e) {
-    const { imageData, baseBlurRadius, buildPyramid } = e.data;
+    const { imageData, baseBlurRadius, buildPyramid, jobId } = e.data;
     
     try {
         if (buildPyramid) {
@@ -42,7 +42,8 @@ self.onmessage = function(e) {
             // Send all levels back with transferable buffers
             self.postMessage({ 
                 success: true,
-                pyramid: levels
+                pyramid: levels,
+                jobId
             }, levels.map(l => l.data.buffer));
             
         } else {
@@ -51,7 +52,8 @@ self.onmessage = function(e) {
             
             self.postMessage({ 
                 success: true,
-                blurred: blurred 
+                blurred: blurred,
+                jobId
             }, [blurred.data.buffer]);
         }
         
