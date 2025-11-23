@@ -20,7 +20,10 @@ const CONFIG = {
     captureScale: 1.0, // scale factor for capture (lower = faster but less quality)
 
     // Animation settings
-    maskSmoothness: 1 //0.5, // 0-1, higher = more responsive (0.2 = smooth but laggy, 1.0 = instant)
+    maskSmoothness: 1, // 0-1, higher = more responsive (0.2 = smooth but laggy, 1.0 = instant)
+
+    // Experimental settings
+    useFoveatedBlur: true // when true, use multi-resolution foveated blur instead of uniform blur
 };
 
 if (typeof module !== 'undefined' && module.exports) {

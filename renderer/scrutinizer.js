@@ -14,6 +14,9 @@ class Scrutinizer {
         this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
 
         // Offscreen canvases for rendering
+        this.originalCanvas = document.createElement('canvas');
+        this.originalCtx = this.originalCanvas.getContext('2d', { willReadFrequently: true });
+
         this.sharpCanvas = document.createElement('canvas');
         this.sharpCtx = this.sharpCanvas.getContext('2d', { willReadFrequently: true });
 
@@ -26,10 +29,29 @@ class Scrutinizer {
         this.blurredCanvas = document.createElement('canvas');
         this.blurredCtx = this.blurredCanvas.getContext('2d', { willReadFrequently: true });
 
+        // Multi-level blur pyramid canvases for progressive filtering
+        this.pyramidCanvases = [];
+        this.pyramidCtxs = [];
+        for (let i = 0; i < 3; i++) {
+            const canvas = document.createElement('canvas');
+            this.pyramidCanvases.push(canvas);
+            this.pyramidCtxs.push(canvas.getContext('2d', { willReadFrequently: true }));
+        }
+
         // State
         this.enabled = false;
         this.isCapturing = false;
         this.processedImage = null; // Blurred/desaturated background
+
+        // Web Worker for blur computation
+        if (this.config.useFoveatedBlur) {
+            this.blurWorker = new Worker('blur-worker.js');
+            this.blurWorker.onmessage = this.handleWorkerMessage.bind(this);
+            this.blurWorker.onerror = (error) => {
+                console.error('Blur worker error:', error);
+                this.blurWorker = null; // Fallback to main thread
+            };
+        }
 
         // Mouse tracking
         this.mouseX = 0;
@@ -152,6 +174,14 @@ class Scrutinizer {
     async enable() {
         console.log('Enabling Scrutinizer mode...');
         this.canvas.style.display = 'block';
+
+        // Initialize foveal center to canvas center as a safe default
+        const rect = this.webview.getBoundingClientRect();
+        this.mouseX = rect.width / 2;
+        this.mouseY = rect.height / 2;
+        this.targetMouseX = this.mouseX;
+        this.targetMouseY = this.mouseY;
+
         await this.captureAndProcess();
         this.startRenderLoop();
     }
@@ -160,6 +190,31 @@ class Scrutinizer {
         console.log('Disabling Scrutinizer mode...');
         this.canvas.style.display = 'none';
         this.stopRenderLoop();
+    }
+
+    handleWorkerMessage(e) {
+        if (e.data.success) {
+            if (e.data.pyramid) {
+                // Store multi-level pyramid
+                e.data.pyramid.forEach((level, i) => {
+                    // Ensure pyramid canvas is sized
+                    if (this.pyramidCanvases[i].width !== level.width || this.pyramidCanvases[i].height !== level.height) {
+                        this.pyramidCanvases[i].width = level.width;
+                        this.pyramidCanvases[i].height = level.height;
+                    }
+                    this.pyramidCtxs[i].putImageData(level, 0, 0);
+                });
+                this.hasPyramid = true;
+            } else if (e.data.blurred) {
+                // Single blur fallback
+                this.blurredCtx.putImageData(e.data.blurred, 0, 0);
+            }
+            this.hasProcessedImage = true;
+            this.isCapturing = false;
+        } else {
+            console.error('Worker blur failed:', e.data.error);
+            this.isCapturing = false;
+        }
     }
 
     async captureAndProcess() {
@@ -182,7 +237,11 @@ class Scrutinizer {
                 this.ctx.fillRect(0, 0, width, height);
             }
 
-            // Ensure offscreen sharp canvas matches
+            // Ensure offscreen canvases match
+            if (this.originalCanvas.width !== width || this.originalCanvas.height !== height) {
+                this.originalCanvas.width = width;
+                this.originalCanvas.height = height;
+            }
             if (this.sharpCanvas.width !== width || this.sharpCanvas.height !== height) {
                 this.sharpCanvas.width = width;
                 this.sharpCanvas.height = height;
@@ -206,24 +265,56 @@ class Scrutinizer {
                 img.src = dataUrl;
             });
 
-            // Draw to offscreen sharp canvas for data extraction and slicing
+            // Draw to offscreen canvases - preserve original for binocular overlay
+            this.originalCtx.clearRect(0, 0, this.originalCanvas.width, this.originalCanvas.height);
+            this.originalCtx.fillStyle = 'white';
+            this.originalCtx.fillRect(0, 0, this.originalCanvas.width, this.originalCanvas.height);
+            this.originalCtx.drawImage(img, 0, 0, this.originalCanvas.width, this.originalCanvas.height);
+
             this.sharpCtx.clearRect(0, 0, this.sharpCanvas.width, this.sharpCanvas.height);
-            // Fill with white first to handle transparency
             this.sharpCtx.fillStyle = 'white';
             this.sharpCtx.fillRect(0, 0, this.sharpCanvas.width, this.sharpCanvas.height);
             this.sharpCtx.drawImage(img, 0, 0, this.sharpCanvas.width, this.sharpCanvas.height);
 
             // Get image data for processing from offscreen canvas
-            let imageData = this.sharpCtx.getImageData(0, 0, this.sharpCanvas.width, this.sharpCanvas.height);
+            let baseData = this.sharpCtx.getImageData(0, 0, this.sharpCanvas.width, this.sharpCanvas.height);
 
-            // Apply desaturation
-            imageData = this.processor.desaturate(imageData);
+            // Apply desaturation first
+            baseData = this.processor.desaturate(baseData);
 
-            // Apply uniform blur across the entire image
-            imageData = this.processor.blur(imageData, this.config.blurRadius);
+            if (this.config.useFoveatedBlur) {
+                // Hybrid path: simplified blur + real-time compositing
+                // Store sharp (desaturated) version immediately
+                this.sharpCtx.putImageData(baseData, 0, 0);
+                this.hasProcessedImage = true; // Allow rendering with just sharp while blur computes
 
-            // Store processed image in offscreen canvas
-            this.blurredCtx.putImageData(imageData, 0, 0);
+                // Offload blur pyramid to Web Worker (non-blocking)
+                if (this.blurWorker) {
+                    const blurInput = new ImageData(
+                        new Uint8ClampedArray(baseData.data), 
+                        baseData.width, 
+                        baseData.height
+                    );
+                    this.blurWorker.postMessage({
+                        imageData: blurInput,
+                        baseBlurRadius: this.config.blurRadius,
+                        buildPyramid: true
+                    }, [blurInput.data.buffer]);
+                    // Worker will call handleWorkerMessage when done
+                    return; // Don't set isCapturing = false yet
+                } else {
+                    // Fallback to main thread if worker failed
+                    const blurredData = this.processor.blur(
+                        new ImageData(new Uint8ClampedArray(baseData.data), baseData.width, baseData.height),
+                        this.config.blurRadius * 1.5
+                    );
+                    this.blurredCtx.putImageData(blurredData, 0, 0);
+                }
+            } else {
+                // Stable path: uniform blur across the entire image
+                let imageData = this.processor.blur(baseData, this.config.blurRadius);
+                this.blurredCtx.putImageData(imageData, 0, 0);
+            }
             this.hasProcessedImage = true;
 
         } catch (error) {
@@ -253,6 +344,130 @@ class Scrutinizer {
 
     render() {
         if (!this.hasProcessedImage) {
+            return;
+        }
+
+        // Hybrid progressive filter: real-time gradient compositing with multi-level pyramid
+        if (this.config.useFoveatedBlur) {
+            // Smooth mouse movement at 60fps
+            this.mouseX += (this.targetMouseX - this.mouseX) * this.config.maskSmoothness;
+            this.mouseY += (this.targetMouseY - this.mouseY) * this.config.maskSmoothness;
+
+            if (this.hasPyramid) {
+                // Use multi-level pyramid for progressive blur
+                // Layer from back to front: heavy blur -> moderate blur -> light blur -> sharp
+                
+                const r1 = this.config.fovealRadius * 0.3;  // Inner sharp zone
+                const r2 = this.config.fovealRadius * 0.8;  // Light blur zone
+                const r3 = this.config.fovealRadius * 1.5;  // Moderate blur zone
+                // Beyond r3: Heavy blur
+
+                // 1. Draw heavy blur everywhere (Level 2)
+                this.ctx.drawImage(this.pyramidCanvases[2], 0, 0);
+
+                // 2. Draw moderate blur with gradient mask (Level 1)
+                this.ctx.save();
+                this.ctx.globalCompositeOperation = 'destination-out';
+                let gradient = this.ctx.createRadialGradient(
+                    this.mouseX, this.mouseY, r2,
+                    this.mouseX, this.mouseY, r3
+                );
+                gradient.addColorStop(0, 'rgba(0,0,0,1)');
+                gradient.addColorStop(1, 'rgba(0,0,0,0)');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.restore();
+
+                this.ctx.globalCompositeOperation = 'destination-over';
+                this.ctx.drawImage(this.pyramidCanvases[1], 0, 0);
+                this.ctx.globalCompositeOperation = 'source-over';
+
+                // 3. Draw light blur with gradient mask (Level 0)
+                this.ctx.save();
+                this.ctx.globalCompositeOperation = 'destination-out';
+                gradient = this.ctx.createRadialGradient(
+                    this.mouseX, this.mouseY, r1,
+                    this.mouseX, this.mouseY, r2
+                );
+                gradient.addColorStop(0, 'rgba(0,0,0,1)');
+                gradient.addColorStop(1, 'rgba(0,0,0,0)');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.restore();
+
+                this.ctx.globalCompositeOperation = 'destination-over';
+                this.ctx.drawImage(this.pyramidCanvases[0], 0, 0);
+                this.ctx.globalCompositeOperation = 'source-over';
+
+                // 4. Draw sharp content at very center
+                this.ctx.save();
+                this.ctx.globalCompositeOperation = 'destination-out';
+                gradient = this.ctx.createRadialGradient(
+                    this.mouseX, this.mouseY, 0,
+                    this.mouseX, this.mouseY, r1
+                );
+                gradient.addColorStop(0, 'rgba(0,0,0,1)');
+                gradient.addColorStop(1, 'rgba(0,0,0,0)');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.restore();
+
+                this.ctx.globalCompositeOperation = 'destination-over';
+                this.ctx.drawImage(this.sharpCanvas, 0, 0);
+                this.ctx.globalCompositeOperation = 'source-over';
+            } else {
+                // Fallback to simple gradient if pyramid not ready
+                this.ctx.drawImage(this.sharpCanvas, 0, 0);
+            }
+
+            // 5. Add binocular foveal overlay for extra sharpness at very center
+            const bioRadius = this.config.fovealRadius * 0.45;
+            const eyeOffset = bioRadius * 0.6;
+            const totalWidth = (bioRadius * 2) + (eyeOffset * 2);
+            const totalHeight = bioRadius * 2;
+
+            // Resize binocular canvases if needed
+            if (this.fovealCanvas.width !== totalWidth || this.fovealCanvas.height !== totalHeight) {
+                this.fovealCanvas.width = totalWidth;
+                this.fovealCanvas.height = totalHeight;
+                this.maskCanvas.width = totalWidth;
+                this.maskCanvas.height = totalHeight;
+            }
+
+            const boxX = this.mouseX - (totalWidth / 2);
+            const boxY = this.mouseY - bioRadius;
+
+            // Prepare binocular mask
+            this.maskCtx.clearRect(0, 0, totalWidth, totalHeight);
+            this.maskCtx.globalCompositeOperation = 'lighter';
+
+            const drawEye = (ctx, centerX, centerY) => {
+                const gradient = ctx.createRadialGradient(
+                    centerX, centerY, bioRadius * 0.4,
+                    centerX, centerY, bioRadius
+                );
+                gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, bioRadius, 0, Math.PI * 2);
+                ctx.fill();
+            };
+
+            const centerX = totalWidth / 2;
+            const centerY = totalHeight / 2;
+            drawEye(this.maskCtx, centerX - eyeOffset, centerY);
+            drawEye(this.maskCtx, centerX + eyeOffset, centerY);
+
+            // Apply mask to ORIGINAL (color) content for binocular overlay
+            this.fovealCtx.clearRect(0, 0, totalWidth, totalHeight);
+            this.fovealCtx.drawImage(this.originalCanvas, boxX, boxY, totalWidth, totalHeight, 0, 0, totalWidth, totalHeight);
+            this.fovealCtx.globalCompositeOperation = 'destination-in';
+            this.fovealCtx.drawImage(this.maskCanvas, 0, 0);
+
+            // Composite binocular overlay onto main canvas
+            this.ctx.drawImage(this.fovealCanvas, boxX, boxY);
+
             return;
         }
 

@@ -206,14 +206,17 @@ For large/complex pages:
 ### Simulation Fidelity
 
 - **Progressive eccentricity-based blur**
-  - Replace the hard transition between sharp foveal region and uniformly blurred periphery with a gradual acuity falloff that better matches empirical eccentricity curves.
-  - Use a radial weight field centered on the current fixation to blend multiple resolution layers (sharp + low-pass images), so blur strength increases with distance from the fovea.
-  - Parameterize inner/outer radii in visual-angle terms once calibration exists.
+  - Replace the hard transition between sharp foveal region and uniformly blurred periphery with a gradual acuity falloff that better matches empirical eccentricity curves (steep drop by ~2° and slower beyond ~5°).
+  - Implement a radial blur-strength function `B(E)` over eccentricity `E` using a fast-rising, saturating curve (e.g., hyperbolic / inverse-linear or logistic form) so that effective acuity is ~50% by ~2°.
+  - Use a multi-resolution pyramid (sharp + several increasingly blurred versions) and blend levels per pixel based on distance from fixation, rather than a single blur kernel.
+  - Initially approximate degrees of visual angle using heuristic pixel radii; longer term, parameterize inner/outer radii in calibrated visual-angle units once a distance/monitor calibration module exists.
+  - Gate the experimental foveated blur behind a configuration flag (e.g., `useFoveatedBlur`) so production builds can continue to use the simpler, robust uniform blur until the new model is validated.
 
 - **Magnocellular-preserving low-pass filter**
   - Ensure the peripheral filter behaves like a Magnocellular-preserving low-pass, not a generic blur that wipes out all structure.
-  - Specifically attenuate high spatial frequencies (fine detail, text) while preserving low spatial frequencies (gross shape and luminance contrast) that drive peripheral guidance.
-  - Explore multi-scale decompositions (e.g., Laplacian/wavelet-style pyramids) to suppress higher bands while retaining low-frequency content, guided by psychophysical data.
+  - Design blur levels to aggressively attenuate high spatial frequencies (fine detail, text, texture) while preserving low spatial frequencies (gross shape and luminance contrast) needed for peripheral guidance and “gist” perception.
+  - Use multi-scale decompositions (e.g., Laplacian/wavelet-style pyramids or band-limited blurs) to suppress higher-frequency bands while retaining low-frequency content.
+  - Validate qualitatively against design tasks: icons and major layout regions should remain distinguishable peripherally, while detailed text becomes unreadable.
 
 #### Analytics (Optional)
 - Anonymous usage statistics

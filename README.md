@@ -28,13 +28,14 @@ While the perceptual experience of vision feels stable and continuous, the under
 
 [![Watch the demo video](https://img.youtube.com/vi/lfROtjCp7bg/0.jpg)](https://www.youtube.com/watch?v=lfROtjCp7bg)
 
-- 🎯 **Foveal mask** that follows your mouse cursor
-- 🌫️ **Peripheral blur** using box blur algorithm
+- 🎯 **Binocular foveal mask** that follows your mouse cursor with distinctive 16:9 shape
+- 🌫️ **Progressive peripheral blur** using multi-level pyramid (mild → moderate → heavy)
 - 🎨 **Desaturation** using ColorMatrix luminance weights from the original implementation
 - 📜 **Scroll detection** with automatic recapture
 - 🔄 **DOM mutation detection** for dynamic content
-- ⌨️ **Keyboard shortcuts** (Space to toggle, wheel to adjust size)
-- 🎚️ **Adjustable foveal radius** (20-300px)
+- ⌨️ **Keyboard shortcuts** (Alt+Space to toggle, Alt+wheel to adjust size)
+- 🎚️ **Menu-based controls** for radius and blur presets
+- ⚡ **Web Worker** for non-blocking blur computation
 
 ## Installation
 
@@ -195,8 +196,11 @@ Scrutinizer2025 follows this lineage but focuses on **pixel-level, gaze-continge
 - **Libraries**: ColorMatrix derived from work by Mario Klingeman
 
 ### This Recreation (2025)
-- Modern Electron/Canvas API implementation
-- Preserves original ColorMatrix algorithm
+- Modern Electron/Canvas API implementation with enhanced physiological accuracy
+- Multi-level blur pyramid for progressive spatial frequency filtering
+- Web Worker offloads blur computation for responsive UI
+- Preserves original ColorMatrix algorithm and binocular foveal signature
+- Progressive blur gradient better models hyperbolic acuity decay (steep at ~2°, gradual beyond ~5°)
 
 ## License
 
