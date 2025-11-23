@@ -220,6 +220,29 @@ Add user-facing controls for progressive blur tuning:
 - Menu or panel UI for adjustment (possibly View → Simulation Fidelity submenu)
 - Useful for researchers comparing different acuity models or designers stress-testing layouts
 
+#### Mongrel Theory Implementation (Neural Processing vs Optical Blur)
+**Priority**: Medium  
+**Effort**: High  
+**Reference**: See `docs/beta_gemini3_discussion.md` for detailed theory
+
+**Current limitation**: Scrutinizer models optical defocus (camera blur) but not neural peripheral processing (summary statistics).
+
+**Biological reality**: Peripheral vision doesn't just blur—it compresses into "texture data" via summary statistics (Ruth Rosenholtz, MIT). The brain calculates average color, orientation, and density, creating "Mongrels"—statistically accurate but spatially scrambled representations.
+
+**Implementation goals**:
+- **Color drop-off with contrast boost**: Desaturate periphery to sepia/mud while boosting contrast (Magnocellular pathway)
+- **Parafoveal crowding**: Implement jitter/displacement instead of pure blur to simulate feature migration
+- **Chromatic aberration**: Shift R/B channels in periphery to simulate Magno/Parvo cell separation
+- **Block sampling**: Use blocky downsampling in far periphery to simulate low photoreceptor density
+- **Blind spot simulation**: Optional circular distortion at ~15° eccentricity
+
+**Canvas-based techniques** (for current architecture):
+1. **Jigsaw Jitter**: Displace pixels with noise offset (simulates crowding)
+2. **Channel splitting**: R channel left, B channel right (simulates diplopia)
+3. **Block downsampling**: Sample every 4th pixel in periphery, draw as 4x4 blocks
+
+**Why it matters**: Current Gaussian blur implies "bad optics." Real parafoveal vision is "bad processing"—features are received but positions are lost. This creates illegible but high-contrast text (closer to biological reality).
+
 #### Capture Fidelity Improvements
 **Priority**: Medium  
 **Effort**: Medium
@@ -246,6 +269,19 @@ Improve how we sample the page for foveal/peripheral processing:
   - ✅ Text becomes unreadable while gross shape/contrast preserved
   - 🔵 **Future**: Wavelet-based decomposition for more precise frequency-band control
   - 🔵 **Future**: Validation against psychophysical acuity curves
+
+- **✅ Neural Processing Model ("Box Sampling with Noise")** (Implemented in Beta)
+  - ✅ Parafoveal crowding with spatial jitter (feature migration) - 2px random offset
+  - ✅ Block-based downsampling in periphery (photoreceptor density) - 3x3 and 5x5 blocks
+  - ✅ Progressive desaturation (periphery is color-blind)
+  - ✅ Replaces Gaussian blur with biologically-accurate spatial uncertainty
+  - 🔵 **Future (scrutinizer2025gl)**: Full "Mongrel Theory" implementation
+    - 🔵 Summary statistics compression with texture synthesis
+    - 🔵 Contrast boost in periphery (Magno/Parvo separation)
+    - 🔵 Chromatic aberration (R/B channel splitting)
+    - 🔵 Optional blind spot simulation at ~15° eccentricity
+    - 🔵 Domain warping with WebGL shaders
+    - 🔵 "Mongrel" visualization mode showing statistical texture compression
 
 #### Analytics (Optional)
 - Anonymous usage statistics

@@ -15,12 +15,23 @@ Scrutinizer simulates **foveal vision** - how your eyes actually see the world:
 
 This approximates what reaches the eye at any moment in time: high resolution and color for a small angle of vision, and lower resolution with less color in the wider angles.
 
-While the perceptual experience of vision feels stable and continuous, the underlying physiology is highly inhomogeneous. Scrutinizer approximates the **retinal input constraint** (what reaches the eye), not the full cognitive integration the brain performs across eye movements. It is best understood as a **simulation of visual constraint**, not a literal recreation of subjective experience.
+### Vision as Controlled Hallucination
+
+While the perceptual experience of vision feels stable and continuous, the underlying physiology is highly inhomogeneous. **Vision is not a camera feed; it is a controlled hallucination** (Anil Seth). Your brain:
+- Is effectively **blind for ~40 minutes per day** during saccades (eye movements)
+- Uses **predictive modeling** to "edit out" the blackouts and motion blur
+- Stitches together a seamless timeline of reality that exists only in your **mind's eye**
+- Processes peripheral vision as **summary statistics** ("Mongrel Theory" - Ruth Rosenholtz, MIT), not just blurred detail
+
+Scrutinizer approximates the **retinal input constraint** (what reaches the eye), not the full cognitive integration the brain performs across eye movements. It is best understood as a **simulation of visual constraint**, not a literal recreation of subjective experience.
 
 ### What's it for?
 - Using foveal/peripheral constraints as a **design stress test** for layouts and iconography
 - Evaluating how well a page **supports visual search and peripheral guidance** (can users find what matters when detail is limited?)
+- Testing **"information scent"** (Information Foraging Theory) - whether peripheral cues trigger foveal attention
+- Understanding **banner blindness** as a feature, not a bug (peripheral vision successfully filtering low-value content)
 - Providing observers and designers with a **qualitative window into constrained perception**, complementary to eye-tracking metrics rather than a replacement for them
+- Revealing the **"heatmap lie"** - users often click buttons they never foveally fixated on, guided by peripheral summary statistics alone
 
 ## Features
 
@@ -29,7 +40,9 @@ While the perceptual experience of vision feels stable and continuous, the under
 [![Watch the demo video](https://img.youtube.com/vi/lfROtjCp7bg/0.jpg)](https://www.youtube.com/watch?v=lfROtjCp7bg)
 
 - 🎯 **Binocular foveal mask** that follows your mouse cursor with distinctive 16:9 shape
-- 🌫️ **Progressive peripheral blur** using multi-level pyramid (mild → moderate → heavy)
+- 🧠 **Neural processing model** using Box Sampling with Noise (not optical blur)
+  - **Parafoveal jitter**: High-contrast but spatially uncertain (simulates crowding/feature migration)
+  - **Peripheral block sampling**: Pixelated/mosaic effect (simulates sparse photoreceptor density)
 - 🎨 **Progressive desaturation** with real-time radial gradient (color → grayscale) that follows cursor at 60fps
 - 🧬 **ColorMatrix luminance weights** preserved from the original implementation for accurate grayscale conversion
 - 📜 **Scroll detection** with automatic recapture
@@ -68,11 +81,19 @@ npm start
 
 Scrutinizer is intentionally **approximate**:
 
-- It models **retinal input constraints** (blur/desaturation outside a foveal region), not the brain's transsaccadic integration that stabilizes perception.
+- It models **retinal input constraints** (spatial uncertainty/downsampling outside foveal region), not the brain's transsaccadic integration that stabilizes perception.
+- **Current implementation** uses Box Sampling with Noise to simulate neural processing:
+  - ✅ **Parafoveal jitter** simulates crowding (feature migration)
+  - ✅ **Block sampling** simulates sparse photoreceptor density
+  - ⚠️ Does not implement full "Mongrel Theory" (summary statistics with texture synthesis)
 - It assumes a fixed relationship between screen pixels and **visual angle**; without calibration for viewing distance and display size, the simulated fovea may be larger or smaller than a physiological 1–2°.
+- **Saccadic suppression** (blindness during eye movements) is not simulated.
+- **Chromatic aberration** (R/B channel splitting) not yet implemented.
 - Inter-individual biometric differences (eye geometry, etc.) are not modeled.
 
 As a result, Scrutinizer should be used as a **design constraint model and empathy tool**, not as a precise physiological instrument. It is ideal for stress-testing layouts and peripheral guidance, and should be complemented with real user studies when high-fidelity validation is needed.
+
+**Future development** (see ROADMAP.md): Full Mongrel Theory implementation with chromatic aberration, contrast boost, and WebGL-based domain warping (scrutinizer2025gl).
 
 ## Technical Details
 
@@ -128,7 +149,10 @@ This architecture allows us to:
 ### Image Processing Pipeline
 
 ```
-DOM → html2canvas → Desaturate → Box Blur → Foveal Mask → Render
+DOM → html2canvas → Desaturate → Neural Processing → Foveal Mask → Render
+                                  ├─ Parafoveal: Jitter (crowding)
+                                  ├─ Near Periphery: 3x3 block sampling
+                                  └─ Far Periphery: 5x5 block sampling
 ```
 
 ### ColorMatrix Implementation
@@ -176,8 +200,23 @@ Edit `renderer/config.js` to customize:
 - `scrollDebounce`: Scroll event delay (default: 150ms)
 - `mutationDebounce`: DOM change delay (default: 200ms)
 
-## Related Work
+## Related Work & Theoretical Foundation
 
+### Vision Science & Cognitive Psychology
+- **Ruth Rosenholtz (MIT)**: Mongrel Theory and peripheral summary statistics - peripheral vision as lossy compression
+- **Anil Seth**: "Controlled hallucination" model of perception and predictive coding
+- **Peter Pirolli (Xerox PARC)**: Information Foraging Theory - "information scent" and peripheral cue detection
+- **Cohen et al. (2020, PNAS)**: "Refrigerator Light" illusion - 1/3 of observers don't notice peripheral desaturation
+- **Balas & Sinha (2007)**: Pan-Field Color Illusion - brain extrapolates foveal color across periphery
+- **Maljkovic & Nakayama (1994)**: Priming and rapid visual learning - word form priming accelerates peripheral recognition
+
+### UX & Design Practice
+- **Jeff Johnson**: *Designing with the Mind in Mind* - "The periphery is for 'Where?' The fovea is for 'What?'"
+- **Susan Weinschenk**: *100 Things Every Designer Needs to Know About People* - peripheral vision as "governor" of foveal attention
+- **Nielsen Norman Group**: Eye-tracking research revealing the "heatmap lie" - fixation ≠ perception
+- **Luke Wroblewski**: Skeleton screens exploiting chronostasis (saccadic suppression) for perceived performance
+
+### Vision Simulation Tools
 - **Commercial service**  
   - Attensee: http://www.attensee.com
 
@@ -187,6 +226,13 @@ Edit `renderer/config.js` to customize:
   - Flashlight Project (ETH Zürich): http://vlab.ethz.ch/flashlight/index.php  
 
 Scrutinizer2025 follows this lineage but focuses on **pixel-level, gaze-contingent masking** as an approximation of retinal constraints for design evaluation.
+
+**For detailed theoretical discussion**, see `docs/beta_gemini3_discussion.md` covering:
+- Saccadic suppression and chronostasis
+- Mongrel Theory and summary statistics
+- Information scent and peripheral "Chief of Staff" model
+- Word form priming in visual search
+- Canvas-based implementation strategies for neural processing simulation
 
 ## Contributors
 
@@ -198,11 +244,14 @@ Scrutinizer2025 follows this lineage but focuses on **pixel-level, gaze-continge
 
 ### This Recreation (2025)
 - Modern Electron/Canvas API implementation with enhanced physiological accuracy
-- Multi-level blur pyramid for progressive spatial frequency filtering
+- **Neural processing model** (Box Sampling with Noise) replaces optical blur:
+  - Parafoveal jitter simulates crowding/feature migration
+  - Block sampling simulates sparse photoreceptor density
+  - Models "bad neural wiring" not "bad optics"
 - Real-time progressive desaturation gradient (color → grayscale falloff with eccentricity)
-- Web Worker offloads blur computation for responsive UI
+- Web Worker offloads processing for responsive UI
 - Preserves original ColorMatrix algorithm and binocular foveal signature
-- Progressive blur gradient better models hyperbolic acuity decay (steep at ~2°, gradual beyond ~5°)
+- Progressive spatial uncertainty better models hyperbolic acuity decay
 - Smooth 60fps tracking with GPU-accelerated Canvas compositing
 
 ## License
