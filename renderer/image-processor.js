@@ -38,6 +38,58 @@ class ImageProcessor {
     }
 
     /**
+     * Rod-sensitive desaturation for peripheral vision
+     * Implements biological reality:
+     * - Rods peak at 505nm (cyan/aqua) - boost this range
+     * - Helmholtz-Kohlrausch effect - saturated colors appear brighter
+     * - Macular pigment absent in periphery - blue light more intense
+     * @param {ImageData} imageData - Canvas ImageData to process
+     * @returns {ImageData} Rod-processed image data
+     */
+    desaturateRodSensitive(imageData) {
+        const data = imageData.data;
+        const { LUM_R, LUM_G, LUM_B } = this.config;
+
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            // Calculate luminance
+            const gray = r * LUM_R + g * LUM_G + b * LUM_B;
+
+            // Detect cyan/aqua (high blue + high green, low red)
+            // Peak rod sensitivity at 505nm (cyan/teal range)
+            const isCyan = (b > 100 && g > 100 && r < 150);
+            const cyanStrength = isCyan ? Math.min((b + g) / 400, 1.0) : 0;
+
+            // Helmholtz-Kohlrausch effect: saturated colors appear brighter
+            const saturation = Math.max(
+                Math.abs(r - gray),
+                Math.abs(g - gray),
+                Math.abs(b - gray)
+            ) / 255;
+            const hkBoost = saturation * 0.3; // Perceived brightness boost
+
+            // Rod sensitivity boost for cyan (505nm peak)
+            const rodBoost = cyanStrength * 0.4;
+
+            // Total brightness boost
+            const brightnessBoost = 1.0 + hkBoost + rodBoost;
+
+            // Desaturate but preserve cyan luminance and boost it
+            const desatAmount = isCyan ? 0.7 : 1.0; // Less desaturation for cyan
+
+            data[i] = Math.min(255, (r + (gray - r) * desatAmount) * brightnessBoost);
+            data[i + 1] = Math.min(255, (g + (gray - g) * desatAmount) * brightnessBoost);
+            data[i + 2] = Math.min(255, (b + (gray - b) * desatAmount) * brightnessBoost);
+            data[i + 3] = 255;
+        }
+
+        return imageData;
+    }
+
+    /**
      * Build a simple multi-resolution pyramid from a base image.
      * Levels[0] is sharp, higher indices are progressively more blurred.
      * @param {ImageData} baseData

@@ -101,10 +101,10 @@ self.onmessage = function(e) {
             // (summary statistics, not optical blur)
             const levels = [];
             
-            // Desaturate the source image first (periphery is color-blind)
-            const desaturated = processor.desaturate(
-                new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height),
-                1.0
+            // Rod-sensitive desaturation for peripheral vision
+            // Boosts cyan/aqua (505nm rod peak) and implements Helmholtz-Kohlrausch effect
+            const desaturated = processor.desaturateRodSensitive(
+                new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height)
             );
             
             // Level 0: Parafoveal jitter (high contrast but spatially uncertain)
