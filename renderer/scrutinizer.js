@@ -55,6 +55,16 @@ class Scrutinizer {
                 console.error('Blur worker error:', error);
                 this.blurWorker = null; // Fallback to main thread
             };
+
+            // Warm up the worker with a dummy job to initialize V8 context
+            // This reduces lag on the first real frame
+            const dummyData = new ImageData(10, 10);
+            this.blurWorker.postMessage({
+                imageData: dummyData,
+                baseBlurRadius: 10,
+                buildPyramid: true,
+                jobId: -1 // Negative ID to be ignored by handler
+            }, [dummyData.data.buffer]);
         }
 
         // Mouse tracking
@@ -108,12 +118,19 @@ class Scrutinizer {
     handleMouseMove(event) {
         // Get mouse position relative to the canvas
         const rect = this.canvas.getBoundingClientRect();
-        this.targetMouseX = event.clientX - rect.left;
-        this.targetMouseY = event.clientY - rect.top;
 
-        // Mouse tracking updates foveal position in render loop
-        // Paint events from WebContentsView provide frames automatically
-    }
+        // Calculate scale factor (Canvas Resolution / Display Size)
+        // This handles HiDPI displays where canvas.width might be 2x rect.width
+        const scaleX = this.canvas.width / rect.width;
+        const scaleY = this.canvas.height / rect.height;
+
+        this.targetMouseX = (event.clientX - rect.left) * scaleX;
+        this.targetMouseY = (event.clientY - rect.top) * scaleY;
+
+        // Debug mouse offset
+        // console.log(`Mouse: ${event.clientX},${event.clientY} Rect: ${rect.left},${rect.top} Target: ${this.targetMouseX},${this.targetMouseY} Scale: ${scaleX},${scaleY}`);
+    }     // Mouse tracking updates foveal position in render loop
+    // Paint events from WebContentsView provide frames automatically
 
     handleScroll() {
         // Scroll changes trigger paint events automatically from WebContentsView
@@ -162,8 +179,11 @@ class Scrutinizer {
     disable() {
         // Keep enabled flag in sync when disabling from any code path.
         this.enabled = false;
-        this.canvas.style.display = 'none';
+        // this.canvas.style.display = 'none'; // REMOVED: Canvas must remain visible to show raw content
         this.stopRenderLoop();
+
+        // Ensure the last frame is drawn (raw)
+        // processFrame will handle subsequent frames
     }
 
     handleWorkerMessage(e) {
@@ -190,6 +210,8 @@ class Scrutinizer {
                 // Single blur fallback
                 this.blurredCtx.putImageData(e.data.blurred, 0, 0);
             }
+
+            // Now we have a valid blurred frame, we can lift the curtain
             this.hasProcessedImage = true;
             this.isCapturing = false;
         } else {
@@ -270,22 +292,49 @@ class Scrutinizer {
                 // Hybrid path: simplified blur + real-time compositing
                 // Store sharp (desaturated) version immediately
                 this.sharpCtx.putImageData(baseData, 0, 0);
-                this.hasProcessedImage = true; // We can keep showing the
-                                              // previous blur pyramid while
-                                              // the new one computes.
+
+                // CRITICAL FIX: Do NOT set hasProcessedImage = true here if we are currently
+                // showing the curtain (hasProcessedImage is false). We must wait for the
+                // first blurred frame to arrive from the worker.
+                // If we already have an image (streaming), we keep it true to avoid flickering.
+                if (this.hasProcessedImage) {
+                    this.hasProcessedImage = true;
+                }
+
+                // Performance Optimization: Downscale blur pass
+                // HiDPI screens (Retina) have 4x pixels. We don't need that resolution for peripheral blur.
+                // Downscaling by 0.5x reduces work by 75%.
+                const blurScale = 0.5;
+                const scaledWidth = Math.floor(width * blurScale);
+                const scaledHeight = Math.floor(height * blurScale);
+
+                // Resize blurredCanvas to scaled dimensions
+                if (this.blurredCanvas.width !== scaledWidth || this.blurredCanvas.height !== scaledHeight) {
+                    this.blurredCanvas.width = scaledWidth;
+                    this.blurredCanvas.height = scaledHeight;
+                }
+
+                // Downscale: Draw sharp canvas to blurred canvas
+                this.blurredCtx.drawImage(this.sharpCanvas, 0, 0, width, height, 0, 0, scaledWidth, scaledHeight);
+
+                // Get scaled image data
+                const scaledData = this.blurredCtx.getImageData(0, 0, scaledWidth, scaledHeight);
 
                 // Offload blur pyramid to Web Worker (non-blocking)
                 if (this.blurWorker) {
                     // Bump job id so we can ignore out-of-order worker results.
                     const jobId = ++this.blurJobId;
+
+                    // Create input buffer from scaled data
                     const blurInput = new ImageData(
-                        new Uint8ClampedArray(baseData.data), 
-                        baseData.width, 
-                        baseData.height
+                        new Uint8ClampedArray(scaledData.data),
+                        scaledData.width,
+                        scaledData.height
                     );
+
                     this.blurWorker.postMessage({
                         imageData: blurInput,
-                        baseBlurRadius: this.config.blurRadius,
+                        baseBlurRadius: this.config.blurRadius * blurScale, // Adjust radius for scale
                         buildPyramid: true,
                         jobId
                     }, [blurInput.data.buffer]);
@@ -294,14 +343,19 @@ class Scrutinizer {
                 } else {
                     // Fallback to main thread if worker failed
                     const blurredData = this.processor.blur(
-                        new ImageData(new Uint8ClampedArray(baseData.data), baseData.width, baseData.height),
-                        this.config.blurRadius * 1.5
+                        scaledData,
+                        this.config.blurRadius * 1.5 * blurScale
                     );
                     this.blurredCtx.putImageData(blurredData, 0, 0);
                 }
             } else {
                 // Stable path: uniform blur across the entire image
                 let imageData = this.processor.blur(baseData, this.config.blurRadius);
+                // Ensure blurredCanvas is full size for uniform path
+                if (this.blurredCanvas.width !== width || this.blurredCanvas.height !== height) {
+                    this.blurredCanvas.width = width;
+                    this.blurredCanvas.height = height;
+                }
                 this.blurredCtx.putImageData(imageData, 0, 0);
             }
             this.hasProcessedImage = true;
@@ -331,8 +385,22 @@ class Scrutinizer {
         }
     }
 
+    resetState() {
+        this.hasProcessedImage = false;
+        this.hasPyramid = false;
+        // Clear canvases to black to prevent showing stale content
+        this.ctx.fillStyle = '#1a1a1a'; // Match body background
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
     render() {
         if (!this.hasProcessedImage) {
+            // Show "curtain" (black screen) until first blur is ready
+            // This prevents the "flash of unblurred content"
+            this.ctx.fillStyle = '#1a1a1a';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+            // Optional: Draw loading indicator or text here if desired
             return;
         }
 
@@ -345,14 +413,15 @@ class Scrutinizer {
             if (this.hasPyramid) {
                 // Use multi-level pyramid for progressive blur
                 // Layer from back to front: heavy blur -> moderate blur -> light blur -> sharp
-                
+
                 const r1 = this.config.fovealRadius * 0.3;  // Inner sharp zone
                 const r2 = this.config.fovealRadius * 0.8;  // Light blur zone
                 const r3 = this.config.fovealRadius * 1.5;  // Moderate blur zone
                 // Beyond r3: Heavy blur
 
                 // 1. Draw heavy blur everywhere (Level 2)
-                this.ctx.drawImage(this.pyramidCanvases[2], 0, 0);
+                // Draw scaled pyramid layer
+                this.ctx.drawImage(this.pyramidCanvases[2], 0, 0, this.pyramidCanvases[2].width, this.pyramidCanvases[2].height, 0, 0, this.canvas.width, this.canvas.height);
 
                 // 2. Draw moderate blur with gradient mask (Level 1)
                 this.ctx.save();
@@ -368,7 +437,8 @@ class Scrutinizer {
                 this.ctx.restore();
 
                 this.ctx.globalCompositeOperation = 'destination-over';
-                this.ctx.drawImage(this.pyramidCanvases[1], 0, 0);
+                // Draw scaled pyramid layer
+                this.ctx.drawImage(this.pyramidCanvases[1], 0, 0, this.pyramidCanvases[1].width, this.pyramidCanvases[1].height, 0, 0, this.canvas.width, this.canvas.height);
                 this.ctx.globalCompositeOperation = 'source-over';
 
                 // 3. Draw light blur with gradient mask (Level 0)
@@ -385,7 +455,8 @@ class Scrutinizer {
                 this.ctx.restore();
 
                 this.ctx.globalCompositeOperation = 'destination-over';
-                this.ctx.drawImage(this.pyramidCanvases[0], 0, 0);
+                // Draw scaled pyramid layer
+                this.ctx.drawImage(this.pyramidCanvases[0], 0, 0, this.pyramidCanvases[0].width, this.pyramidCanvases[0].height, 0, 0, this.canvas.width, this.canvas.height);
                 this.ctx.globalCompositeOperation = 'source-over';
 
                 // 4. Draw sharp content at very center
@@ -496,7 +567,10 @@ class Scrutinizer {
 
         // 1. Draw blurred/desaturated background using drawImage (FAST)
         // this.ctx.putImageData(this.processedImage, 0, 0); // SLOW
-        this.ctx.drawImage(this.blurredCanvas, 0, 0);
+
+        // Draw blurred canvas scaled up to fit main canvas
+        // This handles both the scaled-down foveated path and the full-size uniform path
+        this.ctx.drawImage(this.blurredCanvas, 0, 0, this.blurredCanvas.width, this.blurredCanvas.height, 0, 0, this.canvas.width, this.canvas.height);
 
         // 2. Draw sharp foveal region with soft edge (Binocular / 16:9)
         const radius = this.config.fovealRadius;

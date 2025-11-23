@@ -98,12 +98,70 @@ ipcMain.on('navigate:to', (event, url) => {
     }
 });
 
+ipcMain.on('input:wheel', (event, data) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerToolbar && w.scrutinizerToolbar.webContents === event.sender);
+
+    if (!win) {
+        console.warn('[Main] Could not find window for event sender');
+        return;
+    }
+
+    if (win && win.scrutinizerView && !win.scrutinizerView.isDestroyed()) {
+        win.scrutinizerView.webContents.sendInputEvent({
+            type: 'mouseWheel',
+            x: data.x,
+            y: data.y,
+            deltaX: 0, // Electron requires deltaX/Y to be 0 for mouseWheel event? No, wait.
+            deltaY: 0, // Actually, for 'mouseWheel', it uses accelerationRatio and wheelTicks?
+            // Let's try passing deltas as is, but maybe inverted?
+            // Electron docs: "deltaX Integer - The amount to scroll horizontally."
+            // "deltaY Integer - The amount to scroll vertically."
+            deltaX: data.deltaX,
+            deltaY: data.deltaY,
+            wheelTicksX: data.deltaX / 120,
+            wheelTicksY: data.deltaY / 120,
+            accelerationRatioX: 1,
+            accelerationRatioY: 1,
+            hasPreciseScrollingDeltas: true,
+            canScroll: true
+        });
+    } else {
+        console.warn('[Main] Content view not found or destroyed');
+    }
+});
+
+ipcMain.on('input:mouse', (event, data) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerToolbar && w.scrutinizerToolbar.webContents === event.sender);
+    if (win && win.scrutinizerView && !win.scrutinizerView.isDestroyed()) {
+        win.scrutinizerView.webContents.sendInputEvent({
+            type: data.type,
+            x: data.x,
+            y: data.y,
+            button: data.button,
+            clickCount: data.clickCount
+        });
+    }
+});
+
+ipcMain.on('input:keyboard', (event, data) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerToolbar && w.scrutinizerToolbar.webContents === event.sender);
+    if (win && win.scrutinizerView && !win.scrutinizerView.isDestroyed()) {
+        win.scrutinizerView.webContents.sendInputEvent({
+            type: data.type,
+            keyCode: data.keyCode
+        });
+    }
+});
+
 function createScrutinizerWindow(startUrl) {
     console.log('[Main] Creating new Scrutinizer window', startUrl ? 'with URL: ' + startUrl : '(default URL)');
-    
+
     // Get bounds from settings if available
     const bounds = settingsManager.get('windowBounds') || { width: 1200, height: 900 };
-    
+
     const win = new BrowserWindow({
         width: bounds.width,
         height: bounds.height,
@@ -138,91 +196,135 @@ function createScrutinizerWindow(startUrl) {
             contextIsolation: false
         }
     });
-    
-    // Create content WebContentsView (loads web pages)
-    const contentView = new WebContentsView({
+
+    // Create content BrowserWindow (hidden, offscreen)
+    // This replaces WebContentsView which had issues loading when detached
+    const contentWin = new BrowserWindow({
+        width: 1200,
+        height: 850,
+        show: false, // Hidden
+        frame: false,
         webPreferences: {
-            preload: path.join(__dirname, 'renderer', 'preload.js')
-            // offscreen: true  // TEMP: Disabled - "no content under offscreen mode" error
+            preload: path.join(__dirname, 'renderer', 'preload.js'),
+            offscreen: true,
+            backgroundThrottling: false // Keep running when hidden
         }
     });
 
     // Add views to window (order matters for z-index)
-    win.contentView.addChildView(contentView);  // Background
+    // win.contentView.addChildView(contentView);  // Background - REMOVED
     win.contentView.addChildView(toolbarView);  // Foreground
-    
+
     // Position views
     const toolbarHeight = 50;
     const updateViewBounds = () => {
         const [width, height] = win.getSize();
-        toolbarView.setBounds({ x: 0, y: 0, width: width, height: toolbarHeight });
-        contentView.setBounds({ x: 0, y: toolbarHeight, width: width, height: height - toolbarHeight });
+        // Toolbar view now covers the WHOLE window to display the canvas overlay
+        toolbarView.setBounds({ x: 0, y: 0, width: width, height: height });
+
+        // Resize the offscreen window to match the content area
+        if (!contentWin.isDestroyed()) {
+            contentWin.setSize(width, height - toolbarHeight);
+        }
     };
     updateViewBounds();
-    
+
     // Load toolbar HTML into toolbar view
     toolbarView.webContents.loadFile('renderer/index.html');
-    
+
+    // Open DevTools for the UI
+    toolbarView.webContents.openDevTools({ mode: 'detach' });
+
     // Store references
     win.scrutinizerToolbar = toolbarView;
-    win.scrutinizerView = contentView;
+    win.scrutinizerView = contentWin; // Store window reference
 
     // Keep view bounds in sync on window resize
     win.on('resize', updateViewBounds);
 
-    // Since offscreen rendering doesn't work, use capturePage polling
-    // Capture at 30fps when foveal mode is enabled
-    let captureInterval = null;
-    
-    const startCapturing = async () => {
-        if (captureInterval) return;
-        
-        captureInterval = setInterval(async () => {
-            try {
-                const image = await contentView.webContents.capturePage();
-                const buffer = image.toBitmap();  // BGRA format
-                const size = image.getSize();
-                
-                // Send to toolbar view (where app.js/scrutinizer live)
-                toolbarView.webContents.send('frame-captured', {
-                    buffer: buffer,
-                    width: size.width,
-                    height: size.height
-                });
-            } catch (err) {
-                console.error('[Main] Capture error:', err);
-            }
-        }, 33); // ~30fps
-    };
-    
-    const stopCapturing = () => {
-        if (captureInterval) {
-            clearInterval(captureInterval);
-            captureInterval = null;
+    // Handle offscreen rendering paint events
+    contentWin.webContents.on('paint', (event, dirty, image) => {
+        // console.log('[Main] Paint event:', dirty); // Uncomment for verbose logging
+
+        // Only process if we have a valid image
+        if (!image) return;
+
+        // Get raw bitmap buffer (BGRA format)
+        const buffer = image.toBitmap();
+        const size = image.getSize();
+
+        // Send to toolbar view (where app.js/scrutinizer live)
+        if (!toolbarView.webContents.isDestroyed()) {
+            toolbarView.webContents.send('frame-captured', {
+                buffer: buffer,
+                width: size.width,
+                height: size.height,
+                dirty: dirty
+            });
+        }
+    });
+
+    contentWin.webContents.on('did-start-loading', () => {
+        console.log('[Main] ContentWin did-start-loading');
+        if (!toolbarView.webContents.isDestroyed()) {
+            toolbarView.webContents.send('browser:did-start-loading');
+        }
+    });
+
+    contentWin.webContents.on('did-finish-load', () => {
+        console.log('[Main] ContentWin did-finish-load');
+    });
+
+    contentWin.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+        console.error('[Main] ContentWin did-fail-load:', errorCode, errorDescription);
+    });
+
+    // Forward navigation events to update URL bar
+    const sendUrlUpdate = (url) => {
+        if (!toolbarView.webContents.isDestroyed()) {
+            toolbarView.webContents.send('browser:did-navigate', url);
         }
     };
-    
-    // Listen for foveal mode state changes
-    ipcMain.on('foveal:enabled', () => startCapturing());
-    ipcMain.on('foveal:disabled', () => stopCapturing());
+
+    contentWin.webContents.on('did-navigate', (event, url) => {
+        sendUrlUpdate(url);
+    });
+
+    contentWin.webContents.on('did-navigate-in-page', (event, url) => {
+        sendUrlUpdate(url);
+    });
+
+    // Set frame rate for offscreen rendering
+    contentWin.webContents.setFrameRate(60);
+
+    // Listen for foveal mode state changes to optimize frame rate
+    ipcMain.on('foveal:enabled', () => {
+        if (!contentWin.isDestroyed()) contentWin.webContents.setFrameRate(60);
+    });
+
+    ipcMain.on('foveal:disabled', () => {
+        // Lower frame rate when not in foveal mode to save resources
+        if (!contentWin.isDestroyed()) contentWin.webContents.setFrameRate(10);
+    });
 
     // Forward IPC messages from content view preload to toolbar view
-    contentView.webContents.on('ipc-message', (event, channel, ...args) => {
+    contentWin.webContents.on('ipc-message', (event, channel, ...args) => {
         if (channel === 'keydown') {
-            toolbarView.webContents.send('webview:keydown', args[0]);
+            if (!toolbarView.webContents.isDestroyed()) {
+                toolbarView.webContents.send('webview:keydown', args[0]);
+            }
         } else if (channel === 'mousemove') {
             // Mouse events are handled by toolbar's own listeners
         } else if (channel === 'scroll' || channel === 'mutation' || channel === 'input-change') {
             // Trigger a capture when content changes
-            if (captureInterval) {
-                // Already capturing at interval
-            }
+            // This logic was for WebContentsView, might need adjustment for BrowserWindow
+            // For now, we rely on paint events for capture.
         }
     });
 
     // Load start URL in the content view
     const urlToLoad = startUrl || currentStartPage || 'https://github.com/andyed/scrutinizer2025?tab=readme-ov-file#what-is-scrutinizer';
-    contentView.webContents.loadURL(urlToLoad);
+    contentWin.loadURL(urlToLoad);
 
     // Send init state to toolbar view once it loads
     toolbarView.webContents.once('did-finish-load', () => {
@@ -251,7 +353,7 @@ function createScrutinizerWindow(startUrl) {
 function createWindow() {
     // Initialize settings manager
     settingsManager.init();
-    
+
     // Load saved settings with defaults
     currentRadius = settingsManager.get('radius');
     currentBlur = settingsManager.get('blur');
@@ -283,13 +385,13 @@ function createWindow() {
 app.on('ready', createWindow);
 
 app.on('window-all-closed', function () {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+    if (process.platform !== 'darwin') {
+        app.quit();
+    }
 });
 
 app.on('activate', function () {
-  if (mainWindow === null) {
-    createWindow();
-  }
+    if (mainWindow === null) {
+        createWindow();
+    }
 });

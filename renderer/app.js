@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const forwardBtn = document.getElementById('forward-btn');
     const refreshBtn = document.getElementById('refresh-btn');
     const statusText = document.getElementById('status-text');
-    
+
     // Welcome Popup elements
     const welcomePopup = document.getElementById('welcome-popup');
     const closePopupBtn = document.getElementById('close-popup');
@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.warn('[Renderer] Cannot toggle - scrutinizer not initialized');
             return;
         }
-        
+
         let enabled;
         if (forceState !== null) {
             if (forceState) {
@@ -58,16 +58,21 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             enabled = await scrutinizer.toggle();
         }
-        
+
         toggleBtn.classList.toggle('active', enabled);
         statusText.textContent = enabled ? 'Foveal mode active' : 'Foveal mode disabled';
-        
+
         // Notify main process of state change so new windows inherit it
         ipcRenderer.send('settings:enabled-changed', enabled);
-        
+
         // Tell main process to start/stop capturing frames
         ipcRenderer.send(enabled ? 'foveal:enabled' : 'foveal:disabled');
     };
+
+    // Add missing click handler for toggle button
+    toggleBtn.addEventListener('click', () => {
+        toggleFoveal();
+    });
 
     // Initialize Scrutinizer immediately (no webview element to wait for)
     console.log('[Renderer] Initializing new Scrutinizer instance');
@@ -76,10 +81,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Wire up frame-captured IPC from main process (paint events)
     ipcRenderer.on('frame-captured', (event, data) => {
+        // console.log('[Renderer] Frame captured:', data.width, 'x', data.height); // Uncomment for verbose logging
         if (scrutinizer) {
             // Convert Node Buffer to Uint8Array
             const buffer = new Uint8Array(data.buffer);
             scrutinizer.processFrame(buffer, data.width, data.height);
+        }
+    });
+
+    // Update URL bar when navigation occurs
+    ipcRenderer.on('browser:did-navigate', (event, url) => {
+        // Don't update if the input is focused to avoid interrupting typing
+        if (document.activeElement !== urlInput) {
+            urlInput.value = url;
+        }
+    });
+
+    // Handle page loading start (prevent FOUC)
+    ipcRenderer.on('browser:did-start-loading', () => {
+        if (scrutinizer) {
+            scrutinizer.resetState();
         }
     });
 
@@ -131,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
             // Skip if typing in input field
             if (e.target && e.target.tagName === 'INPUT') return;
-            
+
             if (scrutinizer && scrutinizer.enabled) {
                 if (e.preventDefault) e.preventDefault();
 
@@ -174,6 +195,62 @@ document.addEventListener('DOMContentLoaded', () => {
     // Listen for keyboard events forwarded from WebContentsView via main process
     ipcRenderer.on('webview:keydown', (event, keyEvent) => {
         handleKeyboardShortcut(keyEvent);
+    });
+
+    // Forward input events to the hidden content window
+    const container = document.getElementById('webview-container');
+
+    // Helper to send mouse events
+    const forwardMouseEvent = (e, type) => {
+        const rect = container.getBoundingClientRect();
+        const x = Math.round(e.clientX - rect.left);
+        const y = Math.round(e.clientY - rect.top);
+
+        ipcRenderer.send('input:mouse', {
+            type: type,
+            x: x,
+            y: y,
+            button: e.button === 0 ? 'left' : (e.button === 1 ? 'middle' : 'right'),
+            clickCount: 1
+        });
+    };
+
+    if (container) {
+        container.addEventListener('mousedown', (e) => forwardMouseEvent(e, 'mouseDown'));
+        container.addEventListener('mouseup', (e) => forwardMouseEvent(e, 'mouseUp'));
+        container.addEventListener('mousemove', (e) => forwardMouseEvent(e, 'mouseMove'));
+
+        // Forward scroll events
+        container.addEventListener('wheel', (e) => {
+            ipcRenderer.send('input:wheel', {
+                deltaX: e.deltaX,
+                deltaY: e.deltaY,
+                x: e.clientX,
+                y: e.clientY
+            });
+        }, { passive: true });
+    }
+
+    // Forward keyboard events
+    document.addEventListener('keydown', (e) => {
+        // Don't forward if typing in URL bar
+        if (e.target === urlInput) return;
+
+        ipcRenderer.send('input:keyboard', {
+            type: 'keyDown',
+            keyCode: e.key,
+            modifiers: [] // TODO: Add modifier support if needed
+        });
+    });
+
+    document.addEventListener('keyup', (e) => {
+        if (e.target === urlInput) return;
+
+        ipcRenderer.send('input:keyboard', {
+            type: 'keyUp',
+            keyCode: e.key,
+            modifiers: []
+        });
     });
 
     // IPC listeners for main process (menus, settings)
