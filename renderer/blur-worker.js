@@ -77,15 +77,18 @@ function applyNeuralProcessing(sourceData, width, height, level) {
         // PERIPHERAL: Neural texture synthesis with fractal noise
         const blockSize = level === 1 ? 3 : 5;
         
-        // Fractal noise parameters
-        const freq = 0.1;
-        const amp = blockSize * 0.5;
+        // Fractal noise parameters - TIGHTENED for "shimmer" not "swell"
+        // High frequency: character-width waves (~10-15px), not page-width
+        // Low amplitude: subtle vertical sway, dominant horizontal scramble
+        const freq = 0.5;  // 5x increase: "buzz" not "swim"
+        const amp = blockSize * 0.3;  // Reduced: subtle distortion
         
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const i = (y * width + x) * 4;
                 
                 // 2-octave fractal noise for organic distortion
+                // Tighter waves break coherence of text lines (feature disintegration)
                 const warpX = fractalNoise(y, freq, phase) * amp;
                 const warpY = fractalNoise(x, freq, phase + 1.5) * amp; // Phase offset for X/Y independence
                 
