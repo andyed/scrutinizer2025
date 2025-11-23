@@ -1,4 +1,4 @@
-![Alpha Browser Screenshot](file:///Users/andyed/Documents/dev/scrutinizer2025/screenshots/alpha_browser.png)
+![Alpha Browser Screenshot](screenshots/alpha_browser.png)
 
 # Scrutinizer - Foveal Vision Simulator
 
@@ -23,9 +23,8 @@ This simulates what your brain is actually seeing at any moment in time -- high 
 ## Features
 
 ### Demo Video
-<div class="video-container">
-  <iframe width="560" height="315" src="https://www.youtube.com/embed/lfROtjCp7bg" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-</div>
+
+[![Watch the demo video](https://img.youtube.com/vi/lfROtjCp7bg/0.jpg)](https://www.youtube.com/watch?v=lfROtjCp7bg)
 
 - 🎯 **Foveal mask** that follows your mouse cursor
 - 🌫️ **Peripheral blur** using box blur algorithm
