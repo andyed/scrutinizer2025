@@ -90,15 +90,36 @@ const sourceY = Math.max(0, Math.min(height - 1, y + yOffset));
 
 ## Block Sampling Implementation
 
-### Block Origin Calculation
+### UV Warping (Breaking the Grid)
 ```javascript
-const blockSize = level === 1 ? 3 : 5;
-const blockX = Math.floor(x / blockSize) * blockSize;
-const blockY = Math.floor(y / blockSize) * blockSize;
-const sourceIndex = (blockY * width + blockX) * 4;
+// Low-frequency wobble to break rigid grid
+const warpScale = blockSize * 2;
+const warpStrength = blockSize * 0.5;
+
+const warpX = Math.sin((y / warpScale) * Math.PI * 2) * warpStrength;
+const warpY = Math.cos((x / warpScale) * Math.PI * 2) * warpStrength;
+
+const warpedX = x + warpX;
+const warpedY = y + warpY;
 ```
 
-**Why this works**: All pixels in a block sample from the top-left corner, creating a mosaic effect that simulates large receptive fields pooling multiple photoreceptors.
+**Why this works**: Sine waves create smooth, organic distortion. Text columns "snake" and wave instead of staying locked to pixel grid. Simulates inability to maintain Euclidean grid in periphery.
+
+### Feature Migration (Scrambling)
+```javascript
+const blockSize = level === 1 ? 3 : 5;
+const blockX = Math.floor(warpedX / blockSize) * blockSize;
+const blockY = Math.floor(warpedY / blockSize) * blockSize;
+
+// Randomly sample within block (not just top-left corner)
+const migrationX = Math.floor((noiseTable[idx] / 2) % blockSize);
+const migrationY = Math.floor((noiseTable[idx + 1] / 2) % blockSize);
+
+const sourceX = blockX + migrationX;
+const sourceY = blockY + migrationY;
+```
+
+**Why this works**: Instead of averaging or sampling from block origin, we randomly grab pixels from within the block. This creates "mongrels" - you see pieces of letters (curve of 'd', cross of 't') but in wrong positions. Simulates crowding where features are detected but unbound to objects.
 
 ## Performance Characteristics
 

@@ -48,19 +48,38 @@ function applyNeuralProcessing(sourceData, width, height, level) {
             }
         }
     } else {
-        // PERIPHERAL: Block sampling (simulates sparse photoreceptor density)
-        const blockSize = level === 1 ? 3 : 5; // Level 1: 3x3 blocks, Level 2: 5x5 blocks
+        // PERIPHERAL: Neural texture synthesis (not digital downsampling)
+        const blockSize = level === 1 ? 3 : 5;
+        
+        // Generate low-frequency noise for UV warping (breaks rigid grid)
+        const warpScale = blockSize * 2;
+        const warpStrength = blockSize * 0.5;
         
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const i = (y * width + x) * 4;
                 
-                // Sample from block origin (top-left corner of block)
-                const blockX = Math.floor(x / blockSize) * blockSize;
-                const blockY = Math.floor(y / blockSize) * blockSize;
-                const sourceIndex = (blockY * width + blockX) * 4;
+                // Add low-frequency "wobble" to break the grid
+                // Use simple sine waves for smooth, organic distortion
+                const warpX = Math.sin((y / warpScale) * Math.PI * 2) * warpStrength;
+                const warpY = Math.cos((x / warpScale) * Math.PI * 2) * warpStrength;
                 
-                // Copy block color
+                // Calculate block origin with warping
+                const warpedX = x + warpX;
+                const warpedY = y + warpY;
+                const blockX = Math.floor(warpedX / blockSize) * blockSize;
+                const blockY = Math.floor(warpedY / blockSize) * blockSize;
+                
+                // Feature migration: randomly offset within the block to scramble features
+                // This creates "mongrels" - features present but unbound to correct positions
+                const migrationX = Math.floor((noiseTable[(y * width + x) * 2] / 2) % blockSize);
+                const migrationY = Math.floor((noiseTable[(y * width + x) * 2 + 1] / 2) % blockSize);
+                
+                const sourceX = Math.max(0, Math.min(width - 1, blockX + migrationX));
+                const sourceY = Math.max(0, Math.min(height - 1, blockY + migrationY));
+                const sourceIndex = (sourceY * width + sourceX) * 4;
+                
+                // Copy with feature migration
                 dst[i] = src[sourceIndex];
                 dst[i + 1] = src[sourceIndex + 1];
                 dst[i + 2] = src[sourceIndex + 2];
