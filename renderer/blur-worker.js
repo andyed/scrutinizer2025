@@ -10,6 +10,29 @@ importScripts('image-processor.js', 'config.js');
 const processor = new ImageProcessor(CONFIG);
 
 /**
+ * Smoothstep function for smooth transitions (Hermite interpolation)
+ * Returns value between 0 and 1 with smooth acceleration/deceleration
+ */
+function smoothstep(edge0, edge1, x) {
+    const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+    return t * t * (3 - 2 * t);
+}
+
+/**
+ * 2-octave fractal noise for organic, non-repeating distortion
+ * Prevents brain from detecting single sine wave pattern
+ */
+function fractalNoise(coord, frequency, phase) {
+    // Octave 1: Main swell
+    const wave1 = Math.sin(coord * frequency + phase);
+    
+    // Octave 2: Jitter (2.7x multiplier prevents wave alignment)
+    const wave2 = Math.sin(coord * frequency * 2.7 + phase) * 0.4;
+    
+    return wave1 + wave2;
+}
+
+/**
  * Apply biologically-accurate peripheral processing
  * Level 0: Parafoveal jitter (simulates crowding/feature migration)
  * Level 1: Light block sampling (sparse receptors)
@@ -25,6 +48,9 @@ function applyNeuralProcessing(sourceData, width, height, level) {
     for (let i = 0; i < noiseTable.length; i++) {
         noiseTable[i] = Math.floor((Math.random() - 0.5) * 5); // -2 to +2 range
     }
+    
+    // Phase for fractal noise (could be animated with frame count)
+    const phase = 0; // Static for now, could add: Date.now() * 0.001 for swimming effect
     
     if (level === 0) {
         // PARAFOVEAL: Jitter (simulates crowding - features present but positions uncertain)
@@ -48,21 +74,20 @@ function applyNeuralProcessing(sourceData, width, height, level) {
             }
         }
     } else {
-        // PERIPHERAL: Neural texture synthesis (not digital downsampling)
+        // PERIPHERAL: Neural texture synthesis with fractal noise
         const blockSize = level === 1 ? 3 : 5;
         
-        // Generate low-frequency noise for UV warping (breaks rigid grid)
-        const warpScale = blockSize * 2;
-        const warpStrength = blockSize * 0.5;
+        // Fractal noise parameters
+        const freq = 0.1;
+        const amp = blockSize * 0.5;
         
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const i = (y * width + x) * 4;
                 
-                // Add low-frequency "wobble" to break the grid
-                // Use simple sine waves for smooth, organic distortion
-                const warpX = Math.sin((y / warpScale) * Math.PI * 2) * warpStrength;
-                const warpY = Math.cos((x / warpScale) * Math.PI * 2) * warpStrength;
+                // 2-octave fractal noise for organic distortion
+                const warpX = fractalNoise(y, freq, phase) * amp;
+                const warpY = fractalNoise(x, freq, phase + 1.5) * amp; // Phase offset for X/Y independence
                 
                 // Calculate block origin with warping
                 const warpedX = x + warpX;
