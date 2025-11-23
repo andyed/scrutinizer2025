@@ -18,8 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const backBtn = document.getElementById('back-btn');
     const forwardBtn = document.getElementById('forward-btn');
     const refreshBtn = document.getElementById('refresh-btn');
-    const radiusSlider = document.getElementById('radius-slider');
-    const radiusValue = document.getElementById('radius-value');
     const statusText = document.getElementById('status-text');
 
     // Initialize Scrutinizer once webview is ready
@@ -97,27 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
         navigateBtn.textContent = 'Go';
     });
 
-    // Foveal radius slider
-    radiusSlider.addEventListener('input', (e) => {
-        const radius = parseInt(e.target.value);
-        radiusValue.textContent = radius + 'px';
-        if (scrutinizer) {
-            scrutinizer.config.fovealRadius = radius;
-        }
-    });
-
-    // Blur radius slider
-    const blurSlider = document.getElementById('blur-slider');
-    const blurValue = document.getElementById('blur-value');
-
-    blurSlider.addEventListener('input', (e) => {
-        const radius = parseInt(e.target.value);
-        blurValue.textContent = radius + 'px';
-        if (scrutinizer) {
-            scrutinizer.updateBlurRadius(radius);
-        }
-    });
-
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
         // Space to toggle
@@ -144,16 +121,12 @@ document.addEventListener('DOMContentLoaded', () => {
     ipcRenderer.on('menu:set-radius', (_event, radius) => {
         if (!scrutinizer) return;
         scrutinizer.config.fovealRadius = radius;
-        radiusSlider.value = radius;
-        radiusValue.textContent = radius + 'px';
     });
 
     // Set blur radius from menu
     ipcRenderer.on('menu:set-blur', (_event, radius) => {
         if (!scrutinizer) return;
         scrutinizer.updateBlurRadius(radius);
-        blurSlider.value = radius;
-        blurValue.textContent = radius + 'px';
     });
 
     // Mouse wheel to adjust foveal size
@@ -162,8 +135,6 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const delta = e.deltaY > 0 ? -5 : 5;
             scrutinizer.updateFovealRadius(delta);
-            radiusSlider.value = scrutinizer.config.fovealRadius;
-            radiusValue.textContent = scrutinizer.config.fovealRadius + 'px';
         }
     }, { passive: false });
 
