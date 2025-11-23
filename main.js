@@ -44,6 +44,10 @@ ipcMain.on('settings:enabled-changed', (event, enabled) => {
     // rebuildMenu(); // If menu had a toggle state, we'd update it here
 });
 
+ipcMain.on('window:create', (event, url) => {
+    createScrutinizerWindow(url);
+});
+
 function createScrutinizerWindow(startUrl) {
     // Get bounds from settings if available
     const bounds = settingsManager.get('windowBounds') || { width: 1200, height: 900 };

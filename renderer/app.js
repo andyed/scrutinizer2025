@@ -104,6 +104,14 @@ document.addEventListener('DOMContentLoaded', () => {
         navigateBtn.textContent = 'Stop';
     });
 
+    // Intercept new windows (popups) from webview content
+    webview.addEventListener('new-window', (e) => {
+        e.preventDefault(); // Stop default Electron window
+        if (e.url) {
+            ipcRenderer.send('window:create', e.url);
+        }
+    });
+
     webview.addEventListener('did-stop-loading', () => {
         statusText.textContent = 'Page loaded';
         statusText.classList.remove('loading');
