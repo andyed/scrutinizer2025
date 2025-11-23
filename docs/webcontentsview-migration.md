@@ -336,76 +336,117 @@ function applyFovealState(view, state) {
 - ✅ Popup windows inherit state reliably
 - ✅ Can share processing resources between views
 
-### Phase 6: Migration & Release (1 week)
+### Phase 6: Verify & Ship
 
-1. Merge feature branch
+1. Final integration test
 2. Update documentation
-3. Beta test with users
-4. Release as v2.0
+3. Commit & tag as v2.0
 
-## Timeline
+## Implementation Sequence
 
-**Total: 7-9 weeks**
+**Approach:** Deep dive with strategic test points
 
-| Phase | Duration | Tasks |
-|-------|----------|-------|
-| **Phase 1** | 1-2 weeks | Research, prototyping, benchmark offscreen rendering modes |
-| **Phase 2** | 2-3 weeks | Architecture changes, WebContentsView integration |
-| **Phase 3** | 3-5 days | Implement and test offscreen rendering mode |
-| **Phase 4** | 1 week | Multi-window support and state inheritance |
-| **Phase 5** | 1-2 weeks | Testing, optimization, performance tuning |
-| **Phase 6** | 1 week | Beta testing and release |
+### 1. Minimal Proof of Concept 🔬
 
-**Recommended start:** After v1.0 stable release + 1 month of user feedback
+**Goal:** Single window with offscreen rendering, no foveal effect yet
 
-## Recommended Implementation Path
+**Tasks:**
+- Create branch `feature/webcontentsview`
+- Strip down `main.js` - remove old `<webview>` code
+- Implement `createScrutinizerWindow()` with WebContentsView
+- Set up `paint` event handler → log frame data
+- Load a simple page, verify frames captured
 
-### Option A: Full Migration (Recommended for v2.0)
+**Test Checkpoint:** ✋ Can you see frame capture logs? Does navigation work?
 
-**Pros:**
-- ✅ Solves popup window inheritance issue
-- ✅ 2-3x performance improvement
-- ✅ Modern, future-proof API
-- ✅ Better multi-window architecture
+### 2. Frame Pipeline Integration 🎨
 
-**Cons:**
-- ⚠️ 7-9 weeks development time
-- ⚠️ Significant architectural changes
-- ⚠️ Requires thorough testing
+**Goal:** Get captured frames onto canvas overlay
 
-**Decision:** **Proceed after v1.0 release is stable**
+**Tasks:**
+- Modify `app.js` - remove webview DOM references
+- Set up IPC receiver for `frame-captured` events
+- Convert Buffer → ImageData
+- Draw to overlay canvas (no processing yet)
+- Verify mouse coordinates still work
 
-### Option B: Hybrid Approach (Quick fix for v1.1)
+**Test Checkpoint:** ✋ Can you see the raw page content on overlay canvas?
 
-Keep `<webview>` but add workarounds:
-- Reduce capture frequency to 30 fps
-- Add timeout before `scrutinizer.enable()` in new windows
-- More aggressive state polling
+### 3. Foveal Effect Restoration 👁️
 
-**Pros:**
-- ✅ Faster to implement (1-2 weeks)
-- ✅ Lower risk
+**Goal:** Apply blur and foveal mask to captured frames
 
-**Cons:**
-- ❌ Doesn't solve root cause
-- ❌ Still has timing issues
-- ❌ Technical debt accumulates
-- ❌ No performance gains
+**Tasks:**
+- Wire up ImageProcessor to new frame pipeline
+- Connect blur worker
+- Implement foveal masking on offscreen-rendered frames
+- Test toggle on/off
 
-**Decision:** **Not recommended** - better to do it right once
+**Test Checkpoint:** ✋ Does foveal mode work? Can you toggle with ESC?
 
-### Option C: Incremental Migration (Not Recommended)
+### 4. Multi-Window State Inheritance ⚡
 
-Migrate one piece at a time while maintaining `<webview>` support.
+**Goal:** Popup windows inherit and apply foveal state
 
-**Cons:**
-- ❌ Complex dual-path maintenance
-- ❌ Longer timeline overall
-- ❌ Risk of bugs in both paths
+**Tasks:**
+- Implement `viewsMap` to track all views
+- Add `setWindowOpenHandler` for popups
+- Pass state to new windows
+- Apply state immediately (no race condition!)
 
-**Decision:** **Skip this** - clean break is better
+**Test Checkpoint:** ✋ Open popup - does it have foveal effect if parent did?
+
+### 5. Performance & Polish 🚀
+
+**Goal:** Optimize frame capture and rendering
+
+**Tasks:**
+- Adjust frame rate (start at 60fps, tune down if needed)
+- Implement dirty region optimization (optional)
+- Add window resize handler
+- Verify keyboard shortcuts still work
+- Test scroll tracking
+
+**Test Checkpoint:** ✋ Smooth at 60fps? Memory usage reasonable?
+
+### 6. Final Verification 🎯
+
+**Smoke test checklist:**
+- [ ] Single window: navigate, toggle foveal mode, adjust radius
+- [ ] Popup windows: inherit foveal state correctly
+- [ ] Keyboard shortcuts: ESC, Left/Right arrows
+- [ ] Performance: < 100ms lag when toggling
+- [ ] No console errors
+
+## Testing Strategy
+
+**Philosophy:** Go deep, test at logical breakpoints
+
+**When to come up for air:**
+1. After step 1 - verify capture pipeline works
+2. After step 3 - verify foveal effect works
+3. After step 4 - verify multi-window inheritance (the whole point!)
+4. After step 5 - verify performance acceptable
+
+**When to commit:**
+- After step 1 (minimal POC)
+- After step 3 (feature parity with v1.0)
+- After step 4 (multi-window fixed!)
+- After step 6 (v2.0 release)
+
+**Fallback:** If stuck for >30 min on a step, commit what works and document the blocker
 
 ## Implementation Considerations
+
+**Key Decision:** We're doing the full migration (clean break from `<webview>`)
+
+**Why now:**
+- Popup inheritance is broken in v1.0
+- Performance gains are significant (2-3x)
+- API is straightforward once you understand it
+- Multi-window architecture much cleaner
+
+**Implementation Notes:**
 
 ### API Changes Summary
 
@@ -493,46 +534,28 @@ Migrate one piece at a time while maintaining `<webview>` support.
    });
    ```
 
-### Phase 7: Migration & Release (1 week)
+## Potential Blockers & Quick Fixes
 
-1. Merge feature branch
-2. Update documentation
-3. Beta test with users
-4. Release as v2.0
+**Blocker 1: Paint events not firing**
+- Check `offscreen: true` is set
+- Verify content is actually changing (static pages don't paint)
+- Try loading a simple animated page for testing
 
-## Risks & Mitigations
+**Blocker 2: Buffer → ImageData conversion issues**
+- BGRA format: might need to swap R/B channels
+- Size mismatch: ensure width matches buffer stride
+- Use `new ImageData(new Uint8ClampedArray(buffer), width, height)`
 
-### Risk 1: Breaking Changes
-**Mitigation:** Keep v1.x branch maintained for 6 months
+**Blocker 3: Mouse coordinates off**
+- Account for toolbar height (60px)
+- View bounds must match actual content area
+- Mouse events from preload need offset adjustment
 
-### Risk 2: Performance Regression
-**Mitigation:** Benchmark before/after, rollback if worse
-
-### Risk 3: Platform Differences
-**Mitigation:** Test on multiple macOS versions (10.15+)
-
-### Risk 4: User Disruption
-**Mitigation:** Auto-update with rollback capability
-
-
-
-## Alternative: Hybrid Approach
-
-Keep `<webview>` but optimize capture:
-
-1. Reduce capture frequency (30fps instead of 60fps)
-2. Use smaller capture regions
-3. Implement frame skipping during rapid movement
-
-**Pros:** Less risky, faster to implement
-**Cons:** Still limited by webview architecture
-
-## Decision Point
-
-**Recommend:** Ship v1.0 with current architecture, plan v2.0 migration after:
-- User feedback on v1.0
-- Performance profiling on real-world usage
-- Electron API stability assessment
+**Blocker 4: Performance worse than v1.0**
+- Start with 30fps, not 60fps
+- Check if blur worker is bottleneck
+- Profile paint event frequency
+- Consider dirty region optimization
 
 ## References
 
