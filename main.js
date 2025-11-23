@@ -36,8 +36,10 @@ function createScrutinizerWindow(startUrl) {
     width: 1200,
     height: 900,
     webPreferences: {
+      // Host window needs node access for app.js to use require('electron')
       nodeIntegration: true,
       contextIsolation: false,
+      // Enable webview tag - embedded content runs isolated via preload.js
       webviewTag: true
     }
   });

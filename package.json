@@ -5,7 +5,10 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --enable-logging"
+    "dev": "electron . --enable-logging",
+    "build": "electron-builder --mac",
+    "build:unsigned": "electron-builder --mac --config.mac.identity=null",
+    "release": "electron-builder --mac --publish always"
   },
   "keywords": [
     "electron",
@@ -15,11 +18,45 @@
   ],
   "author": "",
   "license": "MIT",
+  "build": {
+    "appId": "com.scrutinizer.app",
+    "productName": "Scrutinizer",
+    "files": [
+      "main.js",
+      "menu-template.js",
+      "renderer/**/*",
+      "!renderer/**/*.md"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "renderer/scrutinizer_512x512_icon.png",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "dmg": {
+      "sign": false,
+      "title": "Scrutinizer ${version}",
+      "icon": "renderer/scrutinizer_512x512_icon.png"
+    },
+    "publish": {
+      "provider": "s3",
+      "bucket": "scrutinizer-releases",
+      "region": "us-east-1"
+    }
+  },
   "devDependencies": {
+    "@electron/notarize": "^3.1.1",
     "electron": "^28.0.0",
     "electron-builder": "^26.0.12"
   },
   "dependencies": {
+    "electron-updater": "^6.1.7",
     "html2canvas": "^1.4.1"
   }
 }

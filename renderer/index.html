@@ -38,7 +38,12 @@
 
     <!-- Webview container -->
     <div id="webview-container">
-      <webview id="webview" src="https://boxesandarrows.com/icon-analysis/" allowpopups preload="./preload.js">
+      <webview id="webview" 
+               src="https://boxesandarrows.com/icon-analysis/" 
+               allowpopups 
+               preload="./preload.js"
+               disablewebsecurity="false"
+               nodeintegration="false">
       </webview>
 
       <!-- Overlay canvas for foveal effect -->

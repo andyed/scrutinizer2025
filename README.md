@@ -1,4 +1,4 @@
-![Beta Browser Screenshot](screenshots/beta_browser.png)
+![Beta Browser Screenshot](screenshots/onedotoh_browser.png)
 
 # Scrutinizer - Foveal Vision Simulator
 
@@ -32,6 +32,25 @@ Scrutinizer approximates the **retinal input constraint** (what reaches the eye)
 - Understanding **banner blindness** as a feature, not a bug (peripheral vision successfully filtering low-value content)
 - Providing observers and designers with a **qualitative window into constrained perception**, complementary to eye-tracking metrics rather than a replacement for them
 - Revealing the **"heatmap lie"** - users often click buttons they never foveally fixated on, guided by peripheral summary statistics alone
+
+### The Pitch
+Vision is not a camera feed. It is a controlled hallucination.
+
+We assume we see the world in high-definition 180° video. We don't. The human eye is a biological scanner with a terrifyingly narrow bandwidth.
+
+The Reality You only possess "20/20 vision" in the Fovea—a tiny patch of retina roughly the size of your thumb held at arm's length. Everything else is the Periphery: a low-resolution, color-blind, motion-sensitive sensor that doesn't "see" objects, but merely guesses at their textures.
+
+Your brain stitches these jittery, low-fidelity snapshots into a seamless timeline, editing out the blurs and blackouts in real-time. You are effectively blind to detail for 98% of your visual field.
+
+What Scrutinizer Does Scrutinizer strips away the brain's post-processing to reveal the raw data your optic nerve actually receives.
+
+Foveal Simulation: A precise window of high-acuity focus that follows your cursor.
+
+Peripheral Mongrels: Uses "texture synthesis" algorithms to simulate Visual Crowding—where text and shapes disintegrate into statistical noise outside the center.
+
+Rod-Weighted Luminance: Simulates the spectral sensitivity of peripheral rod cells, revealing why "Aqua" buttons glow while red text vanishes.
+
+Why Use It? Designers & Engineers: Stop designing for the "Screenshot." Start designing for the Scan. If your interface doesn't work in Scrutinizer, your users aren't seeing it—they are just hallucinating that they did.
 
 ## Features
 
