@@ -51,10 +51,13 @@ ipcMain.on('settings:welcome-changed', (event, show) => {
 });
 
 ipcMain.on('window:create', (event, url) => {
+    console.log('[Main] Received window:create for:', url);
     createScrutinizerWindow(url);
 });
 
 function createScrutinizerWindow(startUrl) {
+    console.log('[Main] Creating new Scrutinizer window', startUrl ? 'with URL: ' + startUrl : '(default URL)');
+    
     // Get bounds from settings if available
     const bounds = settingsManager.get('windowBounds') || { width: 1200, height: 900 };
     
@@ -88,18 +91,22 @@ function createScrutinizerWindow(startUrl) {
     win.loadFile('renderer/index.html');
 
     win.webContents.once('did-finish-load', () => {
+        console.log('[Main] Window did-finish-load. Sending init-state.');
         win.webContents.send('settings:radius-options', RADIUS_OPTIONS);
         // Pass current state to new window
-        win.webContents.send('settings:init-state', {
+        const state = {
             radius: currentRadius,
             blur: currentBlur,
             enabled: currentEnabled,
             showWelcome: currentShowWelcome
-        });
+        };
+        console.log('[Main] Sending state:', state);
+        win.webContents.send('settings:init-state', state);
     });
 
     if (startUrl) {
         win.webContents.once('did-finish-load', () => {
+            console.log('[Main] Sending popup:navigate to', startUrl);
             win.webContents.send('popup:navigate', startUrl);
         });
     }

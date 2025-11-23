@@ -39,17 +39,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize Scrutinizer once webview is ready
     webview.addEventListener('dom-ready', () => {
-        console.log('Webview ready');
-        scrutinizer = new Scrutinizer(webview, CONFIG);
-        statusText.textContent = 'Ready - Press Option+Space or click Enable to start';
+        console.log('Webview ready (dom-ready fired)');
+        
+        if (!scrutinizer) {
+            console.log('[Renderer] Initializing new Scrutinizer instance');
+            scrutinizer = new Scrutinizer(webview, CONFIG);
+            statusText.textContent = 'Ready - Press Option+Space or click Enable to start';
 
-        // Apply pending state if any
-        if (pendingInitState) {
-            if (pendingInitState.radius) scrutinizer.updateFovealRadius(pendingInitState.radius);
-            if (pendingInitState.blur) scrutinizer.updateBlurRadius(pendingInitState.blur);
-            if (pendingInitState.enabled) toggleFoveal(true);
-            if (pendingInitState.showWelcome !== false) welcomePopup.style.display = 'flex';
-            pendingInitState = null;
+            // Apply pending state if any
+            if (pendingInitState) {
+                console.log('[Renderer] Applying pending init state:', pendingInitState);
+                if (pendingInitState.radius) scrutinizer.updateFovealRadius(pendingInitState.radius);
+                if (pendingInitState.blur) scrutinizer.updateBlurRadius(pendingInitState.blur);
+                if (pendingInitState.enabled) {
+                    console.log('[Renderer] Enabling foveal mode from pending state');
+                    toggleFoveal(true);
+                }
+                if (pendingInitState.showWelcome !== false) welcomePopup.style.display = 'flex';
+                pendingInitState = null;
+            }
+        } else {
+            console.log('[Renderer] Scrutinizer already initialized, skipping re-init');
         }
     });
 
@@ -171,12 +181,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize state from main process (new windows inherit settings)
     ipcRenderer.on('settings:init-state', (event, state) => {
+        console.log('[Renderer] Received settings:init-state', state);
         if (scrutinizer) {
+            console.log('[Renderer] Scrutinizer ready, applying settings immediately');
             if (state.radius) scrutinizer.updateFovealRadius(state.radius);
             if (state.blur) scrutinizer.updateBlurRadius(state.blur);
             
             // Apply enabled state
             if (state.enabled) {
+                console.log('[Renderer] Enabling foveal mode');
                 toggleFoveal(true);
             }
 
@@ -185,6 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 welcomePopup.style.display = 'flex';
             }
         } else {
+            console.log('[Renderer] Scrutinizer NOT ready, queuing settings');
             // Store for initialization
             pendingInitState = state;
         }
