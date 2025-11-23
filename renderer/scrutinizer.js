@@ -63,6 +63,7 @@ class Scrutinizer {
         this.scrollTimeout = null;
         this.mutationTimeout = null;
         this.resizeTimeout = null;
+        this.mouseCaptureTimeout = null;
 
         // Bind methods
         this.handleMouseMove = this.handleMouseMove.bind(this);
@@ -132,12 +133,12 @@ class Scrutinizer {
         this.targetMouseX = event.clientX - rect.left;
         this.targetMouseY = event.clientY - rect.top;
 
-        // Debug: log occasionally
-        if (!this.mouseMoveCount) this.mouseMoveCount = 0;
-        this.mouseMoveCount++;
-        if (this.mouseMoveCount % 30 === 0) {
-            console.log('Mouse move event:', event.clientX, event.clientY, '-> target:',
-                this.targetMouseX.toFixed(0), this.targetMouseY.toFixed(0));
+        // Lightly debounce a recapture so foveal content tracks layout
+        if (this.enabled) {
+            if (this.mouseCaptureTimeout) clearTimeout(this.mouseCaptureTimeout);
+            this.mouseCaptureTimeout = setTimeout(() => {
+                this.captureAndProcess();
+            }, 120);
         }
     }
 
@@ -172,7 +173,6 @@ class Scrutinizer {
     }
 
     async enable() {
-        console.log('Enabling Scrutinizer mode...');
         this.canvas.style.display = 'block';
 
         // Initialize foveal center to canvas center as a safe default
@@ -187,7 +187,6 @@ class Scrutinizer {
     }
 
     disable() {
-        console.log('Disabling Scrutinizer mode...');
         this.canvas.style.display = 'none';
         this.stopRenderLoop();
     }
@@ -229,7 +228,6 @@ class Scrutinizer {
 
             // Ensure main canvas matches
             if (this.canvas.width !== width || this.canvas.height !== height) {
-                console.log('Resizing main canvas:', this.canvas.width, 'x', this.canvas.height, '->', width, 'x', height);
                 this.canvas.width = width;
                 this.canvas.height = height;
                 // Prevent transparency by filling with white immediately
@@ -420,31 +418,15 @@ class Scrutinizer {
                 this.ctx.drawImage(this.sharpCanvas, 0, 0);
             }
 
-            // 5. Add progressive desaturation gradient (real-time, follows mouse)
+            // 5. Calculate binocular dimensions (needed for desaturation mask)
             const bioRadius = this.config.fovealRadius * 0.45;
-            
-            this.ctx.save();
-            this.ctx.globalCompositeOperation = 'saturation';
-            
-            const desatGradient = this.ctx.createRadialGradient(
-                this.mouseX, this.mouseY, bioRadius * 0.8,
-                this.mouseX, this.mouseY, this.config.fovealRadius * 2.5
-            );
-            // Full saturation at center, gradually reduce outward
-            desatGradient.addColorStop(0, 'rgba(255,255,255,1)');    // full color
-            desatGradient.addColorStop(0.3, 'rgba(220,220,220,1)');  // slight reduction
-            desatGradient.addColorStop(0.7, 'rgba(160,160,160,1)');  // more gray
-            desatGradient.addColorStop(1, 'rgba(128,128,128,0.3)');  // grayscale periphery
-            
-            this.ctx.fillStyle = desatGradient;
-            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-            this.ctx.restore();
-
-            // 6. Add binocular foveal overlay for extra sharpness at very center
             const eyeOffset = bioRadius * 0.6;
             const totalWidth = (bioRadius * 2) + (eyeOffset * 2);
             const totalHeight = bioRadius * 2;
+            const boxX = this.mouseX - (totalWidth / 2);
+            const boxY = this.mouseY - bioRadius;
 
+            // 6. Add binocular foveal overlay from captured content FIRST (full color)
             // Resize binocular canvases if needed
             if (this.fovealCanvas.width !== totalWidth || this.fovealCanvas.height !== totalHeight) {
                 this.fovealCanvas.width = totalWidth;
@@ -453,10 +435,7 @@ class Scrutinizer {
                 this.maskCanvas.height = totalHeight;
             }
 
-            const boxX = this.mouseX - (totalWidth / 2);
-            const boxY = this.mouseY - bioRadius;
-
-            // Prepare binocular mask
+            // Create binocular mask
             this.maskCtx.clearRect(0, 0, totalWidth, totalHeight);
             this.maskCtx.globalCompositeOperation = 'lighter';
 
@@ -478,14 +457,32 @@ class Scrutinizer {
             drawEye(this.maskCtx, centerX - eyeOffset, centerY);
             drawEye(this.maskCtx, centerX + eyeOffset, centerY);
 
-            // Apply mask to ORIGINAL (color) content for binocular overlay
+            // Apply mask to captured ORIGINAL (color) content.
+            // Use boxX/boxY directly so the foveal patch stays registered
+            // with the blurred background; let drawImage handle cropping
+            // when the binocular region approaches canvas edges.
             this.fovealCtx.clearRect(0, 0, totalWidth, totalHeight);
-            this.fovealCtx.drawImage(this.originalCanvas, boxX, boxY, totalWidth, totalHeight, 0, 0, totalWidth, totalHeight);
+            this.fovealCtx.drawImage(
+                this.originalCanvas,
+                boxX,
+                boxY,
+                totalWidth,
+                totalHeight,
+                0,
+                0,
+                totalWidth,
+                totalHeight
+            );
             this.fovealCtx.globalCompositeOperation = 'destination-in';
             this.fovealCtx.drawImage(this.maskCanvas, 0, 0);
+            this.fovealCtx.globalCompositeOperation = 'source-over';
 
             // Composite binocular overlay onto main canvas
             this.ctx.drawImage(this.fovealCanvas, boxX, boxY);
+
+            // 7. Progressive desaturation is already baked into the pyramid blur layers
+            // The binocular overlay from originalCanvas provides the only color content
+            // This mimics how color vision is limited to the fovea
 
             return;
         }
@@ -494,12 +491,6 @@ class Scrutinizer {
         this.mouseX += (this.targetMouseX - this.mouseX) * this.config.maskSmoothness;
         this.mouseY += (this.targetMouseY - this.mouseY) * this.config.maskSmoothness;
 
-        // Debug: log every 60 frames
-        if (!this.frameCount) this.frameCount = 0;
-        this.frameCount++;
-        if (this.frameCount % 60 === 0) {
-            console.log('Render frame', this.frameCount, 'Mouse:', this.mouseX.toFixed(0), this.mouseY.toFixed(0));
-        }
 
         // 1. Draw blurred/desaturated background using drawImage (FAST)
         // this.ctx.putImageData(this.processedImage, 0, 0); // SLOW
@@ -571,11 +562,20 @@ class Scrutinizer {
         this.ctx.drawImage(this.fovealCanvas, boxX, boxY);
     }
 
-    updateFovealRadius(delta) {
-        let newRadius = this.config.fovealRadius + delta;
+    updateFovealRadius(radius) {
+        // Accept absolute value (from menu) or delta (from wheel)
+        // If radius looks like a delta (small number, could be negative), treat as delta
+        // Otherwise treat as absolute value
+        let newRadius;
+        if (typeof radius === 'number' && Math.abs(radius) <= 50 && radius !== 20) {
+            // Likely a delta from wheel event
+            newRadius = this.config.fovealRadius + radius;
+        } else {
+            // Absolute value from menu
+            newRadius = radius;
+        }
         newRadius = Math.max(20, Math.min(300, newRadius));
         this.config.fovealRadius = newRadius;
-        console.log('Foveal radius:', this.config.fovealRadius);
     }
 
     updateBlurRadius(radius) {

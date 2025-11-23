@@ -220,6 +220,15 @@ Add user-facing controls for progressive blur tuning:
 - Menu or panel UI for adjustment (possibly View → Simulation Fidelity submenu)
 - Useful for researchers comparing different acuity models or designers stress-testing layouts
 
+#### Capture Fidelity Improvements
+**Priority**: Medium  
+**Effort**: Medium
+
+Improve how we sample the page for foveal/peripheral processing:
+- Use `image.toBitmap()` / `toPNG()` and write pixels directly into an `ImageData` buffer.
+- Draw once into canvas at **1:1 scale** (no scaling in `drawImage`) to avoid extra resampling.
+- Evaluate impact on text clarity (especially small fonts and iconography) versus performance/memory.
+
 ### Simulation Fidelity
 
 - **✅ Progressive eccentricity-based blur** (Implemented in 1.0)

@@ -117,24 +117,29 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleFoveal();
     });
 
-    // Set foveal radius from menu
-    ipcRenderer.on('menu:set-radius', (_event, radius) => {
-        if (!scrutinizer) return;
-        scrutinizer.config.fovealRadius = radius;
+    // Listen for menu commands
+    ipcRenderer.on('menu:set-radius', (event, value) => {
+        scrutinizer.updateFovealRadius(value);
+        // Notify main process to update menu checkmarks
+        ipcRenderer.send('settings:radius-changed', value);
     });
 
     // Set blur radius from menu
-    ipcRenderer.on('menu:set-blur', (_event, radius) => {
-        if (!scrutinizer) return;
-        scrutinizer.updateBlurRadius(radius);
+    ipcRenderer.on('menu:set-blur', (event, value) => {
+        scrutinizer.updateBlurRadius(value);
+        // Notify main process to update menu checkmarks
+        ipcRenderer.send('settings:blur-changed', value);
     });
 
     // Mouse wheel to adjust foveal size when holding Alt/Option
     document.addEventListener('wheel', (e) => {
         if (scrutinizer && scrutinizer.enabled && e.altKey) {
             e.preventDefault(); // prevent page scroll while adjusting radius
-            const delta = e.deltaY > 0 ? -5 : 5;
-            scrutinizer.updateFovealRadius(delta);
+            const delta = -e.deltaY;
+            const newRadius = Math.max(20, Math.min(300, scrutinizer.config.fovealRadius + delta));
+            scrutinizer.updateFovealRadius(newRadius);
+            // Notify main process (won't match exact menu values, but that's ok)
+            ipcRenderer.send('settings:radius-changed', newRadius);
         }
     }, { passive: false });
 
