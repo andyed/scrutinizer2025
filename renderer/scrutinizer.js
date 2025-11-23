@@ -506,6 +506,17 @@ class Scrutinizer {
             // The binocular overlay from originalCanvas provides the only color content
             // This mimics how color vision is limited to the fovea
 
+            // 8. Exclude scrollbar - keep it sharp (typically 15-17px on right edge)
+            const scrollbarWidth = 17;
+            const scrollbarX = this.canvas.width - scrollbarWidth;
+            if (scrollbarX > 0) {
+                this.ctx.drawImage(
+                    this.originalCanvas,
+                    scrollbarX, 0, scrollbarWidth, this.canvas.height,
+                    scrollbarX, 0, scrollbarWidth, this.canvas.height
+                );
+            }
+
             return;
         }
 
@@ -582,6 +593,17 @@ class Scrutinizer {
 
         // D. Composite onto Main Canvas
         this.ctx.drawImage(this.fovealCanvas, boxX, boxY);
+
+        // E. Exclude scrollbar - keep it sharp
+        const scrollbarWidth = 17;
+        const scrollbarX = this.canvas.width - scrollbarWidth;
+        if (scrollbarX > 0) {
+            this.ctx.drawImage(
+                this.sharpCanvas,
+                scrollbarX, 0, scrollbarWidth, this.canvas.height,
+                scrollbarX, 0, scrollbarWidth, this.canvas.height
+            );
+        }
     }
 
     updateFovealRadius(radius) {
