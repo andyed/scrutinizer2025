@@ -64,6 +64,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Notify main process of state change so new windows inherit it
         ipcRenderer.send('settings:enabled-changed', enabled);
+        
+        // Tell main process to start/stop capturing frames
+        ipcRenderer.send(enabled ? 'foveal:enabled' : 'foveal:disabled');
     };
 
     // Initialize Scrutinizer immediately (no webview element to wait for)

@@ -131,7 +131,8 @@ function createScrutinizerWindow(startUrl) {
     const view = new WebContentsView({
         webPreferences: {
             preload: path.join(__dirname, 'renderer', 'preload.js'),
-            offscreen: true  // Enable offscreen rendering for paint events
+            // offscreen: true  // TEMP: Disabled - "no content under offscreen mode" error
+            // Will need alternative capture method (capturePage on demand?)
         }
     });
 
@@ -148,20 +149,40 @@ function createScrutinizerWindow(startUrl) {
     // Keep view bounds in sync on window resize
     win.on('resize', updateViewBounds);
 
-    // Listen for paint events from offscreen rendering
-    view.webContents.on('paint', (event, dirty, image) => {
-        // Get frame buffer and size
-        const buffer = image.toBitmap();  // BGRA format
-        const size = image.getSize();
+    // Since offscreen rendering doesn't work, use capturePage polling
+    // Capture at 30fps when foveal mode is enabled
+    let captureInterval = null;
+    
+    const startCapturing = async () => {
+        if (captureInterval) return;
         
-        // Send to renderer for foveal processing
-        win.webContents.send('frame-captured', {
-            buffer: buffer,
-            width: size.width,
-            height: size.height,
-            dirty: dirty
-        });
-    });
+        captureInterval = setInterval(async () => {
+            try {
+                const image = await view.webContents.capturePage();
+                const buffer = image.toBitmap();  // BGRA format
+                const size = image.getSize();
+                
+                win.webContents.send('frame-captured', {
+                    buffer: buffer,
+                    width: size.width,
+                    height: size.height
+                });
+            } catch (err) {
+                console.error('[Main] Capture error:', err);
+            }
+        }, 33); // ~30fps
+    };
+    
+    const stopCapturing = () => {
+        if (captureInterval) {
+            clearInterval(captureInterval);
+            captureInterval = null;
+        }
+    };
+    
+    // Listen for foveal mode state changes
+    ipcMain.on('foveal:enabled', () => startCapturing());
+    ipcMain.on('foveal:disabled', () => stopCapturing());
 
     // Forward IPC messages from WebContentsView preload to renderer
     view.webContents.on('ipc-message', (event, channel, ...args) => {
@@ -170,12 +191,12 @@ function createScrutinizerWindow(startUrl) {
         } else if (channel === 'mousemove') {
             // Mouse events are handled by renderer's own listeners
         } else if (channel === 'scroll' || channel === 'mutation' || channel === 'input-change') {
-            // These events trigger paint automatically, no need to forward
+            // Trigger a capture when content changes
+            if (captureInterval) {
+                // Already capturing at interval
+            }
         }
     });
-
-    // Set frame rate (60fps for smooth tracking)
-    view.webContents.setFrameRate(60);
 
     // Load start URL in the view
     const urlToLoad = startUrl || currentStartPage || 'https://github.com/andyed/scrutinizer2025?tab=readme-ov-file#what-is-scrutinizer';
