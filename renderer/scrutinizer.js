@@ -199,18 +199,32 @@ class Scrutinizer {
     }
 
     processFrame(buffer, width, height) {
+        // Always update canvas size
+        if (this.canvas.width !== width || this.canvas.height !== height) {
+            this.canvas.width = width;
+            this.canvas.height = height;
+        }
+
+        // Convert BGRA buffer to ImageData
+        const imageData = new ImageData(width, height);
+        for (let i = 0; i < buffer.length; i += 4) {
+            imageData.data[i] = buffer[i + 2];     // R = B
+            imageData.data[i + 1] = buffer[i + 1]; // G = G
+            imageData.data[i + 2] = buffer[i];     // B = R
+            imageData.data[i + 3] = buffer[i + 3]; // A = A
+        }
+
+        // If foveal mode is disabled, just show the raw frame
+        if (!this.enabled) {
+            this.ctx.putImageData(imageData, 0, 0);
+            return;
+        }
+
+        // Foveal mode is enabled - process the frame
         if (this.isCapturing) return;
         this.isCapturing = true;
 
         try {
-            // Ensure main canvas matches frame size
-            if (this.canvas.width !== width || this.canvas.height !== height) {
-                this.canvas.width = width;
-                this.canvas.height = height;
-                // Prevent transparency by filling with white immediately
-                this.ctx.fillStyle = 'white';
-                this.ctx.fillRect(0, 0, width, height);
-            }
 
             // Ensure offscreen canvases match
             if (this.originalCanvas.width !== width || this.originalCanvas.height !== height) {
@@ -228,18 +242,8 @@ class Scrutinizer {
                 this.blurredCanvas.height = height;
             }
 
-            // Convert BGRA buffer to ImageData
-            // Note: Electron's toBitmap() returns BGRA, but ImageData expects RGBA
-            // We need to swap R and B channels
-            const imageData = new ImageData(width, height);
-            for (let i = 0; i < buffer.length; i += 4) {
-                imageData.data[i] = buffer[i + 2];     // R = B
-                imageData.data[i + 1] = buffer[i + 1]; // G = G
-                imageData.data[i + 2] = buffer[i];     // B = R
-                imageData.data[i + 3] = buffer[i + 3]; // A = A
-            }
-
             // Draw to offscreen canvases - preserve original for binocular overlay
+            // (imageData was already converted from BGRA to RGBA above)
             this.originalCtx.clearRect(0, 0, width, height);
             this.originalCtx.fillStyle = 'white';
             this.originalCtx.fillRect(0, 0, width, height);

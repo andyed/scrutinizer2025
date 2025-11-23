@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Wire up frame-captured IPC from main process (paint events)
     ipcRenderer.on('frame-captured', (event, data) => {
-        if (scrutinizer && scrutinizer.enabled) {
+        if (scrutinizer) {
             // Convert Node Buffer to Uint8Array
             const buffer = new Uint8Array(data.buffer);
             scrutinizer.processFrame(buffer, data.width, data.height);
