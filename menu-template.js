@@ -23,7 +23,6 @@ function buildMenuTemplate(sendToRenderer, currentRadius = 180, currentBlur = 10
             submenu: [
                 {
                     label: 'Toggle Foveal Mode',
-                    accelerator: 'Space',
                     click: () => sendToRenderer('menu:toggle-foveal')
                 },
                 { type: 'separator' },

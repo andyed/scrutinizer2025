@@ -57,7 +57,8 @@ function buildMenuTemplate(currentSettings, sendToRenderer) {
             submenu: [
                 {
                     label: 'Toggle Foveal Mode',
-                    accelerator: 'Space',
+                    // NOTE: Space accelerator removed in current builds to
+                    // avoid conflicts with native page scrolling.
                     click: () => sendToRenderer('menu:toggle-foveal')
                 },
                 { type: 'separator' },

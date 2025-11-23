@@ -10,7 +10,7 @@ This document outlines the path from current alpha to a production-ready 1.0 rel
 ### ✅ Already Complete
 - [x] Foveal vision simulation with mouse tracking
 - [x] Adjustable blur and radius controls
-- [x] Keyboard shortcuts (Space, Escape, Wheel)
+- [x] Keyboard shortcuts (Escape, Left/Right arrows)
 - [x] Basic navigation (back/forward, URL bar)
 - [x] Scroll and DOM mutation detection
 
@@ -304,7 +304,7 @@ Improve how we sample the page for foveal/peripheral processing:
 
 Before 1.0 release, verify:
 
-- [ ] All keyboard shortcuts work (Alt+Space, Alt+wheel)
+- [ ] All keyboard shortcuts work (Escape, Left/Right arrows)
 - [ ] Navigation (back/forward/refresh) works correctly
 - [ ] Foveal mode toggles properly
 - [ ] Menu controls update values in real-time
