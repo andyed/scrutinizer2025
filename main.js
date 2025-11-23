@@ -64,29 +64,35 @@ ipcMain.on('window:create', (event, url) => {
 });
 
 // Navigation IPC handlers for WebContentsView
+// Note: event.sender is the toolbar view, we need to navigate the content view
 ipcMain.on('navigate:back', (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
+    // Find window from toolbar webContents
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerToolbar && w.scrutinizerToolbar.webContents === event.sender);
     if (win && win.scrutinizerView) {
         win.scrutinizerView.webContents.goBack();
     }
 });
 
 ipcMain.on('navigate:forward', (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerToolbar && w.scrutinizerToolbar.webContents === event.sender);
     if (win && win.scrutinizerView) {
         win.scrutinizerView.webContents.goForward();
     }
 });
 
 ipcMain.on('navigate:reload', (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerToolbar && w.scrutinizerToolbar.webContents === event.sender);
     if (win && win.scrutinizerView) {
         win.scrutinizerView.webContents.reload();
     }
 });
 
 ipcMain.on('navigate:to', (event, url) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerToolbar && w.scrutinizerToolbar.webContents === event.sender);
     if (win && win.scrutinizerView) {
         win.scrutinizerView.webContents.loadURL(url);
     }
@@ -125,30 +131,41 @@ function createScrutinizerWindow(startUrl) {
     win.on('resize', saveBounds);
     win.on('move', saveBounds);
 
-    win.loadFile('renderer/index.html');
-
-    // Create WebContentsView for page content (replaces <webview> tag)
-    const view = new WebContentsView({
+    // Create toolbar WebContentsView (loads the UI HTML)
+    const toolbarView = new WebContentsView({
         webPreferences: {
-            preload: path.join(__dirname, 'renderer', 'preload.js'),
+            nodeIntegration: true,
+            contextIsolation: false
+        }
+    });
+    
+    // Create content WebContentsView (loads web pages)
+    const contentView = new WebContentsView({
+        webPreferences: {
+            preload: path.join(__dirname, 'renderer', 'preload.js')
             // offscreen: true  // TEMP: Disabled - "no content under offscreen mode" error
-            // Will need alternative capture method (capturePage on demand?)
         }
     });
 
-    // PROBLEM: WebContentsView and renderer HTML can't coexist in same window easily
-    // The renderer's webContents and the WebContentsView compete for space
-    // 
-    // For now, position view below where toolbar should be (y: 50)
-    // and make toolbar background transparent so view shows through
+    // Add views to window (order matters for z-index)
+    win.contentView.addChildView(contentView);  // Background
+    win.contentView.addChildView(toolbarView);  // Foreground
+    
+    // Position views
+    const toolbarHeight = 50;
     const updateViewBounds = () => {
         const [width, height] = win.getSize();
-        view.setBounds({ x: 0, y: 50, width: width, height: height - 50 });
+        toolbarView.setBounds({ x: 0, y: 0, width: width, height: toolbarHeight });
+        contentView.setBounds({ x: 0, y: toolbarHeight, width: width, height: height - toolbarHeight });
     };
-    
-    // Add view BEFORE loading renderer HTML, so renderer overlays it
-    win.contentView.addChildView(view);
     updateViewBounds();
+    
+    // Load toolbar HTML into toolbar view
+    toolbarView.webContents.loadFile('renderer/index.html');
+    
+    // Store references
+    win.scrutinizerToolbar = toolbarView;
+    win.scrutinizerView = contentView;
 
     // Keep view bounds in sync on window resize
     win.on('resize', updateViewBounds);
@@ -162,11 +179,12 @@ function createScrutinizerWindow(startUrl) {
         
         captureInterval = setInterval(async () => {
             try {
-                const image = await view.webContents.capturePage();
+                const image = await contentView.webContents.capturePage();
                 const buffer = image.toBitmap();  // BGRA format
                 const size = image.getSize();
                 
-                win.webContents.send('frame-captured', {
+                // Send to toolbar view (where app.js/scrutinizer live)
+                toolbarView.webContents.send('frame-captured', {
                     buffer: buffer,
                     width: size.width,
                     height: size.height
@@ -188,12 +206,12 @@ function createScrutinizerWindow(startUrl) {
     ipcMain.on('foveal:enabled', () => startCapturing());
     ipcMain.on('foveal:disabled', () => stopCapturing());
 
-    // Forward IPC messages from WebContentsView preload to renderer
-    view.webContents.on('ipc-message', (event, channel, ...args) => {
+    // Forward IPC messages from content view preload to toolbar view
+    contentView.webContents.on('ipc-message', (event, channel, ...args) => {
         if (channel === 'keydown') {
-            win.webContents.send('webview:keydown', args[0]);
+            toolbarView.webContents.send('webview:keydown', args[0]);
         } else if (channel === 'mousemove') {
-            // Mouse events are handled by renderer's own listeners
+            // Mouse events are handled by toolbar's own listeners
         } else if (channel === 'scroll' || channel === 'mutation' || channel === 'input-change') {
             // Trigger a capture when content changes
             if (captureInterval) {
@@ -202,16 +220,14 @@ function createScrutinizerWindow(startUrl) {
         }
     });
 
-    // Load start URL in the view
+    // Load start URL in the content view
     const urlToLoad = startUrl || currentStartPage || 'https://github.com/andyed/scrutinizer2025?tab=readme-ov-file#what-is-scrutinizer';
-    view.webContents.loadURL(urlToLoad);
+    contentView.webContents.loadURL(urlToLoad);
 
-    // Store view reference for navigation commands
-    win.scrutinizerView = view;
-
-    win.webContents.once('did-finish-load', () => {
-        console.log('[Main] Window did-finish-load. Sending init-state.');
-        win.webContents.send('settings:radius-options', RADIUS_OPTIONS);
+    // Send init state to toolbar view once it loads
+    toolbarView.webContents.once('did-finish-load', () => {
+        console.log('[Main] Toolbar did-finish-load. Sending init-state.');
+        toolbarView.webContents.send('settings:radius-options', RADIUS_OPTIONS);
         // Pass current state to new window
         const state = {
             radius: currentRadius,
@@ -219,8 +235,8 @@ function createScrutinizerWindow(startUrl) {
             enabled: currentEnabled,
             showWelcome: currentShowWelcome
         };
-        console.log('[Main] Sending state to new window:', JSON.stringify(state));
-        win.webContents.send('settings:init-state', state);
+        console.log('[Main] Sending state to toolbar:', JSON.stringify(state));
+        toolbarView.webContents.send('settings:init-state', state);
     });
 
     // Navigation will be handled via view.webContents.loadURL() instead of popup:navigate IPC
