@@ -26,6 +26,14 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }, true); // Use capture phase to get events before page handlers
 
+    // Track input/textarea changes for immediate visual feedback
+    window.addEventListener('input', (e) => {
+        // Only trigger for actual text input fields
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            ipcRenderer.sendToHost('input-change');
+        }
+    }, true);
+
     // Track DOM mutations
     const observer = new MutationObserver(() => {
         ipcRenderer.sendToHost('mutation');

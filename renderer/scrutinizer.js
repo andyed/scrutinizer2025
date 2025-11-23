@@ -66,6 +66,7 @@ class Scrutinizer {
         // Debounce timers
         this.scrollTimeout = null;
         this.mutationTimeout = null;
+        this.inputTimeout = null;
         this.resizeTimeout = null;
         this.mouseCaptureTimeout = null;
 
@@ -73,6 +74,7 @@ class Scrutinizer {
         this.handleMouseMove = this.handleMouseMove.bind(this);
         this.handleScroll = this.handleScroll.bind(this);
         this.handleMutation = this.handleMutation.bind(this);
+        this.handleInputChange = this.handleInputChange.bind(this);
         this.handleResize = this.handleResize.bind(this);
         this.render = this.render.bind(this);
 
@@ -92,7 +94,7 @@ class Scrutinizer {
             container.addEventListener('mousemove', this.handleMouseMove);
         }
 
-        // Webview IPC listeners for mouse, scroll, and mutations
+        // Webview IPC listeners for mouse, scroll, mutations, and input changes
         this.webview.addEventListener('ipc-message', (event) => {
             if (event.channel === 'mousemove') {
                 this.targetMouseX = event.args[0];
@@ -108,6 +110,8 @@ class Scrutinizer {
                 this.handleScroll();
             } else if (event.channel === 'mutation') {
                 this.handleMutation();
+            } else if (event.channel === 'input-change') {
+                this.handleInputChange();
             }
         });
 
@@ -162,6 +166,16 @@ class Scrutinizer {
         this.mutationTimeout = setTimeout(() => {
             this.captureAndProcess();
         }, this.config.mutationDebounce);
+    }
+
+    handleInputChange() {
+        if (!this.enabled) return;
+
+        // Short debounce for input changes to provide immediate visual feedback
+        clearTimeout(this.inputTimeout);
+        this.inputTimeout = setTimeout(() => {
+            this.captureAndProcess();
+        }, 50); // 50ms - fast enough to see what you're typing
     }
 
     async toggle() {
