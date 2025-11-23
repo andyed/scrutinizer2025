@@ -111,6 +111,7 @@ class Scrutinizer {
             } else if (event.channel === 'mutation') {
                 this.handleMutation();
             } else if (event.channel === 'input-change') {
+                console.log('[Scrutinizer] Received input-change event');
                 this.handleInputChange();
             }
         });
@@ -169,11 +170,13 @@ class Scrutinizer {
     }
 
     handleInputChange() {
+        console.log('[Scrutinizer] handleInputChange called, enabled:', this.enabled);
         if (!this.enabled) return;
 
         // Short debounce for input changes to provide immediate visual feedback
         clearTimeout(this.inputTimeout);
         this.inputTimeout = setTimeout(() => {
+            console.log('[Scrutinizer] Input timeout fired, triggering capture');
             this.captureAndProcess();
         }, 50); // 50ms - fast enough to see what you're typing
     }
@@ -191,6 +194,9 @@ class Scrutinizer {
     }
 
     async enable() {
+        // Ensure internal state flag matches visual state, even when enable()
+        // is called directly (e.g. from pending init state).
+        this.enabled = true;
         this.canvas.style.display = 'block';
 
         // Initialize foveal center to canvas center as a safe default
@@ -205,6 +211,8 @@ class Scrutinizer {
     }
 
     disable() {
+        // Keep enabled flag in sync when disabling from any code path.
+        this.enabled = false;
         this.canvas.style.display = 'none';
         this.stopRenderLoop();
     }
