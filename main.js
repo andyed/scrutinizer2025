@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, WebContentsView } = require('electron');
 const path = require('path');
 const { buildMenuTemplate, RADIUS_OPTIONS } = require('./menu-template');
 const settingsManager = require('./settings-manager');
@@ -98,6 +98,52 @@ function createScrutinizerWindow(startUrl) {
 
     win.loadFile('renderer/index.html');
 
+    // Create WebContentsView for page content (replaces <webview> tag)
+    const view = new WebContentsView({
+        webPreferences: {
+            preload: path.join(__dirname, 'renderer', 'preload.js'),
+            offscreen: true  // Enable offscreen rendering for paint events
+        }
+    });
+
+    // Attach view to window
+    win.contentView.addChildView(view);
+
+    // Position view below toolbar (60px height)
+    const updateViewBounds = () => {
+        const [width, height] = win.getSize();
+        view.setBounds({ x: 0, y: 60, width: width, height: height - 60 });
+    };
+    updateViewBounds();
+
+    // Keep view bounds in sync on window resize
+    win.on('resize', updateViewBounds);
+
+    // Listen for paint events from offscreen rendering
+    view.webContents.on('paint', (event, dirty, image) => {
+        // Get frame buffer and size
+        const buffer = image.toBitmap();  // BGRA format
+        const size = image.getSize();
+        
+        // Send to renderer for foveal processing
+        win.webContents.send('frame-captured', {
+            buffer: buffer,
+            width: size.width,
+            height: size.height,
+            dirty: dirty
+        });
+    });
+
+    // Set frame rate (60fps for smooth tracking)
+    view.webContents.setFrameRate(60);
+
+    // Load start URL in the view
+    const urlToLoad = startUrl || currentStartPage || 'https://github.com/andyed/scrutinizer2025?tab=readme-ov-file#what-is-scrutinizer';
+    view.webContents.loadURL(urlToLoad);
+
+    // Store view reference for navigation commands
+    win.scrutinizerView = view;
+
     win.webContents.once('did-finish-load', () => {
         console.log('[Main] Window did-finish-load. Sending init-state.');
         win.webContents.send('settings:radius-options', RADIUS_OPTIONS);
@@ -112,12 +158,7 @@ function createScrutinizerWindow(startUrl) {
         win.webContents.send('settings:init-state', state);
     });
 
-    if (startUrl) {
-        win.webContents.once('did-finish-load', () => {
-            console.log('[Main] Sending popup:navigate to', startUrl);
-            win.webContents.send('popup:navigate', startUrl);
-        });
-    }
+    // Navigation will be handled via view.webContents.loadURL() instead of popup:navigate IPC
 
     win.on('closed', () => {
         // Let GC reclaim window; nothing else to do

@@ -38,15 +38,8 @@
 
     <!-- Webview container -->
     <div id="webview-container">
-      <webview id="webview" 
-               src="https://github.com/andyed/scrutinizer2025?tab=readme-ov-file#what-is-scrutinizer" 
-               allowpopups 
-               preload="./preload.js"
-               disablewebsecurity="false"
-               nodeintegration="false">
-      </webview>
-
-      <!-- Overlay canvas for foveal effect -->
+      <!-- WebContentsView is now managed by main.js, not an HTML element -->
+      <!-- It renders behind this canvas -->
       <canvas id="overlay-canvas"></canvas>
     </div>
 
