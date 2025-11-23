@@ -1,9 +1,11 @@
+![Alpha Browser Screenshot](file:///Users/andyed/Documents/dev/scrutinizer2025/screenshots/alpha_browser.png)
+
 # Scrutinizer - Foveal Vision Simulator
 
 A modern recreation of the 2007 Scrutinizer vision-simulating browser, built with Electron and Canvas API.
 
 **Original project:** https://github.com/andyed/scrutinizer  
-**Original website:** http://andyedmonds.com/scrutinizer
+
 
 ## What is Scrutinizer?
 
@@ -19,6 +21,11 @@ This simulates what your brain is actually seeing at any moment in time -- high 
 - Observing users while using the browser to better enable you to understand their thought process
 
 ## Features
+
+### Demo Video
+<div class="video-container">
+  <iframe width="560" height="315" src="https://www.youtube.com/embed/lfROtjCp7bg" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</div>
 
 - 🎯 **Foveal mask** that follows your mouse cursor
 - 🌫️ **Peripheral blur** using box blur algorithm

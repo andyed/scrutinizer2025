@@ -15,7 +15,7 @@ function createWindow() {
   });
 
   mainWindow.loadFile('renderer/index.html');
-  
+
   // Open DevTools for debugging
   mainWindow.webContents.openDevTools();
 
