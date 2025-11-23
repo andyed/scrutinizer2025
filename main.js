@@ -8,6 +8,7 @@ let currentRadius;
 let currentBlur;
 let currentEnabled;
 let currentShowWelcome;
+let currentStartPage;
 
 let mainWindow;
 
@@ -48,6 +49,13 @@ ipcMain.on('settings:enabled-changed', (event, enabled) => {
 ipcMain.on('settings:welcome-changed', (event, show) => {
     currentShowWelcome = show;
     settingsManager.set('showWelcomePopup', show);
+});
+
+ipcMain.on('settings:page-changed', (event, url) => {
+    if (url && url.startsWith('http')) {
+        currentStartPage = url;
+        settingsManager.set('startPage', url);
+    }
 });
 
 ipcMain.on('window:create', (event, url) => {
@@ -127,8 +135,9 @@ function createWindow() {
     currentBlur = settingsManager.get('blur');
     currentEnabled = settingsManager.get('enabled');
     currentShowWelcome = settingsManager.get('showWelcomePopup');
+    currentStartPage = settingsManager.get('startPage');
 
-    mainWindow = createScrutinizerWindow();
+    mainWindow = createScrutinizerWindow(currentStartPage);
 
     // Build and set application menu
     rebuildMenu();

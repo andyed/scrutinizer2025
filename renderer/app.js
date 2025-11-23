@@ -141,8 +141,14 @@ document.addEventListener('DOMContentLoaded', () => {
     webview.addEventListener('did-stop-loading', () => {
         statusText.textContent = 'Page loaded';
         statusText.classList.remove('loading');
-        urlInput.value = webview.getURL();
+        const url = webview.getURL();
+        urlInput.value = url;
         navigateBtn.textContent = 'Go';
+        
+        // Save current page as start page for next launch
+        if (url && url.startsWith('http')) {
+            ipcRenderer.send('settings:page-changed', url);
+        }
     });
 
     webview.addEventListener('did-fail-load', (event) => {
