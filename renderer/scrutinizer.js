@@ -301,11 +301,9 @@ class Scrutinizer {
                 // Hybrid path: simplified blur + real-time compositing
                 // Store sharp (desaturated) version immediately
                 this.sharpCtx.putImageData(baseData, 0, 0);
-                this.hasProcessedImage = true; // Allow rendering with just sharp while blur computes
-
-                // Invalidate any previous blur pyramid; until the new blur
-                // completes we fall back to drawing only the sharp layer.
-                this.hasPyramid = false;
+                this.hasProcessedImage = true; // We can keep showing the
+                                              // previous blur pyramid while
+                                              // the new one computes.
 
                 // Offload blur pyramid to Web Worker (non-blocking)
                 if (this.blurWorker) {
