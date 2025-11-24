@@ -96,13 +96,11 @@ class Scrutinizer {
     }
 
     disable() {
+        // Keep enabled flag in sync when disabling from any code path.
         this.enabled = false;
-        // Do NOT stop the loop or hide canvas, as this is the only view of the content!
-        // We just effectively disable the "effect" by making the fovea huge in render()
-        if (this.canvas) {
-            this.canvas.style.display = 'block';
-        }
-        this.startRenderLoop();
+        // Hide canvas to show raw content underneath
+        this.canvas.style.display = 'none';
+        this.stopRenderLoop();
     }
 
     resetState() {
