@@ -1,6 +1,6 @@
 {
   "name": "scrutinizer-electron",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Foveal vision simulator - recreating the 2007 Scrutinizer browser",
   "main": "main.js",
   "scripts": {
@@ -10,7 +10,8 @@
     "build:unsigned": "electron-builder --mac --config.mac.identity=null",
     "release": "electron-builder --mac --publish always",
     "build:win": "electron-builder --win",
-    "release:win": "electron-builder --win --publish always"
+    "release:win": "electron-builder --win --publish always",
+    "release:all": "electron-builder --mac --win --publish always"
   },
   "keywords": [
     "electron",
@@ -23,6 +24,7 @@
   "build": {
     "appId": "com.scrutinizer.app",
     "productName": "Scrutinizer",
+    "executableName": "Scrutinizer",
     "files": [
       "main.js",
       "menu-template.js",

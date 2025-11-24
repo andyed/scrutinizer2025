@@ -7,7 +7,7 @@
 
 A modern recreation of the 2007 Scrutinizer vision-simulating browser, built with Electron and **WebGL**, and positioned as a **design constraint model** for studying foveal vs. peripheral vision on the web.
 
-![Beta Browser Screenshot](screenshots/onedotoh_browser.png)
+[![Scrutinizer Demo](http://img.youtube.com/vi/LZB845_a5M4/0.jpg)](https://www.youtube.com/watch?v=LZB845_a5M4)
 
 
 **Original project:** https://github.com/andyed/scrutinizer  
