@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, WebContentsView } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, WebContentsView, globalShortcut } = require('electron');
 const path = require('path');
 const { buildMenuTemplate, RADIUS_OPTIONS } = require('./menu-template');
 const settingsManager = require('./settings-manager');
@@ -464,12 +464,54 @@ function createWindow() {
     });
 }
 
-app.on('ready', createWindow);
+app.on('ready', () => {
+    createWindow();
+    
+    // Register global shortcut for Open URL
+    globalShortcut.register('CommandOrControl+L', () => {
+        const win = BrowserWindow.getFocusedWindow();
+        if (win && win.scrutinizerView) {
+            // Trigger the menu item action
+            const currentURL = win.scrutinizerView.webContents.getURL();
+            
+            // Create URL input dialog window
+            const dialog = new BrowserWindow({
+                width: 500,
+                height: 160,
+                parent: win,
+                modal: true,
+                show: false,
+                resizable: false,
+                minimizable: false,
+                maximizable: false,
+                webPreferences: {
+                    nodeIntegration: true,
+                    contextIsolation: false
+                }
+            });
+            
+            dialog.loadFile(path.join(__dirname, 'renderer', 'url-dialog.html'));
+            
+            dialog.once('ready-to-show', () => {
+                dialog.show();
+                dialog.webContents.send('set-url', currentURL);
+            });
+            
+            // Store reference for IPC handlers
+            win.urlDialog = dialog;
+        }
+    });
+});
 
 app.on('window-all-closed', function () {
     if (process.platform !== 'darwin') {
         app.quit();
     }
+});
+
+app.on('will-quit', () => {
+    // Unregister all global shortcuts
+    globalShortcut.unregisterAll();
 });
 
 app.on('activate', function () {

@@ -37,7 +37,8 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                 },
                 {
                     label: 'Open URL...',
-                    accelerator: 'CmdOrCtrl+Shift+L',
+                    // Accelerator shown but handled via globalShortcut in main.js
+                    accelerator: 'CmdOrCtrl+L',
                     click: () => {
                         const win = BrowserWindow.getFocusedWindow();
                         if (!win || !win.scrutinizerView) return;
@@ -48,7 +49,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         // Create URL input dialog window
                         const dialog = new BrowserWindow({
                             width: 500,
-                            height: 150,
+                            height: 160,
                             parent: win,
                             modal: true,
                             show: false,
