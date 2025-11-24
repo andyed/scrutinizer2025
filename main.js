@@ -337,6 +337,13 @@ function createScrutinizerWindow(startUrl) {
         }
     });
 
+    // Intercept target="_blank" links in content window
+    contentWin.webContents.setWindowOpenHandler(({ url }) => {
+        console.log('[Main] Content window opening:', url);
+        createScrutinizerWindow(url);
+        return { action: 'deny' };
+    });
+
     // Load start URL in the content view
     const urlToLoad = startUrl || currentStartPage || 'https://github.com/andyed/scrutinizer2025?tab=readme-ov-file#what-is-scrutinizer';
     contentWin.loadURL(urlToLoad);
