@@ -112,11 +112,6 @@ ipcMain.on('input:wheel', (event, data) => {
             type: 'mouseWheel',
             x: data.x,
             y: data.y,
-            deltaX: 0, // Electron requires deltaX/Y to be 0 for mouseWheel event? No, wait.
-            deltaY: 0, // Actually, for 'mouseWheel', it uses accelerationRatio and wheelTicks?
-            // Let's try passing deltas as is, but maybe inverted?
-            // Electron docs: "deltaX Integer - The amount to scroll horizontally."
-            // "deltaY Integer - The amount to scroll vertically."
             deltaX: data.deltaX,
             deltaY: data.deltaY,
             wheelTicksX: data.deltaX / 120,
@@ -149,9 +144,29 @@ ipcMain.on('input:keyboard', (event, data) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerToolbar && w.scrutinizerToolbar.webContents === event.sender);
     if (win && win.scrutinizerView && !win.scrutinizerView.isDestroyed()) {
+        // Map browser key names to Electron key codes
+        let keyCode = data.keyCode;
+
+        // Electron uses different names for some keys
+        const keyMap = {
+            'ArrowUp': 'Up',
+            'ArrowDown': 'Down',
+            'ArrowLeft': 'Left',
+            'ArrowRight': 'Right',
+            ' ': 'Space',
+            'PageUp': 'PageUp',
+            'PageDown': 'PageDown',
+            'Home': 'Home',
+            'End': 'End'
+        };
+
+        if (keyMap[keyCode]) {
+            keyCode = keyMap[keyCode];
+        }
+
         win.scrutinizerView.webContents.sendInputEvent({
             type: data.type,
-            keyCode: data.keyCode
+            keyCode: keyCode
         });
     }
 });

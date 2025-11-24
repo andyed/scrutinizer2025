@@ -106,15 +106,30 @@ class WebGLRenderer {
                 // Smooth transition instead of hard cut
                 float strength = smoothstep(radius_norm, radius_norm + 0.15, dist);
                 
-                // Domain Warping (Positional Uncertainty)
-                // Use very high frequency noise for "grit" / "Heat Haze"
-                float noiseScale = 400.0; 
-                float n1 = snoise(uv_corrected * noiseScale);
-                float n2 = snoise(uv_corrected * noiseScale + vec2(100.0, 100.0)); // Offset
                 
-                // Displace UVs based on strength
-                // The further out, the more we shove the pixel around
-                vec2 displacement = vec2(n1, n2) * 0.003 * strength;
+                // Domain Warping (Positional Uncertainty) - Multi-Octave
+                // Biology: Receptive fields get LARGER as you move to periphery
+                
+                // High-frequency noise (fine detail destruction - "The Static")
+                // Good for sidebar text, body copy
+                float fineScale = 400.0;
+                float n1_fine = snoise(uv_corrected * fineScale);
+                float n2_fine = snoise(uv_corrected * fineScale + vec2(100.0, 100.0));
+                vec2 fineDisplacement = vec2(n1_fine, n2_fine) * 0.003 * strength;
+                
+                // Low-frequency noise (large feature destruction - "The Warper")
+                // Good for destroying headlines, large text
+                float coarseScale = 50.0;  // Much larger "waves"
+                float n1_coarse = snoise(uv_corrected * coarseScale);
+                float n2_coarse = snoise(uv_corrected * coarseScale + vec2(50.0, 50.0));
+                
+                // Scale coarse noise more aggressively in far periphery
+                // smoothstep(0.4, 0.8, dist) = 0 near center, 1 at edges
+                float coarseStrength = smoothstep(0.4, 0.8, dist);
+                vec2 coarseDisplacement = vec2(n1_coarse, n2_coarse) * 0.006 * strength * coarseStrength;
+                
+                // Combine: Fine noise everywhere, coarse noise only at edges
+                vec2 displacement = fineDisplacement + coarseDisplacement;
                 vec2 newUV = uv + displacement;
                 
                 // Sample texture at warped location

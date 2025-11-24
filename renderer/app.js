@@ -236,6 +236,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Don't forward if typing in URL bar
         if (e.target === urlInput) return;
 
+        // List of keys that should be forwarded for scrolling/navigation
+        const navigationKeys = [
+            'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+            'PageUp', 'PageDown', 'Home', 'End', ' '
+        ];
+
+        // Prevent default for navigation keys so they don't affect the toolbar
+        if (navigationKeys.includes(e.key)) {
+            e.preventDefault();
+        }
+
         ipcRenderer.send('input:keyboard', {
             type: 'keyDown',
             keyCode: e.key,
@@ -245,6 +256,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('keyup', (e) => {
         if (e.target === urlInput) return;
+
+        const navigationKeys = [
+            'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+            'PageUp', 'PageDown', 'Home', 'End', ' '
+        ];
+
+        if (navigationKeys.includes(e.key)) {
+            e.preventDefault();
+        }
 
         ipcRenderer.send('input:keyboard', {
             type: 'keyUp',
