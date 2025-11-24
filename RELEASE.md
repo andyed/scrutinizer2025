@@ -28,15 +28,14 @@ This creates a local .dmg without signing. Test the installer.
 ### 4. Setup Environment Variables
 ```bash
 cp .env.example .env.local
-# Edit .env.local with your credentials
+# Edit .env.local with your credentials:
+# - GH_TOKEN (Required for GitHub Releases)
+# - APPLE_ID (Required for signing)
+# - APPLE_ID_PASSWORD (Required for signing)
+# - TEAM_ID (Required for signing)
 ```
 
-### 5. Setup S3 Bucket
-- Create bucket: `scrutinizer-releases`
-- Enable public read access
-- Configure CORS
-
-### 6. First Signed Build
+### 5. First Signed Build
 ```bash
 # Load environment variables
 source .env.local
@@ -45,15 +44,19 @@ source .env.local
 npm run build
 ```
 
-### 7. Release to S3
+### 6. Release to GitHub
 ```bash
 npm run release
 ```
+This command will:
+1. Build and sign the application
+2. Upload artifacts (.dmg, .zip) to a new **Draft Release** on GitHub
+3. You can then edit the release notes and publish it from the GitHub UI.
 
 ## Cost Summary
 - **Apple Developer:** $99/year
-- **AWS S3:** ~$1-2/month
-- **Total first year:** ~$112
+- **GitHub:** Free (for public repos)
+- **Total first year:** ~$99
 
 ## Documentation
 - **Full guide:** `docs/release-prep.md`
