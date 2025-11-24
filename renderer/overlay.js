@@ -17,15 +17,65 @@ document.addEventListener('DOMContentLoaded', () => {
     const navigateBtn = document.getElementById('go-btn');
     const backBtn = document.getElementById('back-btn');
     const forwardBtn = document.getElementById('forward-btn');
+    const toolbar = document.getElementById('toolbar');
     
     // Initialize Scrutinizer for canvas rendering
     scrutinizer = new Scrutinizer(CONFIG);
+    
+    // Handle mouse events for click-through behavior
+    // When mouse is over toolbar, capture events; otherwise forward to browser
+    let mouseOverToolbar = false;
+    
+    const updateMouseForwarding = () => {
+        if (mouseOverToolbar) {
+            // Mouse over toolbar - capture events so toolbar buttons work
+            ipcRenderer.send('hud:set-ignore-mouse-events', false);
+        } else {
+            // Mouse not over toolbar - forward to browser below
+            ipcRenderer.send('hud:set-ignore-mouse-events', true, { forward: true });
+        }
+    };
+    
+    // Track when mouse enters/leaves toolbar
+    toolbar.addEventListener('mouseenter', () => {
+        mouseOverToolbar = true;
+        updateMouseForwarding();
+    });
+    
+    toolbar.addEventListener('mouseleave', () => {
+        mouseOverToolbar = false;
+        updateMouseForwarding();
+    });
+    
+    // Track mouse globally to catch edge cases
+    document.addEventListener('mousemove', (e) => {
+        const overToolbar = toolbar && toolbar.contains(e.target);
+        if (overToolbar !== mouseOverToolbar) {
+            mouseOverToolbar = overToolbar;
+            updateMouseForwarding();
+        }
+    });
     
     // Listen for frame data from main process
     ipcRenderer.on('frame-captured', (event, data) => {
         if (scrutinizer && data.width > 0 && data.height > 0) {
             const buffer = new Uint8Array(data.buffer);
             scrutinizer.processFrame(buffer, data.width, data.height);
+        }
+    });
+
+    // Keyboard shortcuts coming from content view (preload forwards as webview:keydown)
+    ipcRenderer.on('webview:keydown', (event, keyEvent) => {
+        if (!keyEvent || !keyEvent.code) return;
+
+        // ESC is handled in main.js to toggle HUD window visibility
+        // Arrow keys to adjust radius (when enabled)
+        if (fovealEnabled) {
+            if (keyEvent.code === 'ArrowRight') {
+                if (scrutinizer) scrutinizer.updateFovealRadius(10);
+            } else if (keyEvent.code === 'ArrowLeft') {
+                if (scrutinizer) scrutinizer.updateFovealRadius(-10);
+            }
         }
     });
     
@@ -98,22 +148,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-        // Escape to toggle foveal
-        if (e.code === 'Escape') {
-            e.preventDefault();
-            toggleFoveal();
-            return;
-        }
-
-        // Backquote / Tilde to hide/show toolbar
-        if (e.code === 'Backquote') {
-            e.preventDefault();
-            const toolbarEl = document.getElementById('toolbar');
-            if (toolbarEl) {
-                toolbarEl.classList.toggle('hidden');
-            }
-            return;
-        }
+        // ESC is now handled in main.js to toggle entire HUD window
+        // No need to toggle toolbar visibility here anymore
         
         // Arrow keys to adjust radius (when enabled)
         if (fovealEnabled) {
@@ -127,13 +163,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // When clicking outside the toolbar, hand focus to the content view
-    document.addEventListener('mousedown', (e) => {
-        const toolbarEl = document.getElementById('toolbar');
-        if (toolbarEl && !toolbarEl.contains(e.target)) {
-            ipcRenderer.send('overlay:focus-content');
-        }
-    });
+    // HUD window is now separate - no need to forward mouse/wheel events
+    // Browser window handles all interactions natively
     
     // Listen for page load events to update UI
     ipcRenderer.on('browser:did-start-loading', () => {
@@ -170,6 +201,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     ipcRenderer.on('menu:set-radius', (event, radius) => {
         if (scrutinizer) scrutinizer.updateFovealRadius(radius);
+    });
+    
+    // Handle toolbar visibility toggle (from ESC key or menu)
+    ipcRenderer.on('hud:toggle-toolbar', () => {
+        const toolbarEl = document.getElementById('toolbar');
+        if (toolbarEl) {
+            toolbarEl.classList.toggle('hidden');
+        }
     });
     
     console.log('[Overlay] Ready');

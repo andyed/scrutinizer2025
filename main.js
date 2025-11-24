@@ -19,11 +19,20 @@ function sendToRenderer(channel, ...args) {
     }
 }
 
+function sendToOverlays(channel, ...args) {
+    const windows = BrowserWindow.getAllWindows();
+    for (const win of windows) {
+        if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+            win.scrutinizerHud.webContents.send(channel, ...args);
+        }
+    }
+}
+
 function rebuildMenu() {
     // Ensure settings are initialized
     const radius = currentRadius || 180;
     const blur = currentBlur || 10;
-    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, radius, blur));
+    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur));
     Menu.setApplicationMenu(menu);
 }
 
@@ -58,80 +67,141 @@ ipcMain.on('settings:page-changed', (event, url) => {
     }
 });
 
-// Allow overlay view to hand keyboard focus to the content view
-ipcMain.on('overlay:focus-content', (event) => {
-    const windows = BrowserWindow.getAllWindows();
-    const win = windows.find(w => w.scrutinizerOverlay && w.scrutinizerOverlay.webContents === event.sender);
-    if (win && win.scrutinizerView) {
-        win.scrutinizerView.webContents.focus();
-    }
-});
+// No longer needed - HUD window doesn't intercept wheel events
+// Browser window handles scroll natively
+
+// No longer needed - browser window handles focus natively
 
 ipcMain.on('window:create', (event, url) => {
     console.log('[Main] Received window:create for:', url);
     createScrutinizerWindow(url);
 });
 
-// Navigation IPC handlers for WebContentsView
-// Note: event.sender is the overlay view, we need to navigate the content view
-ipcMain.on('navigate:back', (event) => {
-    // Find window from overlay webContents
+// Navigation IPC handlers from HUD window
+ipcMain.on('hud:navigate:back', (event) => {
     const windows = BrowserWindow.getAllWindows();
-    const win = windows.find(w => w.scrutinizerOverlay && w.scrutinizerOverlay.webContents === event.sender);
+    const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
     if (win && win.scrutinizerView) {
         win.scrutinizerView.webContents.goBack();
     }
 });
 
-ipcMain.on('navigate:forward', (event) => {
+// Legacy handler for backward compatibility
+ipcMain.on('navigate:back', (event) => {
     const windows = BrowserWindow.getAllWindows();
-    const win = windows.find(w => w.scrutinizerOverlay && w.scrutinizerOverlay.webContents === event.sender);
+    const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
+    if (win && win.scrutinizerView) {
+        win.scrutinizerView.webContents.goBack();
+    }
+});
+
+ipcMain.on('hud:navigate:forward', (event) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
     if (win && win.scrutinizerView) {
         win.scrutinizerView.webContents.goForward();
     }
 });
 
-ipcMain.on('navigate:reload', (event) => {
+// Legacy handler
+ipcMain.on('navigate:forward', (event) => {
     const windows = BrowserWindow.getAllWindows();
-    const win = windows.find(w => w.scrutinizerOverlay && w.scrutinizerOverlay.webContents === event.sender);
+    const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
+    if (win && win.scrutinizerView) {
+        win.scrutinizerView.webContents.goForward();
+    }
+});
+
+ipcMain.on('hud:navigate:reload', (event) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
     if (win && win.scrutinizerView) {
         win.scrutinizerView.webContents.reload();
     }
 });
 
-ipcMain.on('navigate:to', (event, url) => {
+// Legacy handler
+ipcMain.on('navigate:reload', (event) => {
     const windows = BrowserWindow.getAllWindows();
-    const win = windows.find(w => w.scrutinizerOverlay && w.scrutinizerOverlay.webContents === event.sender);
+    const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
+    if (win && win.scrutinizerView) {
+        win.scrutinizerView.webContents.reload();
+    }
+});
+
+ipcMain.on('hud:navigate:to', (event, url) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
     if (win && win.scrutinizerView) {
         win.scrutinizerView.webContents.loadURL(url);
     }
 });
 
-// Content view is visible and receives input naturally - no forwarding needed!
-
-// Send window dimensions to overlay for canvas sizing
-ipcMain.on('get-window-size', (event) => {
+// Legacy handler
+ipcMain.on('navigate:to', (event, url) => {
     const windows = BrowserWindow.getAllWindows();
-    const win = windows.find(w => w.scrutinizerOverlay && w.scrutinizerOverlay.webContents === event.sender);
+    const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
+    if (win && win.scrutinizerView) {
+        win.scrutinizerView.webContents.loadURL(url);
+    }
+});
+
+// Send window dimensions to HUD for canvas sizing
+ipcMain.on('hud:request:window-bounds', (event) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
     if (win) {
         const [width, height] = win.getSize();
         event.reply('window-size', { width, height });
     }
 });
 
-// Handle capture requests from overlay (for foveal effect)
-ipcMain.on('capture:request', async (event) => {
+// Legacy handler
+ipcMain.on('get-window-size', (event) => {
     const windows = BrowserWindow.getAllWindows();
-    const win = windows.find(w => w.scrutinizerOverlay && w.scrutinizerOverlay.webContents === event.sender);
+    const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
+    if (win) {
+        const [width, height] = win.getSize();
+        event.reply('window-size', { width, height });
+    }
+});
+
+// Handle capture requests from HUD (for foveal effect)
+ipcMain.on('hud:capture:request', async (event) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
     
-    if (win && win.scrutinizerView && win.scrutinizerOverlay) {
+    if (win && win.scrutinizerView && win.scrutinizerHud) {
         try {
             const image = await win.scrutinizerView.webContents.capturePage();
             const buffer = image.toBitmap();
             const size = image.getSize();
             
-            // Send back to overlay view (where canvas lives)
-            win.scrutinizerOverlay.webContents.send('frame-captured', {
+            // Send back to HUD window (where canvas lives)
+            win.scrutinizerHud.webContents.send('hud:frame-captured', {
+                buffer: buffer,
+                width: size.width,
+                height: size.height
+            });
+        } catch (err) {
+            console.error('[Main] Capture error:', err);
+        }
+    }
+});
+
+// Legacy handler
+ipcMain.on('capture:request', async (event) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
+    
+    if (win && win.scrutinizerView && win.scrutinizerHud) {
+        try {
+            const image = await win.scrutinizerView.webContents.capturePage();
+            const buffer = image.toBitmap();
+            const size = image.getSize();
+            
+            // Send back to HUD window (where canvas lives)
+            win.scrutinizerHud.webContents.send('frame-captured', {
                 buffer: buffer,
                 width: size.width,
                 height: size.height
@@ -148,23 +218,32 @@ ipcMain.on('open-new-window', (event, url) => {
     createScrutinizerWindow(url);
 });
 
+// Handle HUD mouse event forwarding control
+ipcMain.on('hud:set-ignore-mouse-events', (event, ignore, options) => {
+    const windows = BrowserWindow.getAllWindows();
+    const hudWindow = windows.find(w => w.webContents === event.sender);
+    if (hudWindow) {
+        hudWindow.setIgnoreMouseEvents(ignore, options || {});
+    }
+});
+
 function createScrutinizerWindow(startUrl) {
-    console.log('[Main] Creating new Scrutinizer window', startUrl ? 'with URL: ' + startUrl : '(default URL)');
+    console.log('[Main] Creating new Scrutinizer window (dual-window architecture)', startUrl ? 'with URL: ' + startUrl : '(default URL)');
 
     // Get bounds from settings if available
     const bounds = settingsManager.get('windowBounds') || { width: 1200, height: 900 };
 
+    // ===== MAIN BROWSER WINDOW =====
+    // This window contains only the browser content (via WebContentsView)
     const win = new BrowserWindow({
         width: bounds.width,
         height: bounds.height,
         x: bounds.x,
         y: bounds.y,
+        show: true,
         webPreferences: {
-            // Host window needs node access for app.js to use require('electron')
-            nodeIntegration: true,
-            contextIsolation: false,
-            // Enable webview tag - embedded content runs isolated via preload.js
-            webviewTag: true
+            nodeIntegration: false,
+            contextIsolation: true
         }
     });
 
@@ -174,14 +253,19 @@ function createScrutinizerWindow(startUrl) {
         if (saveTimeout) clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
             if (!win.isDestroyed()) {
-                settingsManager.set('windowBounds', win.getBounds());
+                const newBounds = win.getBounds();
+                settingsManager.set('windowBounds', newBounds);
+                // Also sync HUD bounds
+                if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+                    win.scrutinizerHud.setBounds(newBounds);
+                }
             }
-        }, 500);
+        }, 100);
     };
     win.on('resize', saveBounds);
     win.on('move', saveBounds);
 
-    // Create content WebContentsView (the actual browser - VISIBLE, FULL WINDOW)
+    // Create content WebContentsView (the actual browser content)
     const contentView = new WebContentsView({
         webPreferences: {
             preload: path.join(__dirname, 'renderer', 'preload.js'),
@@ -190,66 +274,103 @@ function createScrutinizerWindow(startUrl) {
         }
     });
 
-    // Create overlay WebContentsView (toolbar UI + canvas - FULL WINDOW, transparent)
-    const overlayView = new WebContentsView({
+    // Add content view to main window
+    win.contentView.addChildView(contentView);
+
+    // Position content view to fill the window
+    const updateViewBounds = () => {
+        const [width, height] = win.getSize();
+        contentView.setBounds({ x: 0, y: 0, width: width, height: height });
+    };
+    updateViewBounds();
+    win.on('resize', updateViewBounds);
+
+    // ===== HUD WINDOW =====
+    // Separate transparent window for toolbar + canvas
+    const hudWindow = new BrowserWindow({
+        width: bounds.width,
+        height: bounds.height,
+        x: bounds.x,
+        y: bounds.y,
+        transparent: true,
+        frame: false,
+        alwaysOnTop: true,
+        show: true, // Show by default for now (can toggle with ESC)
+        hasShadow: false,
+        focusable: false, // Don't steal keyboard focus from browser
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
         }
     });
+
+    // Make HUD ignore mouse events by default (forward to browser below)
+    hudWindow.setIgnoreMouseEvents(true, { forward: true });
+
+    // Load HUD content
+    hudWindow.loadFile('renderer/overlay.html');
     
-    // Make overlay view transparent at native level
-    overlayView.setBackgroundColor({ red: 0, green: 0, blue: 0, alpha: 0 });
-    
-    overlayView.webContents.once('did-finish-load', () => {
-        console.log('[Main] Overlay loaded');
-    });
-
-    // Add views to window (order matters for z-index)
-    win.contentView.addChildView(contentView);   // Layer 1: browser (bottom)
-    win.contentView.addChildView(overlayView);   // Layer 2: overlay with toolbar + canvas (top)
-
-    // Position views - BOTH AT (0, 0) FULL WINDOW
-    const updateViewBounds = () => {
-        const [width, height] = win.getSize();
-        // Content view gets full window
-        contentView.setBounds({ x: 0, y: 0, width: width, height: height });
-        // Overlay view gets full window (toolbar floats via CSS)
-        overlayView.setBounds({ x: 0, y: 0, width: width, height: height });
-    };
-    updateViewBounds();
-
-    // Load HTML into overlay (has toolbar + canvas)
-    overlayView.webContents.loadFile('renderer/overlay.html');
-    
-    overlayView.webContents.once('did-finish-load', () => {
-        console.log('[Main] Overlay loaded');
-    });
-
-    // Open DevTools for the overlay (has UI)
-    overlayView.webContents.openDevTools({ mode: 'detach' });
+    // Open DevTools for HUD debugging
+    hudWindow.webContents.openDevTools({ mode: 'detach' });
 
     // Store references
     win.scrutinizerView = contentView;
-    win.scrutinizerOverlay = overlayView;
+    win.scrutinizerHud = hudWindow;
+    hudWindow.mainBrowserWindow = win; // Reverse reference
 
-    // Keep view bounds in sync on window resize
-    win.on('resize', updateViewBounds);
+    // Sync HUD position/size with main window
+    const syncHudBounds = () => {
+        if (!win.isDestroyed() && !hudWindow.isDestroyed()) {
+            hudWindow.setBounds(win.getBounds());
+        }
+    };
+    win.on('move', syncHudBounds);
+    win.on('resize', syncHudBounds);
 
-    // Content view is visible - no paint events needed, just capture when foveal mode is active
-    // Capture will be done via capturePage() on demand from renderer
+    // Listen for keyboard events from content view's preload
+    const keydownHandler = (event, keyEvent) => {
+        // Only handle if event is from this window's content view
+        if (event.sender === contentView.webContents) {
+            console.log('[Main] Received keydown from content:', keyEvent.code);
+            if (keyEvent && keyEvent.code === 'Escape') {
+                // Toggle toolbar visibility (not entire HUD window)
+                // This keeps foveal effect running even when toolbar is hidden
+                if (!hudWindow.webContents.isDestroyed()) {
+                    hudWindow.webContents.send('hud:toggle-toolbar');
+                }
+            }
+            // Forward to HUD for other key handling (arrow keys for radius adjustment)
+            if (!hudWindow.webContents.isDestroyed()) {
+                hudWindow.webContents.send('webview:keydown', keyEvent);
+            }
+        }
+    };
+    
+    // Use ipcMain to listen for keydown events
+    ipcMain.on('keydown', keydownHandler);
+    
+    // Clean up when window closes
+    win.on('closed', () => {
+        ipcMain.removeListener('keydown', keydownHandler);
+        if (!hudWindow.isDestroyed()) {
+            hudWindow.close();
+        }
+    });
 
+    // Content view loading events - forward to HUD
     contentView.webContents.on('did-start-loading', () => {
         console.log('[Main] ContentView did-start-loading');
-        if (!overlayView.webContents.isDestroyed()) {
-            overlayView.webContents.send('browser:did-start-loading');
+        if (!hudWindow.webContents.isDestroyed()) {
+            hudWindow.webContents.send('hud:browser:did-start-loading');
+            hudWindow.webContents.send('browser:did-start-loading'); // Legacy
         }
     });
 
     contentView.webContents.on('did-finish-load', () => {
         console.log('[Main] ContentView did-finish-load');
-        if (!overlayView.webContents.isDestroyed()) {
-            overlayView.webContents.send('browser:did-finish-load');
+        if (!hudWindow.webContents.isDestroyed()) {
+            hudWindow.webContents.send('hud:browser:did-finish-load');
+            hudWindow.webContents.send('browser:did-finish-load'); // Legacy
         }
     });
 
@@ -257,10 +378,11 @@ function createScrutinizerWindow(startUrl) {
         console.error('[Main] ContentView did-fail-load:', errorCode, errorDescription);
     });
 
-    // Forward navigation events to update URL bar
+    // Forward navigation events to update HUD URL bar
     const sendUrlUpdate = (url) => {
-        if (!overlayView.webContents.isDestroyed()) {
-            overlayView.webContents.send('browser:did-navigate', url);
+        if (!hudWindow.webContents.isDestroyed()) {
+            hudWindow.webContents.send('hud:browser:did-navigate', url);
+            hudWindow.webContents.send('browser:did-navigate', url); // Legacy
         }
     };
 
@@ -272,26 +394,7 @@ function createScrutinizerWindow(startUrl) {
         sendUrlUpdate(url);
     });
 
-    // Forward IPC messages from content view preload to overlay view
-    contentView.webContents.on('ipc-message', (event, channel, ...args) => {
-        if (channel === 'keydown') {
-            if (!overlayView.webContents.isDestroyed()) {
-                overlayView.webContents.send('webview:keydown', args[0]);
-            }
-        } else if (channel === 'mousemove') {
-            // Mouse events are handled by overlay's own listeners
-        } else if (channel === 'scroll' || channel === 'mutation' || channel === 'input-change') {
-            // Trigger a capture when content changes
-            // For now, we rely on regular capture interval
-        } else if (channel === 'open-new-window') {
-            // Handle target="_blank" links from preload script
-            const url = args[0];
-            console.log('[Main] Opening new window from preload:', url);
-            createScrutinizerWindow(url);
-        }
-    });
-
-    // Intercept target="_blank" links in content view
+    // Intercept target="_blank" links
     contentView.webContents.setWindowOpenHandler(({ url }) => {
         console.log('[Main] Opening new window:', url);
         createScrutinizerWindow(url);
@@ -302,27 +405,24 @@ function createScrutinizerWindow(startUrl) {
     const urlToLoad = startUrl || currentStartPage || 'https://github.com/andyed/scrutinizer2025?tab=readme-ov-file#what-is-scrutinizer';
     contentView.webContents.loadURL(urlToLoad);
 
-    // Send init state to overlay view once it loads
-    overlayView.webContents.once('did-finish-load', () => {
-        console.log('[Main] Overlay did-finish-load. Sending init-state.');
-        overlayView.webContents.send('settings:radius-options', RADIUS_OPTIONS);
+    // Send init state to HUD once it loads
+    hudWindow.webContents.once('did-finish-load', () => {
+        console.log('[Main] HUD loaded. Sending init-state.');
+        hudWindow.webContents.send('hud:settings:radius-options', RADIUS_OPTIONS);
+        hudWindow.webContents.send('settings:radius-options', RADIUS_OPTIONS); // Legacy
+        
         // Pass current state to new window
         // Only show welcome popup on first window (when mainWindow doesn't exist yet)
-        const isFirstWindow = !mainWindow || BrowserWindow.getAllWindows().length === 1;
+        const isFirstWindow = !mainWindow || BrowserWindow.getAllWindows().filter(w => !w.mainBrowserWindow).length === 1;
         const state = {
             radius: currentRadius,
             blur: currentBlur,
             enabled: currentEnabled,
             showWelcome: isFirstWindow ? currentShowWelcome : false
         };
-        console.log('[Main] Sending state to overlay:', JSON.stringify(state));
-        overlayView.webContents.send('settings:init-state', state);
-    });
-
-    // Navigation will be handled via view.webContents.loadURL() instead of popup:navigate IPC
-
-    win.on('closed', () => {
-        // Let GC reclaim window; nothing else to do
+        console.log('[Main] Sending state to HUD:', JSON.stringify(state));
+        hudWindow.webContents.send('hud:settings:init-state', state);
+        hudWindow.webContents.send('settings:init-state', state); // Legacy
     });
 
     return win;
@@ -344,7 +444,7 @@ function createWindow() {
     // Build and set application menu
     rebuildMenu();
 
-    // Open DevTools for debugging
+    // Open DevTools for main window debugging
     mainWindow.webContents.openDevTools();
 
     // Intercept popups from the main window's web contents

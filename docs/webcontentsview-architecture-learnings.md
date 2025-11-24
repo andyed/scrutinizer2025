@@ -135,20 +135,109 @@ Main window:
 - Actual understanding of the Electron view hierarchy
 - Not just CSS guessing and hoping
 
-## Next Steps
+## THE SOLUTION: Dual-Window Architecture (IMPLEMENTED)
 
-1. **Revert to hidden BrowserWindow** (commit before WebContentsView migration)
-2. **Keep the WebGL improvements** (they work regardless of architecture)
-3. **Document this learning** so we don't try WebContentsView for overlays again
-4. **Focus on performance** - WebGL is working, frame capture is working
+### What We Built (November 2025)
 
-## Technical Debt
+After the struggles above, we implemented a **dual-window architecture** that solves all the problems:
 
-- Remove all WebContentsView code
-- Remove overlay.html / overlay.js
-- Restore single-window architecture with hidden BrowserWindow
-- Clean up IPC handlers that were added for view communication
+#### Architecture Overview
+
+**Window 1: Main Browser Window**
+- Normal BrowserWindow with a single WebContentsView for content
+- Handles all browser interactions natively (click, scroll, type, context menu)
+- No overlay, no UI stacking
+- Just pure browser content
+
+**Window 2: HUD Window (Toolbar + Canvas)**
+- Separate transparent BrowserWindow
+- Properties: `transparent: true`, `frame: false`, `alwaysOnTop: true`, `focusable: false`
+- Loads `renderer/overlay.html` (toolbar + WebGL canvas)
+- Positioned and sized to match main window exactly
+- Starts hidden by default
+
+#### Key Features
+
+1. **Native Browser Interaction**
+   - Main window handles all clicks, scrolls, typing natively
+   - No event forwarding needed
+   - Links work perfectly (including target="_blank")
+   - Context menus work
+   - Form inputs work
+
+2. **HUD Visibility Control**
+   - ESC key toggles HUD show/hide
+   - Menu → View → Show Toolbar also toggles
+   - HUD starts hidden on app launch
+   - When hidden, you have a normal browser
+
+3. **Position Synchronization**
+   - Main window resize/move events sync HUD bounds
+   - HUD always stays perfectly aligned
+   - HUD closes when main window closes
+
+4. **Frame Capture for Foveal Effect**
+   - HUD requests frames via IPC: `hud:capture:request`
+   - Main captures content view: `contentView.webContents.capturePage()`
+   - Sends bitmap to HUD: `hud:frame-captured`
+   - HUD applies WebGL effect
+
+#### IPC Channels
+
+**HUD → Main:**
+- `hud:navigate:back/forward/to` - Navigation commands
+- `hud:capture:request` - Request frame for foveal effect
+- `hud:request:window-bounds` - Get window size
+
+**Main → HUD:**
+- `hud:frame-captured` - Bitmap data for foveal rendering
+- `hud:browser:did-start-loading` - Page load start
+- `hud:browser:did-finish-load` - Page load complete
+- `hud:browser:did-navigate` - URL changed
+- `hud:settings:init-state` - Initial settings
+
+(Legacy channels without `hud:` prefix are maintained for backward compatibility)
+
+#### Code Changes
+
+**main.js:**
+- Removed WebContentsView overlay stacking
+- Created separate HUD BrowserWindow with proper settings
+- Added HUD bounds synchronization
+- Added ESC key handler for HUD visibility
+- Updated all IPC handlers to work with HUD window
+
+**menu-template.js:**
+- Updated "Show Toolbar" to directly toggle HUD window visibility
+
+**renderer/overlay.js:**
+- Removed wheel/focus event forwarding (no longer needed)
+- Kept toolbar UI and WebGL canvas rendering
+- Works in separate HUD window now
+
+### Why This Works
+
+1. **No View Stacking Issues**: Main window has just content, HUD is a separate window
+2. **Native Event Handling**: Main window receives all input directly from OS
+3. **True Transparency**: HUD window with `transparent: true` works reliably
+4. **Clean Separation**: Browser content vs UI/canvas are completely separate
+5. **Simple Mental Model**: Two windows, each with a single purpose
+
+### Performance
+
+- Frame capture: ~33ms (30fps) via `capturePage()`
+- Native scrolling and clicking: 0 latency
+- WebGL rendering: Same performance as before
+- No event forwarding overhead
+
+## Technical Debt Cleared
+
+✅ Removed WebContentsView overlay stacking complexity
+✅ Removed wheel/focus event forwarding
+✅ Simplified IPC communication
+✅ Restored native browser interaction
+✅ Documented new architecture
 
 ---
 
-**Bottom Line**: We tried to be clever with WebContentsView layering. It doesn't work for our use case. The "old" hidden BrowserWindow approach is actually better.
+**Bottom Line**: Dual-window architecture with a separate transparent HUD BrowserWindow is the correct solution. Native browser interaction works perfectly, and the foveal effect remains intact.

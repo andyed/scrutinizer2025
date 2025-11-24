@@ -2,8 +2,9 @@ const { app } = require('electron');
 
 const RADIUS_OPTIONS = [100, 180, 250];
 
-function buildMenuTemplate(sendToRenderer, currentRadius = 180, currentBlur = 10) {
+function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10) {
     const isMac = process.platform === 'darwin';
+    const { BrowserWindow } = require('electron');
 
     return [
         ...(isMac ? [{
@@ -22,8 +23,22 @@ function buildMenuTemplate(sendToRenderer, currentRadius = 180, currentBlur = 10
             label: 'View',
             submenu: [
                 {
+                    label: 'Show Toolbar',
+                    click: () => {
+                        // Toggle toolbar visibility (not entire HUD window)
+                        // This keeps foveal effect running when toolbar is hidden
+                        const windows = BrowserWindow.getAllWindows();
+                        for (const win of windows) {
+                            if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+                                win.scrutinizerHud.webContents.send('hud:toggle-toolbar');
+                            }
+                        }
+                    }
+                },
+                { type: 'separator' },
+                {
                     label: 'Toggle Foveal Mode',
-                    click: () => sendToRenderer('menu:toggle-foveal')
+                    click: () => sendToOverlays('menu:toggle-foveal')
                 },
                 { type: 'separator' },
                 {
@@ -44,19 +59,19 @@ function buildMenuTemplate(sendToRenderer, currentRadius = 180, currentBlur = 10
                             label: 'Small (100px)',
                             type: 'radio',
                             checked: currentRadius === RADIUS_OPTIONS[0],
-                            click: () => sendToRenderer('menu:set-radius', RADIUS_OPTIONS[0])
+                            click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[0])
                         },
                         {
                             label: 'Medium (180px)',
                             type: 'radio',
                             checked: currentRadius === RADIUS_OPTIONS[1],
-                            click: () => sendToRenderer('menu:set-radius', RADIUS_OPTIONS[1])
+                            click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[1])
                         },
                         {
                             label: 'Large (250px)',
                             type: 'radio',
                             checked: currentRadius === RADIUS_OPTIONS[2],
-                            click: () => sendToRenderer('menu:set-radius', RADIUS_OPTIONS[2])
+                            click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[2])
                         }
                     ]
                 },
@@ -67,31 +82,31 @@ function buildMenuTemplate(sendToRenderer, currentRadius = 180, currentBlur = 10
                             label: 'None (0px)',
                             type: 'radio',
                             checked: currentBlur === 0,
-                            click: () => sendToRenderer('menu:set-blur', 0)
+                            click: () => sendToOverlays('menu:set-blur', 0)
                         },
                         {
                             label: 'Light (5px)',
                             type: 'radio',
                             checked: currentBlur === 5,
-                            click: () => sendToRenderer('menu:set-blur', 5)
+                            click: () => sendToOverlays('menu:set-blur', 5)
                         },
                         {
                             label: 'Medium (10px)',
                             type: 'radio',
                             checked: currentBlur === 10,
-                            click: () => sendToRenderer('menu:set-blur', 10)
+                            click: () => sendToOverlays('menu:set-blur', 10)
                         },
                         {
                             label: 'Heavy (20px)',
                             type: 'radio',
                             checked: currentBlur === 20,
-                            click: () => sendToRenderer('menu:set-blur', 20)
+                            click: () => sendToOverlays('menu:set-blur', 20)
                         },
                         {
                             label: 'Maximum (30px)',
                             type: 'radio',
                             checked: currentBlur === 30,
-                            click: () => sendToRenderer('menu:set-blur', 30)
+                            click: () => sendToOverlays('menu:set-blur', 30)
                         }
                     ]
                 }
