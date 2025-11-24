@@ -221,57 +221,54 @@ document.addEventListener('DOMContentLoaded', () => {
     // Forward input events to the hidden content window
     const container = document.getElementById('webview-container');
 
-    // Helper to send mouse events
-    const forwardMouseEvent = (e, type) => {
-        const rect = container.getBoundingClientRect();
-        const x = Math.round(e.clientX - rect.left);
-        const y = Math.round(e.clientY - rect.top);
-
-        ipcRenderer.send('input:mouse', {
-            type: type,
-            x: x,
-            y: y,
-            button: e.button === 0 ? 'left' : (e.button === 1 ? 'middle' : 'right'),
-            clickCount: 1
-        });
-    };
-
     if (container) {
-        container.addEventListener('mousedown', (e) => forwardMouseEvent(e, 'mouseDown'));
-        container.addEventListener('mouseup', (e) => forwardMouseEvent(e, 'mouseUp'));
-        container.addEventListener('mousemove', (e) => forwardMouseEvent(e, 'mouseMove'));
+        // Mouse events - forward with coordinates relative to content area
+        const forwardMouse = (e, type) => {
+            const rect = container.getBoundingClientRect();
+            ipcRenderer.send('input:mouse', {
+                type: type,
+                x: Math.round(e.clientX - rect.left),
+                y: Math.round(e.clientY - rect.top),
+                button: e.button === 0 ? 'left' : (e.button === 1 ? 'middle' : 'right'),
+                clickCount: e.detail || 1
+            });
+        };
 
-        // Forward scroll events
+        container.addEventListener('mousedown', (e) => forwardMouse(e, 'mouseDown'));
+        container.addEventListener('mouseup', (e) => forwardMouse(e, 'mouseUp'));
+        container.addEventListener('mousemove', (e) => forwardMouse(e, 'mouseMove'));
+
+        // Wheel events - forward scroll deltas
         container.addEventListener('wheel', (e) => {
+            const rect = container.getBoundingClientRect();
             ipcRenderer.send('input:wheel', {
+                x: Math.round(e.clientX - rect.left),
+                y: Math.round(e.clientY - rect.top),
                 deltaX: e.deltaX,
-                deltaY: e.deltaY,
-                x: e.clientX,
-                y: e.clientY
+                deltaY: e.deltaY
             });
         }, { passive: true });
     }
 
-    // Forward keyboard events to offscreen content window
-    // The offscreen window doesn't receive focus, so we must forward ALL keyboard input
-    document.addEventListener('keydown', (e) => {
-        // Don't forward if typing in URL bar
+    // Keyboard events - forward to content window (skip if typing in URL bar)
+    const forwardKey = (e, type) => {
         if (e.target === urlInput) return;
-
+        
         ipcRenderer.send('input:keyboard', {
-            type: 'keyDown',
-            keyCode: e.key
+            type: type,
+            keyCode: e.key,
+            code: e.code,
+            modifiers: [
+                e.shiftKey && 'shift',
+                e.ctrlKey && 'control',
+                e.altKey && 'alt',
+                e.metaKey && 'meta'
+            ].filter(Boolean)
         });
-    });
+    };
 
-    document.addEventListener('keyup', (e) => {
-        if (e.target === urlInput) return;
-
-        ipcRenderer.send('input:keyboard', {
-            type: 'keyUp',
-            keyCode: e.key
-        });
-    });
+    document.addEventListener('keydown', (e) => forwardKey(e, 'keyDown'));
+    document.addEventListener('keyup', (e) => forwardKey(e, 'keyUp'));
 
     // IPC listeners for main process (menus, settings)
     ipcRenderer.on('settings:radius-options', (event, options) => {

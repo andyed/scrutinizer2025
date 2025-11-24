@@ -1,4 +1,3 @@
-![Beta Browser Screenshot](screenshots/onedotoh_browser.png)
 
 # Scrutinizer - Foveal Vision Simulator
 
@@ -7,6 +6,9 @@
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 
 A modern recreation of the 2007 Scrutinizer vision-simulating browser, built with Electron and the Canvas API, and positioned as a **design constraint model** for studying foveal vs. peripheral vision on the web.
+
+![Beta Browser Screenshot](screenshots/onedotoh_browser.png)
+
 
 **Original project:** https://github.com/andyed/scrutinizer  
 
@@ -38,13 +40,10 @@ Scrutinizer strips away the brain's post-processing to reveal the raw data your 
 3.  **Rod-Weighted Luminance**: Simulates the spectral sensitivity of peripheral rod cells, revealing why "Aqua" buttons glow while red text vanishes.
 
 > [!TIP]
-> **Designers & Engineers**: Stop designing for the "Screenshot." Start designing for the **Scan**. If your interface doesn't work in Scrutinizer, your users aren't seeing it—they are just hallucinating that they did.
+> **Designers & Engineers**: Stop designing for the "Screenshot." Start designing for the **Scan**. Use Scrutinizer to test how your interfaces perform under real-world visual constraints.
 
 ## Features
 
-### Demo Video
-
-[![Watch the demo video](https://img.youtube.com/vi/lfROtjCp7bg/0.jpg)](https://www.youtube.com/watch?v=lfROtjCp7bg)
 
 > [!TIP]
 > **New in 2025: Neural Processing Model**
@@ -64,28 +63,7 @@ Scrutinizer strips away the brain's post-processing to reveal the raw data your 
 
 ## Download & Installation
 
-### macOS (Recommended for most users)
-
-1. **Download** the latest `.dmg` from GitHub Releases:
-   - https://github.com/andyed/scrutinizer2025/releases/latest
-2. **Open the DMG** and drag **Scrutinizer** into your `Applications` folder.
-3. **First launch on macOS** (unsigned app):
-   - In Finder, right-click (or Ctrl+click) **Scrutinizer.app** → **Open**
-   - macOS will warn that this is from an unidentified developer
-   - Click **Open** to trust it
-
-After the first run, you can launch Scrutinizer normally from Spotlight or Launchpad.
-
-### Windows
-
-1. **Download** the latest Windows installer (`Scrutinizer Setup ... .exe`) from:
-   - https://github.com/andyed/scrutinizer2025/releases/latest
-2. Run the installer. On first run, Windows SmartScreen may warn that the app is from an unknown publisher (unsigned build).
-3. In the SmartScreen dialog:
-   - Click **More info**
-   - Click **Run anyway**
-
-Once installed, you can launch Scrutinizer from the Start Menu like any other app.
+Application builds pending. For now, run from source recommended. 
 
 ### Developer Setup (run from source)
 
