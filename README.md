@@ -63,7 +63,28 @@ Scrutinizer strips away the brain's post-processing to reveal the raw data your 
 
 ## Download & Installation
 
-Application builds pending. For now, run from source recommended. 
+### Unsigned binaries (experimental builds)
+
+These builds are **unsigned** developer previews. Your OS will likely warn you and require extra steps to run them.
+
+- **macOS (Apple Silicon, unsigned ZIP)**  
+  https://github.com/andyed/scrutinizer2025/releases/download/v1.1.3/Scrutinizer-1.1.3-arm64-mac.zip
+
+- **Windows (unsigned installer)**  
+  https://github.com/andyed/scrutinizer2025/releases/download/v1.1.3/Scrutinizer-Setup-1.1.3.exe
+
+For other platforms and versions, see the full Releases list:  
+https://github.com/andyed/scrutinizer2025/releases
+
+> **Security note**
+>
+> These builds are unsigned dev previews.
+>
+> On **macOS** you may need to:
+> - Right-click the app → **Open** → confirm the warning
+>
+> On **Windows** you may need to:
+> - Click **More info** → **Run anyway** in SmartScreen
 
 ### Developer Setup (run from source)
 
