@@ -8,7 +8,7 @@
 A modern recreation of the 2007 Scrutinizer vision-simulating browser, built with Electron and **WebGL**, and positioned as a **design constraint model** for studying foveal vs. peripheral vision on the web.
 
 ## TLDR: Simulating the Cortical Zoom This sequence visualizes the 400ms lifespan of a saccade—from peripheral detection to foveal recognition.
-![Progressive Grid](onedotone_progressive_grid.png)
+![Progressive Grid](screenshots/onedotone_progressive_grid.png)
 
 - Frames 1-5 (Far Periphery): The "Mongrel" Zone. High-frequency details (text) are compressed into statistical noise. Color is desaturated to simulate rod-dominant vision, preserving only high-contrast "blobs" (the logo).
 
