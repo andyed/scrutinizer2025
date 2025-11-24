@@ -352,6 +352,7 @@ function createScrutinizerWindow(startUrl) {
     });
 
     // Intercept target="_blank" links in content window
+    // Use both setWindowOpenHandler (modern) and new-window (legacy) for compatibility
     contentWin.webContents.setWindowOpenHandler(({ url, frameName, disposition }) => {
         console.log('[Main] setWindowOpenHandler called!');
         console.log('[Main] URL:', url);
@@ -359,6 +360,14 @@ function createScrutinizerWindow(startUrl) {
         console.log('[Main] Frame name:', frameName);
         createScrutinizerWindow(url);
         return { action: 'deny' };
+    });
+
+    // Also listen for new-window event (legacy, but might be needed)
+    contentWin.webContents.on('new-window', (event, url) => {
+        console.log('[Main] new-window event fired!');
+        console.log('[Main] URL:', url);
+        event.preventDefault();
+        createScrutinizerWindow(url);
     });
 
     // Load start URL in the content view
