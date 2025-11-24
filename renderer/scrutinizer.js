@@ -49,18 +49,28 @@ class Scrutinizer {
     }
 
     handleResize() {
-        // Explicitly resize canvas to match window
-        const dpr = window.devicePixelRatio || 1;
-        const rect = this.canvas.getBoundingClientRect();
-
-        // If rect is 0 (hidden), use window size
-        const width = (rect.width || window.innerWidth) * dpr;
-        const height = (rect.height || window.innerHeight) * dpr;
-
-        if (this.canvas.width !== width || this.canvas.height !== height) {
-            this.canvas.width = width;
-            this.canvas.height = height;
-        }
+        // Request actual window size from main process
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.send('get-window-size');
+        
+        // Listen for response (only once per resize)
+        ipcRenderer.once('window-size', (event, { width, height }) => {
+            const dpr = window.devicePixelRatio || 1;
+            
+            // Set CSS size to match window
+            this.canvas.style.width = width + 'px';
+            this.canvas.style.height = height + 'px';
+            
+            // Set canvas buffer size with DPR
+            const bufferWidth = width * dpr;
+            const bufferHeight = height * dpr;
+            
+            if (this.canvas.width !== bufferWidth || this.canvas.height !== bufferHeight) {
+                this.canvas.width = bufferWidth;
+                this.canvas.height = bufferHeight;
+                console.log('[Scrutinizer] Canvas resized to:', bufferWidth, 'x', bufferHeight, 'CSS:', width, 'x', height);
+            }
+        });
     }
 
     handleMouseMove(event) {
@@ -82,8 +92,10 @@ class Scrutinizer {
     }
 
     async enable() {
+        console.log('[Scrutinizer] ENABLE called');
         this.enabled = true;
         this.canvas.style.display = 'block';
+        console.log('[Scrutinizer] Canvas display set to block');
 
         // Initialize mouse to center
         const rect = this.canvas.getBoundingClientRect();
@@ -93,14 +105,15 @@ class Scrutinizer {
         this.targetMouseY = this.mouseY;
 
         this.startRenderLoop();
+        console.log('[Scrutinizer] Render loop started');
     }
 
     disable() {
+        console.log('[Scrutinizer] DISABLE called');
         this.enabled = false;
-        // Keep canvas visible and rendering - it's the ONLY view of the offscreen content
-        // The render() method will use infinite radius to show everything clearly
-        this.canvas.style.display = 'block';
-        this.startRenderLoop();
+        // Hide canvas - content view is visible underneath
+        this.canvas.style.display = 'none';
+        this.stopRenderLoop();
     }
 
     resetState() {
@@ -130,6 +143,15 @@ class Scrutinizer {
         // and avoids "SharedImageManager" errors in some Electron environments.
         if (this.renderer) {
             this.renderer.uploadTexture(imageData);
+            
+            // Log occasionally
+            if (!this.frameUploadCount) this.frameUploadCount = 0;
+            this.frameUploadCount++;
+            if (this.frameUploadCount % 30 === 0) {
+                console.log('[Scrutinizer] Uploaded frame', this.frameUploadCount, 'to WebGL');
+            }
+        } else {
+            console.warn('[Scrutinizer] No renderer available for frame upload!');
         }
     }
 

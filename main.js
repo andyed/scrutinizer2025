@@ -58,17 +58,26 @@ ipcMain.on('settings:page-changed', (event, url) => {
     }
 });
 
+// Allow overlay view to hand keyboard focus to the content view
+ipcMain.on('overlay:focus-content', (event) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerOverlay && w.scrutinizerOverlay.webContents === event.sender);
+    if (win && win.scrutinizerView) {
+        win.scrutinizerView.webContents.focus();
+    }
+});
+
 ipcMain.on('window:create', (event, url) => {
     console.log('[Main] Received window:create for:', url);
     createScrutinizerWindow(url);
 });
 
 // Navigation IPC handlers for WebContentsView
-// Note: event.sender is the toolbar view, we need to navigate the content view
+// Note: event.sender is the overlay view, we need to navigate the content view
 ipcMain.on('navigate:back', (event) => {
-    // Find window from toolbar webContents
+    // Find window from overlay webContents
     const windows = BrowserWindow.getAllWindows();
-    const win = windows.find(w => w.scrutinizerToolbar && w.scrutinizerToolbar.webContents === event.sender);
+    const win = windows.find(w => w.scrutinizerOverlay && w.scrutinizerOverlay.webContents === event.sender);
     if (win && win.scrutinizerView) {
         win.scrutinizerView.webContents.goBack();
     }
@@ -76,7 +85,7 @@ ipcMain.on('navigate:back', (event) => {
 
 ipcMain.on('navigate:forward', (event) => {
     const windows = BrowserWindow.getAllWindows();
-    const win = windows.find(w => w.scrutinizerToolbar && w.scrutinizerToolbar.webContents === event.sender);
+    const win = windows.find(w => w.scrutinizerOverlay && w.scrutinizerOverlay.webContents === event.sender);
     if (win && win.scrutinizerView) {
         win.scrutinizerView.webContents.goForward();
     }
@@ -84,7 +93,7 @@ ipcMain.on('navigate:forward', (event) => {
 
 ipcMain.on('navigate:reload', (event) => {
     const windows = BrowserWindow.getAllWindows();
-    const win = windows.find(w => w.scrutinizerToolbar && w.scrutinizerToolbar.webContents === event.sender);
+    const win = windows.find(w => w.scrutinizerOverlay && w.scrutinizerOverlay.webContents === event.sender);
     if (win && win.scrutinizerView) {
         win.scrutinizerView.webContents.reload();
     }
@@ -92,63 +101,44 @@ ipcMain.on('navigate:reload', (event) => {
 
 ipcMain.on('navigate:to', (event, url) => {
     const windows = BrowserWindow.getAllWindows();
-    const win = windows.find(w => w.scrutinizerToolbar && w.scrutinizerToolbar.webContents === event.sender);
+    const win = windows.find(w => w.scrutinizerOverlay && w.scrutinizerOverlay.webContents === event.sender);
     if (win && win.scrutinizerView) {
         win.scrutinizerView.webContents.loadURL(url);
     }
 });
 
-ipcMain.on('input:wheel', (event, data) => {
+// Content view is visible and receives input naturally - no forwarding needed!
+
+// Send window dimensions to overlay for canvas sizing
+ipcMain.on('get-window-size', (event) => {
     const windows = BrowserWindow.getAllWindows();
-    const win = windows.find(w => w.scrutinizerToolbar && w.scrutinizerToolbar.webContents === event.sender);
-
-    if (!win) {
-        console.warn('[Main] Could not find window for event sender');
-        return;
-    }
-
-    if (win && win.scrutinizerView && !win.scrutinizerView.isDestroyed()) {
-        win.scrutinizerView.webContents.sendInputEvent({
-            type: 'mouseWheel',
-            x: data.x,
-            y: data.y,
-            deltaX: data.deltaX,
-            deltaY: data.deltaY,
-            wheelTicksX: data.deltaX / 120,
-            wheelTicksY: data.deltaY / 120,
-            accelerationRatioX: 1,
-            accelerationRatioY: 1,
-            hasPreciseScrollingDeltas: true,
-            canScroll: true
-        });
-    } else {
-        console.warn('[Main] Content view not found or destroyed');
+    const win = windows.find(w => w.scrutinizerOverlay && w.scrutinizerOverlay.webContents === event.sender);
+    if (win) {
+        const [width, height] = win.getSize();
+        event.reply('window-size', { width, height });
     }
 });
 
-ipcMain.on('input:mouse', (event, data) => {
+// Handle capture requests from overlay (for foveal effect)
+ipcMain.on('capture:request', async (event) => {
     const windows = BrowserWindow.getAllWindows();
-    const win = windows.find(w => w.scrutinizerToolbar && w.scrutinizerToolbar.webContents === event.sender);
-    if (win && win.scrutinizerView && !win.scrutinizerView.isDestroyed()) {
-        win.scrutinizerView.webContents.sendInputEvent({
-            type: data.type,
-            x: data.x,
-            y: data.y,
-            button: data.button,
-            clickCount: data.clickCount
-        });
-    }
-});
-
-ipcMain.on('input:keyboard', (event, data) => {
-    const windows = BrowserWindow.getAllWindows();
-    const win = windows.find(w => w.scrutinizerToolbar && w.scrutinizerToolbar.webContents === event.sender);
-    if (win && win.scrutinizerView && !win.scrutinizerView.isDestroyed()) {
-        win.scrutinizerView.webContents.sendInputEvent({
-            type: data.type,
-            keyCode: data.keyCode,
-            modifiers: data.modifiers || []
-        });
+    const win = windows.find(w => w.scrutinizerOverlay && w.scrutinizerOverlay.webContents === event.sender);
+    
+    if (win && win.scrutinizerView && win.scrutinizerOverlay) {
+        try {
+            const image = await win.scrutinizerView.webContents.capturePage();
+            const buffer = image.toBitmap();
+            const size = image.getSize();
+            
+            // Send back to overlay view (where canvas lives)
+            win.scrutinizerOverlay.webContents.send('frame-captured', {
+                buffer: buffer,
+                width: size.width,
+                height: size.height
+            });
+        } catch (err) {
+            console.error('[Main] Capture error:', err);
+        }
     }
 });
 
@@ -191,139 +181,108 @@ function createScrutinizerWindow(startUrl) {
     win.on('resize', saveBounds);
     win.on('move', saveBounds);
 
-    // Create toolbar WebContentsView (loads the UI HTML)
-    const toolbarView = new WebContentsView({
+    // Create content WebContentsView (the actual browser - VISIBLE, FULL WINDOW)
+    const contentView = new WebContentsView({
+        webPreferences: {
+            preload: path.join(__dirname, 'renderer', 'preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true
+        }
+    });
+
+    // Create overlay WebContentsView (toolbar UI + canvas - FULL WINDOW, transparent)
+    const overlayView = new WebContentsView({
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
         }
     });
-
-    // Create content BrowserWindow (hidden, offscreen)
-    // This replaces WebContentsView which had issues loading when detached
-    const contentWin = new BrowserWindow({
-        width: 1200,
-        height: 850,
-        show: false, // Hidden
-        frame: false,
-        webPreferences: {
-            preload: path.join(__dirname, 'renderer', 'preload.js'),
-            offscreen: true,
-            backgroundThrottling: false // Keep running when hidden
-        }
+    
+    // Make overlay view transparent at native level
+    overlayView.setBackgroundColor({ red: 0, green: 0, blue: 0, alpha: 0 });
+    
+    overlayView.webContents.once('did-finish-load', () => {
+        console.log('[Main] Overlay loaded');
     });
 
     // Add views to window (order matters for z-index)
-    // win.contentView.addChildView(contentView);  // Background - REMOVED
-    win.contentView.addChildView(toolbarView);  // Foreground
+    win.contentView.addChildView(contentView);   // Layer 1: browser (bottom)
+    win.contentView.addChildView(overlayView);   // Layer 2: overlay with toolbar + canvas (top)
 
-    // Position views
-    const toolbarHeight = 50;
+    // Position views - BOTH AT (0, 0) FULL WINDOW
     const updateViewBounds = () => {
         const [width, height] = win.getSize();
-        // Toolbar view now covers the WHOLE window to display the canvas overlay
-        toolbarView.setBounds({ x: 0, y: 0, width: width, height: height });
-
-        // Resize the offscreen window to match the content area
-        if (!contentWin.isDestroyed()) {
-            contentWin.setSize(width, height - toolbarHeight);
-        }
+        // Content view gets full window
+        contentView.setBounds({ x: 0, y: 0, width: width, height: height });
+        // Overlay view gets full window (toolbar floats via CSS)
+        overlayView.setBounds({ x: 0, y: 0, width: width, height: height });
     };
     updateViewBounds();
 
-    // Load toolbar HTML into toolbar view
-    toolbarView.webContents.loadFile('renderer/index.html');
+    // Load HTML into overlay (has toolbar + canvas)
+    overlayView.webContents.loadFile('renderer/overlay.html');
+    
+    overlayView.webContents.once('did-finish-load', () => {
+        console.log('[Main] Overlay loaded');
+    });
 
-    // Open DevTools for the UI
-    toolbarView.webContents.openDevTools({ mode: 'detach' });
+    // Open DevTools for the overlay (has UI)
+    overlayView.webContents.openDevTools({ mode: 'detach' });
 
     // Store references
-    win.scrutinizerToolbar = toolbarView;
-    win.scrutinizerView = contentWin; // Store window reference
+    win.scrutinizerView = contentView;
+    win.scrutinizerOverlay = overlayView;
 
     // Keep view bounds in sync on window resize
     win.on('resize', updateViewBounds);
 
-    // Handle offscreen rendering paint events
-    contentWin.webContents.on('paint', (event, dirty, image) => {
-        // console.log('[Main] Paint event:', dirty); // Uncomment for verbose logging
+    // Content view is visible - no paint events needed, just capture when foveal mode is active
+    // Capture will be done via capturePage() on demand from renderer
 
-        // Only process if we have a valid image
-        if (!image) return;
-
-        // Get raw bitmap buffer (BGRA format)
-        const buffer = image.toBitmap();
-        const size = image.getSize();
-
-        // Send to toolbar view (where app.js/scrutinizer live)
-        if (!toolbarView.webContents.isDestroyed()) {
-            toolbarView.webContents.send('frame-captured', {
-                buffer: buffer,
-                width: size.width,
-                height: size.height,
-                dirty: dirty
-            });
+    contentView.webContents.on('did-start-loading', () => {
+        console.log('[Main] ContentView did-start-loading');
+        if (!overlayView.webContents.isDestroyed()) {
+            overlayView.webContents.send('browser:did-start-loading');
         }
     });
 
-    contentWin.webContents.on('did-start-loading', () => {
-        console.log('[Main] ContentWin did-start-loading');
-        if (!toolbarView.webContents.isDestroyed()) {
-            toolbarView.webContents.send('browser:did-start-loading');
+    contentView.webContents.on('did-finish-load', () => {
+        console.log('[Main] ContentView did-finish-load');
+        if (!overlayView.webContents.isDestroyed()) {
+            overlayView.webContents.send('browser:did-finish-load');
         }
     });
 
-    contentWin.webContents.on('did-finish-load', () => {
-        console.log('[Main] ContentWin did-finish-load');
-        if (!toolbarView.webContents.isDestroyed()) {
-            toolbarView.webContents.send('browser:did-finish-load');
-        }
-    });
-
-    contentWin.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-        console.error('[Main] ContentWin did-fail-load:', errorCode, errorDescription);
+    contentView.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+        console.error('[Main] ContentView did-fail-load:', errorCode, errorDescription);
     });
 
     // Forward navigation events to update URL bar
     const sendUrlUpdate = (url) => {
-        if (!toolbarView.webContents.isDestroyed()) {
-            toolbarView.webContents.send('browser:did-navigate', url);
+        if (!overlayView.webContents.isDestroyed()) {
+            overlayView.webContents.send('browser:did-navigate', url);
         }
     };
 
-    contentWin.webContents.on('did-navigate', (event, url) => {
+    contentView.webContents.on('did-navigate', (event, url) => {
         sendUrlUpdate(url);
     });
 
-    contentWin.webContents.on('did-navigate-in-page', (event, url) => {
+    contentView.webContents.on('did-navigate-in-page', (event, url) => {
         sendUrlUpdate(url);
     });
 
-    // Set frame rate for offscreen rendering
-    contentWin.webContents.setFrameRate(60);
-
-    // Listen for foveal mode state changes to optimize frame rate
-    ipcMain.on('foveal:enabled', () => {
-        if (!contentWin.isDestroyed()) contentWin.webContents.setFrameRate(60);
-    });
-
-    ipcMain.on('foveal:disabled', () => {
-        // Lower frame rate when not in foveal mode to save resources
-        if (!contentWin.isDestroyed()) contentWin.webContents.setFrameRate(10);
-    });
-
-    // Forward IPC messages from content view preload to toolbar view
-    contentWin.webContents.on('ipc-message', (event, channel, ...args) => {
+    // Forward IPC messages from content view preload to overlay view
+    contentView.webContents.on('ipc-message', (event, channel, ...args) => {
         if (channel === 'keydown') {
-            if (!toolbarView.webContents.isDestroyed()) {
-                toolbarView.webContents.send('webview:keydown', args[0]);
+            if (!overlayView.webContents.isDestroyed()) {
+                overlayView.webContents.send('webview:keydown', args[0]);
             }
         } else if (channel === 'mousemove') {
-            // Mouse events are handled by toolbar's own listeners
+            // Mouse events are handled by overlay's own listeners
         } else if (channel === 'scroll' || channel === 'mutation' || channel === 'input-change') {
             // Trigger a capture when content changes
-            // This logic was for WebContentsView, might need adjustment for BrowserWindow
-            // For now, we rely on paint events for capture.
+            // For now, we rely on regular capture interval
         } else if (channel === 'open-new-window') {
             // Handle target="_blank" links from preload script
             const url = args[0];
@@ -332,33 +291,21 @@ function createScrutinizerWindow(startUrl) {
         }
     });
 
-    // Intercept target="_blank" links in content window
-    // Use both setWindowOpenHandler (modern) and new-window (legacy) for compatibility
-    contentWin.webContents.setWindowOpenHandler(({ url, frameName, disposition }) => {
-        console.log('[Main] setWindowOpenHandler called!');
-        console.log('[Main] URL:', url);
-        console.log('[Main] Disposition:', disposition);
-        console.log('[Main] Frame name:', frameName);
+    // Intercept target="_blank" links in content view
+    contentView.webContents.setWindowOpenHandler(({ url }) => {
+        console.log('[Main] Opening new window:', url);
         createScrutinizerWindow(url);
         return { action: 'deny' };
     });
 
-    // Also listen for new-window event (legacy, but might be needed)
-    contentWin.webContents.on('new-window', (event, url) => {
-        console.log('[Main] new-window event fired!');
-        console.log('[Main] URL:', url);
-        event.preventDefault();
-        createScrutinizerWindow(url);
-    });
-
     // Load start URL in the content view
     const urlToLoad = startUrl || currentStartPage || 'https://github.com/andyed/scrutinizer2025?tab=readme-ov-file#what-is-scrutinizer';
-    contentWin.loadURL(urlToLoad);
+    contentView.webContents.loadURL(urlToLoad);
 
-    // Send init state to toolbar view once it loads
-    toolbarView.webContents.once('did-finish-load', () => {
-        console.log('[Main] Toolbar did-finish-load. Sending init-state.');
-        toolbarView.webContents.send('settings:radius-options', RADIUS_OPTIONS);
+    // Send init state to overlay view once it loads
+    overlayView.webContents.once('did-finish-load', () => {
+        console.log('[Main] Overlay did-finish-load. Sending init-state.');
+        overlayView.webContents.send('settings:radius-options', RADIUS_OPTIONS);
         // Pass current state to new window
         // Only show welcome popup on first window (when mainWindow doesn't exist yet)
         const isFirstWindow = !mainWindow || BrowserWindow.getAllWindows().length === 1;
@@ -368,8 +315,8 @@ function createScrutinizerWindow(startUrl) {
             enabled: currentEnabled,
             showWelcome: isFirstWindow ? currentShowWelcome : false
         };
-        console.log('[Main] Sending state to toolbar:', JSON.stringify(state));
-        toolbarView.webContents.send('settings:init-state', state);
+        console.log('[Main] Sending state to overlay:', JSON.stringify(state));
+        overlayView.webContents.send('settings:init-state', state);
     });
 
     // Navigation will be handled via view.webContents.loadURL() instead of popup:navigate IPC

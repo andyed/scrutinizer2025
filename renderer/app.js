@@ -1,17 +1,14 @@
 /**
- * Application entry point
- * Initializes Scrutinizer and sets up UI event handlers
+ * Toolbar UI handler
+ * Manages navigation controls and forwards commands to overlay view
  */
-
-let scrutinizer;
 
 // Wait for DOM to be ready
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Initializing Scrutinizer...');
+    console.log('Initializing toolbar UI...');
 
     // IPC from main process
     const { ipcRenderer } = require('electron');
-    let radiusOptions = null;
 
     // Get elements (no webview element anymore)
     const toggleBtn = document.getElementById('toggle-btn');
@@ -19,54 +16,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const navigateBtn = document.getElementById('go-btn');
     const backBtn = document.getElementById('back-btn');
     const forwardBtn = document.getElementById('forward-btn');
-    const refreshBtn = document.getElementById('refresh-btn');
-    const statusText = document.getElementById('status-text');
 
-    // Welcome Popup elements
-    const welcomePopup = document.getElementById('welcome-popup');
-    const closePopupBtn = document.getElementById('close-popup');
-    const dontShowCheckbox = document.getElementById('dont-show-again');
+    // Welcome popup removed - using custom start page instead
 
-    const closePopup = () => {
-        welcomePopup.style.display = 'none';
-        // If "Don't show again" is checked, update settings
-        if (dontShowCheckbox.checked) {
-            ipcRenderer.send('settings:welcome-changed', false);
-        }
-    };
-
-    closePopupBtn.addEventListener('click', closePopup);
-
-    let pendingInitState = null;
-
-    // Toggle foveal mode function (defined early so it can be used in event handlers)
-    const toggleFoveal = async (forceState = null) => {
-        if (!scrutinizer) {
-            console.warn('[Renderer] Cannot toggle - scrutinizer not initialized');
-            return;
-        }
-
-        let enabled;
+    // Track enabled state locally (overlay has the actual Scrutinizer)
+    let fovealEnabled = false;
+    
+    const toggleFoveal = (forceState = null) => {
         if (forceState !== null) {
-            if (forceState) {
-                await scrutinizer.enable();
-                enabled = true;
-            } else {
-                await scrutinizer.disable();
-                enabled = false;
-            }
+            fovealEnabled = forceState;
         } else {
-            enabled = await scrutinizer.toggle();
+            fovealEnabled = !fovealEnabled;
         }
 
-        toggleBtn.classList.toggle('active', enabled);
-        statusText.textContent = enabled ? 'Foveal mode active' : 'Foveal mode disabled';
-
-        // Notify main process of state change so new windows inherit it
-        ipcRenderer.send('settings:enabled-changed', enabled);
-
+        toggleBtn.classList.toggle('active', fovealEnabled);
+        
+        // Notify main process of state change
+        ipcRenderer.send('settings:enabled-changed', fovealEnabled);
+        
+        // Tell overlay view to enable/disable (it will show/hide canvas)
+        ipcRenderer.send(fovealEnabled ? 'overlay:enable' : 'overlay:disable');
         // Tell main process to start/stop capturing frames
-        ipcRenderer.send(enabled ? 'foveal:enabled' : 'foveal:disabled');
+        ipcRenderer.send(fovealEnabled ? 'foveal:enabled' : 'foveal:disabled');
     };
 
     // Add missing click handler for toggle button
@@ -74,19 +45,14 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleFoveal();
     });
 
-    // Initialize Scrutinizer immediately (no webview element to wait for)
-    console.log('[Renderer] Initializing new Scrutinizer instance');
-    scrutinizer = new Scrutinizer(CONFIG);
-    statusText.textContent = 'Ready - Press ESC or click Enable to start';
+    // Scrutinizer is now in the overlay view, not here
 
-    // Wire up frame-captured IPC from main process (paint events)
-    ipcRenderer.on('frame-captured', (event, data) => {
-        // console.log('[Renderer] Frame captured:', data.width, 'x', data.height); // Uncomment for verbose logging
-        if (scrutinizer) {
-            // Convert Node Buffer to Uint8Array
-            const buffer = new Uint8Array(data.buffer);
-            scrutinizer.processFrame(buffer, data.width, data.height);
-        }
+    // Capture loop is now handled by overlay view
+    
+    // Remove loading class when page loads
+    ipcRenderer.on('browser:did-finish-load', () => {
+        console.log('[App] Page loading finished');
+        toggleBtn.classList.remove('loading');
     });
 
     // Update URL bar when navigation occurs
@@ -105,10 +71,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add loading animation to toggle button
         toggleBtn.classList.add('loading');
 
-        if (scrutinizer) {
-            scrutinizer.resetState();
-        }
-
         // Safety timeout: remove loading class after 5s if did-finish-load doesn't fire
         setTimeout(() => {
             if (toggleBtn.classList.contains('loading')) {
@@ -118,12 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 5000);
     });
 
-    // Handle page loading finish
-    ipcRenderer.on('browser:did-finish-load', () => {
-        console.log('[App] Page loading finished - removing loading class');
-        // Remove loading animation
-        toggleBtn.classList.remove('loading');
-    });
+    // (browser:did-finish-load handler is above with startCapturing)
 
     // Navigation controls - send to main process which controls the WebContentsView
     backBtn.addEventListener('click', () => {
@@ -132,10 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     forwardBtn.addEventListener('click', () => {
         ipcRenderer.send('navigate:forward');
-    });
-
-    refreshBtn.addEventListener('click', () => {
-        ipcRenderer.send('navigate:reload');
     });
 
     navigateBtn.addEventListener('click', () => {
@@ -159,141 +112,39 @@ document.addEventListener('DOMContentLoaded', () => {
     const handleKeyboardShortcut = (e) => {
         // Escape to toggle foveal view on/off
         if (e.code === 'Escape') {
-            if (welcomePopup.style.display !== 'none') {
-                closePopup();
-            } else {
-                // Always try to toggle, toggleFoveal has its own guard
-                if (e.preventDefault) e.preventDefault();
-                toggleFoveal();
-            }
+            if (e.preventDefault) e.preventDefault();
+            toggleFoveal();
             return;
         }
 
-        // Left/Right arrows (<>) to adjust fovea size (only when foveal mode is active)
-        if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
-            // Skip if typing in input field
-            if (e.target && e.target.tagName === 'INPUT') return;
-
-            if (scrutinizer && scrutinizer.enabled) {
-                if (e.preventDefault) e.preventDefault();
-
-                const radiusSteps = (radiusOptions && radiusOptions.length) ? radiusOptions : [100, 180, 250];
-                const currentRadius = scrutinizer.config.fovealRadius;
-
-                let currentIndex = radiusSteps.findIndex(r => r === currentRadius);
-                if (currentIndex === -1) {
-                    let nearestIndex = 0;
-                    let nearestDiff = Math.abs(currentRadius - radiusSteps[0]);
-                    for (let i = 1; i < radiusSteps.length; i++) {
-                        const diff = Math.abs(currentRadius - radiusSteps[i]);
-                        if (diff < nearestDiff) {
-                            nearestDiff = diff;
-                            nearestIndex = i;
-                        }
-                    }
-                    currentIndex = nearestIndex;
-                }
-
-                // Right arrow (>) increases, Left arrow (<) decreases
-                const direction = e.code === 'ArrowRight' ? 1 : -1;
-                let nextIndex = currentIndex;
-                if (direction > 0 && currentIndex < radiusSteps.length - 1) {
-                    nextIndex = currentIndex + 1;
-                } else if (direction < 0 && currentIndex > 0) {
-                    nextIndex = currentIndex - 1;
-                }
-
-                const newRadius = radiusSteps[nextIndex];
-                scrutinizer.updateFovealRadius(newRadius);
-                ipcRenderer.send('settings:radius-changed', newRadius);
-            }
-        }
+        // Left/Right arrows - handled by overlay view now
+        // (Overlay listens for keyboard events and adjusts radius)
     };
 
     // Keyboard shortcuts from document (when focus is on toolbar/UI)
     document.addEventListener('keydown', handleKeyboardShortcut);
 
-    // Listen for keyboard events forwarded from WebContentsView via main process
+    // Listen for keyboard shortcuts forwarded from content view
     ipcRenderer.on('webview:keydown', (event, keyEvent) => {
         handleKeyboardShortcut(keyEvent);
     });
 
-    // Forward input events to the hidden content window
-    const container = document.getElementById('webview-container');
-
-    if (container) {
-        // Mouse events - forward with coordinates relative to content area
-        const forwardMouse = (e, type) => {
-            const rect = container.getBoundingClientRect();
-            ipcRenderer.send('input:mouse', {
-                type: type,
-                x: Math.round(e.clientX - rect.left),
-                y: Math.round(e.clientY - rect.top),
-                button: e.button === 0 ? 'left' : (e.button === 1 ? 'middle' : 'right'),
-                clickCount: e.detail || 1
-            });
-        };
-
-        container.addEventListener('mousedown', (e) => forwardMouse(e, 'mouseDown'));
-        container.addEventListener('mouseup', (e) => forwardMouse(e, 'mouseUp'));
-        container.addEventListener('mousemove', (e) => forwardMouse(e, 'mouseMove'));
-
-        // Wheel events - forward scroll deltas
-        container.addEventListener('wheel', (e) => {
-            const rect = container.getBoundingClientRect();
-            ipcRenderer.send('input:wheel', {
-                x: Math.round(e.clientX - rect.left),
-                y: Math.round(e.clientY - rect.top),
-                deltaX: e.deltaX,
-                deltaY: e.deltaY
-            });
-        }, { passive: true });
-    }
-
-    // Keyboard events - forward to content window (skip if typing in URL bar)
-    const forwardKey = (e, type) => {
-        if (e.target === urlInput) return;
-        
-        ipcRenderer.send('input:keyboard', {
-            type: type,
-            keyCode: e.key,
-            code: e.code,
-            modifiers: [
-                e.shiftKey && 'shift',
-                e.ctrlKey && 'control',
-                e.altKey && 'alt',
-                e.metaKey && 'meta'
-            ].filter(Boolean)
-        });
-    };
-
-    document.addEventListener('keydown', (e) => forwardKey(e, 'keyDown'));
-    document.addEventListener('keyup', (e) => forwardKey(e, 'keyUp'));
-
     // IPC listeners for main process (menus, settings)
-    ipcRenderer.on('settings:radius-options', (event, options) => {
-        radiusOptions = Array.isArray(options) && options.length ? options.slice().sort((a, b) => a - b) : null;
-    });
-
     ipcRenderer.on('settings:init-state', (event, state) => {
         console.log('[Renderer] Received init-state:', state);
-        // Apply immediately since scrutinizer is already initialized
-        if (state.radius) scrutinizer.updateFovealRadius(state.radius);
-        if (state.blur) scrutinizer.updateBlurRadius(state.blur);
+        // Forward state to overlay view
         if (state.enabled) toggleFoveal(true);
-        if (state.showWelcome !== false) welcomePopup.style.display = 'flex';
+        // Radius and blur are sent to overlay via IPC
     });
 
     // Menu IPC handlers
     ipcRenderer.on('menu:toggle-foveal', () => {
-        if (scrutinizer) toggleFoveal();
+        toggleFoveal();
     });
 
     ipcRenderer.on('menu:set-radius', (event, radius) => {
-        if (scrutinizer) {
-            scrutinizer.updateFovealRadius(radius);
-            ipcRenderer.send('settings:radius-changed', radius);
-        }
+        // Forward to overlay view
+        ipcRenderer.send('overlay:set-radius', radius);
     });
 
 
