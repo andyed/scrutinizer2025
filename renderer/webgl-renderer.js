@@ -130,14 +130,14 @@ class WebGLRenderer {
                 // NO CLAMP: Allow radius to be larger than screen for "Disabled" state
                 
                 // === THREE-ZONE MODEL (STAGGERED EFFECTS) ===
-                // Parafovea straddles the radius boundary for gradual transition
-                // 1. FOVEA (Crystal Clear): 0 to 80% of radius
-                // 2. PARAFOVEA (Heat Haze - WARP ONLY): 80% to 180% of radius (straddles boundary - 20% in, 80% out)
-                // 3. FAR PERIPHERY (Mongrel): 180%+ of radius (well outside the oval)
+                // TIGHTENED: Parafovea was too wide (60-160%), causing readable text outside oval
+                // 1. FOVEA (Crystal Clear): 0 to 60% of radius
+                // 2. PARAFOVEA (Heat Haze - WARP ONLY): 60% to 110% of radius (mostly inside oval, 10% out)
+                // 3. FAR PERIPHERY (Mongrel): 100%+ of radius (CA starts AT the oval edge)
                 
-                float fovea_radius = radius_norm * 0.8; // 80% of user-selected radius
-                float parafovea_radius = radius_norm * 1.8; // Extends 80% beyond the oval
-                float periphery_start = radius_norm * 1.8; // CA begins well outside
+                float fovea_radius = radius_norm * 0.6; // 60% of user-selected radius
+                float parafovea_radius = radius_norm * 1.1; // Small extension beyond oval (was 1.6x)
+                float periphery_start = radius_norm * 1.0; // CA begins AT the oval edge (was 1.6x)
                 
                 // STAGGERED STRENGTH MASKS
                 
@@ -205,7 +205,8 @@ class WebGLRenderer {
                 
                 // 2. The Jitter (High frequency, variable amplitude by zone)
                 // CRITICAL: This breaks the Bouma shape (word envelope)
-                float fineScale = isFarPeriphery ? 8000.0 : 3000.0; // INCREASED from 5000/2000 for more aggressive letter destruction
+                // MASSIVELY increased frequency for per-letter destruction
+                float fineScale = isFarPeriphery ? 15000.0 : 6000.0; // DOUBLED from 8000/3000 for much finer grain
                 vec2 warpedUV_noise = vec2((uv_corrected.x + warpVector.x) / 1.77, uv_corrected.y + warpVector.y); // Apply 16:9 aspect
                 
                 float n1_jitter = snoise(warpedUV_noise * fineScale);
@@ -222,10 +223,10 @@ class WebGLRenderer {
                     jitterAmp = vec2(0.01, 0.008); // Was 0.005/0.004
                 } else if (isParafovea) {
                     // Parafovea: PROGRESSIVE crowding
-                    // Inner parafovea: subtle (0.0006, 0.00006)
-                    // Outer parafovea: EXTREME aggression (0.008, 0.006) for Bouma breaking
-                    float baseX = mix(0.0006, 0.008, outerParafoveaStrength); // DOUBLED from 0.004
-                    float baseY = mix(0.00006, 0.006, outerParafoveaStrength); // DOUBLED from 0.003
+                    // Inner parafovea: subtle (0.001, 0.0001) - slightly increased
+                    // Outer parafovea: MASSIVELY aggressive (0.015, 0.012) for destroying "gif.md" type text
+                    float baseX = mix(0.001, 0.015, outerParafoveaStrength); // DOUBLED from 0.008
+                    float baseY = mix(0.0001, 0.012, outerParafoveaStrength); // DOUBLED from 0.006
                     jitterAmp = vec2(baseX, baseY);
                 } else {
                     // Fovea: no jitter
