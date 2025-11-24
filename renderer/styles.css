@@ -258,7 +258,8 @@ label {
   left: 0;
   width: 100% !important;
   height: 100% !important;
-  pointer-events: none;
+  pointer-events: none !important;
+  /* CRITICAL: Let clicks pass through to webview */
   /* Let clicks pass through to webview */
   z-index: 100;
   display: block;
