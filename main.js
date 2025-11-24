@@ -171,6 +171,12 @@ ipcMain.on('input:keyboard', (event, data) => {
     }
 });
 
+// Handle new window requests from preload script (target="_blank" links)
+ipcMain.on('open-new-window', (event, url) => {
+    console.log('[Main] Received open-new-window request:', url);
+    createScrutinizerWindow(url);
+});
+
 function createScrutinizerWindow(startUrl) {
     console.log('[Main] Creating new Scrutinizer window', startUrl ? 'with URL: ' + startUrl : '(default URL)');
 

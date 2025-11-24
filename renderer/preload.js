@@ -57,7 +57,8 @@ window.addEventListener('DOMContentLoaded', () => {
         if (link && link.target === '_blank' && link.href) {
             e.preventDefault();
             console.log('[Preload] Intercepted target=_blank link:', link.href);
-            ipcRenderer.sendToHost('open-new-window', link.href);
+            // Use 'send' instead of 'sendToHost' for BrowserWindow
+            ipcRenderer.send('open-new-window', link.href);
         }
     }, true); // Use capture phase to intercept before page handlers
 });
