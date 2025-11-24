@@ -2,10 +2,10 @@
 # Scrutinizer - Foveal Vision Simulator
 
 [![Electron](https://img.shields.io/badge/Electron-28.0-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
-[![Canvas API](https://img.shields.io/badge/Canvas%20API-HTML5-E34F26?style=flat-square&logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
+[![WebGL](https://img.shields.io/badge/WebGL-2.0-990000?style=flat-square&logo=webgl&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 
-A modern recreation of the 2007 Scrutinizer vision-simulating browser, built with Electron and the Canvas API, and positioned as a **design constraint model** for studying foveal vs. peripheral vision on the web.
+A modern recreation of the 2007 Scrutinizer vision-simulating browser, built with Electron and **WebGL**, and positioned as a **design constraint model** for studying foveal vs. peripheral vision on the web.
 
 ![Beta Browser Screenshot](screenshots/onedotoh_browser.png)
 
@@ -46,20 +46,20 @@ Scrutinizer strips away the brain's post-processing to reveal the raw data your 
 
 
 > [!TIP]
-> **New in 2025: Neural Processing Model**
-> We've replaced the old optical blur with a biologically-accurate "Box Sampling with Noise" model:
+> **New in 2025: Neural Processing Model (WebGL)**
+> We've replaced the old optical blur with a biologically-accurate "Box Sampling with Noise" model, running entirely on the GPU:
 > - **Parafoveal Jitter**: High-contrast but spatially uncertain (simulates crowding)
 > - **Peripheral Block Sampling**: Pixelated/mosaic effect (simulates sparse photoreceptor density)
 > - **Rod Sensitivity**: Cyan/Aqua elements glow in the periphery (505nm peak)
 
-- � **Binocular foveal mask** that follows your mouse cursor with distinctive 16:9 shape
-- �🎨 **Progressive desaturation** with real-time radial gradient (color → grayscale)
+- 👁️ **Binocular foveal mask** that follows your mouse cursor with distinctive 16:9 shape
+- 🎨 **Progressive desaturation** with real-time radial gradient (color → grayscale)
 - 🧬 **ColorMatrix luminance weights** preserved for accurate grayscale conversion
 - 📜 **Scroll detection** with automatic recapture
 - 🔄 **DOM mutation detection** for dynamic content
 - ⌨️ **Keyboard shortcuts** (ESC to toggle, Left/Right arrows to adjust size)
-- 🎚️ **Menu-based controls** for radius and blur presets
-- ⚡ **Web Worker** for non-blocking blur computation
+- 🎚️ **Menu-based controls** for radius and blur presets (Simulation menu)
+- 🚀 **WebGL Pipeline** for 60fps performance and zero-copy rendering
 
 ## Download & Installation
 
@@ -77,13 +77,13 @@ npm start
 
 ## Usage
 
-1. **Navigate**: Enter a URL in the address bar and click **Go**
-2. **Enable**: Click the eye icon or press `Escape` to toggle foveal mode
+1. **Navigate**: Use **File → Open URL** (Cmd+L) to enter a website address.
+2. **Enable**: Click the eye icon or press `Escape` to toggle foveal mode.
 3. **Adjust**:
-   - Use the **View → Foveal Radius** menu to pick a radius preset
-   - Use **View → Blur Amount** to adjust peripheral blur
-   - Or use **Left/Right arrow keys** (<>) while foveal mode is enabled
-4. **Observe**: Watch how easily key elements can be located using mostly peripheral vision
+   - Use the **Simulation → Foveal Radius** menu to pick a radius preset.
+   - Use **Simulation → Blur Amount** to adjust peripheral blur.
+   - Or use **Left/Right arrow keys** (<>) while foveal mode is enabled.
+4. **Observe**: Watch how easily key elements can be located using mostly peripheral vision.
 
 ### Keyboard Shortcuts
 
@@ -92,6 +92,7 @@ npm start
 | `Escape` | Toggle foveal mode on/off |
 | `Right Arrow` (>) | Increase foveal radius (when foveal mode is enabled) |
 | `Left Arrow` (<) | Decrease foveal radius (when foveal mode is enabled) |
+| `Cmd+L` | Open URL dialog |
 
 ## Limitations
 
@@ -110,7 +111,7 @@ npm start
 
 ### How does it work?
 
-The software captures a bitmap of the page, blurs and desaturates it. The overlay is placed on top of the web page with a foveal sized mask enabling see through wherever the mouse is located.
+The software captures the browser content and processes it through a custom **WebGL Fragment Shader** pipeline. This allows for complex, per-pixel visual effects that simulate the limitations of the human eye in real-time.
 
 ### Electron Architecture
 
@@ -126,13 +127,16 @@ To track mouse movements and page events within the webview, we use Electron's *
 2. **Sending Events**: The injected code uses `ipcRenderer.sendToHost()` to send mouse coordinates, scroll events, and DOM mutations back to the parent
 3. **Receiving Events**: The parent listens via `webview.addEventListener('ipc-message')` to receive these events
 
-#### Image Processing Pipeline
+#### WebGL Rendering Pipeline
+
+We moved from a CPU-based canvas approach to a fully GPU-accelerated pipeline to achieve 60fps performance:
 
 ```
-DOM → html2canvas → Rod-Sensitive Desaturation → Neural Processing → Foveal Mask → Render
-                                                 ├─ Parafoveal: Jitter (crowding)
-                                                 ├─ Near Periphery: Fractal Noise (shimmer)
-                                                 └─ Far Periphery: Block Sampling + Warping
+DOM → Capture Page → GPU Texture Upload → WebGL Fragment Shader → Render
+                                          ├─ Uniforms: Mouse Pos, Radius, Blur
+                                          ├─ Pass 1: Rod-Sensitive Desaturation
+                                          ├─ Pass 2: Variable Block Sampling (Periphery)
+                                          └─ Pass 3: Foveal Masking
 ```
 
 ## Related Work & Theoretical Foundation

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="UTF-8">
   <title>Open URL</title>
@@ -9,73 +10,85 @@
       padding: 0;
       box-sizing: border-box;
     }
-    
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
       padding: 12px;
       background: #f5f5f5;
     }
-    
+
     .container {
       background: white;
-      padding: 16px;
+      padding: 24px;
+      /* Increased padding */
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
-    
+
     label {
       display: block;
       font-weight: 500;
-      margin-bottom: 6px;
+      margin-bottom: 12px;
+      /* Increased margin */
       color: #333;
+      font-size: 15px;
     }
-    
+
     input {
       width: 100%;
-      padding: 8px;
+      padding: 10px 12px;
+      /* Increased padding */
       border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
-      margin-bottom: 12px;
+      border-radius: 6px;
+      font-size: 15px;
+      margin-bottom: 20px;
+      /* Increased margin */
     }
-    
+
     input:focus {
       outline: none;
       border-color: #667eea;
       box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
     }
-    
+
     .buttons {
       display: flex;
-      gap: 10px;
+      gap: 12px;
       justify-content: flex-end;
     }
-    
+
     button {
-      padding: 8px 16px;
+      padding: 10px 20px;
+      /* Increased padding */
       border: 1px solid #ddd;
-      border-radius: 4px;
+      border-radius: 6px;
       background: white;
       font-size: 14px;
       cursor: pointer;
       transition: all 0.2s;
+      font-weight: 500;
     }
-    
+
     button:hover {
       background: #f5f5f5;
     }
-    
+
     button.primary {
       background: #667eea;
       color: white;
       border-color: #667eea;
     }
-    
+
     button.primary:hover {
       background: #5568d3;
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <label for="url">Enter URL:</label>
@@ -85,20 +98,20 @@
       <button id="go" class="primary">Go</button>
     </div>
   </div>
-  
+
   <script>
     const { ipcRenderer } = require('electron');
-    
+
     const urlInput = document.getElementById('url');
     const goBtn = document.getElementById('go');
     const cancelBtn = document.getElementById('cancel');
-    
+
     // Get current URL from main process
     ipcRenderer.on('set-url', (event, url) => {
       urlInput.value = url;
       urlInput.select();
     });
-    
+
     goBtn.addEventListener('click', () => {
       const url = urlInput.value.trim();
       if (url) {
@@ -106,11 +119,11 @@
         ipcRenderer.send('url-dialog:go', fullUrl);
       }
     });
-    
+
     cancelBtn.addEventListener('click', () => {
       ipcRenderer.send('url-dialog:cancel');
     });
-    
+
     urlInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         goBtn.click();
@@ -120,4 +133,5 @@
     });
   </script>
 </body>
+
 </html>

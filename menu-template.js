@@ -1,4 +1,4 @@
-const { app } = require('electron');
+const { app, shell } = require('electron');
 
 const RADIUS_OPTIONS = [100, 180, 250];
 
@@ -6,11 +6,19 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
     const isMac = process.platform === 'darwin';
     const { BrowserWindow } = require('electron');
 
-    return [
+    const template = [
+        // App Menu (macOS only)
         ...(isMac ? [{
             label: app.name,
             submenu: [
-                { role: 'about' },
+                {
+                    label: 'About ' + app.name,
+                    click: async () => {
+                        await shell.openExternal('https://github.com/andyed/scrutinizer2025');
+                    }
+                },
+                { type: 'separator' },
+                { role: 'services' },
                 { type: 'separator' },
                 { role: 'hide' },
                 { role: 'hideOthers' },
@@ -19,6 +27,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                 { role: 'quit' }
             ]
         }] : []),
+        // File Menu
         {
             label: 'File',
             submenu: [
@@ -27,29 +36,44 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     accelerator: 'CmdOrCtrl+N',
                     click: () => {
                         const { dialog } = require('electron');
-                        dialog.showMessageBox({
-                            type: 'question',
-                            message: 'New Window URL',
-                            detail: 'Enter URL in the console for now (TODO: proper dialog)',
-                            buttons: ['OK']
-                        });
+                        // Trigger the same flow as open-new-window
+                        const win = BrowserWindow.getFocusedWindow();
+                        if (win && win.scrutinizerView) {
+                            // For now, just open default
+                            const { ipcMain } = require('electron');
+                            // This is a bit hacky to reach back to main, but we can just emit an event or use the exposed function if we had it.
+                            // Better: just use the existing IPC handler if possible, or replicate logic.
+                            // Since we don't have direct access to createScrutinizerWindow here, we'll send an IPC to main
+                            // But wait, we are IN the main process here (menu template is used by main).
+                            // We can't easily call createScrutinizerWindow from here without circular deps or passing it in.
+                            // Let's stick to the existing behavior or improve it.
+                            // The previous implementation showed a message box. Let's keep it simple or improve.
+                            // Let's actually make it useful: Open the URL dialog for a NEW window?
+                            // Or just open a new default window.
+
+                            // Let's try to send a signal to the main process to open a new window.
+                            // Since we are in main process, we can use a global event emitter or just require main? No, circular dependency.
+                            // We'll stick to the previous "New Window" behavior for now but maybe just open a default one?
+                            // Actually, the previous code showed a dialog. Let's just open a new window with default URL.
+                            // We can emit an event on the app object?
+                            app.emit('create-new-window');
+                        }
                     }
                 },
                 {
                     label: 'Open URL...',
-                    // Accelerator shown but handled via globalShortcut in main.js
                     accelerator: 'CmdOrCtrl+L',
                     click: () => {
                         const win = BrowserWindow.getFocusedWindow();
                         if (!win || !win.scrutinizerView) return;
-                        
+
                         const currentURL = win.scrutinizerView.webContents.getURL();
                         const path = require('path');
-                        
+
                         // Create URL input dialog window
                         const dialog = new BrowserWindow({
                             width: 500,
-                            height: 160,
+                            height: 180, // Increased height for better spacing
                             parent: win,
                             modal: true,
                             show: false,
@@ -61,14 +85,14 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                 contextIsolation: false
                             }
                         });
-                        
+
                         dialog.loadFile(path.join(__dirname, 'renderer', 'url-dialog.html'));
-                        
+
                         dialog.once('ready-to-show', () => {
                             dialog.show();
                             dialog.webContents.send('set-url', currentURL);
                         });
-                        
+
                         // Store reference for IPC handlers
                         win.urlDialog = dialog;
                     }
@@ -77,59 +101,52 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                 { role: 'close' }
             ]
         },
+        // Edit Menu
         {
-            label: 'Navigate',
+            label: 'Edit',
             submenu: [
+                { role: 'undo' },
+                { role: 'redo' },
+                { type: 'separator' },
+                { role: 'cut' },
+                { role: 'copy' },
+                { role: 'paste' },
+                { role: 'pasteAndMatchStyle' },
+                { role: 'delete' },
+                { role: 'selectAll' },
+                { type: 'separator' },
                 {
-                    label: 'Back',
-                    accelerator: 'CmdOrCtrl+Left',
-                    click: () => {
-                        const win = BrowserWindow.getFocusedWindow();
-                        if (win && win.scrutinizerView) {
-                            win.scrutinizerView.webContents.goBack();
-                        }
-                    }
-                },
-                {
-                    label: 'Forward',
-                    accelerator: 'CmdOrCtrl+Right',
-                    click: () => {
-                        const win = BrowserWindow.getFocusedWindow();
-                        if (win && win.scrutinizerView) {
-                            win.scrutinizerView.webContents.goForward();
-                        }
-                    }
-                },
-                {
-                    label: 'Reload',
-                    accelerator: 'CmdOrCtrl+R',
-                    click: () => {
-                        const win = BrowserWindow.getFocusedWindow();
-                        if (win && win.scrutinizerView) {
-                            win.scrutinizerView.webContents.reload();
-                        }
-                    }
+                    label: 'Speech',
+                    submenu: [
+                        { role: 'startSpeaking' },
+                        { role: 'stopSpeaking' }
+                    ]
                 }
             ]
         },
+        // View Menu
         {
             label: 'View',
+            submenu: [
+                { role: 'reload' },
+                { role: 'forceReload' },
+                { role: 'toggleDevTools' },
+                { type: 'separator' },
+                { role: 'resetZoom' },
+                { role: 'zoomIn' },
+                { role: 'zoomOut' },
+                { type: 'separator' },
+                { role: 'togglefullscreen' }
+            ]
+        },
+        // Simulation Menu (Custom)
+        {
+            label: 'Simulation',
             submenu: [
                 {
                     label: 'Toggle Foveal Mode',
                     accelerator: 'CmdOrCtrl+F',
                     click: () => sendToOverlays('menu:toggle-foveal')
-                },
-                { type: 'separator' },
-                {
-                    label: 'Toggle Developer Tools',
-                    accelerator: isMac ? 'Alt+Command+I' : 'Ctrl+Shift+I',
-                    role: 'toggleDevTools'
-                },
-                {
-                    label: 'Reload',
-                    accelerator: 'CmdOrCtrl+R',
-                    role: 'reload'
                 },
                 { type: 'separator' },
                 {
@@ -191,8 +208,40 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     ]
                 }
             ]
+        },
+        // Window Menu
+        {
+            label: 'Window',
+            submenu: [
+                { role: 'minimize' },
+                { role: 'zoom' },
+                { type: 'separator' },
+                { role: 'front' },
+                { type: 'separator' },
+                { role: 'window' }
+            ]
+        },
+        // Help Menu
+        {
+            role: 'help',
+            submenu: [
+                {
+                    label: 'Learn More',
+                    click: async () => {
+                        await shell.openExternal('https://github.com/andyed/scrutinizer2025');
+                    }
+                },
+                {
+                    label: 'Report Issue',
+                    click: async () => {
+                        await shell.openExternal('https://github.com/andyed/scrutinizer2025/issues');
+                    }
+                }
+            ]
         }
     ];
+
+    return template;
 }
 
 module.exports = { buildMenuTemplate, RADIUS_OPTIONS };
