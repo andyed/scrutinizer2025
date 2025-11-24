@@ -1,6 +1,6 @@
 {
   "name": "scrutinizer-electron",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "Foveal vision simulator - recreating the 2007 Scrutinizer browser",
   "main": "main.js",
   "scripts": {
@@ -51,8 +51,18 @@
     },
     "win": {
       "target": [
-        "nsis",
-        "zip"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "renderer/scrutinizer_512x512_icon.png"
     },
