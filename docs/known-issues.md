@@ -62,4 +62,11 @@ See `docs/webcontentsview-migration.md` for full migration plan.
 
 ## Other Known Issues
 
-_(None currently - this is the only blocking issue for v1.0)_
+### Browser Features
+- **Find in Page**: `Cmd+F` / `Ctrl+F` is currently not implemented. Users cannot search for text within the webview.
+- **Downloads**: File downloads happen silently in the background (to the default OS downloads folder) with no UI feedback or progress indicators.
+- **Complex Popups & Authentication**: OAuth flows (e.g., "Sign in with Google") that rely on specific window relationships or popup behavior may be broken, as `target="_blank"` links currently open in a new, detached Scrutinizer window.
+
+### Visual Artifacts
+- **Scroll Lag**: Rapid scrolling may cause a momentary desynchronization between the overlay canvas (visuals) and the underlying webview (interaction targets).
+- **Cursor State**: The mouse cursor may not always correctly reflect the hover state (e.g., changing to a hand pointer) due to the overlay window intercepting events.
