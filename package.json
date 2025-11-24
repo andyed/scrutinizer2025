@@ -1,6 +1,6 @@
 {
   "name": "scrutinizer-electron",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Foveal vision simulator - recreating the 2007 Scrutinizer browser",
   "main": "main.js",
   "scripts": {
@@ -26,6 +26,7 @@
     "files": [
       "main.js",
       "menu-template.js",
+      "settings-manager.js",
       "renderer/**/*",
       "!renderer/**/*.md"
     ],
