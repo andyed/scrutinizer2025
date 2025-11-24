@@ -130,13 +130,14 @@ class WebGLRenderer {
                 // NO CLAMP: Allow radius to be larger than screen for "Disabled" state
                 
                 // === THREE-ZONE MODEL (STAGGERED EFFECTS) ===
-                // 1. FOVEA (Crystal Clear): 0 to ~30% of radius
-                // 2. PARAFOVEA (Heat Haze - WARP ONLY): 30% to 60% of radius - Black/white, readable but crowded
-                // 3. FAR PERIPHERY (Mongrel): 60%+ - CA + Heavy effects
+                // Parafovea straddles the radius boundary for gradual transition
+                // 1. FOVEA (Crystal Clear): 0 to 80% of radius
+                // 2. PARAFOVEA (Heat Haze - WARP ONLY): 80% to 180% of radius (straddles boundary - 20% in, 80% out)
+                // 3. FAR PERIPHERY (Mongrel): 180%+ of radius (well outside the oval)
                 
-                float fovea_radius = radius_norm * 0.3; // The "rock solid" zone
-                float parafovea_radius = radius_norm * 0.6; // SHRUNK from 1.0 - tighter parafovea
-                float periphery_start = radius_norm * 0.6; // CA begins at 60% of base radius (was 100%)
+                float fovea_radius = radius_norm * 0.8; // 80% of user-selected radius
+                float parafovea_radius = radius_norm * 1.8; // Extends 80% beyond the oval
+                float periphery_start = radius_norm * 1.8; // CA begins well outside
                 
                 // STAGGERED STRENGTH MASKS
                 
@@ -162,7 +163,7 @@ class WebGLRenderer {
                 
                 // Detect zones for conditional logic
                 bool isParafovea = dist > fovea_radius && dist <= periphery_start;
-                bool isFarPeriphery = dist > periphery_start * 1.5; // Extreme periphery at 90% of base radius
+                bool isFarPeriphery = dist > periphery_start * 1.1; // Extreme effects just beyond parafovea (was 1.5x too far)
                 
                 
                 // Domain Warping (Positional Uncertainty) - Recursive Noise
@@ -176,15 +177,18 @@ class WebGLRenderer {
                 // CRITICAL: Single-octave noise has "safe valleys" where distortion = 0
                 // Small text can survive intact in these valleys ("Eye of the Storm" bug)
                 
+                // Apply 16:9 aspect adjustment to noise sampling to match elliptical foveal shape
+                vec2 uv_noise = vec2(uv_corrected.x / 1.77, uv_corrected.y);
+                
                 // Octave A: Base frequency (doubled for X-axis to destroy small fonts)
                 float coarseScaleX = isFarPeriphery ? 2000.0 : 200.0; // DOUBLED from 1000/100
                 float coarseScaleY = isFarPeriphery ? 1000.0 : 100.0; // Original Y freq
-                float n1_warp_a = snoise(vec2(uv_corrected.x * coarseScaleX, uv_corrected.y * coarseScaleY));
-                float n2_warp_a = snoise(vec2(uv_corrected.x * coarseScaleX, uv_corrected.y * coarseScaleY) + vec2(50.0, 50.0));
+                float n1_warp_a = snoise(vec2(uv_noise.x * coarseScaleX, uv_noise.y * coarseScaleY));
+                float n2_warp_a = snoise(vec2(uv_noise.x * coarseScaleX, uv_noise.y * coarseScaleY) + vec2(50.0, 50.0));
                 
                 // Octave B: Higher frequency, offset phase (fills the gaps)
-                float n1_warp_b = snoise(vec2(uv_corrected.x * coarseScaleX * 2.3, uv_corrected.y * coarseScaleY * 2.3) + vec2(100.0, 100.0));
-                float n2_warp_b = snoise(vec2(uv_corrected.x * coarseScaleX * 2.3, uv_corrected.y * coarseScaleY * 2.3) + vec2(150.0, 150.0));
+                float n1_warp_b = snoise(vec2(uv_noise.x * coarseScaleX * 2.3, uv_noise.y * coarseScaleY * 2.3) + vec2(100.0, 100.0));
+                float n2_warp_b = snoise(vec2(uv_noise.x * coarseScaleX * 2.3, uv_noise.y * coarseScaleY * 2.3) + vec2(150.0, 150.0));
                 
                 // TURBULENCE: Combine octaves so there are NO safe spots
                 float n1_warp = n1_warp_a + n2_warp_b * 0.5; // Second octave at 50% strength
@@ -202,10 +206,10 @@ class WebGLRenderer {
                 // 2. The Jitter (High frequency, variable amplitude by zone)
                 // CRITICAL: This breaks the Bouma shape (word envelope)
                 float fineScale = isFarPeriphery ? 8000.0 : 3000.0; // INCREASED from 5000/2000 for more aggressive letter destruction
-                vec2 warpedUV = uv_corrected + warpVector; // Domain distortion
+                vec2 warpedUV_noise = vec2((uv_corrected.x + warpVector.x) / 1.77, uv_corrected.y + warpVector.y); // Apply 16:9 aspect
                 
-                float n1_jitter = snoise(warpedUV * fineScale);
-                float n2_jitter = snoise(warpedUV * fineScale + vec2(100.0, 100.0));
+                float n1_jitter = snoise(warpedUV_noise * fineScale);
+                float n2_jitter = snoise(warpedUV_noise * fineScale + vec2(100.0, 100.0));
                 
                 // BOUMA BREAKER: Outer parafovea needs more aggressive vertical jitter
                 // Create gradient within parafovea: inner (subtle) -> outer (aggressive)
@@ -214,14 +218,14 @@ class WebGLRenderer {
                 // Base amplitudes
                 vec2 jitterAmp;
                 if (isFarPeriphery) {
-                    // Far Periphery: maximum chaos
-                    jitterAmp = vec2(0.005, 0.004); // Increased from 0.003/0.002
+                    // Far Periphery: EXTREME chaos (doubled from previous)
+                    jitterAmp = vec2(0.01, 0.008); // Was 0.005/0.004
                 } else if (isParafovea) {
                     // Parafovea: PROGRESSIVE crowding
                     // Inner parafovea: subtle (0.0006, 0.00006)
-                    // Outer parafovea: VERY aggressive (0.004, 0.003) for Bouma breaking
-                    float baseX = mix(0.0006, 0.004, outerParafoveaStrength); // DOUBLED from 0.002
-                    float baseY = mix(0.00006, 0.003, outerParafoveaStrength); // DOUBLED from 0.0015 (50x boost in outer!)
+                    // Outer parafovea: EXTREME aggression (0.008, 0.006) for Bouma breaking
+                    float baseX = mix(0.0006, 0.008, outerParafoveaStrength); // DOUBLED from 0.004
+                    float baseY = mix(0.00006, 0.006, outerParafoveaStrength); // DOUBLED from 0.003
                     jitterAmp = vec2(baseX, baseY);
                 } else {
                     // Fovea: no jitter
@@ -244,8 +248,8 @@ class WebGLRenderer {
                 
                 // Calculate Aberration Amount
                 // NOW uses zone-based caStrength (only active beyond parafovea)
-                // Reduced by ~50% to avoid "Double Vision" (0.015 -> 0.008)
-                float aberrationAmt = 0.008 * caStrength * u_intensity * u_ca_strength;
+                // INCREASED from 0.008 to 0.02 (2.5x) for stronger illegibility
+                float aberrationAmt = 0.02 * caStrength * u_intensity * u_ca_strength;
                 
                 // Calculate offsets
                 // Red pulls IN (closer to mouse)
