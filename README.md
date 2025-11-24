@@ -7,7 +7,16 @@
 
 A modern recreation of the 2007 Scrutinizer vision-simulating browser, built with Electron and **WebGL**, and positioned as a **design constraint model** for studying foveal vs. peripheral vision on the web.
 
-[![Scrutinizer Demo](http://img.youtube.com/vi/LZB845_a5M4/0.jpg)](https://www.youtube.com/watch?v=LZB845_a5M4)
+## TLDR: Simulating the Cortical Zoom This sequence visualizes the 400ms lifespan of a saccade—from peripheral detection to foveal recognition.
+![Progressive Grid](onedotone_progressive_grid.png)
+
+- Frames 1-5 (Far Periphery): The "Mongrel" Zone. High-frequency details (text) are compressed into statistical noise. Color is desaturated to simulate rod-dominant vision, preserving only high-contrast "blobs" (the logo).
+
+- Frames 6-10 (Parafovea): The "Crowding" Zone. Color sensitivity returns as cone density increases. Text features (ascenders/descenders) emerge, but "Interactional Crowding" prevents legibility.
+
+- Frames 11-14 (Fovea): The "High-Res" Zone. The central 2° of vision resolves the image, finally allowing the brain to parse semantic meaning.
+
+See a video:[Scrutinizer Demo](https://www.youtube.com/watch?v=LZB845_a5M4)
 
 
 **Original project:** https://github.com/andyed/scrutinizer  
