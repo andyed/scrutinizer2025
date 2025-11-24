@@ -20,24 +20,103 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
             ]
         }] : []),
         {
-            label: 'View',
+            label: 'File',
             submenu: [
                 {
-                    label: 'Show Toolbar',
+                    label: 'New Window',
+                    accelerator: 'CmdOrCtrl+N',
                     click: () => {
-                        // Toggle toolbar visibility (not entire HUD window)
-                        // This keeps foveal effect running when toolbar is hidden
-                        const windows = BrowserWindow.getAllWindows();
-                        for (const win of windows) {
-                            if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
-                                win.scrutinizerHud.webContents.send('hud:toggle-toolbar');
+                        const { dialog } = require('electron');
+                        dialog.showMessageBox({
+                            type: 'question',
+                            message: 'New Window URL',
+                            detail: 'Enter URL in the console for now (TODO: proper dialog)',
+                            buttons: ['OK']
+                        });
+                    }
+                },
+                {
+                    label: 'Open URL...',
+                    accelerator: 'CmdOrCtrl+Shift+L',
+                    click: () => {
+                        const win = BrowserWindow.getFocusedWindow();
+                        if (!win || !win.scrutinizerView) return;
+                        
+                        const currentURL = win.scrutinizerView.webContents.getURL();
+                        const path = require('path');
+                        
+                        // Create URL input dialog window
+                        const dialog = new BrowserWindow({
+                            width: 500,
+                            height: 150,
+                            parent: win,
+                            modal: true,
+                            show: false,
+                            resizable: false,
+                            minimizable: false,
+                            maximizable: false,
+                            webPreferences: {
+                                nodeIntegration: true,
+                                contextIsolation: false
                             }
-                        }
+                        });
+                        
+                        dialog.loadFile(path.join(__dirname, 'renderer', 'url-dialog.html'));
+                        
+                        dialog.once('ready-to-show', () => {
+                            dialog.show();
+                            dialog.webContents.send('set-url', currentURL);
+                        });
+                        
+                        // Store reference for IPC handlers
+                        win.urlDialog = dialog;
                     }
                 },
                 { type: 'separator' },
+                { role: 'close' }
+            ]
+        },
+        {
+            label: 'Navigate',
+            submenu: [
+                {
+                    label: 'Back',
+                    accelerator: 'CmdOrCtrl+Left',
+                    click: () => {
+                        const win = BrowserWindow.getFocusedWindow();
+                        if (win && win.scrutinizerView) {
+                            win.scrutinizerView.webContents.goBack();
+                        }
+                    }
+                },
+                {
+                    label: 'Forward',
+                    accelerator: 'CmdOrCtrl+Right',
+                    click: () => {
+                        const win = BrowserWindow.getFocusedWindow();
+                        if (win && win.scrutinizerView) {
+                            win.scrutinizerView.webContents.goForward();
+                        }
+                    }
+                },
+                {
+                    label: 'Reload',
+                    accelerator: 'CmdOrCtrl+R',
+                    click: () => {
+                        const win = BrowserWindow.getFocusedWindow();
+                        if (win && win.scrutinizerView) {
+                            win.scrutinizerView.webContents.reload();
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            label: 'View',
+            submenu: [
                 {
                     label: 'Toggle Foveal Mode',
+                    accelerator: 'CmdOrCtrl+F',
                     click: () => sendToOverlays('menu:toggle-foveal')
                 },
                 { type: 'separator' },

@@ -9,50 +9,24 @@ let captureInterval = null;
 let fovealEnabled = false;
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('[Overlay] Initializing');
-    
-    // Get UI elements
-    const toggleBtn = document.getElementById('toggle-btn');
-    const urlInput = document.getElementById('url-input');
-    const navigateBtn = document.getElementById('go-btn');
-    const backBtn = document.getElementById('back-btn');
-    const forwardBtn = document.getElementById('forward-btn');
-    const toolbar = document.getElementById('toolbar');
+    console.log('[Overlay] Initializing (no toolbar - menu only)');
     
     // Initialize Scrutinizer for canvas rendering
     scrutinizer = new Scrutinizer(CONFIG);
     
-    // Handle mouse events for click-through behavior
-    // When mouse is over toolbar, capture events; otherwise forward to browser
-    let mouseOverToolbar = false;
-    
-    const updateMouseForwarding = () => {
-        if (mouseOverToolbar) {
-            // Mouse over toolbar - capture events so toolbar buttons work
-            ipcRenderer.send('hud:set-ignore-mouse-events', false);
-        } else {
-            // Mouse not over toolbar - forward to browser below
-            ipcRenderer.send('hud:set-ignore-mouse-events', true, { forward: true });
-        }
-    };
-    
-    // Track when mouse enters/leaves toolbar
-    toolbar.addEventListener('mouseenter', () => {
-        mouseOverToolbar = true;
-        updateMouseForwarding();
-    });
-    
-    toolbar.addEventListener('mouseleave', () => {
-        mouseOverToolbar = false;
-        updateMouseForwarding();
-    });
-    
-    // Track mouse globally to catch edge cases
+    // Track mouse for foveal center (HUD forwards all events so we get them here too)
     document.addEventListener('mousemove', (e) => {
-        const overToolbar = toolbar && toolbar.contains(e.target);
-        if (overToolbar !== mouseOverToolbar) {
-            mouseOverToolbar = overToolbar;
-            updateMouseForwarding();
+        if (scrutinizer) {
+            scrutinizer.handleMouseMove(e);
+        }
+    });
+    
+    // Also listen for mouse position from content view
+    ipcRenderer.on('browser:mousemove', (event, x, y) => {
+        // Update foveal center when mouse moves in browser below
+        if (scrutinizer) {
+            const syntheticEvent = { clientX: x, clientY: y };
+            scrutinizer.handleMouseMove(syntheticEvent);
         }
     });
     
@@ -96,15 +70,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    // Toggle foveal effect
+    // Toggle foveal effect (called from menu)
     const toggleFoveal = (forceState = null) => {
         if (forceState !== null) {
             fovealEnabled = forceState;
         } else {
             fovealEnabled = !fovealEnabled;
         }
-
-        toggleBtn.classList.toggle('active', fovealEnabled);
         
         // Notify main process
         ipcRenderer.send('settings:enabled-changed', fovealEnabled);
@@ -117,72 +89,18 @@ document.addEventListener('DOMContentLoaded', () => {
             stopCapturing();
         }
     };
-    
-    // Toolbar event handlers
-    toggleBtn.addEventListener('click', () => {
-        toggleFoveal();
-    });
-    
-    backBtn.addEventListener('click', () => {
-        ipcRenderer.send('navigate:back');
-    });
 
-    forwardBtn.addEventListener('click', () => {
-        ipcRenderer.send('navigate:forward');
-    });
-
-    navigateBtn.addEventListener('click', () => {
-        const url = urlInput.value.trim();
-        if (url) {
-            const fullUrl = url.startsWith('http') ? url : 'https://' + url;
-            ipcRenderer.send('navigate:to', fullUrl);
-            ipcRenderer.send('settings:page-changed', fullUrl);
-        }
-    });
-
-    urlInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            navigateBtn.click();
-        }
-    });
-    
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-        // ESC is now handled in main.js to toggle entire HUD window
-        // No need to toggle toolbar visibility here anymore
-        
-        // Arrow keys to adjust radius (when enabled)
-        if (fovealEnabled) {
-            if (e.code === 'ArrowRight') {
-                e.preventDefault();
-                if (scrutinizer) scrutinizer.updateFovealRadius(10);
-            } else if (e.code === 'ArrowLeft') {
-                e.preventDefault();
-                if (scrutinizer) scrutinizer.updateFovealRadius(-10);
-            }
-        }
-    });
-
-    // HUD window is now separate - no need to forward mouse/wheel events
-    // Browser window handles all interactions natively
-    
-    // Listen for page load events to update UI
+    // Listen for page load events
     ipcRenderer.on('browser:did-start-loading', () => {
         console.log('[Overlay] Page loading started');
-        toggleBtn.classList.add('loading');
     });
 
     ipcRenderer.on('browser:did-finish-load', () => {
         console.log('[Overlay] Page loading finished');
-        toggleBtn.classList.remove('loading');
     });
 
     ipcRenderer.on('browser:did-navigate', (event, url) => {
-        // Update URL bar (unless it's focused)
-        if (document.activeElement !== urlInput) {
-            urlInput.value = url;
-        }
-        toggleBtn.classList.remove('loading');
+        console.log('[Overlay] Browser navigated to:', url);
     });
     
     // Listen for init state from main process
@@ -203,13 +121,5 @@ document.addEventListener('DOMContentLoaded', () => {
         if (scrutinizer) scrutinizer.updateFovealRadius(radius);
     });
     
-    // Handle toolbar visibility toggle (from ESC key or menu)
-    ipcRenderer.on('hud:toggle-toolbar', () => {
-        const toolbarEl = document.getElementById('toolbar');
-        if (toolbarEl) {
-            toolbarEl.classList.toggle('hidden');
-        }
-    });
-    
-    console.log('[Overlay] Ready');
+    console.log('[Overlay] Ready (menu-only mode)');
 });

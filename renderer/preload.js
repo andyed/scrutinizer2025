@@ -5,6 +5,11 @@ console.log('[Preload] ✅ Script loaded and executing');
 window.addEventListener('DOMContentLoaded', () => {
     console.log('[Preload] DOMContentLoaded fired');
     
+    // Track mouse movement for foveal effect
+    window.addEventListener('mousemove', (e) => {
+        ipcRenderer.send('browser:mousemove', e.clientX, e.clientY);
+    });
+    
     // Forward keyboard events to main process for shortcuts
     window.addEventListener('keydown', (e) => {
         // Forward Escape and Left/Right arrow keys

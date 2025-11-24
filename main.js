@@ -218,12 +218,33 @@ ipcMain.on('open-new-window', (event, url) => {
     createScrutinizerWindow(url);
 });
 
-// Handle HUD mouse event forwarding control
-ipcMain.on('hud:set-ignore-mouse-events', (event, ignore, options) => {
+// Forward browser mouse position to HUD for foveal effect tracking
+ipcMain.on('browser:mousemove', (event, x, y) => {
     const windows = BrowserWindow.getAllWindows();
-    const hudWindow = windows.find(w => w.webContents === event.sender);
-    if (hudWindow) {
-        hudWindow.setIgnoreMouseEvents(ignore, options || {});
+    // Find the window that owns this content view
+    const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
+    if (win && win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+        win.scrutinizerHud.webContents.send('browser:mousemove', x, y);
+    }
+});
+
+// Handle URL dialog responses
+ipcMain.on('url-dialog:go', (event, url) => {
+    const windows = BrowserWindow.getAllWindows();
+    const parentWin = windows.find(w => w.urlDialog && w.urlDialog.webContents === event.sender);
+    if (parentWin && parentWin.scrutinizerView) {
+        parentWin.scrutinizerView.webContents.loadURL(url);
+        parentWin.urlDialog.close();
+        delete parentWin.urlDialog;
+    }
+});
+
+ipcMain.on('url-dialog:cancel', (event) => {
+    const windows = BrowserWindow.getAllWindows();
+    const parentWin = windows.find(w => w.urlDialog && w.urlDialog.webContents === event.sender);
+    if (parentWin && parentWin.urlDialog) {
+        parentWin.urlDialog.close();
+        delete parentWin.urlDialog;
     }
 });
 
@@ -255,10 +276,6 @@ function createScrutinizerWindow(startUrl) {
             if (!win.isDestroyed()) {
                 const newBounds = win.getBounds();
                 settingsManager.set('windowBounds', newBounds);
-                // Also sync HUD bounds
-                if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
-                    win.scrutinizerHud.setBounds(newBounds);
-                }
             }
         }, 100);
     };
@@ -287,14 +304,17 @@ function createScrutinizerWindow(startUrl) {
 
     // ===== HUD WINDOW =====
     // Separate transparent window for toolbar + canvas
+    // Position it to match the content area of main window (not including title bar)
+    const contentBounds = win.getContentBounds();
     const hudWindow = new BrowserWindow({
-        width: bounds.width,
-        height: bounds.height,
-        x: bounds.x,
-        y: bounds.y,
+        parent: win, // Attach to main window so it stays on top of it
+        width: contentBounds.width,
+        height: contentBounds.height,
+        x: contentBounds.x,
+        y: contentBounds.y,
         transparent: true,
         frame: false,
-        alwaysOnTop: true,
+        modal: false, // Not modal, but stays above parent
         show: true, // Show by default for now (can toggle with ESC)
         hasShadow: false,
         focusable: false, // Don't steal keyboard focus from browser
@@ -304,10 +324,10 @@ function createScrutinizerWindow(startUrl) {
         }
     });
 
-    // Make HUD ignore mouse events by default (forward to browser below)
+    // HUD always forwards events - no toolbar to click
     hudWindow.setIgnoreMouseEvents(true, { forward: true });
 
-    // Load HUD content
+    // Load HUD content (just canvas, no toolbar)
     hudWindow.loadFile('renderer/overlay.html');
     
     // Open DevTools for HUD debugging
@@ -319,39 +339,21 @@ function createScrutinizerWindow(startUrl) {
     hudWindow.mainBrowserWindow = win; // Reverse reference
 
     // Sync HUD position/size with main window
+    // Use getContentBounds to account for title bar
     const syncHudBounds = () => {
         if (!win.isDestroyed() && !hudWindow.isDestroyed()) {
-            hudWindow.setBounds(win.getBounds());
+            const contentBounds = win.getContentBounds();
+            hudWindow.setBounds(contentBounds);
         }
     };
     win.on('move', syncHudBounds);
     win.on('resize', syncHudBounds);
+    
+    // Initial sync
+    syncHudBounds();
 
-    // Listen for keyboard events from content view's preload
-    const keydownHandler = (event, keyEvent) => {
-        // Only handle if event is from this window's content view
-        if (event.sender === contentView.webContents) {
-            console.log('[Main] Received keydown from content:', keyEvent.code);
-            if (keyEvent && keyEvent.code === 'Escape') {
-                // Toggle toolbar visibility (not entire HUD window)
-                // This keeps foveal effect running even when toolbar is hidden
-                if (!hudWindow.webContents.isDestroyed()) {
-                    hudWindow.webContents.send('hud:toggle-toolbar');
-                }
-            }
-            // Forward to HUD for other key handling (arrow keys for radius adjustment)
-            if (!hudWindow.webContents.isDestroyed()) {
-                hudWindow.webContents.send('webview:keydown', keyEvent);
-            }
-        }
-    };
-    
-    // Use ipcMain to listen for keydown events
-    ipcMain.on('keydown', keydownHandler);
-    
     // Clean up when window closes
     win.on('closed', () => {
-        ipcMain.removeListener('keydown', keydownHandler);
         if (!hudWindow.isDestroyed()) {
             hudWindow.close();
         }
@@ -360,7 +362,7 @@ function createScrutinizerWindow(startUrl) {
     // Content view loading events - forward to HUD
     contentView.webContents.on('did-start-loading', () => {
         console.log('[Main] ContentView did-start-loading');
-        if (!hudWindow.webContents.isDestroyed()) {
+        if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
             hudWindow.webContents.send('hud:browser:did-start-loading');
             hudWindow.webContents.send('browser:did-start-loading'); // Legacy
         }
@@ -368,7 +370,7 @@ function createScrutinizerWindow(startUrl) {
 
     contentView.webContents.on('did-finish-load', () => {
         console.log('[Main] ContentView did-finish-load');
-        if (!hudWindow.webContents.isDestroyed()) {
+        if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
             hudWindow.webContents.send('hud:browser:did-finish-load');
             hudWindow.webContents.send('browser:did-finish-load'); // Legacy
         }
@@ -380,7 +382,7 @@ function createScrutinizerWindow(startUrl) {
 
     // Forward navigation events to update HUD URL bar
     const sendUrlUpdate = (url) => {
-        if (!hudWindow.webContents.isDestroyed()) {
+        if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
             hudWindow.webContents.send('hud:browser:did-navigate', url);
             hudWindow.webContents.send('browser:did-navigate', url); // Legacy
         }
@@ -407,22 +409,24 @@ function createScrutinizerWindow(startUrl) {
 
     // Send init state to HUD once it loads
     hudWindow.webContents.once('did-finish-load', () => {
-        console.log('[Main] HUD loaded. Sending init-state.');
-        hudWindow.webContents.send('hud:settings:radius-options', RADIUS_OPTIONS);
-        hudWindow.webContents.send('settings:radius-options', RADIUS_OPTIONS); // Legacy
-        
-        // Pass current state to new window
-        // Only show welcome popup on first window (when mainWindow doesn't exist yet)
-        const isFirstWindow = !mainWindow || BrowserWindow.getAllWindows().filter(w => !w.mainBrowserWindow).length === 1;
-        const state = {
-            radius: currentRadius,
-            blur: currentBlur,
-            enabled: currentEnabled,
-            showWelcome: isFirstWindow ? currentShowWelcome : false
-        };
-        console.log('[Main] Sending state to HUD:', JSON.stringify(state));
-        hudWindow.webContents.send('hud:settings:init-state', state);
-        hudWindow.webContents.send('settings:init-state', state); // Legacy
+        if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
+            console.log('[Main] HUD loaded. Sending init-state.');
+            hudWindow.webContents.send('hud:settings:radius-options', RADIUS_OPTIONS);
+            hudWindow.webContents.send('settings:radius-options', RADIUS_OPTIONS); // Legacy
+            
+            // Pass current state to new window
+            // Only show welcome popup on first window (when mainWindow doesn't exist yet)
+            const isFirstWindow = !mainWindow || BrowserWindow.getAllWindows().filter(w => !w.mainBrowserWindow).length === 1;
+            const state = {
+                radius: currentRadius,
+                blur: currentBlur,
+                enabled: currentEnabled,
+                showWelcome: isFirstWindow ? currentShowWelcome : false
+            };
+            console.log('[Main] Sending state to HUD:', JSON.stringify(state));
+            hudWindow.webContents.send('hud:settings:init-state', state);
+            hudWindow.webContents.send('settings:init-state', state); // Legacy
+        }
     });
 
     return win;
