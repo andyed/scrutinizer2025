@@ -337,6 +337,11 @@ function createScrutinizerWindow(startUrl) {
             // Trigger a capture when content changes
             // This logic was for WebContentsView, might need adjustment for BrowserWindow
             // For now, we rely on paint events for capture.
+        } else if (channel === 'open-new-window') {
+            // Handle target="_blank" links from preload script
+            const url = args[0];
+            console.log('[Main] Opening new window from preload:', url);
+            createScrutinizerWindow(url);
         }
     });
 

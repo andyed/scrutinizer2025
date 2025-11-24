@@ -50,4 +50,14 @@ window.addEventListener('DOMContentLoaded', () => {
         attributes: true,
         characterData: true
     });
+
+    // Intercept clicks on links with target="_blank"
+    window.addEventListener('click', (e) => {
+        const link = e.target.closest('a');
+        if (link && link.target === '_blank' && link.href) {
+            e.preventDefault();
+            console.log('[Preload] Intercepted target=_blank link:', link.href);
+            ipcRenderer.sendToHost('open-new-window', link.href);
+        }
+    }, true); // Use capture phase to intercept before page handlers
 });

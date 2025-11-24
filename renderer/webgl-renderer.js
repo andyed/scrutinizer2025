@@ -138,8 +138,14 @@ class WebGLRenderer {
                 // SWIZZLE: Fix BGRA -> RGBA
                 color.rgb = color.bgr;
                 
+                // Exclude scrollbar region (right edge, ~17px wide)
+                // Keep scrollbar sharp and unaffected by peripheral effects
+                float scrollbarWidth = 17.0;
+                float distFromRightEdge = u_resolution.x - (uv.x * u_resolution.x);
+                bool isScrollbar = distFromRightEdge < scrollbarWidth;
+                
                 // Rod Vision (Desaturation + Tint + Contrast + Grain)
-                if (strength > 0.0) {
+                if (strength > 0.0 && !isScrollbar) {
                     // Exponential saturation falloff
                     float eccentricity = max(0.0, dist - radius_norm);
                     float saturation = exp(-3.0 * eccentricity);
