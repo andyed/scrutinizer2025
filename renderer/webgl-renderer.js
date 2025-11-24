@@ -22,6 +22,30 @@ class WebGLRenderer {
         this.texCoordBuffer = null;
 
         this.init();
+        this.warmup(); // Pre-compile shader to avoid 20s lag on first real render
+    }
+
+    warmup() {
+        // Create a tiny dummy texture and render it to force shader compilation
+        // This eliminates the 20s GPU warmup lag on first real frame
+        const gl = this.gl;
+        const dummyData = new Uint8Array(4 * 4 * 4); // 4x4 RGBA
+        for (let i = 0; i < dummyData.length; i += 4) {
+            dummyData[i] = 128;     // R
+            dummyData[i + 1] = 128; // G
+            dummyData[i + 2] = 128; // B
+            dummyData[i + 3] = 255; // A
+        }
+
+        const dummyImage = new ImageData(new Uint8ClampedArray(dummyData), 4, 4);
+        this.uploadTexture(dummyImage);
+
+        // Render a few frames to trigger shader compilation and optimization
+        for (let i = 0; i < 3; i++) {
+            this.render(100, 100, 50, 50, 30);
+        }
+
+        console.log('[WebGL] Shader warmup complete');
     }
 
     init() {

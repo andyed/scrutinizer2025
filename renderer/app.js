@@ -95,6 +95,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (document.activeElement !== urlInput) {
             urlInput.value = url;
         }
+        // Also remove loading class as a fallback
+        toggleBtn.classList.remove('loading');
     });
 
     // Handle page loading start (prevent FOUC)
@@ -106,6 +108,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (scrutinizer) {
             scrutinizer.resetState();
         }
+
+        // Safety timeout: remove loading class after 5s if did-finish-load doesn't fire
+        setTimeout(() => {
+            if (toggleBtn.classList.contains('loading')) {
+                console.log('[App] Safety timeout - removing stuck loading class');
+                toggleBtn.classList.remove('loading');
+            }
+        }, 5000);
     });
 
     // Handle page loading finish

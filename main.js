@@ -370,11 +370,13 @@ function createScrutinizerWindow(startUrl) {
         console.log('[Main] Toolbar did-finish-load. Sending init-state.');
         toolbarView.webContents.send('settings:radius-options', RADIUS_OPTIONS);
         // Pass current state to new window
+        // Only show welcome popup on first window (when mainWindow doesn't exist yet)
+        const isFirstWindow = !mainWindow || BrowserWindow.getAllWindows().length === 1;
         const state = {
             radius: currentRadius,
             blur: currentBlur,
             enabled: currentEnabled,
-            showWelcome: currentShowWelcome
+            showWelcome: isFirstWindow ? currentShowWelcome : false
         };
         console.log('[Main] Sending state to toolbar:', JSON.stringify(state));
         toolbarView.webContents.send('settings:init-state', state);
