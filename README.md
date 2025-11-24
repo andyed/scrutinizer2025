@@ -67,7 +67,7 @@ Scrutinizer strips away the brain's post-processing to reveal the raw data your 
 - 📜 **Scroll detection** with automatic recapture
 - 🔄 **DOM mutation detection** for dynamic content
 - ⌨️ **Keyboard shortcuts** (ESC to toggle, Left/Right arrows to adjust size)
-- 🎚️ **Menu-based controls** for radius and blur presets (Simulation menu)
+- 🎚️ **Menu-based controls** for radius and intensity presets (Simulation menu)
 - 🚀 **WebGL Pipeline** for 60fps performance and zero-copy rendering
 
 ## Download & Installation
@@ -111,7 +111,7 @@ npm start
 2. **Enable**: Click the eye icon or press `Escape` to toggle foveal mode.
 3. **Adjust**:
    - Use the **Simulation → Foveal Radius** menu to pick a radius preset.
-   - Use **Simulation → Blur Amount** to adjust peripheral blur.
+   - Use **Simulation → Peripheral Intensity** to adjust the strength of peripheral degradation (pixelation, noise, and desaturation).
    - Or use **Left/Right arrow keys** (<>) while foveal mode is enabled.
 4. **Observe**: Watch how easily key elements can be located using mostly peripheral vision.
 
@@ -163,7 +163,7 @@ We moved from a CPU-based canvas approach to a fully GPU-accelerated pipeline to
 
 ```
 DOM → Capture Page → GPU Texture Upload → WebGL Fragment Shader → Render
-                                          ├─ Uniforms: Mouse Pos, Radius, Blur
+                                          ├─ Uniforms: Mouse Pos, Radius, Intensity
                                           ├─ Pass 1: Rod-Sensitive Desaturation
                                           ├─ Pass 2: Variable Block Sampling (Periphery)
                                           └─ Pass 3: Foveal Masking
