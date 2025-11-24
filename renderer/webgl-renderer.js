@@ -131,12 +131,12 @@ class WebGLRenderer {
                 
                 // === THREE-ZONE MODEL (STAGGERED EFFECTS) ===
                 // 1. FOVEA (Crystal Clear): 0 to ~30% of radius
-                // 2. PARAFOVEA (Heat Haze - WARP ONLY): 30% to 250% of radius - Black/white, readable but crowded
-                // 3. FAR PERIPHERY (Mongrel): 250%+ - CA + Heavy effects
+                // 2. PARAFOVEA (Heat Haze - WARP ONLY): 30% to 60% of radius - Black/white, readable but crowded
+                // 3. FAR PERIPHERY (Mongrel): 60%+ - CA + Heavy effects
                 
                 float fovea_radius = radius_norm * 0.3; // The "rock solid" zone
-                float parafovea_radius = radius_norm; // The "wiggle" zone (warp only)
-                float periphery_start = radius_norm * 2.5; // Where CA begins (pushed much further out)
+                float parafovea_radius = radius_norm * 0.6; // SHRUNK from 1.0 - tighter parafovea
+                float periphery_start = radius_norm * 0.6; // CA begins at 60% of base radius (was 100%)
                 
                 // STAGGERED STRENGTH MASKS
                 
@@ -150,19 +150,19 @@ class WebGLRenderer {
                 float noiseSample = rand(uv_corrected * 100.0); // High-freq noise for dithering
                 float distDithered = dist + (noiseSample - 0.5) * 0.3; // Add ±15% noise to distance
                 
-                // CA only starts at 2.5x radius (far beyond parafovea)
-                // Wide transition (0.5) for gradual blend
-                float caStrength = smoothstep(periphery_start, periphery_start + 0.5, distDithered);
+                // CA kicks in at 60% of radius (was 100%)
+                // Wide transition (0.25) for gradual dithered blend
+                float caStrength = smoothstep(periphery_start, periphery_start + 0.25, distDithered);
                 
                 // Rod Vision Strength: Starts in parafovea, strengthens in periphery
                 float rodStrength = smoothstep(fovea_radius, periphery_start, dist);
                 
                 // Pixelation/Scatter Strength: Only in far periphery
-                float scatterStrength = smoothstep(periphery_start, periphery_start + 0.3, dist);
+                float scatterStrength = smoothstep(periphery_start, periphery_start + 0.2, dist);
                 
                 // Detect zones for conditional logic
                 bool isParafovea = dist > fovea_radius && dist <= periphery_start;
-                bool isFarPeriphery = dist > periphery_start * 1.2; // Extreme periphery at 3x base radius
+                bool isFarPeriphery = dist > periphery_start * 1.5; // Extreme periphery at 90% of base radius
                 
                 
                 // Domain Warping (Positional Uncertainty) - Recursive Noise
@@ -172,28 +172,62 @@ class WebGLRenderer {
                 // PARAFOVEA: Subtle warp for "heat haze" (crowding without destruction)
                 // FAR PERIPHERY: Extreme warp for "scrambling" (letter collisions)
                 
-                // 1. The Warp (Variable frequency and amplitude by zone)
-                float coarseScale = isFarPeriphery ? 1000.0 : 100.0; // 10x frequency in far periphery
-                float n1_warp = snoise(uv_corrected * coarseScale);
-                float n2_warp = snoise(uv_corrected * coarseScale + vec2(50.0, 50.0));
+                // 1. The Warp (Multi-octave turbulence to eliminate zero-crossings)
+                // CRITICAL: Single-octave noise has "safe valleys" where distortion = 0
+                // Small text can survive intact in these valleys ("Eye of the Storm" bug)
                 
-                // Parafovea: Low amplitude, Y-crushed (preserve baselines)
-                // Far Periphery: High amplitude, Y-restored (destroy word shapes)
+                // Octave A: Base frequency (doubled for X-axis to destroy small fonts)
+                float coarseScaleX = isFarPeriphery ? 2000.0 : 200.0; // DOUBLED from 1000/100
+                float coarseScaleY = isFarPeriphery ? 1000.0 : 100.0; // Original Y freq
+                float n1_warp_a = snoise(vec2(uv_corrected.x * coarseScaleX, uv_corrected.y * coarseScaleY));
+                float n2_warp_a = snoise(vec2(uv_corrected.x * coarseScaleX, uv_corrected.y * coarseScaleY) + vec2(50.0, 50.0));
+                
+                // Octave B: Higher frequency, offset phase (fills the gaps)
+                float n1_warp_b = snoise(vec2(uv_corrected.x * coarseScaleX * 2.3, uv_corrected.y * coarseScaleY * 2.3) + vec2(100.0, 100.0));
+                float n2_warp_b = snoise(vec2(uv_corrected.x * coarseScaleX * 2.3, uv_corrected.y * coarseScaleY * 2.3) + vec2(150.0, 150.0));
+                
+                // TURBULENCE: Combine octaves so there are NO safe spots
+                float n1_warp = n1_warp_a + n2_warp_b * 0.5; // Second octave at 50% strength
+                float n2_warp = n2_warp_a + n1_warp_b * 0.5;
+                
+                // TUNED: Reduced amplitude to preserve vertical collinearity ("left rail")
+                // The brain relies on vertical alignment even in periphery
+                // Parafovea: Very low amplitude, Y-crushed (preserve baselines AND vertical edges)
+                // Far Periphery: Moderate amplitude, Y-restored (some scrambling but not "melting")
                 vec2 warpAmp = isFarPeriphery ? 
-                    vec2(0.01, 0.008) :  // Far Periphery: accordion + baseline shift
-                    vec2(0.002, 0.0002); // Parafovea: subtle grit, straight baselines
+                    vec2(0.005, 0.004) :  // Far Periphery: reduced from 0.01/0.008 (50% reduction)
+                    vec2(0.001, 0.0001); // Parafovea: reduced from 0.002/0.0002 (50% reduction)
                 vec2 warpVector = vec2(n1_warp, n2_warp) * warpAmp * warpStrength * u_intensity;
                 
                 // 2. The Jitter (High frequency, variable amplitude by zone)
-                float fineScale = isFarPeriphery ? 5000.0 : 2000.0; // Per-letter in far periphery
+                // CRITICAL: This breaks the Bouma shape (word envelope)
+                float fineScale = isFarPeriphery ? 8000.0 : 3000.0; // INCREASED from 5000/2000 for more aggressive letter destruction
                 vec2 warpedUV = uv_corrected + warpVector; // Domain distortion
                 
                 float n1_jitter = snoise(warpedUV * fineScale);
                 float n2_jitter = snoise(warpedUV * fineScale + vec2(100.0, 100.0));
                 
-                vec2 jitterAmp = isFarPeriphery ?
-                    vec2(0.003, 0.002) :  // Far Periphery: per-letter chaos
-                    vec2(0.0006, 0.00006); // Parafovea: micro-texture
+                // BOUMA BREAKER: Outer parafovea needs more aggressive vertical jitter
+                // Create gradient within parafovea: inner (subtle) -> outer (aggressive)
+                float outerParafoveaStrength = smoothstep(parafovea_radius * 0.5, parafovea_radius, dist);
+                
+                // Base amplitudes
+                vec2 jitterAmp;
+                if (isFarPeriphery) {
+                    // Far Periphery: maximum chaos
+                    jitterAmp = vec2(0.005, 0.004); // Increased from 0.003/0.002
+                } else if (isParafovea) {
+                    // Parafovea: PROGRESSIVE crowding
+                    // Inner parafovea: subtle (0.0006, 0.00006)
+                    // Outer parafovea: VERY aggressive (0.004, 0.003) for Bouma breaking
+                    float baseX = mix(0.0006, 0.004, outerParafoveaStrength); // DOUBLED from 0.002
+                    float baseY = mix(0.00006, 0.003, outerParafoveaStrength); // DOUBLED from 0.0015 (50x boost in outer!)
+                    jitterAmp = vec2(baseX, baseY);
+                } else {
+                    // Fovea: no jitter
+                    jitterAmp = vec2(0.0, 0.0);
+                }
+                
                 vec2 jitterVector = vec2(n1_jitter, n2_jitter) * jitterAmp * warpStrength * u_intensity;
                 
                 // Combine: The final lookup is Original + Warp + Jitter
@@ -289,13 +323,16 @@ class WebGLRenderer {
                 
                 // --- Debug: Show Boundary ---
                 if (u_debug_boundary > 0.5) {
-                    // Draw a red line at dist == radius_norm
-                    // Use smoothstep for anti-aliased line
-                    float lineThickness = 0.002; // Thickness in normalized units
+                    // Draw a subtle semi-transparent grey line
+                    // Medium grey works on both light and dark backgrounds
+                    float lineThickness = 0.003; // Slightly thicker for better visibility
                     float border = 1.0 - smoothstep(0.0, lineThickness, abs(dist - radius_norm));
                     
                     if (border > 0.0) {
-                        color.rgb = mix(color.rgb, vec3(1.0, 0.0, 0.0), border);
+                        // Medium grey with moderate opacity
+                        vec3 lineColor = vec3(0.5, 0.5, 0.5); // 50% grey - visible on both white and black
+                        float alpha = border * 0.6; // 60% opacity for good visibility
+                        color.rgb = mix(color.rgb, lineColor, alpha);
                     }
                 }
                 

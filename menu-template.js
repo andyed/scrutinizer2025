@@ -54,7 +54,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
 
                         const dialog = new BrowserWindow({
                             width: 500,
-                            height: 180,
+                            height: 207, // Increased by 15% (was 180) for better spacing
                             parent: win,
                             modal: true,
                             show: false,
