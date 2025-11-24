@@ -130,14 +130,15 @@ class WebGLRenderer {
                 // NO CLAMP: Allow radius to be larger than screen for "Disabled" state
                 
                 // === THREE-ZONE MODEL (STAGGERED EFFECTS) ===
-                // TIGHTENED: Parafovea was too wide (60-160%), causing readable text outside oval
-                // 1. FOVEA (Crystal Clear): 0 to 60% of radius
-                // 2. PARAFOVEA (Heat Haze - WARP ONLY): 60% to 110% of radius (mostly inside oval, 10% out)
-                // 3. FAR PERIPHERY (Mongrel): 100%+ of radius (CA starts AT the oval edge)
+                // Updated so that the visible debug boundary matches the end of the crystal-clear fovea
+                // and the parafovea/periphery transitions sit just outside that boundary.
+                // 1. FOVEA (Crystal Clear):        0 → 100% of radius_norm
+                // 2. PARAFOVEA (Heat Haze / Warp): 100% → 135% of radius_norm
+                // 3. FAR PERIPHERY (Mongrel):      120%+ of radius_norm
                 
-                float fovea_radius = radius_norm * 0.6; // 60% of user-selected radius
-                float parafovea_radius = radius_norm * 1.1; // Small extension beyond oval (was 1.6x)
-                float periphery_start = radius_norm * 1.0; // CA begins AT the oval edge (was 1.6x)
+                float fovea_radius = radius_norm;          // fovea ends exactly at the configured radius
+                float parafovea_radius = radius_norm * 1.35; // outer edge of parafovea
+                float periphery_start = radius_norm * 1.2;   // far-periphery effects begin slightly outside fovea
                 
                 // STAGGERED STRENGTH MASKS
                 
@@ -155,15 +156,15 @@ class WebGLRenderer {
                 // Wide transition (0.25) for gradual dithered blend
                 float caStrength = smoothstep(periphery_start, periphery_start + 0.25, distDithered);
                 
-                // Rod Vision Strength: Starts in parafovea, strengthens in periphery
+                // Rod Vision Strength: Starts just outside fovea, strengthens into periphery
                 float rodStrength = smoothstep(fovea_radius, periphery_start, dist);
                 
-                // Pixelation/Scatter Strength: Only in far periphery
+                // Pixelation/Scatter Strength: Only in far periphery (begins right at periphery_start)
                 float scatterStrength = smoothstep(periphery_start, periphery_start + 0.2, dist);
                 
                 // Detect zones for conditional logic
                 bool isParafovea = dist > fovea_radius && dist <= periphery_start;
-                bool isFarPeriphery = dist > periphery_start * 1.1; // Extreme effects just beyond parafovea (was 1.5x too far)
+                bool isFarPeriphery = dist > periphery_start; // Extreme effects start as soon as we enter far periphery
                 
                 
                 // Domain Warping (Positional Uncertainty) - Recursive Noise
@@ -328,10 +329,10 @@ class WebGLRenderer {
                 
                 // --- Debug: Show Boundary ---
                 if (u_debug_boundary > 0.5) {
-                    // Draw a subtle semi-transparent grey line
+                    // Draw a subtle semi-transparent grey line at the TRUE foveal edge
                     // Medium grey works on both light and dark backgrounds
                     float lineThickness = 0.003; // Slightly thicker for better visibility
-                    float border = 1.0 - smoothstep(0.0, lineThickness, abs(dist - radius_norm));
+                    float border = 1.0 - smoothstep(0.0, lineThickness, abs(dist - fovea_radius));
                     
                     if (border > 0.0) {
                         // Medium grey with moderate opacity
