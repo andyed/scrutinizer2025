@@ -288,6 +288,9 @@ function createScrutinizerWindow(startUrl) {
 
     contentWin.webContents.on('did-finish-load', () => {
         console.log('[Main] ContentWin did-finish-load');
+        if (!toolbarView.webContents.isDestroyed()) {
+            toolbarView.webContents.send('browser:did-finish-load');
+        }
     });
 
     contentWin.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
@@ -338,8 +341,11 @@ function createScrutinizerWindow(startUrl) {
     });
 
     // Intercept target="_blank" links in content window
-    contentWin.webContents.setWindowOpenHandler(({ url }) => {
-        console.log('[Main] Content window opening:', url);
+    contentWin.webContents.setWindowOpenHandler(({ url, frameName, disposition }) => {
+        console.log('[Main] setWindowOpenHandler called!');
+        console.log('[Main] URL:', url);
+        console.log('[Main] Disposition:', disposition);
+        console.log('[Main] Frame name:', frameName);
         createScrutinizerWindow(url);
         return { action: 'deny' };
     });

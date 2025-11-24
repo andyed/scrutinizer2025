@@ -99,9 +99,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle page loading start (prevent FOUC)
     ipcRenderer.on('browser:did-start-loading', () => {
+        // Add loading animation to toggle button
+        toggleBtn.classList.add('loading');
+
         if (scrutinizer) {
             scrutinizer.resetState();
         }
+    });
+
+    // Handle page loading finish
+    ipcRenderer.on('browser:did-finish-load', () => {
+        // Remove loading animation
+        toggleBtn.classList.remove('loading');
     });
 
     // Navigation controls - send to main process which controls the WebContentsView
