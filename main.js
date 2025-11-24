@@ -523,7 +523,7 @@ app.on('ready', () => {
             // Create URL input dialog window
             const dialog = new BrowserWindow({
                 width: 500,
-                height: 160,
+                height: 200,
                 parent: win,
                 modal: true,
                 show: false,
