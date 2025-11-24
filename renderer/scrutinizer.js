@@ -96,11 +96,11 @@ class Scrutinizer {
     }
 
     disable() {
-        // Keep enabled flag in sync when disabling from any code path.
         this.enabled = false;
-        // Hide canvas to show raw content underneath
-        this.canvas.style.display = 'none';
-        this.stopRenderLoop();
+        // Keep canvas visible and rendering - it's the ONLY view of the offscreen content
+        // The render() method will use infinite radius to show everything clearly
+        this.canvas.style.display = 'block';
+        this.startRenderLoop();
     }
 
     resetState() {
