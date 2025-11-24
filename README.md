@@ -74,7 +74,7 @@ Scrutinizer strips away the brain's post-processing to reveal the raw data your 
 
 ### Unsigned binaries (experimental builds)
 
-These builds are **unsigned** developer previews. Your OS will likely warn you and require extra steps to run them.
+These builds are **unsigned** developer previews intended for testing and early feedback. Your OS will warn you and require extra steps to run them.
 
 - **macOS (Apple Silicon, unsigned ZIP)**  
   https://github.com/andyed/scrutinizer2025/releases/download/v1.1.3/Scrutinizer-1.1.3-arm64-mac.zip
@@ -86,14 +86,35 @@ For other platforms and versions, see the full Releases list:
 https://github.com/andyed/scrutinizer2025/releases
 
 > **Security note**
->
-> These builds are unsigned dev previews.
->
-> On **macOS** you may need to:
-> - Right-click the app → **Open** → confirm the warning
->
-> On **Windows** you may need to:
-> - Click **More info** → **Run anyway** in SmartScreen
+> These are unsigned dev previews. Only install them if you trust the source (this repo) and understand the risks of running unsigned binaries.
+
+#### macOS: running the unsigned app
+
+1. Download and unzip `Scrutinizer-1.1.3-arm64-mac.zip`.
+2. Move `Scrutinizer.app` into your `/Applications` folder.
+3. First launch:
+   - Right-click `Scrutinizer.app` → **Open**.
+   - When macOS warns that the app is from an unidentified developer, click **Open**.
+4. If macOS still blocks it:
+   - Open **System Settings → Privacy & Security**.
+   - Scroll down to the **Security** section and look for “Scrutinizer was blocked…”.
+   - Click **Open Anyway**, then confirm.
+
+For advanced users who are comfortable with the terminal, you can also remove the quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Scrutinizer.app
+```
+
+#### Windows: running the unsigned installer
+
+1. Download `Scrutinizer-Setup-1.1.3.exe`.
+2. Double-click to run the installer.
+3. If SmartScreen shows a warning:
+   - Click **More info**.
+   - Click **Run anyway**.
+
+This behavior is expected for unsigned experimental builds. A future release may provide fully signed and notarized packages for smoother installation.
 
 ### Developer Setup (run from source)
 
@@ -139,6 +160,10 @@ npm start
 ## Implementation Notes
 
 The simulation is powered by a custom **WebGL Fragment Shader** that processes the browser viewport in real-time (60fps). The pipeline implements four distinct biological constraints:
+
+For a deeper look at the foveal / parafoveal / peripheral model and shader parameters, see:
+
+- [`docs/foveated-vision-model.md`](docs/foveated-vision-model.md)
 
 ### 1. Rod-Weighted Luminance (Scotopic Vision)
 In the periphery, cone cells (color) are scarce, and rod cells (luminance) dominate. Rods have a peak sensitivity at **505nm (Cyan/Blue-Green)** and are blind to red light.

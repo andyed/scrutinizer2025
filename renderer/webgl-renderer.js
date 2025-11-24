@@ -62,22 +62,24 @@ class WebGLRenderer {
             }
         `;
 
-        // Fragment Shader - The "Mongrel"
+        // Fragment Shader - Core "Mongrel" peripheral simulation
         const fsSource = `
             precision mediump float;
 
-            uniform sampler2D u_texture;
-            uniform vec2 u_resolution;
-            uniform vec2 u_mouse;
-            uniform float u_foveaRadius;
-            uniform float u_pixelation; // Base pixelation
-            uniform float u_intensity;  // Global intensity multiplier (0.0 to 1.5)
-            uniform float u_ca_strength; // Chromatic Aberration strength (0.0 or 1.0)
-            uniform float u_debug_boundary; // Debug Boundary (0.0 or 1.0)
+            // === UNIFORMS (host-controlled parameters) ===
+            uniform sampler2D u_texture;      // Captured browser frame
+            uniform vec2  u_resolution;       // Canvas resolution in pixels
+            uniform vec2  u_mouse;            // Foveal center in pixels (canvas space)
+            uniform float u_foveaRadius;      // Foveal radius in pixels (configured in JS)
+            uniform float u_pixelation;       // Base pixelation scalar (used with scatter strength)
+            uniform float u_intensity;        // Global intensity multiplier (0.0 → off, ~1.0 → full effect)
+            uniform float u_ca_strength;      // Chromatic aberration enable (0.0 or 1.0)
+            uniform float u_debug_boundary;   // Debug boundary toggle (0.0 or 1.0)
 
             varying vec2 v_texCoord;
 
-            // Simplex 2D noise
+            // === NOISE HELPERS ===
+            // 2D simplex noise and a small rand helper used for warping, jitter, and grain.
             vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
             float snoise(vec2 v){
                 const vec4 C = vec4(0.211324865405187, 0.366025403784439,
@@ -105,13 +107,15 @@ class WebGLRenderer {
                 return 130.0 * dot(m, g);
             }
 
-            // Random function for Grain
+            // Pseudo-random function for grain / dithering
             float rand(vec2 co){
                 return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
             }
 
             void main() {
-                // Normalize coordinates
+                // === 1. COORDINATE SETUP ===
+                // Convert texture coordinates + mouse position into a normalized, roughly
+                // elliptical space so a circular distance gives us a 16:9 foveal shape.
                 float aspect = u_resolution.x / u_resolution.y;
                 vec2 uv = v_texCoord;
                 vec2 uv_corrected = vec2(uv.x * aspect, uv.y);
@@ -119,64 +123,66 @@ class WebGLRenderer {
                 vec2 mouse_uv = u_mouse / u_resolution;
                 vec2 mouse_corrected = vec2(mouse_uv.x * aspect, mouse_uv.y);
                 
-                // Calculate distance for Fovea Shape
-                // User wants "roughly 16:9" (elliptical) shape
+                // Calculate distance in this corrected space for foveal shape
                 vec2 delta = uv_corrected - mouse_corrected;
                 // Squash X distance to make the shape wider (16:9 aspect = ~1.77)
                 delta.x /= 1.77; 
                 float dist = length(delta);
 
+                // === 2. ZONE RADII (FOVEA / PARAFOVEA / PERIPHERY) ===
                 float radius_norm = u_foveaRadius / u_resolution.y;
                 // NO CLAMP: Allow radius to be larger than screen for "Disabled" state
                 
-                // === THREE-ZONE MODEL (STAGGERED EFFECTS) ===
-                // Updated so that the visible debug boundary matches the end of the crystal-clear fovea
-                // and the parafovea/periphery transitions sit just outside that boundary.
-                // 1. FOVEA (Crystal Clear):        0 → 100% of radius_norm
-                // 2. PARAFOVEA (Heat Haze / Warp): 100% → 135% of radius_norm
-                // 3. FAR PERIPHERY (Mongrel):      120%+ of radius_norm
+                // THREE-ZONE MODEL (STAGGERED EFFECTS)
+                // 1. FOVEA (0  → 100% of radius_norm)
+                //    - crystal clear, no warp/jitter/rod vision
+                // 2. PARAFOVEA (100% → 135% of radius_norm)
+                //    - increasing warp + jitter (crowding / Bouma breakage)
+                // 3. FAR PERIPHERY (120%+ of radius_norm)
+                //    - strong warp/jitter, rod-vision tinting, pixel scatter
                 
                 float fovea_radius = radius_norm;          // fovea ends exactly at the configured radius
                 float parafovea_radius = radius_norm * 1.35; // outer edge of parafovea
                 float periphery_start = radius_norm * 1.2;   // far-periphery effects begin slightly outside fovea
                 
-                // STAGGERED STRENGTH MASKS
-                
-                // Warp Strength: Starts at fovea edge, reaches full at parafovea edge
-                // Stays active throughout (parafovea AND periphery)
+                // === 3. STRENGTH MASKS BY ZONE ===
+                // These smoothstep curves control how strongly each effect ramps
+                // with eccentricity (distance from the foveal center).
+
+                // Warp Strength: positional warping, active from fovea edge outward.
+                // Reaches full strength near the outer parafovea, then stays high.
                 float warpStrength = smoothstep(fovea_radius, parafovea_radius, dist);
                 warpStrength = pow(warpStrength, 0.5); // Ease the curve
                 
-                // CA Strength: DITHERED ACTIVATION
-                // Add high-frequency noise to the distance for ragged edge
+                // Chromatic Aberration Strength: activated with a dithered edge so
+                // the transition is noisy rather than a clean ring.
                 float noiseSample = rand(uv_corrected * 100.0); // High-freq noise for dithering
                 float distDithered = dist + (noiseSample - 0.5) * 0.3; // Add ±15% noise to distance
                 
-                // CA kicks in at 60% of radius (was 100%)
-                // Wide transition (0.25) for gradual dithered blend
+                // CA kicks in in the near-to-far periphery band with a wide transition.
                 float caStrength = smoothstep(periphery_start, periphery_start + 0.25, distDithered);
                 
-                // Rod Vision Strength: Starts just outside fovea, strengthens into periphery
+                // Rod Vision Strength: controls desaturation + tint + grain.
+                // 0 at fovea edge, rising through parafovea into periphery.
                 float rodStrength = smoothstep(fovea_radius, periphery_start, dist);
                 
-                // Pixelation/Scatter Strength: Only in far periphery (begins right at periphery_start)
+                // Pixelation / Scatter Strength: only active in far periphery.
                 float scatterStrength = smoothstep(periphery_start, periphery_start + 0.2, dist);
                 
-                // Detect zones for conditional logic
+                // Boolean helpers for zone-specific logic (e.g., jitter amplitude curves).
                 bool isParafovea = dist > fovea_radius && dist <= periphery_start;
                 bool isFarPeriphery = dist > periphery_start; // Extreme effects start as soon as we enter far periphery
                 
-                
-                // Domain Warping (Positional Uncertainty) - Recursive Noise
-                // Biology: Receptive fields get LARGER as you move to periphery
-                // Logic: f(p) = noise(p + noise(p))
-                
-                // PARAFOVEA: Subtle warp for "heat haze" (crowding without destruction)
-                // FAR PERIPHERY: Extreme warp for "scrambling" (letter collisions)
-                
-                // 1. The Warp (Multi-octave turbulence to eliminate zero-crossings)
-                // CRITICAL: Single-octave noise has "safe valleys" where distortion = 0
-                // Small text can survive intact in these valleys ("Eye of the Storm" bug)
+                // === 4. DOMAIN WARPING (POSITIONAL UNCERTAINTY) ===
+                // Biology: receptive fields grow with eccentricity → positional
+                // uncertainty. Implemented as multi-octave noise-driven warping.
+                // Logic: f(p) = noise(p + noise(p)) in an aspect-corrected space.
+                //
+                // PARAFOVEA: subtle "heat haze" (crowding without full destruction)
+                // FAR PERIPHERY: more extreme warp (scrambling / letter collisions)
+                //
+                // 1. Coarse Warp: multi-octave turbulence to eliminate zero-crossings,
+                //    so there are no perfectly undistorted rings where text survives.
                 
                 // Apply 16:9 aspect adjustment to noise sampling to match elliptical foveal shape
                 vec2 uv_noise = vec2(uv_corrected.x / 1.77, uv_corrected.y);
@@ -195,29 +201,27 @@ class WebGLRenderer {
                 float n1_warp = n1_warp_a + n2_warp_b * 0.5; // Second octave at 50% strength
                 float n2_warp = n2_warp_a + n1_warp_b * 0.5;
                 
-                // TUNED: Reduced amplitude to preserve vertical collinearity ("left rail")
-                // The brain relies on vertical alignment even in periphery
-                // Parafovea: Very low amplitude, Y-crushed (preserve baselines AND vertical edges)
-                // Far Periphery: Moderate amplitude, Y-restored (some scrambling but not "melting")
+                // TUNED: Reduced amplitude to preserve vertical collinearity ("left rail").
+                // Parafovea: very low amplitude, Y-crushed → baselines and vertical strokes survive.
+                // Far periphery: moderate amplitude, Y-restored → some scrambling but no total melt.
                 vec2 warpAmp = isFarPeriphery ? 
                     vec2(0.005, 0.004) :  // Far Periphery: reduced from 0.01/0.008 (50% reduction)
                     vec2(0.001, 0.0001); // Parafovea: reduced from 0.002/0.0002 (50% reduction)
                 vec2 warpVector = vec2(n1_warp, n2_warp) * warpAmp * warpStrength * u_intensity;
                 
-                // 2. The Jitter (High frequency, variable amplitude by zone)
-                // CRITICAL: This breaks the Bouma shape (word envelope)
-                // MASSIVELY increased frequency for per-letter destruction
+                // 2. High-Frequency Jitter: breaks Bouma shapes (word envelopes).
+                // Very high spatial frequency to target individual letters.
                 float fineScale = isFarPeriphery ? 15000.0 : 6000.0; // DOUBLED from 8000/3000 for much finer grain
                 vec2 warpedUV_noise = vec2((uv_corrected.x + warpVector.x) / 1.77, uv_corrected.y + warpVector.y); // Apply 16:9 aspect
                 
                 float n1_jitter = snoise(warpedUV_noise * fineScale);
                 float n2_jitter = snoise(warpedUV_noise * fineScale + vec2(100.0, 100.0));
                 
-                // BOUMA BREAKER: Outer parafovea needs more aggressive vertical jitter
-                // Create gradient within parafovea: inner (subtle) -> outer (aggressive)
+                // BOUMA BREAKER: within parafovea, ramp jitter from subtle (inner)
+                // to aggressive (outer) so words become illegible before full pixelation.
                 float outerParafoveaStrength = smoothstep(parafovea_radius * 0.5, parafovea_radius, dist);
                 
-                // Base amplitudes
+                // Base amplitudes per zone (scaled later by warpStrength and u_intensity).
                 vec2 jitterAmp;
                 if (isFarPeriphery) {
                     // Far Periphery: EXTREME chaos (doubled from previous)
@@ -236,21 +240,22 @@ class WebGLRenderer {
                 
                 vec2 jitterVector = vec2(n1_jitter, n2_jitter) * jitterAmp * warpStrength * u_intensity;
                 
-                // Combine: The final lookup is Original + Warp + Jitter
+                // Combine coarse warp + fine jitter to get the final displaced lookup.
                 vec2 displacement = warpVector + jitterVector;
                 vec2 newUV = uv + displacement;
                 
-                // --- Chromatic Aberration (The Lens Split) ---
-                // Calculate vector from fovea (mouse) to current pixel (uv_corrected)
+                // === 5. CHROMATIC ABERRATION (LENS SPLIT) ===
+                // Simulate lens splitting: R/G/B sample from slightly different positions
+                // along the radial direction away from the foveal center.
+                // Calculate vector from fovea to current pixel.
                 vec2 ca_delta = uv_corrected - mouse_corrected;
                 float ca_dist = length(ca_delta);
                 
                 // Normalize direction
                 vec2 ca_dir = ca_delta / (ca_dist + 0.0001); // Avoid divide by zero
                 
-                // Calculate Aberration Amount
-                // NOW uses zone-based caStrength (only active beyond parafovea)
-                // INCREASED from 0.008 to 0.02 (2.5x) for stronger illegibility
+                // Aberration amount uses zone-based caStrength (only outside parafovea)
+                // and is scaled by global intensity + CA toggle.
                 float aberrationAmt = 0.02 * caStrength * u_intensity * u_ca_strength;
                 
                 // Calculate offsets
@@ -259,11 +264,10 @@ class WebGLRenderer {
                 // Blue pushes OUT (further from mouse) - Blue scatters more
                 vec2 b_offset = ca_dir * aberrationAmt * 1.0;
                 
-                // Sample Channels Separately
-                // We apply the displacement (noise) to all of them, THEN apply the chromatic shift
-                // Note: We need to un-correct aspect ratio for the texture lookup if we used corrected coords for offset
-                // But here 'displacement' is already in UV space.
-                // Let's convert our offsets to UV space (divide X by aspect)
+                // Sample channels separately.
+                // First apply the displacement (warp + jitter) to all channels,
+                // then offset R/B radially in opposite directions.
+                // Convert offsets back to UV space (un-correct X by aspect).
                 r_offset.x /= aspect;
                 b_offset.x /= aspect;
                 
@@ -278,15 +282,16 @@ class WebGLRenderer {
                 color.b = colorB.r; // Blue channel
                 color.a = 1.0;
                 
-                // Exclude scrollbar region (right edge, ~17px wide)
-                // Keep scrollbar sharp and unaffected by peripheral effects
+                // === 6. SCROLLBAR PRESERVATION ===
+                // Exclude a thin right-edge band from peripheral processing so the
+                // OS/browser scrollbar remains sharp and usable.
                 float scrollbarWidth = 17.0;
                 float distFromRightEdge = u_resolution.x - (uv.x * u_resolution.x);
                 bool isScrollbar = distFromRightEdge < scrollbarWidth;
                 
-                // Rod Vision (Desaturation + Tint + Contrast + Grain)
+                // === 7. ROD VISION (DESATURATION / TINT / GRAIN) ===
                 if (rodStrength > 0.0 && !isScrollbar) {
-                    // Exponential saturation falloff
+                    // Exponential saturation falloff with global intensity baked in.
                     float eccentricity = max(0.0, dist - fovea_radius);
                     float saturation = exp(-3.0 * eccentricity);
                     // Scale saturation loss by intensity (higher intensity = less saturation)
@@ -298,21 +303,18 @@ class WebGLRenderer {
                     
                     float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
                     
-                    // Contrast Boost (Magnocellular)
-                    // Scale contrast boost by intensity
+                    // Contrast boost (Magnocellular pathway style), scaled by intensity.
                     float contrast = 1.0 + (0.3 * u_intensity);
                     float boostedGray = (gray - 0.5) * contrast + 0.5;
                     boostedGray = clamp(boostedGray, 0.0, 1.0);
                     
-                    // Add Grain (Neural Noise / Visual Snow)
-                    // Mix in some random noise to break the "smoothness"
+                    // Add grain (neural noise / visual snow) to break smooth gradients.
                     float grain = rand(uv_corrected * 10.0) - 0.5; // -0.5 to 0.5
                     // Scale grain by intensity
                     boostedGray += grain * 0.15 * u_intensity; 
                     boostedGray = clamp(boostedGray, 0.0, 1.0);
                     
-                    // Rod Tint: Cyan-ish Grey
-                    // Apply tint based on luminance: Darker = More Blue, Lighter = Neutral
+                    // Rod tint: cyan-ish gray, stronger in darker regions.
                     vec3 rodTint = vec3(boostedGray * 0.6, boostedGray * 0.9, boostedGray * 1.0);
                     vec3 neutralGray = vec3(boostedGray);
                     
@@ -320,18 +322,19 @@ class WebGLRenderer {
                     float tintStrength = (1.0 - gray) * 0.8 * u_intensity; 
                     vec3 finalRodColor = mix(neutralGray, rodTint, tintStrength);
                     
-                    // Mix based on rodStrength and saturation
+                    // First mix rod tint vs original based on saturation,
+                    // then blend that with original based on rodStrength.
                     vec3 peripheryColor = mix(finalRodColor, color.rgb, saturation);
                     
                     // Then mix that with the pure original color based on rodStrength
                     color.rgb = mix(color.rgb, peripheryColor, rodStrength);
                 }
                 
-                // --- Debug: Show Boundary ---
+                // === 8. DEBUG: FOVEAL BOUNDARY OVERLAY ===
                 if (u_debug_boundary > 0.5) {
-                    // Draw a subtle semi-transparent grey line at the TRUE foveal edge
-                    // Medium grey works on both light and dark backgrounds
-                    float lineThickness = 0.003; // Slightly thicker for better visibility
+                    // Draw a subtle semi-transparent grey line at the TRUE foveal edge.
+                    // Medium grey works on both light and dark backgrounds.
+                    float lineThickness = 0.003; // Visual thickness of the boundary band
                     float border = 1.0 - smoothstep(0.0, lineThickness, abs(dist - fovea_radius));
                     
                     if (border > 0.0) {

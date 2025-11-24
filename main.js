@@ -67,6 +67,16 @@ ipcMain.on('settings:page-changed', (event, url) => {
     }
 });
 
+// Handle Home navigation requests from renderer (Go → Home)
+ipcMain.on('navigate:home', (event) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
+    if (!win || !win.scrutinizerView) return;
+
+    const urlToLoad = currentStartPage || 'https://github.com/andyed/scrutinizer2025?tab=readme-ov-file#what-is-scrutinizer';
+    win.scrutinizerView.webContents.loadURL(urlToLoad);
+});
+
 // No longer needed - HUD window doesn't intercept wheel events
 // Browser window handles scroll natively
 
@@ -245,6 +255,42 @@ ipcMain.on('url-dialog:cancel', (event) => {
     if (parentWin && parentWin.urlDialog) {
         parentWin.urlDialog.close();
         delete parentWin.urlDialog;
+    }
+});
+
+// Keyboard shortcuts forwarded from browser content (preload)
+// Used to support navigation and foveal toggling when focus is in the page.
+ipcMain.on('keydown', (event, keyEvent) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
+    if (!win) return;
+
+    const { code, altKey, ctrlKey, metaKey } = keyEvent || {};
+
+    // Platform helpers
+    const isMac = process.platform === 'darwin';
+    const cmdOrCtrl = isMac ? metaKey : ctrlKey;
+
+    // Navigation: Back / Forward
+    if (code === 'ArrowLeft' && (cmdOrCtrl || altKey)) {
+        if (win.scrutinizerView) {
+            win.scrutinizerView.webContents.goBack();
+        }
+        return;
+    }
+
+    if (code === 'ArrowRight' && (cmdOrCtrl || altKey)) {
+        if (win.scrutinizerView) {
+            win.scrutinizerView.webContents.goForward();
+        }
+        return;
+    }
+
+    // Forward Escape and bare arrow keys to HUD/overlay for foveal controls
+    if (code === 'Escape' || code === 'ArrowLeft' || code === 'ArrowRight') {
+        if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+            win.scrutinizerHud.webContents.send('webview:keydown', keyEvent);
+        }
     }
 });
 

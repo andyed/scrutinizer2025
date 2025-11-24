@@ -119,6 +119,32 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                 { role: 'togglefullscreen' }
             ]
         },
+        // Go Menu (navigation)
+        {
+            label: 'Go',
+            submenu: [
+                {
+                    label: 'Back',
+                    accelerator: process.platform === 'darwin' ? 'Cmd+Left' : 'Alt+Left',
+                    click: () => sendToRenderer('navigate:back')
+                },
+                {
+                    label: 'Forward',
+                    accelerator: process.platform === 'darwin' ? 'Cmd+Right' : 'Alt+Right',
+                    click: () => sendToRenderer('navigate:forward')
+                },
+                { type: 'separator' },
+                {
+                    label: 'Home',
+                    accelerator: 'CmdOrCtrl+Shift+H',
+                    click: () => {
+                        // Ask the renderer to navigate to the configured start page.
+                        // The renderer forwards this as 'navigate:to' with the correct URL.
+                        sendToRenderer('navigate:home');
+                    }
+                }
+            ]
+        },
         // Simulation Menu (Custom)
         {
             label: 'Simulation',
