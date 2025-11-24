@@ -70,7 +70,8 @@ class WebGLRenderer {
             uniform vec2 u_resolution;
             uniform vec2 u_mouse;
             uniform float u_foveaRadius;
-            uniform float u_pixelation; // Controls how fast cells grow
+            uniform float u_pixelation; // Base pixelation
+            uniform float u_intensity;  // Global intensity multiplier (0.0 to 1.5)
 
             varying vec2 v_texCoord;
 
@@ -130,6 +131,10 @@ class WebGLRenderer {
                 // Smooth transition instead of hard cut
                 float strength = smoothstep(radius_norm, radius_norm + 0.15, dist);
                 
+                // Scale strength by intensity (if intensity is 0, effect is 0)
+                // But we want to keep the fovea clear regardless.
+                // Actually, we want the *maximum* degradation to be scaled by intensity.
+                
                 
                 // Domain Warping (Positional Uncertainty) - Multi-Octave
                 // Biology: Receptive fields get LARGER as you move to periphery
@@ -139,7 +144,8 @@ class WebGLRenderer {
                 float fineScale = 400.0;
                 float n1_fine = snoise(uv_corrected * fineScale);
                 float n2_fine = snoise(uv_corrected * fineScale + vec2(100.0, 100.0));
-                vec2 fineDisplacement = vec2(n1_fine, n2_fine) * 0.003 * strength;
+                // Scale displacement by intensity
+                vec2 fineDisplacement = vec2(n1_fine, n2_fine) * 0.003 * strength * u_intensity;
                 
                 // Low-frequency noise (large feature destruction - "The Warper")
                 // Good for destroying headlines, large text
@@ -150,7 +156,8 @@ class WebGLRenderer {
                 // Scale coarse noise more aggressively in far periphery
                 // smoothstep(0.4, 0.8, dist) = 0 near center, 1 at edges
                 float coarseStrength = smoothstep(0.4, 0.8, dist);
-                vec2 coarseDisplacement = vec2(n1_coarse, n2_coarse) * 0.006 * strength * coarseStrength;
+                // Scale displacement by intensity
+                vec2 coarseDisplacement = vec2(n1_coarse, n2_coarse) * 0.006 * strength * coarseStrength * u_intensity;
                 
                 // Combine: Fine noise everywhere, coarse noise only at edges
                 vec2 displacement = fineDisplacement + coarseDisplacement;
@@ -173,19 +180,26 @@ class WebGLRenderer {
                     // Exponential saturation falloff
                     float eccentricity = max(0.0, dist - radius_norm);
                     float saturation = exp(-3.0 * eccentricity);
-                    saturation = max(0.0, saturation); // Allow full desaturation
+                    // Scale saturation loss by intensity (higher intensity = less saturation)
+                    // If intensity is 0, saturation should remain 1.0 (no loss)
+                    // But our logic is inverted: saturation is 0.0 at periphery.
+                    // Let's mix between original saturation and calculated saturation based on intensity.
+                    saturation = mix(1.0, saturation, u_intensity);
+                    saturation = max(0.0, saturation); 
                     
                     float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
                     
                     // Contrast Boost (Magnocellular)
-                    float contrast = 1.3;
+                    // Scale contrast boost by intensity
+                    float contrast = 1.0 + (0.3 * u_intensity);
                     float boostedGray = (gray - 0.5) * contrast + 0.5;
                     boostedGray = clamp(boostedGray, 0.0, 1.0);
                     
                     // Add Grain (Neural Noise / Visual Snow)
                     // Mix in some random noise to break the "smoothness"
                     float grain = rand(uv_corrected * 10.0) - 0.5; // -0.5 to 0.5
-                    boostedGray += grain * 0.15; // 15% grain strength
+                    // Scale grain by intensity
+                    boostedGray += grain * 0.15 * u_intensity; 
                     boostedGray = clamp(boostedGray, 0.0, 1.0);
                     
                     // Rod Tint: Cyan-ish Grey
@@ -194,13 +208,18 @@ class WebGLRenderer {
                     vec3 neutralGray = vec3(boostedGray);
                     
                     // Stronger tint in dark areas
-                    float tintStrength = (1.0 - gray) * 0.8; 
+                    float tintStrength = (1.0 - gray) * 0.8 * u_intensity; 
                     vec3 finalRodColor = mix(neutralGray, rodTint, tintStrength);
                     
                     // Mix based on strength and saturation
                     vec3 peripheryColor = mix(finalRodColor, color.rgb, saturation);
                     
                     // Then mix that with the pure original color based on strength
+                    // If intensity is 0, we want strength to effectively be 0 for visual changes?
+                    // No, strength is spatial. u_intensity is magnitude.
+                    // If u_intensity is 0, displacement is 0, grain is 0, saturation is 1.0.
+                    // So peripheryColor == color.rgb.
+                    // So this mix is fine.
                     color.rgb = mix(color.rgb, peripheryColor, strength);
                 }
                 
@@ -218,6 +237,7 @@ class WebGLRenderer {
         this.mouseLocation = gl.getUniformLocation(this.program, "u_mouse");
         this.foveaRadiusLocation = gl.getUniformLocation(this.program, "u_foveaRadius");
         this.pixelationLocation = gl.getUniformLocation(this.program, "u_pixelation");
+        this.intensityLocation = gl.getUniformLocation(this.program, "u_intensity");
         this.textureLocation = gl.getUniformLocation(this.program, "u_texture");
 
         console.log('[WebGL] Uniform Locations:', {
@@ -225,6 +245,7 @@ class WebGLRenderer {
             mouse: this.mouseLocation,
             radius: this.foveaRadiusLocation,
             pixelation: this.pixelationLocation,
+            intensity: this.intensityLocation,
             texture: this.textureLocation
         });
 
@@ -311,8 +332,9 @@ class WebGLRenderer {
      * @param {number} mouseX Mouse X (0..width)
      * @param {number} mouseY Mouse Y (0..height)
      * @param {number} foveaRadius Radius in pixels
+     * @param {number} intensity Intensity multiplier (0.0 to 1.5)
      */
-    render(width, height, mouseX, mouseY, foveaRadius) {
+    render(width, height, mouseX, mouseY, foveaRadius, intensity = 0.6) {
         if (!this.program) return;
         const gl = this.gl;
 
@@ -340,7 +362,8 @@ class WebGLRenderer {
         gl.uniform2f(this.resolutionLocation, width, height);
         gl.uniform2f(this.mouseLocation, mouseX, mouseY);
         gl.uniform1f(this.foveaRadiusLocation, foveaRadius);
-        gl.uniform1f(this.pixelationLocation, 0.05); // Configurable?
+        gl.uniform1f(this.pixelationLocation, 0.05 * intensity); // Scale pixelation by intensity
+        gl.uniform1f(this.intensityLocation, intensity);
         gl.uniform1i(this.textureLocation, 0);
 
         // Draw

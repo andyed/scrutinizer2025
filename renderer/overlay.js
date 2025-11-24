@@ -10,17 +10,17 @@ let fovealEnabled = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('[Overlay] Initializing (no toolbar - menu only)');
-    
+
     // Initialize Scrutinizer for canvas rendering
     scrutinizer = new Scrutinizer(CONFIG);
-    
+
     // Track mouse for foveal center (HUD forwards all events so we get them here too)
     document.addEventListener('mousemove', (e) => {
         if (scrutinizer) {
             scrutinizer.handleMouseMove(e);
         }
     });
-    
+
     // Also listen for mouse position from content view
     ipcRenderer.on('browser:mousemove', (event, x, y) => {
         // Update foveal center when mouse moves in browser below
@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
             scrutinizer.handleMouseMove(syntheticEvent);
         }
     });
-    
+
     // Listen for frame data from main process
     ipcRenderer.on('frame-captured', (event, data) => {
         if (scrutinizer && data.width > 0 && data.height > 0) {
@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-    
+
     // Start/stop capture loop
     const startCapturing = () => {
         if (captureInterval) return;
@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ipcRenderer.send('capture:request');
         }, 33); // 30fps
     };
-    
+
     const stopCapturing = () => {
         if (captureInterval) {
             console.log('[Overlay] Stopping capture loop');
@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
             captureInterval = null;
         }
     };
-    
+
     // Toggle foveal effect (called from menu)
     const toggleFoveal = (forceState = null) => {
         if (forceState !== null) {
@@ -77,10 +77,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             fovealEnabled = !fovealEnabled;
         }
-        
+
         // Notify main process
         ipcRenderer.send('settings:enabled-changed', fovealEnabled);
-        
+
         if (fovealEnabled) {
             scrutinizer.enable();
             startCapturing();
@@ -102,7 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ipcRenderer.on('browser:did-navigate', (event, url) => {
         console.log('[Overlay] Browser navigated to:', url);
     });
-    
+
     // Listen for init state from main process
     ipcRenderer.on('settings:init-state', (event, state) => {
         console.log('[Overlay] Received init-state:', state);
@@ -111,15 +111,15 @@ document.addEventListener('DOMContentLoaded', () => {
             scrutinizer.updateFovealRadius(state.radius);
         }
     });
-    
+
     // Menu IPC handlers
     ipcRenderer.on('menu:toggle-foveal', () => {
         toggleFoveal();
     });
 
-    ipcRenderer.on('menu:set-radius', (event, radius) => {
-        if (scrutinizer) scrutinizer.updateFovealRadius(radius);
+    ipcRenderer.on('menu:set-intensity', (event, intensity) => {
+        if (scrutinizer) scrutinizer.updateIntensity(intensity);
     });
-    
+
     console.log('[Overlay] Ready (menu-only mode)');
 });

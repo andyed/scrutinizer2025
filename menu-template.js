@@ -173,37 +173,34 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     ]
                 },
                 {
-                    label: 'Blur Amount',
+                    label: 'Peripheral Intensity',
                     submenu: [
                         {
-                            label: 'None (0px)',
+                            label: 'None (0%)',
                             type: 'radio',
-                            checked: currentBlur === 0,
-                            click: () => sendToOverlays('menu:set-blur', 0)
+                            checked: currentBlur === 0, // We might need to track intensity separately later, but for now 0 is 0
+                            click: () => sendToOverlays('menu:set-intensity', 0.0)
                         },
                         {
-                            label: 'Light (5px)',
+                            label: 'Low (30%)',
                             type: 'radio',
-                            checked: currentBlur === 5,
-                            click: () => sendToOverlays('menu:set-blur', 5)
+                            click: () => sendToOverlays('menu:set-intensity', 0.3)
                         },
                         {
-                            label: 'Medium (10px)',
+                            label: 'Medium (60%)',
                             type: 'radio',
-                            checked: currentBlur === 10,
-                            click: () => sendToOverlays('menu:set-blur', 10)
+                            checked: true, // Default
+                            click: () => sendToOverlays('menu:set-intensity', 0.6)
                         },
                         {
-                            label: 'Heavy (20px)',
+                            label: 'High (100%)',
                             type: 'radio',
-                            checked: currentBlur === 20,
-                            click: () => sendToOverlays('menu:set-blur', 20)
+                            click: () => sendToOverlays('menu:set-intensity', 1.0)
                         },
                         {
-                            label: 'Maximum (30px)',
+                            label: 'Extreme (150%)',
                             type: 'radio',
-                            checked: currentBlur === 30,
-                            click: () => sendToOverlays('menu:set-blur', 30)
+                            click: () => sendToOverlays('menu:set-intensity', 1.5)
                         }
                     ]
                 }

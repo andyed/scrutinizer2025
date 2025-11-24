@@ -52,19 +52,19 @@ class Scrutinizer {
         // Request actual window size from main process
         const { ipcRenderer } = require('electron');
         ipcRenderer.send('get-window-size');
-        
+
         // Listen for response (only once per resize)
         ipcRenderer.once('window-size', (event, { width, height }) => {
             const dpr = window.devicePixelRatio || 1;
-            
+
             // Set CSS size to match window
             this.canvas.style.width = width + 'px';
             this.canvas.style.height = height + 'px';
-            
+
             // Set canvas buffer size with DPR
             const bufferWidth = width * dpr;
             const bufferHeight = height * dpr;
-            
+
             if (this.canvas.width !== bufferWidth || this.canvas.height !== bufferHeight) {
                 this.canvas.width = bufferWidth;
                 this.canvas.height = bufferHeight;
@@ -143,7 +143,7 @@ class Scrutinizer {
         // and avoids "SharedImageManager" errors in some Electron environments.
         if (this.renderer) {
             this.renderer.uploadTexture(imageData);
-            
+
             // Log occasionally
             if (!this.frameUploadCount) this.frameUploadCount = 0;
             this.frameUploadCount++;
@@ -193,7 +193,8 @@ class Scrutinizer {
             this.canvas.height,
             this.mouseX,
             this.mouseY,
-            effectiveRadius
+            effectiveRadius,
+            this.config.intensity !== undefined ? this.config.intensity : 0.6 // Default to 0.6
         );
     }
 
@@ -208,9 +209,9 @@ class Scrutinizer {
         this.config.fovealRadius = newRadius;
     }
 
-    updateBlurRadius(radius) {
-        this.config.blurRadius = radius;
-        // In WebGL, we might map this to pixelation size or something
+    updateIntensity(intensity) {
+        this.config.intensity = intensity;
+        console.log('[Scrutinizer] Intensity set to:', intensity);
     }
 }
 
