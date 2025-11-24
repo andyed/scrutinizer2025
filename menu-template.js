@@ -1,6 +1,6 @@
 const { app, shell } = require('electron');
 
-const RADIUS_OPTIONS = [100, 180, 250];
+const RADIUS_OPTIONS = [60, 100, 180, 250];
 
 function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10) {
     const isMac = process.platform === 'darwin';
@@ -36,26 +36,8 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     accelerator: 'CmdOrCtrl+N',
                     click: () => {
                         const { dialog } = require('electron');
-                        // Trigger the same flow as open-new-window
                         const win = BrowserWindow.getFocusedWindow();
                         if (win && win.scrutinizerView) {
-                            // For now, just open default
-                            const { ipcMain } = require('electron');
-                            // This is a bit hacky to reach back to main, but we can just emit an event or use the exposed function if we had it.
-                            // Better: just use the existing IPC handler if possible, or replicate logic.
-                            // Since we don't have direct access to createScrutinizerWindow here, we'll send an IPC to main
-                            // But wait, we are IN the main process here (menu template is used by main).
-                            // We can't easily call createScrutinizerWindow from here without circular deps or passing it in.
-                            // Let's stick to the existing behavior or improve it.
-                            // The previous implementation showed a message box. Let's keep it simple or improve.
-                            // Let's actually make it useful: Open the URL dialog for a NEW window?
-                            // Or just open a new default window.
-
-                            // Let's try to send a signal to the main process to open a new window.
-                            // Since we are in main process, we can use a global event emitter or just require main? No, circular dependency.
-                            // We'll stick to the previous "New Window" behavior for now but maybe just open a default one?
-                            // Actually, the previous code showed a dialog. Let's just open a new window with default URL.
-                            // We can emit an event on the app object?
                             app.emit('create-new-window');
                         }
                     }
@@ -70,10 +52,9 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         const currentURL = win.scrutinizerView.webContents.getURL();
                         const path = require('path');
 
-                        // Create URL input dialog window
                         const dialog = new BrowserWindow({
                             width: 500,
-                            height: 180, // Increased height for better spacing
+                            height: 180,
                             parent: win,
                             modal: true,
                             show: false,
@@ -93,7 +74,6 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             dialog.webContents.send('set-url', currentURL);
                         });
 
-                        // Store reference for IPC handlers
                         win.urlDialog = dialog;
                     }
                 },
@@ -153,22 +133,28 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     label: 'Foveal Radius',
                     submenu: [
                         {
-                            label: 'Small (100px)',
+                            label: 'Extra Small (60px)',
                             type: 'radio',
                             checked: currentRadius === RADIUS_OPTIONS[0],
                             click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[0])
                         },
                         {
-                            label: 'Medium (180px)',
+                            label: 'Small (100px)',
                             type: 'radio',
                             checked: currentRadius === RADIUS_OPTIONS[1],
                             click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[1])
                         },
                         {
-                            label: 'Large (250px)',
+                            label: 'Medium (180px)',
                             type: 'radio',
                             checked: currentRadius === RADIUS_OPTIONS[2],
                             click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[2])
+                        },
+                        {
+                            label: 'Large (250px)',
+                            type: 'radio',
+                            checked: currentRadius === RADIUS_OPTIONS[3],
+                            click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[3])
                         }
                     ]
                 },
@@ -203,6 +189,13 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             click: () => sendToOverlays('menu:set-intensity', 1.5)
                         }
                     ]
+                },
+                { type: 'separator' },
+                {
+                    label: 'Chromatic Aberration',
+                    type: 'checkbox',
+                    checked: true,
+                    click: (menuItem) => sendToOverlays('menu:toggle-ca', menuItem.checked)
                 }
             ]
         },

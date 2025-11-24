@@ -72,6 +72,7 @@ class WebGLRenderer {
             uniform float u_foveaRadius;
             uniform float u_pixelation; // Base pixelation
             uniform float u_intensity;  // Global intensity multiplier (0.0 to 1.5)
+            uniform float u_ca_strength; // Chromatic Aberration strength (0.0 or 1.0)
 
             varying vec2 v_texCoord;
 
@@ -163,11 +164,60 @@ class WebGLRenderer {
                 vec2 displacement = fineDisplacement + coarseDisplacement;
                 vec2 newUV = uv + displacement;
                 
-                // Sample texture at warped location
-                vec4 color = texture2D(u_texture, newUV);
+                // --- Chromatic Aberration (The Lens Split) ---
+                // Calculate vector from fovea (mouse) to current pixel (uv_corrected)
+                vec2 ca_delta = uv_corrected - mouse_corrected;
+                float ca_dist = length(ca_delta);
                 
-                // SWIZZLE: Fix BGRA -> RGBA
-                color.rgb = color.bgr;
+                // Normalize direction
+                vec2 ca_dir = ca_delta / (ca_dist + 0.0001); // Avoid divide by zero
+                
+                // Calculate Aberration Amount
+                // Scales with distance from fovea AND intensity AND toggle
+                // 0.015 is roughly 10-15 pixels on a 1080p screen
+                float aberrationAmt = 0.015 * strength * u_intensity * u_ca_strength;
+                
+                // Calculate offsets
+                // Red pulls IN (closer to mouse)
+                vec2 r_offset = ca_dir * aberrationAmt * 0.5;
+                // Blue pushes OUT (further from mouse) - Blue scatters more
+                vec2 b_offset = ca_dir * aberrationAmt * 1.0;
+                
+                // Sample Channels Separately
+                // We apply the displacement (noise) to all of them, THEN apply the chromatic shift
+                // Note: We need to un-correct aspect ratio for the texture lookup if we used corrected coords for offset
+                // But here 'displacement' is already in UV space.
+                // Let's convert our offsets to UV space (divide X by aspect)
+                r_offset.x /= aspect;
+                b_offset.x /= aspect;
+                
+                vec4 colorR = texture2D(u_texture, newUV - r_offset);
+                vec4 colorG = texture2D(u_texture, newUV); // Green is anchor
+                vec4 colorB = texture2D(u_texture, newUV + b_offset);
+                
+                // Reassemble
+                vec4 color = vec4(colorR.b, colorG.g, colorB.r, 1.0); // Note: Texture is BGRA, so R component is actually B?
+                // Wait, texture2D returns what?
+                // If the texture is uploaded as RGBA, it's RGBA.
+                // But earlier code said: "SWIZZLE: Fix BGRA -> RGBA: color.rgb = color.bgr;"
+                // This implies the source texture is BGRA (common in Electron/Skia).
+                // So:
+                // colorR.r is actually Blue? No.
+                // If source is BGRA:
+                // .r = Blue
+                // .g = Green
+                // .b = Red
+                // .a = Alpha
+                
+                // We want:
+                // Final Red Channel = Sampled Red (which is .b in BGRA source)
+                // Final Green Channel = Sampled Green (which is .g in BGRA source)
+                // Final Blue Channel = Sampled Blue (which is .r in BGRA source)
+                
+                color.r = colorR.b; // Red comes from the .b component of the Red-shifted sample
+                color.g = colorG.g; // Green comes from the .g component of the Anchor sample
+                color.b = colorB.r; // Blue comes from the .r component of the Blue-shifted sample
+                color.a = 1.0;
                 
                 // Exclude scrollbar region (right edge, ~17px wide)
                 // Keep scrollbar sharp and unaffected by peripheral effects
@@ -238,6 +288,7 @@ class WebGLRenderer {
         this.foveaRadiusLocation = gl.getUniformLocation(this.program, "u_foveaRadius");
         this.pixelationLocation = gl.getUniformLocation(this.program, "u_pixelation");
         this.intensityLocation = gl.getUniformLocation(this.program, "u_intensity");
+        this.caStrengthLocation = gl.getUniformLocation(this.program, "u_ca_strength");
         this.textureLocation = gl.getUniformLocation(this.program, "u_texture");
 
         console.log('[WebGL] Uniform Locations:', {
@@ -246,6 +297,7 @@ class WebGLRenderer {
             radius: this.foveaRadiusLocation,
             pixelation: this.pixelationLocation,
             intensity: this.intensityLocation,
+            caStrength: this.caStrengthLocation,
             texture: this.textureLocation
         });
 
@@ -333,8 +385,9 @@ class WebGLRenderer {
      * @param {number} mouseY Mouse Y (0..height)
      * @param {number} foveaRadius Radius in pixels
      * @param {number} intensity Intensity multiplier (0.0 to 1.5)
+     * @param {number} caStrength Chromatic Aberration strength (0.0 or 1.0)
      */
-    render(width, height, mouseX, mouseY, foveaRadius, intensity = 0.6) {
+    render(width, height, mouseX, mouseY, foveaRadius, intensity = 0.6, caStrength = 1.0) {
         if (!this.program) return;
         const gl = this.gl;
 
@@ -364,6 +417,7 @@ class WebGLRenderer {
         gl.uniform1f(this.foveaRadiusLocation, foveaRadius);
         gl.uniform1f(this.pixelationLocation, 0.05 * intensity); // Scale pixelation by intensity
         gl.uniform1f(this.intensityLocation, intensity);
+        gl.uniform1f(this.caStrengthLocation, caStrength);
         gl.uniform1i(this.textureLocation, 0);
 
         // Draw

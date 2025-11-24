@@ -133,41 +133,41 @@ npm start
 - **Current implementation** uses Box Sampling with Noise, not full "Mongrel Theory" texture synthesis.
 - It assumes a fixed relationship between screen pixels and **visual angle**.
 - **Saccadic suppression** (blindness during eye movements) is not simulated.
-- **Chromatic aberration** (R/B channel splitting) not yet implemented.
 
 **Future development** (see `ROADMAP.md`) includes full Mongrel Theory implementation and WebGL-based domain warping.
 
-## Technical Details
+## Implementation Notes
 
-### How does it work?
+The simulation is powered by a custom **WebGL Fragment Shader** that processes the browser viewport in real-time (60fps). The pipeline implements four distinct biological constraints:
 
-The software captures the browser content and processes it through a custom **WebGL Fragment Shader** pipeline. This allows for complex, per-pixel visual effects that simulate the limitations of the human eye in real-time.
+### 1. Rod-Weighted Luminance (Scotopic Vision)
+In the periphery, cone cells (color) are scarce, and rod cells (luminance) dominate. Rods have a peak sensitivity at **505nm (Cyan/Blue-Green)** and are blind to red light.
 
-### Electron Architecture
+- **Algorithm**: We calculate a "Rod Tint" vector based on the pixel's luminance.
+- **Effect**: As eccentricity increases, colors desaturate towards a cyan-grey. Red objects lose contrast and vanish, while blue/green objects appear brighter ("Purkinje shift").
 
-This implementation leverages Electron's unique capabilities to interact with browser content:
+### 2. Box Sampling (Retinal Ganglion Density)
+The density of Retinal Ganglion Cells (RGCs) drops exponentially from the fovea. This results in a loss of sampling resolution.
 
-#### Webview Tag
-We use Electron's [`<webview>` tag](https://www.electronjs.org/docs/latest/api/webview-tag) to embed a fully-functional browser within the application. The webview is an isolated browser context that can load any web page while remaining sandboxed from the parent application.
+- **Algorithm**: We use a variable-size pixelation filter. The "block size" scales with distance from the fovea.
+- **Effect**: Fine details in the periphery are averaged into larger blocks, destroying high-frequency information (like text) while preserving low-frequency structures (layout).
 
-#### IPC Communication
-To track mouse movements and page events within the webview, we use Electron's **Inter-Process Communication (IPC)**:
+### 3. Domain Warping (Positional Uncertainty)
+Peripheral vision suffers from "crowding"—the inability to isolate features. The brain receives a statistical summary of the texture rather than precise coordinates.
 
-1. **Injecting Code**: Using `webview.executeJavaScript()`, we inject tracking code into the loaded page
-2. **Sending Events**: The injected code uses `ipcRenderer.sendToHost()` to send mouse coordinates, scroll events, and DOM mutations back to the parent
-3. **Receiving Events**: The parent listens via `webview.addEventListener('ipc-message')` to receive these events
+- **Algorithm**: We apply multi-octave **Simplex Noise** to the UV coordinates of the texture lookup.
+- **Effect**:
+    - **Fine Noise**: Jitters small details (text looks like "ants").
+    - **Coarse Noise**: Warps large shapes (layout feels unstable).
 
-#### WebGL Rendering Pipeline
+### 4. Radial Chromatic Aberration (The "Lens Split")
+The Magno-cellular pathway (motion/luminance) processes information faster than the Parvo-cellular pathway (color), leading to temporal and spatial asynchrony.
 
-We moved from a CPU-based canvas approach to a fully GPU-accelerated pipeline to achieve 60fps performance:
-
-```
-DOM → Capture Page → GPU Texture Upload → WebGL Fragment Shader → Render
-                                          ├─ Uniforms: Mouse Pos, Radius, Intensity
-                                          ├─ Pass 1: Rod-Sensitive Desaturation
-                                          ├─ Pass 2: Variable Block Sampling (Periphery)
-                                          └─ Pass 3: Foveal Masking
-```
+- **Algorithm**: We split the color channels based on a radial vector from the fovea:
+    - **Red Channel**: Pulled *inward* (towards fovea).
+    - **Blue Channel**: Pushed *outward* (away from fovea).
+    - **Green Channel**: Anchored.
+- **Effect**: High-contrast edges in the periphery develop color fringes (Red/Cyan), creating a "vibrating" or "3D" effect that simulates the difficulty of locking focus on peripheral objects.
 
 ## Related Work & Theoretical Foundation
 

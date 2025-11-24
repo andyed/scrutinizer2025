@@ -194,7 +194,8 @@ class Scrutinizer {
             this.mouseX,
             this.mouseY,
             effectiveRadius,
-            this.config.intensity !== undefined ? this.config.intensity : 0.6 // Default to 0.6
+            this.config.intensity !== undefined ? this.config.intensity : 0.6, // Default to 0.6
+            this.config.chromaticAberration !== undefined ? (this.config.chromaticAberration ? 1.0 : 0.0) : 1.0 // Default to ON
         );
     }
 
@@ -212,6 +213,11 @@ class Scrutinizer {
     updateIntensity(intensity) {
         this.config.intensity = intensity;
         console.log('[Scrutinizer] Intensity set to:', intensity);
+    }
+
+    toggleCA(enabled) {
+        this.config.chromaticAberration = enabled;
+        console.log('[Scrutinizer] CA set to:', enabled);
     }
 }
 

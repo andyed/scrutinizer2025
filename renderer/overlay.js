@@ -121,5 +121,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (scrutinizer) scrutinizer.updateIntensity(intensity);
     });
 
+    ipcRenderer.on('menu:toggle-ca', (event, enabled) => {
+        if (scrutinizer) scrutinizer.toggleCA(enabled);
+    });
+
     console.log('[Overlay] Ready (menu-only mode)');
 });
