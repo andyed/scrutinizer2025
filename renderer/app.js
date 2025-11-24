@@ -263,10 +263,11 @@ document.addEventListener('DOMContentLoaded', () => {
             'PageUp', 'PageDown', 'Home', 'End', ' '
         ];
 
+        // Only forward navigation keys, let everything else work normally
+        if (!navigationKeys.includes(e.key)) return;
+
         // Prevent default for navigation keys so they don't affect the toolbar
-        if (navigationKeys.includes(e.key)) {
-            e.preventDefault();
-        }
+        e.preventDefault();
 
         ipcRenderer.send('input:keyboard', {
             type: 'keyDown',
@@ -283,9 +284,10 @@ document.addEventListener('DOMContentLoaded', () => {
             'PageUp', 'PageDown', 'Home', 'End', ' '
         ];
 
-        if (navigationKeys.includes(e.key)) {
-            e.preventDefault();
-        }
+        // Only forward navigation keys
+        if (!navigationKeys.includes(e.key)) return;
+
+        e.preventDefault();
 
         ipcRenderer.send('input:keyboard', {
             type: 'keyUp',

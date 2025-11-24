@@ -256,14 +256,12 @@ label {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100% !important;
-  height: 100% !important;
-  pointer-events: none !important;
-  /* CRITICAL: Let clicks pass through to webview */
-  /* Let clicks pass through to webview */
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  /* Let clicks pass through to content below */
   z-index: 100;
   display: block;
-  /* Visible by default */
 }
 
 /* Status bar */
