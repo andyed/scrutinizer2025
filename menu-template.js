@@ -126,21 +126,33 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                 {
                     label: 'Back',
                     accelerator: process.platform === 'darwin' ? 'Cmd+Left' : 'Alt+Left',
-                    click: () => sendToRenderer('navigate:back')
+                    click: () => {
+                        const win = BrowserWindow.getFocusedWindow();
+                        if (win && win.scrutinizerView) {
+                            win.scrutinizerView.webContents.goBack();
+                        }
+                    }
                 },
                 {
                     label: 'Forward',
                     accelerator: process.platform === 'darwin' ? 'Cmd+Right' : 'Alt+Right',
-                    click: () => sendToRenderer('navigate:forward')
+                    click: () => {
+                        const win = BrowserWindow.getFocusedWindow();
+                        if (win && win.scrutinizerView) {
+                            win.scrutinizerView.webContents.goForward();
+                        }
+                    }
                 },
                 { type: 'separator' },
                 {
                     label: 'Home',
                     accelerator: 'CmdOrCtrl+Shift+H',
                     click: () => {
-                        // Ask the renderer to navigate to the configured start page.
-                        // The renderer forwards this as 'navigate:to' with the correct URL.
-                        sendToRenderer('navigate:home');
+                        const win = BrowserWindow.getFocusedWindow();
+                        if (win && win.scrutinizerView) {
+                            const defaultUrl = 'https://github.com/andyed/scrutinizer2025?tab=readme-ov-file#what-is-scrutinizer';
+                            win.scrutinizerView.webContents.loadURL(defaultUrl);
+                        }
                     }
                 }
             ]
