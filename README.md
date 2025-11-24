@@ -157,6 +157,12 @@ npm start
 
 **Future development** (see `ROADMAP.md`) includes full Mongrel Theory implementation and WebGL-based domain warping.
 
+### Visuospatial Decay (Cognitive Mode)
+
+An upcoming mode that simulates **working memory limits** instead of just optical blur—think "visual RAM" and Miller's Law made visible. It will help you see when your UI relies on users remembering off-screen context rather than recognizing what is right next to the decision.
+
+See the [roadmap](./ROADMAP.md) for details.
+
 ## Implementation Notes
 
 The simulation is powered by a custom **WebGL Fragment Shader** that processes the browser viewport in real-time (60fps). The pipeline implements four distinct biological constraints:

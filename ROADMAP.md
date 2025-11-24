@@ -131,24 +131,16 @@ Create:
 
 #### Popup Handling
 **Priority**: Medium  
-**Effort**: Medium  
-**Status**: ⚠️ Partially Working - **Defer to v2.0 WebContentsView Migration**
+**Effort**: Low  
+**Status**: ✅ WebContentsView migration landed in 1.2; popup behavior is generally solid
 
 **Current state**:
-- ✅ Popups open in new Scrutinizer windows (intercepts `new-window` events)
+- ✅ Popups open in Scrutinizer windows (intercepts `new-window` events where applicable)
 - ✅ Settings inheritance works (radius, blur, enabled state passed to new windows)
-- ❌ **Known Issue**: Foveal effect not applying to popup windows despite state inheritance
-  - State is received and stored correctly
-  - Timing issue with webview initialization and scrutinizer.enable() call
-  - Related to `<webview>` tag's multi-process architecture
+- ✅ WebContentsView-based architecture simplifies multi-window and popup handling
+- ⚠️ Minor visual or timing quirks may remain on some sites; track these in `docs/known-issues.md`
 
-**Recommendation**: **Defer fix to v2.0** (see `docs/webcontentsview-migration.md`)
-- Current `<webview>` architecture makes multi-window state sync complex
-- WebContentsView migration will provide same-process architecture
-- Much cleaner state management and initialization flow
-- Multi-window support explicitly listed as Phase 3 test item in migration plan
-
-**Workaround for users**: Manually press ESC to toggle foveal mode in popup windows
+**Notes**: WebContentsView migration was completed as part of the 1.2 release; this section is now mainly for future fine-tuning rather than core architectural work.
 
 ---
 
@@ -212,6 +204,9 @@ For large/complex pages:
 - Eye tracker integration (Tobii, etc.)
 - Session recording/playback
 - Heatmap generation from usage data
+
+#### Navigation polish (1.3)
+- "Go" menu added with Home / Back / Forward entries for more discoverable navigation controls
 
 #### Advanced Simulation Controls
 **Priority**: Medium  
@@ -285,6 +280,7 @@ Improve how we sample the page for foveal/peripheral processing:
   - ✅ Block-based downsampling in periphery (photoreceptor density) - 3x3 and 5x5 blocks
   - ✅ Progressive desaturation (periphery is color-blind)
   - ✅ Replaces Gaussian blur with biologically-accurate spatial uncertainty
+  - ✅ Improved peripheral simulation and shader pipeline landed in 1.3 (see `docs/foveated-vision-model.md` and inline shader comments for details)
   - 🔵 **Future (scrutinizer2025gl)**: Full "Mongrel Theory" implementation
     - 🔵 Summary statistics compression with texture synthesis
     - 🔵 Contrast boost in periphery (Magno/Parvo separation)
@@ -318,16 +314,16 @@ Before 1.0 release, verify:
 
 ---
 
-## Release Timeline Estimate
+## Release Phases (Historical Plan)
 
-| Phase | Duration | Tasks |
-|-------|----------|-------|
-| **Phase 1**: Core Features | 1-2 weeks | Menus, bookmarks, homepage |
-| **Phase 2**: Build & Package | 3-5 days | electron-builder config, test builds |
-| **Phase 3**: Testing & Polish | 1 week | Edge cases, documentation, bug fixes |
-| **Phase 4**: Release | 1-2 days | Final builds, GitHub release, announcements |
+| Phase | Status | Focus |
+|-------|--------|-------|
+| **Phase 1**: Core Features | ✅ Completed | Menus, bookmarks, homepage |
+| **Phase 2**: Build & Package | ✅ Completed | electron-builder config, test builds |
+| **Phase 3**: Testing & Polish | ✅ Ongoing/iterative | Edge cases, documentation, bug fixes |
+| **Phase 4**: Release | ⚠️ In progress | Final builds, GitHub release, announcements |
 
-**Total estimated time**: 3-4 weeks for solo developer
+**Main remaining blocker for broad distribution**: properly **signed apps** (code signing and notarization across platforms).
 
 ---
 
