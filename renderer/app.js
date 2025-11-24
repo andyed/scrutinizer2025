@@ -99,6 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle page loading start (prevent FOUC)
     ipcRenderer.on('browser:did-start-loading', () => {
+        console.log('[App] Page loading started - adding loading class');
         // Add loading animation to toggle button
         toggleBtn.classList.add('loading');
 
@@ -109,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle page loading finish
     ipcRenderer.on('browser:did-finish-load', () => {
+        console.log('[App] Page loading finished - removing loading class');
         // Remove loading animation
         toggleBtn.classList.remove('loading');
     });
