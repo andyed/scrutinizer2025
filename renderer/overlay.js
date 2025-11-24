@@ -125,5 +125,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (scrutinizer) scrutinizer.toggleCA(enabled);
     });
 
+    ipcRenderer.on('menu:toggle-debug-boundary', (event, enabled) => {
+        if (scrutinizer) scrutinizer.toggleDebugBoundary(enabled);
+    });
+
+    ipcRenderer.on('menu:toggle-debug-boundary', (event, enabled) => {
+        if (scrutinizer) scrutinizer.toggleDebugBoundary(enabled);
+    });
+
     console.log('[Overlay] Ready (menu-only mode)');
 });

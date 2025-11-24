@@ -73,6 +73,7 @@ class WebGLRenderer {
             uniform float u_pixelation; // Base pixelation
             uniform float u_intensity;  // Global intensity multiplier (0.0 to 1.5)
             uniform float u_ca_strength; // Chromatic Aberration strength (0.0 or 1.0)
+            uniform float u_debug_boundary; // Debug Boundary (0.0 or 1.0)
 
             varying vec2 v_texCoord;
 
@@ -128,40 +129,75 @@ class WebGLRenderer {
                 float radius_norm = u_foveaRadius / u_resolution.y;
                 // NO CLAMP: Allow radius to be larger than screen for "Disabled" state
                 
-                // Calculate Effect Strength (0.0 in Fovea, 1.0 in Periphery)
-                // Smooth transition instead of hard cut
-                float strength = smoothstep(radius_norm, radius_norm + 0.15, dist);
+                // === THREE-ZONE MODEL (STAGGERED EFFECTS) ===
+                // 1. FOVEA (Crystal Clear): 0 to ~30% of radius
+                // 2. PARAFOVEA (Heat Haze - WARP ONLY): 30% to 250% of radius - Black/white, readable but crowded
+                // 3. FAR PERIPHERY (Mongrel): 250%+ - CA + Heavy effects
                 
-                // Scale strength by intensity (if intensity is 0, effect is 0)
-                // But we want to keep the fovea clear regardless.
-                // Actually, we want the *maximum* degradation to be scaled by intensity.
+                float fovea_radius = radius_norm * 0.3; // The "rock solid" zone
+                float parafovea_radius = radius_norm; // The "wiggle" zone (warp only)
+                float periphery_start = radius_norm * 2.5; // Where CA begins (pushed much further out)
+                
+                // STAGGERED STRENGTH MASKS
+                
+                // Warp Strength: Starts at fovea edge, reaches full at parafovea edge
+                // Stays active throughout (parafovea AND periphery)
+                float warpStrength = smoothstep(fovea_radius, parafovea_radius, dist);
+                warpStrength = pow(warpStrength, 0.5); // Ease the curve
+                
+                // CA Strength: DITHERED ACTIVATION
+                // Add high-frequency noise to the distance for ragged edge
+                float noiseSample = rand(uv_corrected * 100.0); // High-freq noise for dithering
+                float distDithered = dist + (noiseSample - 0.5) * 0.3; // Add ±15% noise to distance
+                
+                // CA only starts at 2.5x radius (far beyond parafovea)
+                // Wide transition (0.5) for gradual blend
+                float caStrength = smoothstep(periphery_start, periphery_start + 0.5, distDithered);
+                
+                // Rod Vision Strength: Starts in parafovea, strengthens in periphery
+                float rodStrength = smoothstep(fovea_radius, periphery_start, dist);
+                
+                // Pixelation/Scatter Strength: Only in far periphery
+                float scatterStrength = smoothstep(periphery_start, periphery_start + 0.3, dist);
+                
+                // Detect zones for conditional logic
+                bool isParafovea = dist > fovea_radius && dist <= periphery_start;
+                bool isFarPeriphery = dist > periphery_start * 1.2; // Extreme periphery at 3x base radius
                 
                 
-                // Domain Warping (Positional Uncertainty) - Multi-Octave
+                // Domain Warping (Positional Uncertainty) - Recursive Noise
                 // Biology: Receptive fields get LARGER as you move to periphery
+                // Logic: f(p) = noise(p + noise(p))
                 
-                // High-frequency noise (fine detail destruction - "The Static")
-                // Good for sidebar text, body copy
-                float fineScale = 400.0;
-                float n1_fine = snoise(uv_corrected * fineScale);
-                float n2_fine = snoise(uv_corrected * fineScale + vec2(100.0, 100.0));
-                // Scale displacement by intensity
-                vec2 fineDisplacement = vec2(n1_fine, n2_fine) * 0.003 * strength * u_intensity;
+                // PARAFOVEA: Subtle warp for "heat haze" (crowding without destruction)
+                // FAR PERIPHERY: Extreme warp for "scrambling" (letter collisions)
                 
-                // Low-frequency noise (large feature destruction - "The Warper")
-                // Good for destroying headlines, large text
-                float coarseScale = 50.0;  // Much larger "waves"
-                float n1_coarse = snoise(uv_corrected * coarseScale);
-                float n2_coarse = snoise(uv_corrected * coarseScale + vec2(50.0, 50.0));
+                // 1. The Warp (Variable frequency and amplitude by zone)
+                float coarseScale = isFarPeriphery ? 1000.0 : 100.0; // 10x frequency in far periphery
+                float n1_warp = snoise(uv_corrected * coarseScale);
+                float n2_warp = snoise(uv_corrected * coarseScale + vec2(50.0, 50.0));
                 
-                // Scale coarse noise more aggressively in far periphery
-                // smoothstep(0.4, 0.8, dist) = 0 near center, 1 at edges
-                float coarseStrength = smoothstep(0.4, 0.8, dist);
-                // Scale displacement by intensity
-                vec2 coarseDisplacement = vec2(n1_coarse, n2_coarse) * 0.006 * strength * coarseStrength * u_intensity;
+                // Parafovea: Low amplitude, Y-crushed (preserve baselines)
+                // Far Periphery: High amplitude, Y-restored (destroy word shapes)
+                vec2 warpAmp = isFarPeriphery ? 
+                    vec2(0.01, 0.008) :  // Far Periphery: accordion + baseline shift
+                    vec2(0.002, 0.0002); // Parafovea: subtle grit, straight baselines
+                vec2 warpVector = vec2(n1_warp, n2_warp) * warpAmp * warpStrength * u_intensity;
                 
-                // Combine: Fine noise everywhere, coarse noise only at edges
-                vec2 displacement = fineDisplacement + coarseDisplacement;
+                // 2. The Jitter (High frequency, variable amplitude by zone)
+                float fineScale = isFarPeriphery ? 5000.0 : 2000.0; // Per-letter in far periphery
+                vec2 warpedUV = uv_corrected + warpVector; // Domain distortion
+                
+                float n1_jitter = snoise(warpedUV * fineScale);
+                float n2_jitter = snoise(warpedUV * fineScale + vec2(100.0, 100.0));
+                
+                vec2 jitterAmp = isFarPeriphery ?
+                    vec2(0.003, 0.002) :  // Far Periphery: per-letter chaos
+                    vec2(0.0006, 0.00006); // Parafovea: micro-texture
+                vec2 jitterVector = vec2(n1_jitter, n2_jitter) * jitterAmp * warpStrength * u_intensity;
+                
+                // Combine: The final lookup is Original + Warp + Jitter
+                vec2 displacement = warpVector + jitterVector;
                 vec2 newUV = uv + displacement;
                 
                 // --- Chromatic Aberration (The Lens Split) ---
@@ -173,9 +209,9 @@ class WebGLRenderer {
                 vec2 ca_dir = ca_delta / (ca_dist + 0.0001); // Avoid divide by zero
                 
                 // Calculate Aberration Amount
-                // Scales with distance from fovea AND intensity AND toggle
-                // 0.015 is roughly 10-15 pixels on a 1080p screen
-                float aberrationAmt = 0.015 * strength * u_intensity * u_ca_strength;
+                // NOW uses zone-based caStrength (only active beyond parafovea)
+                // Reduced by ~50% to avoid "Double Vision" (0.015 -> 0.008)
+                float aberrationAmt = 0.008 * caStrength * u_intensity * u_ca_strength;
                 
                 // Calculate offsets
                 // Red pulls IN (closer to mouse)
@@ -195,28 +231,11 @@ class WebGLRenderer {
                 vec4 colorG = texture2D(u_texture, newUV); // Green is anchor
                 vec4 colorB = texture2D(u_texture, newUV + b_offset);
                 
-                // Reassemble
-                vec4 color = vec4(colorR.b, colorG.g, colorB.r, 1.0); // Note: Texture is BGRA, so R component is actually B?
-                // Wait, texture2D returns what?
-                // If the texture is uploaded as RGBA, it's RGBA.
-                // But earlier code said: "SWIZZLE: Fix BGRA -> RGBA: color.rgb = color.bgr;"
-                // This implies the source texture is BGRA (common in Electron/Skia).
-                // So:
-                // colorR.r is actually Blue? No.
-                // If source is BGRA:
-                // .r = Blue
-                // .g = Green
-                // .b = Red
-                // .a = Alpha
-                
-                // We want:
-                // Final Red Channel = Sampled Red (which is .b in BGRA source)
-                // Final Green Channel = Sampled Green (which is .g in BGRA source)
-                // Final Blue Channel = Sampled Blue (which is .r in BGRA source)
-                
-                color.r = colorR.b; // Red comes from the .b component of the Red-shifted sample
-                color.g = colorG.g; // Green comes from the .g component of the Anchor sample
-                color.b = colorB.r; // Blue comes from the .r component of the Blue-shifted sample
+                // Reassemble with BGRA swizzle
+                vec4 color;
+                color.r = colorR.b; // Red channel
+                color.g = colorG.g; // Green channel  
+                color.b = colorB.r; // Blue channel
                 color.a = 1.0;
                 
                 // Exclude scrollbar region (right edge, ~17px wide)
@@ -226,9 +245,9 @@ class WebGLRenderer {
                 bool isScrollbar = distFromRightEdge < scrollbarWidth;
                 
                 // Rod Vision (Desaturation + Tint + Contrast + Grain)
-                if (strength > 0.0 && !isScrollbar) {
+                if (rodStrength > 0.0 && !isScrollbar) {
                     // Exponential saturation falloff
-                    float eccentricity = max(0.0, dist - radius_norm);
+                    float eccentricity = max(0.0, dist - fovea_radius);
                     float saturation = exp(-3.0 * eccentricity);
                     // Scale saturation loss by intensity (higher intensity = less saturation)
                     // If intensity is 0, saturation should remain 1.0 (no loss)
@@ -261,16 +280,23 @@ class WebGLRenderer {
                     float tintStrength = (1.0 - gray) * 0.8 * u_intensity; 
                     vec3 finalRodColor = mix(neutralGray, rodTint, tintStrength);
                     
-                    // Mix based on strength and saturation
+                    // Mix based on rodStrength and saturation
                     vec3 peripheryColor = mix(finalRodColor, color.rgb, saturation);
                     
-                    // Then mix that with the pure original color based on strength
-                    // If intensity is 0, we want strength to effectively be 0 for visual changes?
-                    // No, strength is spatial. u_intensity is magnitude.
-                    // If u_intensity is 0, displacement is 0, grain is 0, saturation is 1.0.
-                    // So peripheryColor == color.rgb.
-                    // So this mix is fine.
-                    color.rgb = mix(color.rgb, peripheryColor, strength);
+                    // Then mix that with the pure original color based on rodStrength
+                    color.rgb = mix(color.rgb, peripheryColor, rodStrength);
+                }
+                
+                // --- Debug: Show Boundary ---
+                if (u_debug_boundary > 0.5) {
+                    // Draw a red line at dist == radius_norm
+                    // Use smoothstep for anti-aliased line
+                    float lineThickness = 0.002; // Thickness in normalized units
+                    float border = 1.0 - smoothstep(0.0, lineThickness, abs(dist - radius_norm));
+                    
+                    if (border > 0.0) {
+                        color.rgb = mix(color.rgb, vec3(1.0, 0.0, 0.0), border);
+                    }
                 }
                 
                 gl_FragColor = color;
@@ -289,6 +315,7 @@ class WebGLRenderer {
         this.pixelationLocation = gl.getUniformLocation(this.program, "u_pixelation");
         this.intensityLocation = gl.getUniformLocation(this.program, "u_intensity");
         this.caStrengthLocation = gl.getUniformLocation(this.program, "u_ca_strength");
+        this.debugBoundaryLocation = gl.getUniformLocation(this.program, "u_debug_boundary");
         this.textureLocation = gl.getUniformLocation(this.program, "u_texture");
 
         console.log('[WebGL] Uniform Locations:', {
@@ -298,6 +325,7 @@ class WebGLRenderer {
             pixelation: this.pixelationLocation,
             intensity: this.intensityLocation,
             caStrength: this.caStrengthLocation,
+            debugBoundary: this.debugBoundaryLocation,
             texture: this.textureLocation
         });
 
@@ -386,8 +414,9 @@ class WebGLRenderer {
      * @param {number} foveaRadius Radius in pixels
      * @param {number} intensity Intensity multiplier (0.0 to 1.5)
      * @param {number} caStrength Chromatic Aberration strength (0.0 or 1.0)
+     * @param {number} debugBoundary Debug Boundary (0.0 or 1.0)
      */
-    render(width, height, mouseX, mouseY, foveaRadius, intensity = 0.6, caStrength = 1.0) {
+    render(width, height, mouseX, mouseY, foveaRadius, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0) {
         if (!this.program) return;
         const gl = this.gl;
 
@@ -415,9 +444,10 @@ class WebGLRenderer {
         gl.uniform2f(this.resolutionLocation, width, height);
         gl.uniform2f(this.mouseLocation, mouseX, mouseY);
         gl.uniform1f(this.foveaRadiusLocation, foveaRadius);
-        gl.uniform1f(this.pixelationLocation, 0.05 * intensity); // Scale pixelation by intensity
+        gl.uniform1f(this.pixelationLocation, 0.15 * intensity); // Pixelation scales with intensity (only active in far periphery via scatterStrength in shader)
         gl.uniform1f(this.intensityLocation, intensity);
         gl.uniform1f(this.caStrengthLocation, caStrength);
+        gl.uniform1f(this.debugBoundaryLocation, debugBoundary);
         gl.uniform1i(this.textureLocation, 0);
 
         // Draw

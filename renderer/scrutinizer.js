@@ -195,7 +195,8 @@ class Scrutinizer {
             this.mouseY,
             effectiveRadius,
             this.config.intensity !== undefined ? this.config.intensity : 0.6, // Default to 0.6
-            this.config.chromaticAberration !== undefined ? (this.config.chromaticAberration ? 1.0 : 0.0) : 1.0 // Default to ON
+            this.config.chromaticAberration !== undefined ? (this.config.chromaticAberration ? 1.0 : 0.0) : 1.0, // Default to ON
+            this.config.debugBoundary !== undefined ? (this.config.debugBoundary ? 1.0 : 0.0) : 0.0 // Default to OFF
         );
     }
 
@@ -218,6 +219,11 @@ class Scrutinizer {
     toggleCA(enabled) {
         this.config.chromaticAberration = enabled;
         console.log('[Scrutinizer] CA set to:', enabled);
+    }
+
+    toggleDebugBoundary(enabled) {
+        this.config.debugBoundary = enabled;
+        console.log('[Scrutinizer] Debug Boundary set to:', enabled);
     }
 }
 

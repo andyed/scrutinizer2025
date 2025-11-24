@@ -133,28 +133,34 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     label: 'Foveal Radius',
                     submenu: [
                         {
-                            label: 'Extra Small (60px)',
+                            label: 'Extra Small (20px)',
                             type: 'radio',
                             checked: currentRadius === RADIUS_OPTIONS[0],
                             click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[0])
                         },
                         {
-                            label: 'Small (100px)',
+                            label: 'Small (45px)',
                             type: 'radio',
                             checked: currentRadius === RADIUS_OPTIONS[1],
                             click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[1])
                         },
                         {
-                            label: 'Medium (180px)',
+                            label: 'Medium (90px)',
                             type: 'radio',
                             checked: currentRadius === RADIUS_OPTIONS[2],
                             click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[2])
                         },
                         {
-                            label: 'Large (250px)',
+                            label: 'Large (160px)',
                             type: 'radio',
                             checked: currentRadius === RADIUS_OPTIONS[3],
                             click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[3])
+                        },
+                        {
+                            label: 'Extra Large (250px)',
+                            type: 'radio',
+                            checked: currentRadius === RADIUS_OPTIONS[4],
+                            click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[4])
                         }
                     ]
                 },
@@ -196,6 +202,13 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     type: 'checkbox',
                     checked: true,
                     click: (menuItem) => sendToOverlays('menu:toggle-ca', menuItem.checked)
+                },
+                { type: 'separator' },
+                {
+                    label: 'Debug: Show Boundary',
+                    type: 'checkbox',
+                    checked: false,
+                    click: (menuItem) => sendToOverlays('menu:toggle-debug-boundary', menuItem.checked)
                 }
             ]
         },
