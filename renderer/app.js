@@ -252,47 +252,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { passive: true });
     }
 
-    // Forward keyboard events
+    // Forward keyboard events to offscreen content window
+    // The offscreen window doesn't receive focus, so we must forward ALL keyboard input
     document.addEventListener('keydown', (e) => {
         // Don't forward if typing in URL bar
         if (e.target === urlInput) return;
 
-        // List of keys that should be forwarded for scrolling/navigation
-        const navigationKeys = [
-            'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-            'PageUp', 'PageDown', 'Home', 'End', ' '
-        ];
-
-        // Only forward navigation keys, let everything else work normally
-        if (!navigationKeys.includes(e.key)) return;
-
-        // Prevent default for navigation keys so they don't affect the toolbar
-        e.preventDefault();
-
         ipcRenderer.send('input:keyboard', {
             type: 'keyDown',
-            keyCode: e.key,
-            modifiers: [] // TODO: Add modifier support if needed
+            keyCode: e.key
         });
     });
 
     document.addEventListener('keyup', (e) => {
         if (e.target === urlInput) return;
 
-        const navigationKeys = [
-            'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-            'PageUp', 'PageDown', 'Home', 'End', ' '
-        ];
-
-        // Only forward navigation keys
-        if (!navigationKeys.includes(e.key)) return;
-
-        e.preventDefault();
-
         ipcRenderer.send('input:keyboard', {
             type: 'keyUp',
-            keyCode: e.key,
-            modifiers: []
+            keyCode: e.key
         });
     });
 
