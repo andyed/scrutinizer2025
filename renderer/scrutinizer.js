@@ -27,6 +27,7 @@ class Scrutinizer {
         this.mouseY = 0;
         this.targetMouseX = 0;
         this.targetMouseY = 0;
+        this.currentZoom = 1.0;
 
         // Bind methods
         this.handleMouseMove = this.handleMouseMove.bind(this);
@@ -80,8 +81,39 @@ class Scrutinizer {
         const scaleX = this.canvas.width / rect.width;
         const scaleY = this.canvas.height / rect.height;
 
-        this.targetMouseX = (event.clientX - rect.left) * scaleX;
-        this.targetMouseY = (event.clientY - rect.top) * scaleY;
+        // Update zoom if provided in event (from synthetic event)
+        if (event.zoom) {
+            this.currentZoom = event.zoom;
+        }
+
+        // Apply zoom correction to client coordinates
+        // When zoomed in (zoom > 1), the content coordinates are smaller than screen pixels?
+        // Wait, clientX/Y from browser are viewport coordinates. 
+        // If browser is zoomed to 200%, a physical pixel at 100 is reported as clientX=50?
+        // No, clientX is usually CSS pixels.
+        // Let's try multiplying by zoom factor.
+
+        let clientX = event.clientX;
+        let clientY = event.clientY;
+
+        // If this is a synthetic event from the browser view (has zoom property),
+        // we need to scale the coordinates because the browser reports them relative to the zoomed content?
+        // Actually, Electron's input event coordinates are usually in DIPs relative to the webview.
+        // When zoomed, the webview content scales, but the viewport stays the same size.
+        // The mouse event coordinates from the webview might need scaling if they are reported in "zoomed CSS pixels".
+
+        if (event.zoom) {
+            clientX *= event.zoom;
+            clientY *= event.zoom;
+        }
+
+        this.targetMouseX = (clientX - rect.left) * scaleX;
+        this.targetMouseY = (clientY - rect.top) * scaleY;
+    }
+
+    handleZoomChanged(zoom) {
+        console.log('[Scrutinizer] Zoom changed to:', zoom);
+        this.currentZoom = zoom;
     }
 
     async toggle() {

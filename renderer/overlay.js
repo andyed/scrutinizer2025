@@ -22,11 +22,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Also listen for mouse position from content view
-    ipcRenderer.on('browser:mousemove', (event, x, y) => {
+    // Also listen for mouse position from content view
+    ipcRenderer.on('browser:mousemove', (event, x, y, zoom = 1.0) => {
         // Update foveal center when mouse moves in browser below
         if (scrutinizer) {
-            const syntheticEvent = { clientX: x, clientY: y };
+            const syntheticEvent = { clientX: x, clientY: y, zoom: zoom };
             scrutinizer.handleMouseMove(syntheticEvent);
+        }
+    });
+
+    // Listen for zoom changes
+    ipcRenderer.on('browser:zoom-changed', (event, zoom) => {
+        if (scrutinizer) {
+            scrutinizer.handleZoomChanged(zoom);
         }
     });
 

@@ -180,13 +180,13 @@ ipcMain.on('get-window-size', (event) => {
 ipcMain.on('hud:capture:request', async (event) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
-    
+
     if (win && win.scrutinizerView && win.scrutinizerHud) {
         try {
             const image = await win.scrutinizerView.webContents.capturePage();
             const buffer = image.toBitmap();
             const size = image.getSize();
-            
+
             // Send back to HUD window (where canvas lives)
             win.scrutinizerHud.webContents.send('hud:frame-captured', {
                 buffer: buffer,
@@ -203,13 +203,13 @@ ipcMain.on('hud:capture:request', async (event) => {
 ipcMain.on('capture:request', async (event) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
-    
+
     if (win && win.scrutinizerView && win.scrutinizerHud) {
         try {
             const image = await win.scrutinizerView.webContents.capturePage();
             const buffer = image.toBitmap();
             const size = image.getSize();
-            
+
             // Send back to HUD window (where canvas lives)
             win.scrutinizerHud.webContents.send('frame-captured', {
                 buffer: buffer,
@@ -229,12 +229,20 @@ ipcMain.on('open-new-window', (event, url) => {
 });
 
 // Forward browser mouse position to HUD for foveal effect tracking
-ipcMain.on('browser:mousemove', (event, x, y) => {
+ipcMain.on('browser:mousemove', (event, x, y, zoom = 1.0) => {
     const windows = BrowserWindow.getAllWindows();
     // Find the window that owns this content view
     const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
     if (win && win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
-        win.scrutinizerHud.webContents.send('browser:mousemove', x, y);
+        win.scrutinizerHud.webContents.send('browser:mousemove', x, y, zoom);
+    }
+});
+
+ipcMain.on('browser:zoom-changed', (event, zoom) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
+    if (win && win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+        win.scrutinizerHud.webContents.send('browser:zoom-changed', zoom);
     }
 });
 
@@ -375,7 +383,7 @@ function createScrutinizerWindow(startUrl) {
 
     // Load HUD content (just canvas, no toolbar)
     hudWindow.loadFile('renderer/overlay.html');
-    
+
     // Open DevTools for HUD debugging
     hudWindow.webContents.openDevTools({ mode: 'detach' });
 
@@ -394,7 +402,7 @@ function createScrutinizerWindow(startUrl) {
     };
     win.on('move', syncHudBounds);
     win.on('resize', syncHudBounds);
-    
+
     // Initial sync
     syncHudBounds();
 
@@ -459,7 +467,7 @@ function createScrutinizerWindow(startUrl) {
             console.log('[Main] HUD loaded. Sending init-state.');
             hudWindow.webContents.send('hud:settings:radius-options', RADIUS_OPTIONS);
             hudWindow.webContents.send('settings:radius-options', RADIUS_OPTIONS); // Legacy
-            
+
             // Pass current state to new window
             // Only show welcome popup on first window (when mainWindow doesn't exist yet)
             const isFirstWindow = !mainWindow || BrowserWindow.getAllWindows().filter(w => !w.mainBrowserWindow).length === 1;
@@ -512,14 +520,14 @@ function createWindow() {
 
 app.on('ready', () => {
     createWindow();
-    
+
     // Register global shortcut for Open URL
     globalShortcut.register('CommandOrControl+L', () => {
         const win = BrowserWindow.getFocusedWindow();
         if (win && win.scrutinizerView) {
             // Trigger the menu item action
             const currentURL = win.scrutinizerView.webContents.getURL();
-            
+
             // Create URL input dialog window
             const dialog = new BrowserWindow({
                 width: 500,
@@ -535,14 +543,14 @@ app.on('ready', () => {
                     contextIsolation: false
                 }
             });
-            
+
             dialog.loadFile(path.join(__dirname, 'renderer', 'url-dialog.html'));
-            
+
             dialog.once('ready-to-show', () => {
                 dialog.show();
                 dialog.webContents.send('set-url', currentURL);
             });
-            
+
             // Store reference for IPC handlers
             win.urlDialog = dialog;
         }

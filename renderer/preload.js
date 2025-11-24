@@ -1,15 +1,20 @@
-const { ipcRenderer } = require('electron');
+const { ipcRenderer, webFrame } = require('electron');
 
 console.log('[Preload] ✅ Script loaded and executing');
 
 window.addEventListener('DOMContentLoaded', () => {
     console.log('[Preload] DOMContentLoaded fired');
-    
+
     // Track mouse movement for foveal effect
     window.addEventListener('mousemove', (e) => {
-        ipcRenderer.send('browser:mousemove', e.clientX, e.clientY);
+        ipcRenderer.send('browser:mousemove', e.clientX, e.clientY, webFrame.getZoomFactor());
     });
-    
+
+    // Track zoom/resize changes
+    window.addEventListener('resize', () => {
+        ipcRenderer.send('browser:zoom-changed', webFrame.getZoomFactor());
+    });
+
     // Forward keyboard events to main process for shortcuts
     window.addEventListener('keydown', (e) => {
         // Forward Escape and Left/Right arrow keys
