@@ -353,15 +353,16 @@ class Scrutinizer {
         );
     }
 
-    updateFovealRadius(radius) {
+    updateFovealRadius(value, isDelta = false) {
         let newRadius;
-        if (typeof radius === 'number' && Math.abs(radius) <= 50 && radius !== 20) {
-            newRadius = this.config.fovealRadius + radius;
+        if (isDelta) {
+            newRadius = this.config.fovealRadius + value;
         } else {
-            newRadius = radius;
+            newRadius = value;
         }
         newRadius = Math.max(20, Math.min(300, newRadius));
         this.config.fovealRadius = newRadius;
+        console.log('[Scrutinizer] Updated foveal radius to:', newRadius);
     }
 
     updateIntensity(intensity) {

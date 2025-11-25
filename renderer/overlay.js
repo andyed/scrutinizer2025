@@ -91,9 +91,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Arrow keys to adjust radius (when enabled)
         if (fovealEnabled) {
             if (keyEvent.code === 'ArrowRight') {
-                if (scrutinizer) scrutinizer.updateFovealRadius(10);
+                if (scrutinizer) scrutinizer.updateFovealRadius(10, true);
             } else if (keyEvent.code === 'ArrowLeft') {
-                if (scrutinizer) scrutinizer.updateFovealRadius(-10);
+                if (scrutinizer) scrutinizer.updateFovealRadius(-10, true);
             }
         }
     });
@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('[Overlay] Received init-state:', state);
         if (state.enabled) toggleFoveal(true);
         if (state.radius) {
-            scrutinizer.updateFovealRadius(state.radius);
+            scrutinizer.updateFovealRadius(state.radius, false);
         }
         if (state.visualMemory !== undefined) {
             console.log('[Overlay] Initializing visual memory:', state.visualMemory);
@@ -147,6 +147,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Menu IPC handlers
     ipcRenderer.on('menu:toggle-foveal', () => {
         toggleFoveal();
+    });
+
+    ipcRenderer.on('menu:set-radius', (event, radius) => {
+        if (scrutinizer) scrutinizer.updateFovealRadius(radius, false);
     });
 
     ipcRenderer.on('menu:set-intensity', (event, intensity) => {

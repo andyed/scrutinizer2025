@@ -16,13 +16,15 @@ A modern recreation of the 2007 Scrutinizer vision-simulating browser, built wit
 
 - Frames 11-14 (Fovea): The "High-Res" Zone. The central 2° of vision resolves the image, finally allowing the brain to parse semantic meaning.
 
-See a video:[Scrutinizer Demo](https://www.youtube.com/watch?v=LZB845_a5M4)
-
-
 **Original project:** https://github.com/andyed/scrutinizer  
+
+https://www.youtube.com/watch?v=-usQ9k55H90
 
 
 ## What is Scrutinizer?
+Scrutinizer is available as a desktop browser standalone app. [Scrutinizer Demo](See a video:[Scrutinizer Demo](https://www.youtube.com/watch?v=LZB845_a5M4)
+)
+
 
 > [!IMPORTANT]
 > **Vision is not a camera feed. It is a controlled hallucination.**
