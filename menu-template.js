@@ -234,6 +234,32 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         }
                     ]
                 },
+                {
+                    label: 'Visual Memory',
+                    submenu: [
+                        {
+                            label: 'Off (Default)',
+                            type: 'radio',
+                            checked: true, // Default
+                            click: () => sendToOverlays('menu:set-visual-memory', 0)
+                        },
+                        {
+                            label: 'Limited (5 items)',
+                            type: 'radio',
+                            click: () => sendToOverlays('menu:set-visual-memory', 5)
+                        },
+                        {
+                            label: 'Extended (10 items)',
+                            type: 'radio',
+                            click: () => sendToOverlays('menu:set-visual-memory', 10)
+                        },
+                        {
+                            label: 'Infinite (Fog of War)',
+                            type: 'radio',
+                            click: () => sendToOverlays('menu:set-visual-memory', -1)
+                        }
+                    ]
+                },
                 { type: 'separator' },
                 {
                     label: 'Chromatic Aberration',

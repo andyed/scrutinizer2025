@@ -9,6 +9,7 @@ let currentBlur;
 let currentEnabled;
 let currentShowWelcome;
 let currentStartPage;
+let currentVisualMemory;
 
 let mainWindow;
 
@@ -58,6 +59,12 @@ ipcMain.on('settings:enabled-changed', (event, enabled) => {
 ipcMain.on('settings:welcome-changed', (event, show) => {
     currentShowWelcome = show;
     settingsManager.set('showWelcomePopup', show);
+});
+
+ipcMain.on('settings:visual-memory-changed', (event, value) => {
+    currentVisualMemory = value;
+    settingsManager.set('visualMemory', value);
+    // rebuildMenu(); // If we want to update checked state
 });
 
 ipcMain.on('settings:page-changed', (event, url) => {
@@ -475,6 +482,7 @@ function createScrutinizerWindow(startUrl) {
                 radius: currentRadius,
                 blur: currentBlur,
                 enabled: currentEnabled,
+                visualMemory: currentVisualMemory,
                 showWelcome: isFirstWindow ? currentShowWelcome : false
             };
             console.log('[Main] Sending state to HUD:', JSON.stringify(state));

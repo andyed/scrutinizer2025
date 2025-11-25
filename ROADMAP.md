@@ -13,34 +13,9 @@ This document outlines the path from current alpha to a production-ready 1.0 rel
 - [x] Keyboard shortcuts (Escape, Left/Right arrows)
 - [x] Basic navigation (back/forward, URL bar)
 - [x] Scroll and DOM mutation detection
+- [x] Basic browser controls (open url, back, forward)
 
-### 🔴 Critical for 1.0
 
-#### Application Menus
-**Priority**: High  
-**Effort**: Medium
-
-Implement native menu bar with:
-- **File Menu**: 
-  - New Window
-  - Close Window
-  - Quit
-- **Edit Menu**:
-  - Copy/Paste (standard shortcuts)
-- **View Menu**:
-  - Toggle Foveal Mode
-  - Actual Size / Zoom In / Zoom Out
-  - Toggle DevTools
-- **Bookmarks Menu**:
-  - Add Bookmark
-  - Show All Bookmarks
-  - Bookmark list
-- **Help Menu**:
-  - Documentation
-  - Keyboard Shortcuts
-  - About Scrutinizer
-
-**Implementation**: Use Electron's `Menu` API in `main.js`
 
 ---
 
@@ -59,18 +34,6 @@ Simple bookmark management:
 - `renderer/bookmarks.html` - Bookmark manager UI
 - Store in user data directory via `app.getPath('userData')`
 
----
-
-#### Homepage Configuration
-**Priority**: High  
-**Effort**: Low
-
-- Add "Set as Homepage" option in menu
-- Persist homepage URL to config file
-- Load homepage on startup instead of hardcoded URL
-- Settings UI to edit homepage
-
-**Implementation**: Extend `config.js` with persistent storage
 
 ---
 
@@ -125,39 +88,41 @@ Create:
 
 ---
 
-## Priority 3: Edge Cases & Polish
+## Priority 3: Learning Mode (The "Omelet" Update)
 
-### 🟢 Nice-to-have for 1.0
+### 🧠 Visuospatial Memory Simulation
+**Goal**: Simulate the "Visuospatial Sketchpad" of working memory. The screen "remembers" detail only where the user has foveated, and forgets it over time, mimicking biological cognitive load.
 
-#### Popup Handling
-**Priority**: Medium  
-**Effort**: Low  
-**Status**: ✅ WebContentsView migration landed in 1.2; popup behavior is generally solid
+#### The Core Mechanic: "Visuospatial Decay"
+**Biological Accuracy**: Human working memory is limited (Miller’s Law: 7 ± 2 items). We don't remember the footer just because we looked at it 10 seconds ago.
 
-**Current state**:
-- ✅ Popups open in Scrutinizer windows (intercepts `new-window` events where applicable)
-- ✅ Settings inheritance works (radius, blur, enabled state passed to new windows)
-- ✅ WebContentsView-based architecture simplifies multi-window and popup handling
-- ⚠️ Minor visual or timing quirks may remain on some sites; track these in `docs/known-issues.md`
+- **Interaction**: Saccades (scanning) act as "Data Fetching" operations.
+- **Clarification**: As the fovea (cursor) moves, it "paints" clarity onto the canvas (removing the blur/noise).
+- **The Twist (Decay)**: Once the user has "cleared" more than ~5 distinct chunks (or after ~10 seconds), the oldest cleared areas begin to "rot" (slowly return to the mongrel/noise state).
+- **The Lesson**: Teaches Cognitive Load. If a user has to look back and forth frantically to keep the mental model "alive," the design is too dense.
 
-**Notes**: WebContentsView migration was completed as part of the 1.2 release; this section is now mainly for future fine-tuning rather than core architectural work.
+#### Technical Implementation
+- **Mask Texture**: A secondary, low-res offscreen `<canvas>` (heatmap of attention).
+- **The Brush**: `requestAnimationFrame` loop draws a soft white circle at cursor coordinates onto the Mask.
+- **Decay Shader**: Apply a global fade (alpha subtraction) to the Mask every frame to simulate memory loss.
+- **Compositor**: 
+  - Pass Mask pixel data to `blur-worker.js`.
+  - Pixel Shader: `FinalPixel = mix(MongrelPixel, CleanPixel, MaskValue)`.
 
----
-
-#### Embedded Video Support
-**Priority**: Medium  
-**Effort**: Low (Testing)
-
-**Test cases**:
-- YouTube embedded players
-- Vimeo, other video platforms
-- HTML5 `<video>` elements
-
-**Known limitation**: Canvas capture may not capture video frames (security restriction)
-
-**Potential workaround**: Detect video elements and exclude from blur region
+#### Variations & Settings
+- **"Fog of War" (Permanent Cache)**: 
+  - *Setting*: Memory Limit = Infinite.
+  - *Mechanic*: "Gamified" scanning. Paint clarity that persists. 
+  - *Metric*: "Comprehension Score" (% of page loaded).
+- **"Change Blindness" Trap (The VJ Prank)**:
+  - *Mechanic*: Change text in the "preserved" (peripheral) zones while the user is looking away.
+  - *Reveal*: Show a replay of the "Confidence Path" proving they didn't notice the change.
 
 ---
+
+## Priority 4: Edge Cases & Polish
+
+
 
 #### CORS & Capture Failures
 **Priority**: Medium  
@@ -172,19 +137,8 @@ Create:
 
 ---
 
-#### Performance Optimization
-**Priority**: Medium  
-**Effort**: Medium
 
-For large/complex pages:
-- Implement progressive capture (viewport only)
-- Reduce capture frequency for static content
-- Add loading indicator during capture
-- Optimize blur algorithm (consider WebGL shader)
-
----
-
-## Priority 4: Future Enhancements (Post-1.0)
+## Priority 5: Future Enhancements (Post-1.0)
 
 ### 🔵 Version 1.1+
 
@@ -225,28 +179,7 @@ Add user-facing controls for progressive blur tuning:
 - Menu or panel UI for adjustment (possibly View → Simulation Fidelity submenu)
 - Useful for researchers comparing different acuity models or designers stress-testing layouts
 
-#### Mongrel Theory Implementation (Neural Processing vs Optical Blur)
-**Priority**: Medium  
-**Effort**: High  
-**Reference**: See `docs/beta_gemini3_discussion.md` for detailed theory
 
-**Current limitation**: Scrutinizer models optical defocus (camera blur) but not neural peripheral processing (summary statistics).
-
-**Biological reality**: Peripheral vision doesn't just blur—it compresses into "texture data" via summary statistics (Ruth Rosenholtz, MIT). The brain calculates average color, orientation, and density, creating "Mongrels"—statistically accurate but spatially scrambled representations.
-
-**Implementation goals**:
-- **Color drop-off with contrast boost**: Desaturate periphery to sepia/mud while boosting contrast (Magnocellular pathway)
-- **Parafoveal crowding**: Implement jitter/displacement instead of pure blur to simulate feature migration
-- **Chromatic aberration**: Shift R/B channels in periphery to simulate Magno/Parvo cell separation
-- **Block sampling**: Use blocky downsampling in far periphery to simulate low photoreceptor density
-- **Blind spot simulation**: Optional circular distortion at ~15° eccentricity
-
-**Canvas-based techniques** (for current architecture):
-1. **Jigsaw Jitter**: Displace pixels with noise offset (simulates crowding)
-2. **Channel splitting**: R channel left, B channel right (simulates diplopia)
-3. **Block downsampling**: Sample every 4th pixel in periphery, draw as 4x4 blocks
-
-**Why it matters**: Current Gaussian blur implies "bad optics." Real parafoveal vision is "bad processing"—features are received but positions are lost. This creates illegible but high-contrast text (closer to biological reality).
 
 #### Capture Fidelity Improvements
 **Priority**: Medium  
@@ -314,18 +247,6 @@ Before 1.0 release, verify:
 
 ---
 
-## Release Phases (Historical Plan)
-
-| Phase | Status | Focus |
-|-------|--------|-------|
-| **Phase 1**: Core Features | ✅ Completed | Menus, bookmarks, homepage |
-| **Phase 2**: Build & Package | ✅ Completed | electron-builder config, test builds |
-| **Phase 3**: Testing & Polish | ✅ Ongoing/iterative | Edge cases, documentation, bug fixes |
-| **Phase 4**: Release | ⚠️ In progress | Final builds, GitHub release, announcements |
-
-**Main remaining blocker for broad distribution**: properly **signed apps** (code signing and notarization across platforms).
-
----
 
 ## Open Questions
 

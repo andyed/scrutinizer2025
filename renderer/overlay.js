@@ -118,6 +118,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.radius) {
             scrutinizer.updateFovealRadius(state.radius);
         }
+        if (state.visualMemory !== undefined) {
+            console.log('[Overlay] Initializing visual memory:', state.visualMemory);
+            // if (scrutinizer) scrutinizer.setVisualMemoryLimit(state.visualMemory);
+        }
     });
 
     // Menu IPC handlers
@@ -139,6 +143,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     ipcRenderer.on('menu:toggle-debug-boundary', (event, enabled) => {
         if (scrutinizer) scrutinizer.toggleDebugBoundary(enabled);
+    });
+
+    ipcRenderer.on('menu:set-visual-memory', (event, limit) => {
+        console.log('[Overlay] Setting visual memory limit:', limit);
+        // TODO: Pass to scrutinizer once implemented
+        // if (scrutinizer) scrutinizer.setVisualMemoryLimit(limit);
+
+        // Notify main process to persist setting
+        ipcRenderer.send('settings:visual-memory-changed', limit);
     });
 
     console.log('[Overlay] Ready (menu-only mode)');
