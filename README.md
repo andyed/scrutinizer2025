@@ -18,12 +18,13 @@ A modern recreation of the 2007 Scrutinizer vision-simulating browser, built wit
 
 **Original project:** https://github.com/andyed/scrutinizer  
 
-https://www.youtube.com/watch?v=-usQ9k55H90
+
 
 
 ## What is Scrutinizer?
-Scrutinizer is available as a desktop browser standalone app. [Scrutinizer Demo](See a video:[Scrutinizer Demo](https://www.youtube.com/watch?v=LZB845_a5M4)
-)
+Scrutinizer is available as a desktop browser standalone app.
+
+[![Scrutinizer Demo](https://img.youtube.com/vi/LZB845_a5M4/0.jpg)](https://www.youtube.com/watch?v=LZB845_a5M4)
 
 
 > [!IMPORTANT]
