@@ -441,6 +441,14 @@ function createScrutinizerWindow(startUrl) {
         console.error('[Main] ContentView did-fail-load:', errorCode, errorDescription);
     });
 
+    // Reset visual memory on navigation
+    contentView.webContents.on('did-start-navigation', () => {
+        console.log('[Main] Navigation started, resetting visual memory');
+        if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
+            hudWindow.webContents.send('hud:reset-visual-memory');
+        }
+    });
+
     // Forward navigation events to update HUD URL bar
     const sendUrlUpdate = (url) => {
         if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {

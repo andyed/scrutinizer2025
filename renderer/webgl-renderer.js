@@ -68,6 +68,9 @@ class WebGLRenderer {
 
             // === UNIFORMS (host-controlled parameters) ===
             uniform sampler2D u_texture;      // Captured browser frame
+            uniform sampler2D u_maskTexture;  // Visual memory mask (Fog of War)
+            uniform float u_useMask;          // Toggle for mask usage (0.0 or 1.0)
+            
             uniform vec2  u_resolution;       // Canvas resolution in pixels
             uniform vec2  u_mouse;            // Foveal center in pixels (canvas space)
             uniform float u_foveaRadius;      // Foveal radius in pixels (configured in JS)
@@ -344,6 +347,32 @@ class WebGLRenderer {
                         color.rgb = mix(color.rgb, lineColor, alpha);
                     }
                 }
+
+                // === 9. FOG OF WAR (VISUAL MEMORY) ===
+                if (u_useMask > 0.5) {
+                    // Sample the mask texture
+                    // Mask is white (1.0) where visited/clear, black (0.0) where unknown/mongrel
+                    vec4 maskColor = texture2D(u_maskTexture, uv);
+                    float clarity = maskColor.r; // Use red channel (it's grayscale)
+
+                    // Get the "Clean" pixel (original texture, no distortion)
+                    // We need to sample it carefully - if we use 'uv' it's perfect.
+                    // But wait, the input texture is BGRA swizzled? 
+                    // No, texture2D returns RGBA usually, but our input might be BGRA from Electron?
+                    // The main pipeline above does: color.r = colorR.b; color.b = colorB.r;
+                    // So we should replicate that swizzle for the clean pixel to match colors.
+                    
+                    vec4 cleanRaw = texture2D(u_texture, uv);
+                    vec4 cleanPixel;
+                    cleanPixel.r = cleanRaw.b;
+                    cleanPixel.g = cleanRaw.g;
+                    cleanPixel.b = cleanRaw.r;
+                    cleanPixel.a = 1.0;
+
+                    // Mix: 0.0 (Black Mask) -> Keep 'color' (Mongrel)
+                    //      1.0 (White Mask) -> Use 'cleanPixel' (Clear)
+                    color = mix(color, cleanPixel, clarity);
+                }
                 
                 gl_FragColor = color;
             }
@@ -364,6 +393,10 @@ class WebGLRenderer {
         this.debugBoundaryLocation = gl.getUniformLocation(this.program, "u_debug_boundary");
         this.textureLocation = gl.getUniformLocation(this.program, "u_texture");
 
+        // New uniforms
+        this.maskTextureLocation = gl.getUniformLocation(this.program, "u_maskTexture");
+        this.useMaskLocation = gl.getUniformLocation(this.program, "u_useMask");
+
         console.log('[WebGL] Uniform Locations:', {
             resolution: this.resolutionLocation,
             mouse: this.mouseLocation,
@@ -372,7 +405,9 @@ class WebGLRenderer {
             intensity: this.intensityLocation,
             caStrength: this.caStrengthLocation,
             debugBoundary: this.debugBoundaryLocation,
-            texture: this.textureLocation
+            texture: this.textureLocation,
+            maskTexture: this.maskTextureLocation,
+            useMask: this.useMaskLocation
         });
 
         // Create buffers
@@ -410,6 +445,18 @@ class WebGLRenderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+        // Create mask texture
+        this.maskTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, this.maskTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+        // Initialize mask with black
+        const dummyMask = new Uint8Array([0, 0, 0, 255]);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, dummyMask);
     }
 
     createProgram(gl, vsSource, fsSource) {
@@ -446,8 +493,20 @@ class WebGLRenderer {
      */
     uploadTexture(image) {
         const gl = this.gl;
+        gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.texture);
         // texImage2D is fast for ImageBitmap (Zero-copy if lucky)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    }
+
+    /**
+     * Upload mask data to GPU
+     * @param {HTMLCanvasElement|ImageData} image 
+     */
+    uploadMask(image) {
+        const gl = this.gl;
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.maskTexture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
     }
 
@@ -461,8 +520,9 @@ class WebGLRenderer {
      * @param {number} intensity Intensity multiplier (0.0 to 1.5)
      * @param {number} caStrength Chromatic Aberration strength (0.0 or 1.0)
      * @param {number} debugBoundary Debug Boundary (0.0 or 1.0)
+     * @param {number} useMask Use mask texture (0.0 or 1.0)
      */
-    render(width, height, mouseX, mouseY, foveaRadius, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0) {
+    render(width, height, mouseX, mouseY, foveaRadius, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, useMask = 0.0) {
         if (!this.program) return;
         const gl = this.gl;
 
@@ -485,6 +545,15 @@ class WebGLRenderer {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer);
         gl.vertexAttribPointer(this.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
 
+        // Bind textures
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+        gl.uniform1i(this.textureLocation, 0);
+
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.maskTexture);
+        gl.uniform1i(this.maskTextureLocation, 1);
+
         // Set uniforms
         // console.log(`[WebGL] Render: Res(${width},${height}) Mouse(${mouseX},${mouseY}) Rad(${foveaRadius})`);
         gl.uniform2f(this.resolutionLocation, width, height);
@@ -494,7 +563,7 @@ class WebGLRenderer {
         gl.uniform1f(this.intensityLocation, intensity);
         gl.uniform1f(this.caStrengthLocation, caStrength);
         gl.uniform1f(this.debugBoundaryLocation, debugBoundary);
-        gl.uniform1i(this.textureLocation, 0);
+        gl.uniform1f(this.useMaskLocation, useMask);
 
         // Draw
         gl.drawArrays(gl.TRIANGLES, 0, 6);

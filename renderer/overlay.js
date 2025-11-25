@@ -38,11 +38,48 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Start/stop capture loop
+    let isCapturing = false;
+    let isWaitingForFrame = false;
+
+    const requestNextFrame = () => {
+        if (!isCapturing) return;
+        if (isWaitingForFrame) return; // Backpressure control
+
+        isWaitingForFrame = true;
+        ipcRenderer.send('capture:request');
+    };
+
+    const startCapturing = () => {
+        if (isCapturing) return;
+        console.log('[Overlay] Starting capture loop (self-clocking)');
+        isCapturing = true;
+        isWaitingForFrame = false;
+        requestNextFrame();
+    };
+
+    const stopCapturing = () => {
+        if (!isCapturing) return;
+        console.log('[Overlay] Stopping capture loop');
+        isCapturing = false;
+        isWaitingForFrame = false;
+    };
+
     // Listen for frame data from main process
     ipcRenderer.on('frame-captured', (event, data) => {
+        // Mark as ready for next frame
+        isWaitingForFrame = false;
+
         if (scrutinizer && data.width > 0 && data.height > 0) {
             const buffer = new Uint8Array(data.buffer);
             scrutinizer.processFrame(buffer, data.width, data.height);
+        }
+
+        // Request next frame if still capturing
+        if (isCapturing) {
+            // Use requestAnimationFrame to sync with display refresh
+            // and prevent tight loops if capture is instant
+            requestAnimationFrame(requestNextFrame);
         }
     });
 
@@ -60,23 +97,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-
-    // Start/stop capture loop
-    const startCapturing = () => {
-        if (captureInterval) return;
-        console.log('[Overlay] Starting capture loop');
-        captureInterval = setInterval(() => {
-            ipcRenderer.send('capture:request');
-        }, 33); // 30fps
-    };
-
-    const stopCapturing = () => {
-        if (captureInterval) {
-            console.log('[Overlay] Stopping capture loop');
-            clearInterval(captureInterval);
-            captureInterval = null;
-        }
-    };
 
     // Toggle foveal effect (called from menu)
     const toggleFoveal = (forceState = null) => {
@@ -120,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (state.visualMemory !== undefined) {
             console.log('[Overlay] Initializing visual memory:', state.visualMemory);
-            // if (scrutinizer) scrutinizer.setVisualMemoryLimit(state.visualMemory);
+            if (scrutinizer) scrutinizer.setVisualMemoryLimit(state.visualMemory);
         }
     });
 
@@ -147,11 +167,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     ipcRenderer.on('menu:set-visual-memory', (event, limit) => {
         console.log('[Overlay] Setting visual memory limit:', limit);
-        // TODO: Pass to scrutinizer once implemented
-        // if (scrutinizer) scrutinizer.setVisualMemoryLimit(limit);
+        if (scrutinizer) scrutinizer.setVisualMemoryLimit(limit);
 
         // Notify main process to persist setting
         ipcRenderer.send('settings:visual-memory-changed', limit);
+    });
+
+    ipcRenderer.on('hud:reset-visual-memory', () => {
+        console.log('[Overlay] Resetting visual memory due to navigation');
+        if (scrutinizer) scrutinizer.resetVisualMemory();
     });
 
     console.log('[Overlay] Ready (menu-only mode)');
