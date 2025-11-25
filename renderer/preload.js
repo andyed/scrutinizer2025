@@ -6,8 +6,15 @@ window.addEventListener('DOMContentLoaded', () => {
     console.log('[Preload] DOMContentLoaded fired');
 
     // Track mouse movement for foveal effect
+    let ticking = false;
     window.addEventListener('mousemove', (e) => {
-        ipcRenderer.send('browser:mousemove', e.clientX, e.clientY, webFrame.getZoomFactor());
+        if (!ticking) {
+            window.requestAnimationFrame(() => {
+                ipcRenderer.send('browser:mousemove', e.clientX, e.clientY, webFrame.getZoomFactor());
+                ticking = false;
+            });
+            ticking = true;
+        }
     });
 
     // Track zoom/resize changes
