@@ -392,7 +392,7 @@ function createScrutinizerWindow(startUrl) {
     hudWindow.loadFile('renderer/overlay.html');
 
     // Open DevTools for HUD debugging
-    hudWindow.webContents.openDevTools({ mode: 'detach' });
+    // hudWindow.webContents.openDevTools({ mode: 'detach' });
 
     // Store references
     win.scrutinizerView = contentView;
@@ -519,7 +519,7 @@ function createWindow() {
     rebuildMenu();
 
     // Open DevTools for main window debugging
-    mainWindow.webContents.openDevTools();
+    // mainWindow.webContents.openDevTools();
 
     // Intercept popups from the main window's web contents
     if (mainWindow && mainWindow.webContents && mainWindow.webContents.setWindowOpenHandler) {

@@ -91,9 +91,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // Arrow keys to adjust radius (when enabled)
         if (fovealEnabled) {
             if (keyEvent.code === 'ArrowRight') {
-                if (scrutinizer) scrutinizer.updateFovealRadius(10, true);
+                if (scrutinizer) {
+                    scrutinizer.updateFovealRadius(10, true);
+                    ipcRenderer.send('settings:radius-changed', scrutinizer.config.fovealRadius);
+                }
             } else if (keyEvent.code === 'ArrowLeft') {
-                if (scrutinizer) scrutinizer.updateFovealRadius(-10, true);
+                if (scrutinizer) {
+                    scrutinizer.updateFovealRadius(-10, true);
+                    ipcRenderer.send('settings:radius-changed', scrutinizer.config.fovealRadius);
+                }
             }
         }
     });

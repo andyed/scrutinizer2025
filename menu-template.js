@@ -1,10 +1,18 @@
 const { app, shell } = require('electron');
 
-const RADIUS_OPTIONS = [60, 100, 180, 250];
+const RADIUS_OPTIONS = [20, 45, 90, 160, 250];
 
 function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10) {
     const isMac = process.platform === 'darwin';
     const { BrowserWindow } = require('electron');
+
+    // Helper to find closest radius option
+    const isClosest = (target) => {
+        const closest = RADIUS_OPTIONS.reduce((prev, curr) => {
+            return (Math.abs(curr - currentRadius) < Math.abs(prev - currentRadius) ? curr : prev);
+        });
+        return closest === target;
+    };
 
     const template = [
         // App Menu (macOS only)
@@ -124,6 +132,17 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
             label: 'Go',
             submenu: [
                 {
+                    label: 'Refresh',
+                    accelerator: 'CmdOrCtrl+R',
+                    click: () => {
+                        const win = BrowserWindow.getFocusedWindow();
+                        if (win && win.scrutinizerView) {
+                            win.scrutinizerView.webContents.reload();
+                        }
+                    }
+                },
+                { type: 'separator' },
+                {
                     label: 'Back',
                     accelerator: process.platform === 'darwin' ? 'Cmd+Left' : 'Alt+Left',
                     click: () => {
@@ -173,31 +192,31 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         {
                             label: 'Extra Small (20px)',
                             type: 'radio',
-                            checked: currentRadius === RADIUS_OPTIONS[0],
+                            checked: isClosest(RADIUS_OPTIONS[0]),
                             click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[0])
                         },
                         {
                             label: 'Small (45px)',
                             type: 'radio',
-                            checked: currentRadius === RADIUS_OPTIONS[1],
+                            checked: isClosest(RADIUS_OPTIONS[1]),
                             click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[1])
                         },
                         {
                             label: 'Medium (90px)',
                             type: 'radio',
-                            checked: currentRadius === RADIUS_OPTIONS[2],
+                            checked: isClosest(RADIUS_OPTIONS[2]),
                             click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[2])
                         },
                         {
                             label: 'Large (160px)',
                             type: 'radio',
-                            checked: currentRadius === RADIUS_OPTIONS[3],
+                            checked: isClosest(RADIUS_OPTIONS[3]),
                             click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[3])
                         },
                         {
                             label: 'Extra Large (250px)',
                             type: 'radio',
-                            checked: currentRadius === RADIUS_OPTIONS[4],
+                            checked: isClosest(RADIUS_OPTIONS[4]),
                             click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[4])
                         }
                     ]
