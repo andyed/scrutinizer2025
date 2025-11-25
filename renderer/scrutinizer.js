@@ -266,16 +266,27 @@ class Scrutinizer {
             // Infinite (-1) -> No decay
 
             if (this.visualMemoryLimit > 0) {
-                let decayRate = 0.0;
+                let baseDecay = 0.0;
+                let interferenceDecay = 0.0;
+
                 if (this.visualMemoryLimit === 5) {
-                    decayRate = 0.005; // ~3.3s persistence (was 0.008)
+                    baseDecay = 0.005; // Passive fade (scanning)
+                    interferenceDecay = 0.025; // Active displacement (encoding new info) - Strong!
                 } else if (this.visualMemoryLimit === 10) {
-                    decayRate = 0.002; // ~8s persistence (was 0.005)
+                    baseDecay = 0.001; // Very slow passive fade
+                    interferenceDecay = 0.002; // Weak displacement
+                }
+
+                // Calculate effective decay
+                // If velocity is low (fixation), we are encoding new info, so old info is displaced faster.
+                let currentDecay = baseDecay;
+                if (this.currentVelocity < 0.5) { // Same threshold as painting
+                    currentDecay += interferenceDecay;
                 }
 
                 // Apply global fade
                 this.maskCtx.globalCompositeOperation = 'destination-out';
-                this.maskCtx.fillStyle = `rgba(0, 0, 0, ${decayRate})`;
+                this.maskCtx.fillStyle = `rgba(0, 0, 0, ${currentDecay})`;
                 this.maskCtx.fillRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
             }
 
