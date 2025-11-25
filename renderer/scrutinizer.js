@@ -268,7 +268,7 @@ class Scrutinizer {
             if (this.visualMemoryLimit > 0) {
                 let decayRate = 0.0;
                 if (this.visualMemoryLimit === 5) {
-                    decayRate = 0.008; // ~2s persistence (was 0.02)
+                    decayRate = 0.005; // ~3.3s persistence (was 0.008)
                 } else if (this.visualMemoryLimit === 10) {
                     decayRate = 0.002; // ~8s persistence (was 0.005)
                 }
@@ -279,14 +279,26 @@ class Scrutinizer {
                 this.maskCtx.fillRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
             }
 
-            // 2. Painting Logic (Velocity Check)
-            // Only paint if velocity is low (fixation)
-            // Threshold: 0.5 px/ms = 500 px/s. Saccades are > 300 deg/s.
-            // Screen width ~2000px. 500px/s is a reasonable "scanning" speed.
-            // Fixations are effectively 0.
-            const VELOCITY_THRESHOLD = 0.5;
+            // 2. Painting Logic
+            // Infinite (-1): Instant clear, no velocity check
+            // Limited (>0): Dwell-based clear, velocity check (fixation only)
 
-            if (this.currentVelocity < VELOCITY_THRESHOLD) {
+            let brushOpacity = 0.0;
+            let velocityThreshold = 0.0;
+
+            if (this.visualMemoryLimit === -1) {
+                // Infinite: Fog of War style
+                brushOpacity = 1.0; // Instant clear
+                velocityThreshold = Infinity; // Always paint
+            } else {
+                // Limited: Working Memory simulation
+                // Bumped opacity significantly (0.05 -> 0.15) to make memory visible and reduce CA artifacts
+                // Still requires ~7 frames (~100ms) to reach full clarity, so dwell is still needed but less punishing.
+                brushOpacity = 0.15;
+                velocityThreshold = 0.5; // Fixation only
+            }
+
+            if (this.currentVelocity < velocityThreshold) {
                 // Draw soft white circle on mask at current mouse position
                 // We need to map main canvas coords to mask canvas coords
                 const maskScaleX = this.maskCanvas.width / this.canvas.width;
@@ -298,7 +310,7 @@ class Scrutinizer {
 
                 // Draw "brush"
                 const gradient = this.maskCtx.createRadialGradient(maskX, maskY, maskRadius * 0.5, maskX, maskY, maskRadius);
-                gradient.addColorStop(0, 'rgba(255, 255, 255, 0.2)'); // Accumulate slowly (0.2 alpha per frame)
+                gradient.addColorStop(0, `rgba(255, 255, 255, ${brushOpacity})`);
                 gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)'); // Fade out
 
                 this.maskCtx.globalCompositeOperation = 'screen'; // Additive light (accumulates up to 1.0)
