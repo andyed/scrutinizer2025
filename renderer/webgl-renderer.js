@@ -355,6 +355,10 @@ class WebGLRenderer {
                     vec4 maskColor = texture2D(u_maskTexture, uv);
                     float clarity = maskColor.r; // Use red channel (it's grayscale)
 
+                    // Apply smoothstep to create a "black point" cutoff
+                    // This ensures faint memory (below 0.1) snaps to 0.0 (full blur), preventing "ghosts"
+                    clarity = smoothstep(0.1, 1.0, clarity);
+
                     // Get the "Clean" pixel (original texture, no distortion)
                     // We need to sample it carefully - if we use 'uv' it's perfect.
                     // But wait, the input texture is BGRA swizzled? 

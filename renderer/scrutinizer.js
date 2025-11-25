@@ -271,10 +271,10 @@ class Scrutinizer {
 
                 if (this.visualMemoryLimit === 5) {
                     baseDecay = 0.005; // Passive fade (scanning)
-                    interferenceDecay = 0.025; // Active displacement (encoding new info) - Strong!
+                    interferenceDecay = 0.012; // Active displacement (was 0.025) - More retention
                 } else if (this.visualMemoryLimit === 10) {
-                    baseDecay = 0.001; // Very slow passive fade
-                    interferenceDecay = 0.002; // Weak displacement
+                    baseDecay = 0.003; // Very slow passive fade (was 0.002)
+                    interferenceDecay = 0.006; // Weak displacement (was 0.004)
                 }
 
                 // Calculate effective decay
