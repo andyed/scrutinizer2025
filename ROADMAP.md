@@ -222,46 +222,6 @@ Improve how we sample the page for foveal/peripheral processing:
     - 🔵 Domain warping with WebGL shaders
     - 🔵 "Mongrel" visualization mode showing statistical texture compression
 
-#### Analytics (Optional)
-- Anonymous usage statistics
-- Crash reporting (Sentry, etc.)
-- Opt-in telemetry
-
----
-
-## Testing Checklist
-
-Before 1.0 release, verify:
-
-- [ ] All keyboard shortcuts work (Escape, Left/Right arrows)
-- [ ] Navigation (back/forward/refresh) works correctly
-- [ ] Foveal mode toggles properly
-- [ ] Menu controls update values in real-time
-- [ ] Scroll tracking maintains alignment
-- [ ] Bookmarks save and load correctly
-- [ ] Homepage setting persists across restarts
-- [ ] Builds successfully on macOS, Windows, Linux
-- [ ] App launches without errors on fresh install
-- [ ] Memory usage is reasonable (<500MB for typical page)
-- [ ] No console errors in production build
-
----
 
 
-## Open Questions
 
-1. **Target platforms**: All three (macOS/Windows/Linux) or start with one?
-2. **Code signing**: Worth the cost for 1.0 or defer to 1.1?
-3. **Distribution**: GitHub releases only, or also submit to app stores?
-4. **Monetization**: Free and open source, or paid app?
-5. **Support**: GitHub issues only, or dedicated support channel?
-
----
-
-## Success Metrics for 1.0
-
-- App launches successfully on all target platforms
-- Core foveal simulation works on 90%+ of websites
-- No critical bugs in basic navigation/interaction
-- Documentation is clear enough for non-technical users
-- At least 10 beta testers provide positive feedback
