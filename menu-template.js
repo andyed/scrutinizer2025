@@ -292,6 +292,38 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             label: 'Noise (Dynamic)',
                             type: 'radio',
                             click: () => sendToOverlays('menu:set-mongrel-mode', 0)
+                        },
+                        { type: 'separator' },
+                        {
+                            label: 'Aesthetic Mode',
+                            submenu: [
+                                {
+                                    label: 'High-Key Ghosting (Default)',
+                                    type: 'radio',
+                                    checked: true,
+                                    click: () => sendToOverlays('menu:set-aesthetic-mode', 0)
+                                },
+                                {
+                                    label: 'Lab Mode (Scotopic)',
+                                    type: 'radio',
+                                    click: () => sendToOverlays('menu:set-aesthetic-mode', 1)
+                                },
+                                {
+                                    label: 'Frosted Glass (iOS)',
+                                    type: 'radio',
+                                    click: () => sendToOverlays('menu:set-aesthetic-mode', 2)
+                                },
+                                {
+                                    label: 'Blueprint (UX)',
+                                    type: 'radio',
+                                    click: () => sendToOverlays('menu:set-aesthetic-mode', 3)
+                                },
+                                {
+                                    label: 'Cyberpunk (Neon)',
+                                    type: 'radio',
+                                    click: () => sendToOverlays('menu:set-aesthetic-mode', 4)
+                                }
+                            ]
                         }
                     ]
                 },

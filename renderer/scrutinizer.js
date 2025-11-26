@@ -330,7 +330,11 @@
                 this.config.chromaticAberration !== undefined ? (this.config.chromaticAberration ? 1.0 : 0.0) : 1.0, // Default to ON
                 this.config.debugBoundary !== undefined ? (this.config.debugBoundary ? 1.0 : 0.0) : 0.0, // Default to OFF
                 useMask ? 1.0 : 0.0,
-                this.config.mongrelMode !== undefined ? this.config.mongrelMode : 1.0 // Default to 1.0 (Shatter)
+                this.config.mongrelMode !== undefined ? this.config.mongrelMode : 1.0, // Default to 1.0 (Shatter)
+                this.aestheticMode !== undefined ? this.aestheticMode : 0.0, // Default to 0.0 (High-Key)
+                this.currentVelocity,
+                this.stableMouseX, // Pass stable X
+                this.stableMouseY  // Pass stable Y
             );
         }
 
@@ -384,6 +388,14 @@
         setMongrelMode(mode) {
             this.config.mongrelMode = Number(mode); // Ensure number
             const msg = `[Scrutinizer] Mongrel Mode set to: ${this.config.mongrelMode} (Type: ${typeof this.config.mongrelMode})`;
+            console.log(msg);
+            const { ipcRenderer } = require('electron');
+            ipcRenderer.send('log:renderer', msg);
+        }
+
+        setAestheticMode(mode) {
+            this.aestheticMode = Number(mode);
+            const msg = `[Scrutinizer] Aesthetic Mode set to: ${this.aestheticMode}`;
             console.log(msg);
             const { ipcRenderer } = require('electron');
             ipcRenderer.send('log:renderer', msg);

@@ -202,6 +202,10 @@
             if (scrutinizer) scrutinizer.setMongrelMode(mode);
         });
 
+        ipcRenderer.on('menu:set-aesthetic-mode', (event, mode) => {
+            if (scrutinizer) scrutinizer.setAestheticMode(mode);
+        });
+
         ipcRenderer.on('hud:reset-visual-memory', () => {
             if (scrutinizer && scrutinizer.config.visualMemory > 0) {
                 log('[Overlay] Resetting visual memory due to navigation');

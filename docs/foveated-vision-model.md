@@ -200,3 +200,38 @@ In future versions, these can be exposed as user‑tunable parameters by mapping
   - Chromatic aberration strength.
 
 Those sliders would effectively reshape the smoothstep curves described above, allowing different “profiles” of peripheral disruption while preserving the same underlying model.
+
+---
+
+## 11. Aesthetic Choices
+
+The renderer implements specific aesthetic modes to tailor the peripheral experience for different use cases.
+
+### High-Key Ghosting (Default)
+A subtle, "cinematic" effect designed for general usage.
+- **Visuals**: The periphery is desaturated and lifted to a cool light gray (`vec3(0.8, 0.85, 0.9)`).
+- **Goal**: Maintains focus on the fovea without the "clinical" or "horror" feel of a dark periphery. It feels like a camera lens with a specific focus.
+
+### Lab Mode (Scotopic Simulation)
+A scientifically grounded simulation of rod-mediated vision.
+- **Visuals**: The periphery is darkened, desaturated, and tinted with "Eigengrau" (dark blue-grey).
+- **Goal**: Demonstrates the actual biological limitations of peripheral vision (low acuity, color blindness, low light sensitivity).
+
+### Blueprint Mode (UX Research)
+A "Digital Schematic" look designed for UX testing.
+-   **Visuals**: The periphery is turned into a high-contrast, pixelated wireframe.
+-   **Mechanism**: Uses **Explicit Sequencing** (Quantize -> Distort -> Sample) to create stable, blocky distortions.
+    1.  **Quantize**: UVs are snapped to a 30px grid.
+    2.  **Distort**: A random offset is calculated *once* per block.
+    3.  **Edge Detect**: A binary edge detector runs on the distorted blocks.
+-   **Goal**: Completely obscures text content (readability = 0) while preserving the high-level layout structure (images, columns, headers). This forces the user to rely on "Visual Scent" (shape/color) rather than reading.
+
+### Cyberpunk Mode (WIP)
+A high-contrast, neon-tinted mode for VJ/Creative use.
+-   **Visuals**: Deep blacks, neon cyan/purple highlights.
+-   **Goal**: Purely aesthetic.
+
+### Saccadic Suppression (Motion Hiding)
+To prevent distracting "shimmering" or updates during rapid eye movements (saccades), the renderer tracks mouse velocity.
+-   **Mechanism**: When mouse velocity exceeds a threshold (>4000px/s), the periphery is "washed out" (faded to white in High-Key).
+-   **Goal**: Mimics the brain's natural suppression of visual input during saccades, hiding the low-fidelity updates that would otherwise be distracting.

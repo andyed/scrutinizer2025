@@ -38,6 +38,7 @@
                 // Uniform locations
                 this.resolutionLocation = null;
                 this.mouseLocation = null;
+                this.mouseStableLocation = null;
                 this.foveaRadiusLocation = null; // Renamed to match shader concept (foveaRadius)
                 this.pixelationLocation = null;
                 this.intensityLocation = null;
@@ -46,7 +47,9 @@
                 this.textureLocation = null;
                 this.maskTextureLocation = null;
                 this.useMaskLocation = null;
+                this.velocityLocation = null;
                 this.mongrelModeLocation = null;
+                this.aestheticModeLocation = null;
 
                 this.init();
                 this.warmup();
@@ -82,18 +85,21 @@
                 precision mediump float;
     
                 // === UNIFORMS ===
-                uniform sampler2D u_texture;      // Captured browser frame
+                uniform sampler2D u_texture;      // Captured browser frame (Live)
                 uniform sampler2D u_maskTexture;  // Visual memory mask
                 uniform float u_useMask;
                 
                 uniform vec2  u_resolution;
                 uniform vec2  u_mouse;
+                uniform vec2  u_mouse_stable; // Hysteresis-smoothed mouse for distortion
                 uniform float u_foveaRadius;
                 uniform float u_pixelation;
                 uniform float u_intensity;
                 uniform float u_ca_strength;
                 uniform float u_debug_boundary;
+                uniform float u_velocity;         // Mouse velocity in px/ms
                 uniform float u_mongrel_mode;     // 0.0 = Noise, 1.0 = Shatter
+                uniform float u_aesthetic_mode;   // 0=HighKey, 1=Lab, 2=Frosted, 3=Blueprint, 4=Cyberpunk
     
                 varying vec2 v_texCoord;
     
@@ -139,11 +145,16 @@
                 vec4 sampleMongrel(sampler2D tex, vec2 uv, float strength, float intensity) {
                     if (strength <= 0.01) return texture2D(tex, uv);
     
-                    float cellDensity = 50.0 + (strength * 150.0); 
+                    // FIXED: Use constant cell density so the grid doesn't "swim" when strength changes
+                    float cellDensity = 120.0; 
+                    
                     float xID = floor(uv.x * cellDensity);
                     float yID = floor(uv.y * (cellDensity * 0.5));
     
+                    // Strength only affects the AMPLITUDE of the jitter, not the grid structure
                     float jitterScale = 0.04 * strength * intensity;
+                    
+                    // Hash based on fixed grid IDs
                     float offX = (hash22(vec2(yID, xID)).x - 0.5) * jitterScale;
                     float offY = (hash22(vec2(xID, yID + 13.0)).x - 0.5) * jitterScale;
     
@@ -155,21 +166,144 @@
                     return mix(clean, ghost, 0.3);
                 }
     
-                vec3 calculateRodSensation(vec3 col, float dist, float intensity, float startThreshold) {
-                    float rodFactor = smoothstep(startThreshold, startThreshold + 0.55, dist); 
-                    rodFactor = clamp(rodFactor * intensity, 0.0, 1.0);
-    
-                    float luma = dot(col, vec3(0.0, 0.6, 0.4)); 
-                    vec3 coldDark = vec3(0.02, 0.05, 0.1);
-                    vec3 coldBright = vec3(0.6, 0.7, 0.8);
-                    
-                    vec3 rodColor = mix(coldDark, coldBright, luma);
-                    rodColor *= 0.96; // Was 0.8, lightened by 20% per user request
-                    
-                    float noise = (rand(gl_FragCoord.xy) - 0.5) * 0.1;
-                    rodColor += noise;
-    
-                    return mix(col, rodColor, rodFactor);
+                vec3 applyAestheticEffect(vec3 col, vec2 uv, sampler2D tex, float dist, float intensity, float startThreshold) {
+                    float effectFactor = smoothstep(startThreshold, startThreshold + 0.55, dist); 
+                    effectFactor = clamp(effectFactor * intensity, 0.0, 1.0);
+
+                    // Saccadic Suppression (Motion Blur/Washout)
+                    // Increased threshold to 4.0 px/ms (4000px/s) to prevent flashing on small "jiggles"
+                    float saccadeFactor = smoothstep(4.0, 10.0, u_velocity);
+
+                    // Mode Selection
+                    // 0: High-Key Ghosting
+                    // 1: Lab Mode (Scotopic)
+                    // 2: Frosted Glass
+                    // 3: Blueprint
+                    // 4: Cyberpunk
+
+                    if (u_aesthetic_mode < 0.5) {
+                        // === 0: HIGH-KEY GHOSTING (Default) ===
+                        // Desaturate + Lift Shadows
+                        float luma = dot(col, vec3(0.299, 0.587, 0.114));
+                        vec3 gray = vec3(luma);
+                        vec3 targetWhite = vec3(0.8, 0.85, 0.9); // Cool light gray
+                        vec3 ghostColor = mix(gray, targetWhite, 0.4); 
+                        
+                        // Digital Grain
+                        float noise = (rand(gl_FragCoord.xy) - 0.5) * 0.05;
+                        ghostColor += noise;
+                        
+                        // Saccadic: Wash out to white (Reduced intensity to 50% to prevent harsh flashing)
+                        ghostColor = mix(ghostColor, vec3(0.95, 0.98, 1.0), saccadeFactor * 0.5);
+
+                        return mix(col, ghostColor, effectFactor * 0.95); 
+
+                    } else if (u_aesthetic_mode < 1.5) {
+                        // === 1: LAB MODE (Scotopic) ===
+                        // Dark, Blue-Tinted, Grainy
+                        float luma = dot(col, vec3(0.0, 0.6, 0.4)); 
+                        vec3 coldDark = vec3(0.02, 0.05, 0.1);
+                        vec3 coldBright = vec3(0.6, 0.7, 0.8);
+                        
+                        vec3 rodColor = mix(coldDark, coldBright, luma);
+                        rodColor *= 0.96; 
+                        
+                        float noise = (rand(gl_FragCoord.xy) - 0.5) * 0.1;
+                        rodColor += noise;
+
+                        // Saccadic: Fade to deep dark
+                        rodColor = mix(rodColor, vec3(0.01, 0.01, 0.01), saccadeFactor * 0.9);
+
+                        return mix(col, rodColor, effectFactor);
+
+                    } else if (u_aesthetic_mode < 2.5) {
+                        // === 2: FROSTED GLASS (iOS) ===
+                        // Bright, Low Contrast, Milky
+                        float luma = dot(col, vec3(0.299, 0.587, 0.114));
+                        vec3 milk = vec3(0.9, 0.92, 0.95);
+                        
+                        // Reduce contrast by mixing towards milk
+                        vec3 frostedColor = mix(col, milk, 0.6);
+                        
+                        // Saccadic: Whiteout
+                        frostedColor = mix(frostedColor, vec3(1.0), saccadeFactor * 0.8);
+                        
+                        return mix(col, frostedColor, effectFactor);
+
+                    } else if (u_aesthetic_mode < 3.5) {
+                        // === 3: BLUEPRINT (UX) ===
+                        // Visual Scent: Quantized Structural Edges (Optimized)
+                        
+                        float strength = smoothstep(u_foveaRadius, u_foveaRadius + 0.4, dist);
+                        
+                        // 1. Quantize UVs (Mosaic)
+                        // FIXED: Use CONSTANT block size to prevent "swimming" grid when mouse moves
+                        float blockSize = 30.0; 
+                        vec2 blockDims = u_resolution / blockSize;
+                        vec2 quantUV = floor(uv * blockDims) / blockDims + (vec2(0.5) / blockDims);
+                        
+                        // 2. Calculate Distortion ONCE (Optimization)
+                        // Inline Mongrel logic to avoid 5x function calls
+                        float cellDensity = 120.0; 
+                        float xID = floor(quantUV.x * cellDensity);
+                        float yID = floor(quantUV.y * (cellDensity * 0.5));
+                        float jitterScale = 0.04 * strength * u_intensity;
+                        
+                        float offX = (hash22(vec2(yID, xID)).x - 0.5) * jitterScale;
+                        float offY = (hash22(vec2(xID, yID + 13.0)).x - 0.5) * jitterScale;
+                        
+                        vec2 shatteredUV = quantUV + vec2(offX, offY);
+                        
+                        // 3. Base Color (Simple Lookup)
+                        vec3 baseCol = texture2D(tex, shatteredUV).rgb;
+                        
+                        // 4. Edge Detection (Simple Lookups on Shattered UV)
+                        // We assume the distortion is locally constant (valid for blocks)
+                        float structureScale = 2.0 + 4.0 * effectFactor;
+                        vec2 edgeStep = vec2(structureScale) / u_resolution;
+                        
+                        vec3 n = texture2D(tex, shatteredUV + vec2(0.0, edgeStep.y)).rgb;
+                        vec3 s = texture2D(tex, shatteredUV - vec2(0.0, edgeStep.y)).rgb;
+                        vec3 e = texture2D(tex, shatteredUV + vec2(edgeStep.x, 0.0)).rgb;
+                        vec3 w = texture2D(tex, shatteredUV - vec2(edgeStep.x, 0.0)).rgb;
+                        
+                        float lumaN = dot(n, vec3(0.299, 0.587, 0.114));
+                        float lumaS = dot(s, vec3(0.299, 0.587, 0.114));
+                        float lumaE = dot(e, vec3(0.299, 0.587, 0.114));
+                        float lumaW = dot(w, vec3(0.299, 0.587, 0.114));
+                        
+                        float edgeH = abs(lumaE - lumaW);
+                        float edgeV = abs(lumaN - lumaS);
+                        float edge = length(vec2(edgeH, edgeV));
+                        
+                        // 5. Sharpen & Threshold
+                        edge = smoothstep(0.05, 0.2, edge);
+                        
+                        // 6. Compose
+                        vec3 edgeColor = vec3(1.0) - baseCol;
+                        vec3 final = mix(baseCol, edgeColor, edge);
+                        
+                        return mix(col, final, effectFactor);
+
+                    } else {
+                        // === 4: CYBERPUNK (VJ) ===
+                        // High Contrast, Neon Tints
+                        float luma = dot(col, vec3(0.299, 0.587, 0.114));
+                        
+                        // Crush blacks, boost whites
+                        float contrastLuma = smoothstep(0.2, 0.8, luma);
+                        
+                        // Tint shadows Purple, Highlights Cyan
+                        vec3 shadowColor = vec3(0.2, 0.0, 0.3); // Deep Purple
+                        vec3 highlightColor = vec3(0.0, 0.8, 1.0); // Cyan
+                        
+                        vec3 cyberColor = mix(shadowColor, highlightColor, contrastLuma);
+                        
+                        // Saccadic: Glitchy bright
+                        cyberColor = mix(cyberColor, vec3(1.0, 0.0, 1.0), saccadeFactor * 0.5); // Magenta flash
+                        
+                        return mix(col, cyberColor, effectFactor);
+                    }
                 }
     
                 void main() {
@@ -182,21 +316,40 @@
                     
                     vec2 delta = uv_corrected - mouse_corrected;
                     delta.x /= 1.77; 
-                    float dist = length(delta);
+                    float dist = length(delta); // Real distance (for lighting/rod vision)
+
+                    // Stable Mouse (for Distortion/Mongrel)
+                    vec2 mouse_stable_uv = u_mouse_stable / u_resolution;
+                    vec2 mouse_stable_corrected = vec2(mouse_stable_uv.x * aspect, mouse_stable_uv.y);
+                    vec2 delta_stable = uv_corrected - mouse_stable_corrected;
+                    delta_stable.x /= 1.77;
+                    float dist_stable = length(delta_stable); // Stable distance (for distortion)
     
                     float radius_norm = u_foveaRadius / u_resolution.y;
                     float fovea_radius = radius_norm;
                     float parafovea_radius = radius_norm * 1.35;
                     float periphery_start = radius_norm * 1.2;
                     
-                    bool isParafovea = dist > fovea_radius && dist <= periphery_start;
-                    bool isFarPeriphery = dist > periphery_start; 
+                    // Use STABLE distance for distortion zones
+                    bool isParafovea = dist_stable > fovea_radius && dist_stable <= periphery_start;
+                    bool isFarPeriphery = dist_stable > periphery_start; 
                     
                     vec4 color;
                     
+                    // Use REAL distance for the mask to prevent "lag" (fovea follows mouse)
+                    // Use QUANTIZED strength to prevent "shimmer" (noise pattern steps)
+                    
+                    // Blueprint Mode (3) should NOT have distortion, as it relies on clean edge detection
+                    bool isBlueprint = abs(u_aesthetic_mode - 3.0) < 0.1;
+                    
                     if (u_mongrel_mode > 0.5) {
                         // SHATTER
+                        // Calculate smooth strength based on REAL distance
                         float mongrelStrength = smoothstep(fovea_radius, periphery_start + 0.4, dist);
+                        
+                        if (isBlueprint) mongrelStrength = 0.0; // Disable shatter for Blueprint
+                        
+                        // Sample using smooth strength (now stable because sampleMongrel is fixed)
                         vec4 rawColor = sampleMongrel(u_texture, uv, mongrelStrength, u_intensity);
                         
                         // BGRA Swizzle
@@ -207,8 +360,11 @@
                         
                     } else {
                         // NOISE
+                        // Calculate smooth strength based on REAL distance
                         float warpStrength = smoothstep(fovea_radius, parafovea_radius, dist);
                         warpStrength = pow(warpStrength, 0.5);
+                        
+                        if (isBlueprint) warpStrength = 0.0; // Disable noise for Blueprint
                         
                         vec2 uv_noise = vec2(uv_corrected.x / 1.77, uv_corrected.y);
                         
@@ -232,7 +388,7 @@
                         float n1_jitter = snoise(warpedUV_noise * fineScale);
                         float n2_jitter = snoise(warpedUV_noise * fineScale + vec2(100.0, 100.0));
                         
-                        float outerParafoveaStrength = smoothstep(parafovea_radius * 0.5, parafovea_radius, dist);
+                        float outerParafoveaStrength = smoothstep(parafovea_radius * 0.5, parafovea_radius, dist); // Use real dist
                         vec2 jitterAmp;
                         if (isFarPeriphery) {
                             jitterAmp = vec2(0.01, 0.008);
@@ -248,9 +404,9 @@
                         vec2 displacement = warpVector + jitterVector;
                         vec2 newUV = uv + displacement;
                         
-                        // CA Logic for Noise Mode
+                        // CA Logic
                         float noiseSample = rand(uv_corrected * 100.0);
-                        float distDithered = dist + (noiseSample - 0.5) * 0.3;
+                        float distDithered = dist + (noiseSample - 0.5) * 0.3; // Use real dist
                         float caStrength = smoothstep(periphery_start, periphery_start + 0.25, distDithered);
                         
                         float aberrationAmt = 0.02 * caStrength * u_intensity * u_ca_strength;
@@ -276,7 +432,8 @@
                     bool isScrollbar = distFromRightEdge < scrollbarWidth;
                     
                     if (!isScrollbar) {
-                        vec3 finalRGB = calculateRodSensation(color.rgb, dist, u_intensity, periphery_start);
+                        // Pass v_texCoord (uv) for texture sampling, NOT uv_corrected!
+                        vec3 finalRGB = applyAestheticEffect(color.rgb, v_texCoord, u_texture, dist, u_intensity, periphery_start);
                         color.rgb = finalRGB;
                     }
                     
@@ -319,6 +476,7 @@
 
                 this.resolutionLocation = gl.getUniformLocation(this.program, "u_resolution");
                 this.mouseLocation = gl.getUniformLocation(this.program, "u_mouse");
+                this.mouseStableLocation = gl.getUniformLocation(this.program, "u_mouse_stable");
                 this.foveaRadiusLocation = gl.getUniformLocation(this.program, "u_foveaRadius");
                 this.pixelationLocation = gl.getUniformLocation(this.program, "u_pixelation");
                 this.intensityLocation = gl.getUniformLocation(this.program, "u_intensity");
@@ -327,7 +485,9 @@
                 this.textureLocation = gl.getUniformLocation(this.program, "u_texture");
                 this.maskTextureLocation = gl.getUniformLocation(this.program, "u_maskTexture");
                 this.useMaskLocation = gl.getUniformLocation(this.program, "u_useMask");
+                this.velocityLocation = gl.getUniformLocation(this.program, "u_velocity");
                 this.mongrelModeLocation = gl.getUniformLocation(this.program, "u_mongrel_mode");
+                this.aestheticModeLocation = gl.getUniformLocation(this.program, "u_aesthetic_mode");
 
                 // Create buffers
                 this.positionBuffer = gl.createBuffer();
@@ -413,7 +573,19 @@
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
             }
 
-            render(width, height, mouseX, mouseY, foveaRadius, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, useMask = 0.0, mongrelMode = 1.0) {
+            uploadMask(image) {
+                const gl = this.gl;
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, this.maskTexture);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            }
+
+            clear() {
+                const gl = this.gl;
+                gl.clearColor(0.0, 0.0, 0.0, 0.0);
+                gl.clear(gl.COLOR_BUFFER_BIT);
+            }
+            render(width, height, mouseX, mouseY, foveaRadius, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, useMask = 0.0, mongrelMode = 1.0, aestheticMode = 0.0, velocity = 0.0, stableMouseX = 0.0, stableMouseY = 0.0) {
                 if (!this.program) return;
                 const gl = this.gl;
 
@@ -443,13 +615,16 @@
 
                 gl.uniform2f(this.resolutionLocation, width, height);
                 gl.uniform2f(this.mouseLocation, mouseX, mouseY);
+                gl.uniform2f(this.mouseStableLocation, stableMouseX, stableMouseY);
                 gl.uniform1f(this.foveaRadiusLocation, foveaRadius);
                 gl.uniform1f(this.pixelationLocation, 0.15 * intensity);
                 gl.uniform1f(this.intensityLocation, intensity);
                 gl.uniform1f(this.caStrengthLocation, caStrength);
                 gl.uniform1f(this.debugBoundaryLocation, debugBoundary);
                 gl.uniform1f(this.useMaskLocation, useMask);
+                gl.uniform1f(this.velocityLocation, velocity);
                 gl.uniform1f(this.mongrelModeLocation, mongrelMode);
+                gl.uniform1f(this.aestheticModeLocation, aestheticMode);
 
                 if (Math.random() < 0.01) {
                     // console.log(`[WebGL] Render Mode: ${mongrelMode}, Res: ${width}x${height}, Mouse: ${mouseX},${mouseY}`);
