@@ -180,8 +180,6 @@ When enabled from the menu, the shader draws a subtle grey ring at the true fove
 - Location: `dist == fovea_radius`.
 - Purpose: visualization only – it does not change sampling or strength masks.
 
-This allows you to align text or UI elements exactly at the transition between crystal‑clear and disrupted vision when evaluating presets.
-
 ---
 
 ## 10. Future tuning knobs

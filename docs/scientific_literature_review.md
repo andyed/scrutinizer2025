@@ -73,8 +73,7 @@ The Magno-cellular pathway (motion/luminance) processes information faster than 
 
 * **Jeff Johnson:** [*Designing with the Mind in Mind* (Elsevier)](https://www.sciencedirect.com/book/9780124079144/designing-with-the-mind-in-mind)
 * **Susan Weinschenk:** [*100 Things Every Designer Needs to Know About People*](https://theteamw.com/books/100-things-every-designer-needs-to-know-about-people/)
-* **Nielsen Norman Group:** [The "Heatmap Lie" / Eye Tracking Limitations](https://www.nngroup.com/articles/eye-tracking-setup/)
-    * *Note:* References the gap between where we look (foveal) and what we process (peripheral).
+
 
 
 
