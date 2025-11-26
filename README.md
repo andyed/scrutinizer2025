@@ -124,6 +124,11 @@ Scrutinizer uses a custom WebGL pipeline to simulate biological constraints like
 For implementation details, see [Implementation Notes: The Biological Model](docs/foveated-vision-model.md). 
 
 This allows the visual simulation to be applied efficiently to even video content and in general a smooth experience, with only a minor additional latency associated with initial shader compilation and some defenses against showing partially loaded untransformed content.
+
+### Recent Updates (v1.1.5)
+- **Renderer Stability**: Fixed critical WebGL initialization crashes by isolating renderer scripts in IIFEs.
+- **Visuals Restored**: Resolved shader uniform mismatches to ensure Mongrel Mode and Rod Vision work correctly.
+- **Configuration**: Added `renderer/config.js` for fine-tuning, including `enableLogger` for debugging.
 ---
 
 ## Theoretical Foundation

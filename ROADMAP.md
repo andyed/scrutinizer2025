@@ -14,30 +14,49 @@ This document outlines the path from current alpha to a production-ready 1.0 rel
 - [x] Basic navigation (back/forward, URL bar)
 - [x] Scroll and DOM mutation detection
 - [x] Basic browser controls (open url, back, forward)
+- [x] WebGL-based "Mongrel" rendering pipeline
+- [x] "Rod Vision" (Eigengrau) simulation
+- [x] Visual Memory (Fog of War) mechanics
 
 
 
 ---
 
-#### Bookmarking System
-**Priority**: High  
-**Effort**: Medium
+## Priority 2: Aesthetic Pivot (The "Cinematic" Update)
 
-Simple bookmark management:
-- Add current page to bookmarks (Cmd/Ctrl+D)
-- Bookmark manager UI (simple list)
-- Persist bookmarks to JSON file
-- Quick access from menu bar
+**Goal**: Move from "Clinical/Horror" (simulating blindness/disease) to "Cinematic/Focus" (directing attention). The periphery should look "unimportant" rather than "broken."
 
-**Files to create**:
-- `renderer/bookmarks.js` - Bookmark logic
-- `renderer/bookmarks.html` - Bookmark manager UI
-- Store in user data directory via `app.getPath('userData')`
+### 🎨 New Aesthetic Directions
 
+#### 1. The "Frosted Glass" Tweak (Apple/iOS Aesthetic)
+*For Pitching & Client Demos*
+- **Concept**: Treat the periphery as if it's behind textured privacy glass.
+- **Implementation**:
+    - Reduce high-frequency jitter (larger, softer shards).
+    - Smooth, prismatic chromatic aberration.
+    - Preserve luminance (no darkening).
+    - **Why**: Feels like a UI state, not a rendering error.
+
+#### 2. The "Blueprint" Tweak (UX Research Aesthetic)
+*For Design Reviews & A/B Testing*
+- **Concept**: "Visual Scent" - show layout/grid but hide content details.
+- **Implementation**:
+    - High-pass filter in periphery (edges only).
+    - "Blueprint Blue" tint.
+    - **Why**: Highlights Layout vs. Content. Proves the user sees the grid but misses the copy.
+
+#### 3. The "Cyberpunk/Neon" Tweak (VJ/Creative Aesthetic)
+*For "Eye Candy" & Creative Coding*
+- **Concept**: Hyper-spectral periphery. Fovea is "Real", Periphery is "Digital/Hallucinogenic".
+- **Implementation**:
+    - Aggressive RGB channel splitting.
+    - Boost saturation of Cyan/Magenta in periphery.
+    - Inverted Vignette: Edges fade to a "glow" (Deep Purple/Neon) instead of black.
+    - **Why**: Makes the fovea feel hyper-real by contrast.
 
 ---
 
-## Priority 2: Distribution & Release
+## Priority 3: Distribution & Release
 
 ### 🟡 Important for 1.0
 
@@ -88,7 +107,7 @@ Create:
 
 ---
 
-## Priority 3: Learning Mode (The "Omelet" Update)
+## Priority 4: Learning Mode (The "Omelet" Update)
 
 ### 🧠 Visuospatial Memory Simulation
 **Goal**: Simulate the "Visuospatial Sketchpad" of working memory. The screen "remembers" detail only where the user has foveated, and forgets it over time, mimicking biological cognitive load.
@@ -120,7 +139,7 @@ Create:
 
 ---
 
-## Priority 4: Edge Cases & Polish
+## Priority 5: Edge Cases & Polish
 
 
 
@@ -138,7 +157,7 @@ Create:
 ---
 
 
-## Priority 5: Future Enhancements (Post-1.0)
+## Priority 6: Future Enhancements (Post-1.0)
 
 ### 🔵 Version 1.1+
 
@@ -221,7 +240,3 @@ Improve how we sample the page for foveal/peripheral processing:
     - 🔵 Optional blind spot simulation at ~15° eccentricity
     - 🔵 Domain warping with WebGL shaders
     - 🔵 "Mongrel" visualization mode showing statistical texture compression
-
-
-
-

@@ -23,7 +23,10 @@ const CONFIG = {
     maskSmoothness: 1, // 0-1, higher = more responsive (0.2 = smooth but laggy, 1.0 = instant)
 
     // Experimental settings
-    useFoveatedBlur: true // when true, use multi-resolution foveated blur instead of uniform blur
+    useFoveatedBlur: true, // when true, use multi-resolution foveated blur instead of uniform blur
+
+    // Debug settings
+    enableLogger: true // Enable renderer logs passing through to main process terminal
 };
 
 if (typeof module !== 'undefined' && module.exports) {

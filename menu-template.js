@@ -279,6 +279,22 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         }
                     ]
                 },
+                {
+                    label: 'Mongrel Mode',
+                    submenu: [
+                        {
+                            label: 'Shatter (Static)',
+                            type: 'radio',
+                            checked: true, // Default
+                            click: () => sendToOverlays('menu:set-mongrel-mode', 1)
+                        },
+                        {
+                            label: 'Noise (Dynamic)',
+                            type: 'radio',
+                            click: () => sendToOverlays('menu:set-mongrel-mode', 0)
+                        }
+                    ]
+                },
                 { type: 'separator' },
                 {
                     label: 'Chromatic Aberration',

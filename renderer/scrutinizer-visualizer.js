@@ -14,13 +14,19 @@
 class ScrutinizerVisualizer {
     constructor(canvas) {
         this.canvas = canvas;
-        this.gl = canvas.getContext('webgl', {
-            alpha: false, // We don't need transparency on the main canvas
+        const contextAttributes = {
+            alpha: true, // Required for transparent window composition
             antialias: false,
             preserveDrawingBuffer: false
-        });
+        };
+
+        // Try WebGL 2 first, then WebGL 1, then experimental
+        this.gl = canvas.getContext('webgl2', contextAttributes) ||
+            canvas.getContext('webgl', contextAttributes) ||
+            canvas.getContext('experimental-webgl', contextAttributes);
 
         if (!this.gl) {
+            console.error('[ScrutinizerVisualizer] Failed to initialize WebGL context.');
             throw new Error('WebGL not supported');
         }
 

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html style="background: transparent !important;">
+
 <head>
   <meta charset="UTF-8">
   <title>Scrutinizer Overlay</title>
@@ -9,8 +10,9 @@
       padding: 0;
       box-sizing: border-box;
     }
-    
-    html, body {
+
+    html,
+    body {
       background: transparent !important;
       overflow: hidden;
       margin: 0;
@@ -19,7 +21,7 @@
       height: 100vh;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     }
-    
+
     /* Full-window canvas */
     #overlay-canvas {
       position: fixed;
@@ -27,19 +29,41 @@
       left: 0;
       width: 100vw;
       height: 100vh;
-      pointer-events: none; /* Canvas doesn't capture clicks */
+      pointer-events: none;
+      /* Canvas doesn't capture clicks */
       display: none;
       z-index: 100;
     }
   </style>
 </head>
+
 <body>
   <!-- Full-window canvas (no toolbar) -->
   <canvas id="overlay-canvas"></canvas>
-  
+
+  <script>
+    (() => {
+      const { ipcRenderer } = require('electron');
+      window.onerror = function (message, source, lineno, colno, error) {
+        const msg = `[Renderer Global Error] ${message} at ${source}:${lineno}:${colno}`;
+        console.error(msg);
+        ipcRenderer.send('log:renderer', msg);
+        if (error && error.stack) {
+          ipcRenderer.send('log:renderer', error.stack);
+        }
+      };
+      window.addEventListener('unhandledrejection', function (event) {
+        const msg = `[Renderer Unhandled Rejection] ${event.reason}`;
+        console.error(msg);
+        ipcRenderer.send('log:renderer', msg);
+      });
+    })();
+  </script>
+
   <script src="config.js"></script>
   <script src="webgl-renderer.js"></script>
   <script src="scrutinizer.js"></script>
   <script src="overlay.js"></script>
 </body>
+
 </html>

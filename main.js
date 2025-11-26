@@ -20,14 +20,17 @@ function sendToRenderer(channel, ...args) {
     }
 }
 
-function sendToOverlays(channel, ...args) {
+const sendToOverlays = (channel, ...args) => {
     const windows = BrowserWindow.getAllWindows();
-    for (const win of windows) {
-        if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+    let sentCount = 0;
+    windows.forEach(win => {
+        if (win.scrutinizerHud) {
             win.scrutinizerHud.webContents.send(channel, ...args);
+            sentCount++;
         }
-    }
-}
+    });
+    console.log(`[Main] sendToOverlays: Sent '${channel}' to ${sentCount} windows`);
+};
 
 function rebuildMenu() {
     // Ensure settings are initialized
@@ -184,7 +187,9 @@ ipcMain.on('get-window-size', (event) => {
 });
 
 // Handle capture requests from HUD (for foveal effect)
+// Handle capture requests from HUD (for foveal effect)
 ipcMain.on('hud:capture:request', async (event) => {
+    // console.log('[Main] Received hud:capture:request'); // Keep this commented to avoid spam if loop is fast
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
 
@@ -195,6 +200,11 @@ ipcMain.on('hud:capture:request', async (event) => {
             const size = image.getSize();
 
             // Send back to HUD window (where canvas lives)
+            // Log every 60th frame to avoid spam, or just once to verify
+            if (Math.random() < 0.05) {
+                console.log(`[Main] Captured frame: ${size.width}x${size.height}, Buffer: ${buffer.length}`);
+            }
+
             win.scrutinizerHud.webContents.send('hud:frame-captured', {
                 buffer: buffer,
                 width: size.width,
@@ -203,6 +213,8 @@ ipcMain.on('hud:capture:request', async (event) => {
         } catch (err) {
             console.error('[Main] Capture error:', err);
         }
+    } else {
+        console.warn('[Main] hud:capture:request failed: Could not find matching window for sender');
     }
 });
 
@@ -499,8 +511,15 @@ function createScrutinizerWindow(startUrl) {
         }
     });
 
+
+
     return win;
 }
+
+// Add this outside createScrutinizerWindow to ensure it's registered once
+ipcMain.on('log:renderer', (event, message) => {
+    console.log('[Renderer]', message);
+});
 
 function createWindow() {
     // Initialize settings manager
@@ -509,7 +528,8 @@ function createWindow() {
     // Load saved settings with defaults
     currentRadius = settingsManager.get('radius');
     currentBlur = settingsManager.get('blur');
-    currentEnabled = settingsManager.get('enabled') !== undefined ? settingsManager.get('enabled') : false;
+    currentEnabled = true; // Force enabled for debugging
+    // currentEnabled = settingsManager.get('enabled') !== undefined ? settingsManager.get('enabled') : true; // Default to true for debugging
     currentShowWelcome = settingsManager.get('showWelcomePopup');
     currentStartPage = settingsManager.get('startPage');
 
@@ -533,6 +553,9 @@ function createWindow() {
         mainWindow = null;
     });
 }
+
+app.commandLine.appendSwitch('ignore-gpu-blacklist');
+app.commandLine.appendSwitch('enable-transparent-visuals');
 
 app.on('ready', () => {
     createWindow();
