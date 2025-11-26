@@ -123,6 +123,7 @@ Scrutinizer uses a custom WebGL pipeline to simulate biological constraints like
 
 For implementation details, see [Implementation Notes: The Biological Model](docs/foveated-vision-model.md). 
 
+This allows the visual simulation to be applied efficiently to even video content and in general a smooth experience, with only a minor additional latency associated with initial shader compilation and some defenses against showing partially loaded untransformed content.
 ---
 
 ## Theoretical Foundation
@@ -145,13 +146,6 @@ This project is grounded in research from vision science and cognitive psycholog
 
 ---
 
-## License & Contributors
-
-### Contributors
-- **Creator**: Andy Edmonds
-- **Coders**: James Douma @ Nitobi, Inc., Andy Edmonds, Evan Mullins
-- **Designers**: Evan Mullins, Dave Hallock
-
-### License
+## License
 Copyright (c) 2012-2025, Andy Edmonds. All rights reserved.
 Licensed under the [MIT License](LICENSE).
