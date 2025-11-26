@@ -8,6 +8,10 @@
 
 Scrutinizer is a browser-based simulation that strips away the brain's post-processing to reveal the raw, noisy data your optic nerve actually receives. It compels designers to stop designing for the "Screenshot" and start designing for the "Scan".
 
+It's intended to be useful in the design process, from solo iteration to design review dialogue, and even client presentation (with special modes for storytelling!).
+
+Additionally, there's a long history (keyword: "restricted focus viewer")of using foveal simulation bound to the mouse as a way to conduct user testing, allowing the observer to track the attention of the participant. 
+
 ---
 
 ## Table of Contents
