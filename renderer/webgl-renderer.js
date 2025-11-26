@@ -28,6 +28,9 @@
                     Logger.error('[WebGL] Failed to initialize WebGL context. Your browser or hardware may not support it.');
                     throw new Error('WebGL not supported');
                 }
+                
+                const { ipcRenderer } = require('electron');
+                ipcRenderer.send('log:renderer', `[WebGLRenderer] WebGL context created: ${this.gl.constructor.name}`);
 
                 this.program = null;
                 this.texture = null;
@@ -58,6 +61,10 @@
             warmup() {
                 // Run async to avoid blocking main thread on startup
                 setTimeout(() => {
+                    // Save original canvas size
+                    const originalWidth = this.canvas.width;
+                    const originalHeight = this.canvas.height;
+                    
                     const dummyData = new Uint8Array(4 * 4 * 4);
                     dummyData.fill(128);
                     const dummyImage = new ImageData(new Uint8ClampedArray(dummyData), 4, 4);
@@ -65,6 +72,13 @@
 
                     // Render a single frame to force shader compilation
                     this.render(100, 100, 50, 50, 30);
+                    
+                    // Restore original canvas size
+                    if (originalWidth > 0 && originalHeight > 0) {
+                        this.canvas.width = originalWidth;
+                        this.canvas.height = originalHeight;
+                    }
+                    
                     console.log('[WebGL] Shader warmup complete (Async)');
                 }, 100);
             }
@@ -483,6 +497,8 @@
             `;
 
                 this.program = this.createProgram(gl, vsSource, fsSource);
+                const { ipcRenderer: ipc2 } = require('electron');
+                ipc2.send('log:renderer', `[WebGLRenderer] Shaders compiled and program created successfully`);
 
                 // Look up locations
                 this.positionLocation = gl.getAttribLocation(this.program, "a_position");
@@ -600,7 +616,21 @@
                 gl.clear(gl.COLOR_BUFFER_BIT);
             }
             render(width, height, mouseX, mouseY, foveaRadius, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, useMask = 0.0, mongrelMode = 1.0, aestheticMode = 0.0, velocity = 0.0, stableMouseX = 0.0, stableMouseY = 0.0) {
-                if (!this.program) return;
+                if (!this.program) {
+                    console.error('[WebGLRenderer] render() called but program is null!');
+                    return;
+                }
+                
+                // Log first render
+                if (!this.renderCallCount) {
+                    this.renderCallCount = 0;
+                }
+                this.renderCallCount++;
+                if (this.renderCallCount === 1) {
+                    const { ipcRenderer } = require('electron');
+                    ipcRenderer.send('log:renderer', `[WebGLRenderer] First render: ${width}x${height}, mouse=(${mouseX},${mouseY}), radius=${foveaRadius}, mode=${mongrelMode}`);
+                }
+                
                 const gl = this.gl;
 
                 if (this.canvas.width !== width || this.canvas.height !== height) {
@@ -608,6 +638,10 @@
                     this.canvas.height = height;
                 }
                 gl.viewport(0, 0, width, height);
+                
+                // Enable blending for transparent window composition
+                gl.enable(gl.BLEND);
+                gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
                 gl.useProgram(this.program);
 
@@ -642,6 +676,21 @@
 
                 if (Math.random() < 0.01) {
                     // console.log(`[WebGL] Render Mode: ${mongrelMode}, Res: ${width}x${height}, Mouse: ${mouseX},${mouseY}`);
+                }
+                
+                // Log first drawArrays call
+                if (!this.drawCallCount) {
+                    this.drawCallCount = 0;
+                }
+                this.drawCallCount++;
+                if (this.drawCallCount === 10) {
+                    const { ipcRenderer: ipc3 } = require('electron');
+                    ipc3.send('log:renderer', `[WebGLRenderer] drawArrays called (10th call), canvas=${this.canvas.width}x${this.canvas.height}`);
+                    // Check for WebGL errors
+                    const error = gl.getError();
+                    if (error !== gl.NO_ERROR) {
+                        ipc3.send('log:renderer', `[WebGLRenderer] WebGL Error: ${error}`);
+                    }
                 }
 
                 gl.drawArrays(gl.TRIANGLES, 0, 6);

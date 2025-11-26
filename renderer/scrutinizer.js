@@ -66,6 +66,8 @@
             this.enabled = true;
             this.canvas.style.display = 'block';
             Logger.log('[Scrutinizer] ENABLE called');
+            Logger.log(`[Scrutinizer] Canvas state: ${this.canvas.width}x${this.canvas.height}, display=${this.canvas.style.display}, position=${this.canvas.style.position}`);
+            Logger.log(`[Scrutinizer] Canvas computed style: ${window.getComputedStyle(this.canvas).display}`);
             this.startRenderLoop();
         }
 
@@ -84,6 +86,7 @@
         handleResize() {
             // Request actual window size from main process
             const { ipcRenderer } = require('electron');
+            Logger.log('[Scrutinizer] handleResize called, requesting window size...');
             ipcRenderer.send('get-window-size');
 
             // Listen for response (only once per resize)
@@ -173,7 +176,10 @@
         }
 
         processFrame(buffer, width, height) {
-            if (!this.renderer || !this.enabled) return;
+            if (!this.renderer || !this.enabled) {
+                Logger.log(`[Scrutinizer] processFrame skipped - renderer: ${!!this.renderer}, enabled: ${this.enabled}`);
+                return;
+            }
 
             // Create ImageData from buffer
             const imageData = new ImageData(new Uint8ClampedArray(buffer), width, height);
@@ -182,7 +188,10 @@
             this.renderer.uploadTexture(imageData);
 
             // Log occasionally
-            if (!this.frameUploadCount) this.frameUploadCount = 0;
+            if (!this.frameUploadCount) {
+                this.frameUploadCount = 0;
+                Logger.log(`[Scrutinizer] First frame uploaded! ${width}x${height}`);
+            }
             this.frameUploadCount++;
             if (this.frameUploadCount % 60 === 0) {
                 Logger.log(`[Scrutinizer] Uploaded frame ${this.frameUploadCount} to WebGL (${width}x${height})`);
@@ -316,9 +325,19 @@
                 this.renderer.uploadMask(this.maskCanvas);
             }
 
+            // Log first render
+            if (!this.renderCount) {
+                this.renderCount = 0;
+            }
+            this.renderCount++;
+            if (this.renderCount === 1) {
+                Logger.log(`[Scrutinizer] First render call: canvas=${this.canvas.width}x${this.canvas.height}, mouse=(${this.mouseX},${this.mouseY}), radius=${effectiveRadius}`);}
+
             // DEBUG: Log state occasionally
             if (Math.random() < 0.005) {
                 console.log(`[Scrutinizer] Render: Enabled=${this.enabled}, Radius=${effectiveRadius}, Mem=${this.visualMemoryLimit}, Vel=${this.currentVelocity.toFixed(3)}`);
+                console.log(`[Scrutinizer] Canvas: ${this.canvas.width}x${this.canvas.height}, Display: ${this.canvas.style.display}, Mouse: (${this.mouseX.toFixed(1)}, ${this.mouseY.toFixed(1)})`);
+                console.log(`[Scrutinizer] Renderer exists: ${!!this.renderer}, Frame count: ${this.frameUploadCount || 0}`);
             }
 
             this.renderer.render(
