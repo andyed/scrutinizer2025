@@ -240,3 +240,12 @@ Improve how we sample the page for foveal/peripheral processing:
     - 🔵 Optional blind spot simulation at ~15° eccentricity
     - 🔵 Domain warping with WebGL shaders
     - 🔵 "Mongrel" visualization mode showing statistical texture compression
+
+#### OffscreenCanvas Renderer (Worker Thread)
+**Priority**: Low/Ambiguous
+**Effort**: High
+
+- Move WebGL context to a Web Worker using `OffscreenCanvas`.
+- **Goal**: Decouple rendering from main thread to prevent UI jank.
+- **Ambiguity**: High complexity refactor. Current performance is GPU-bound, so CPU offloading might yield diminishing returns for the effort required.
+

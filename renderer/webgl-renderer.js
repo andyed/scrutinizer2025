@@ -56,16 +56,17 @@
             }
 
             warmup() {
-                const dummyData = new Uint8Array(4 * 4 * 4);
-                dummyData.fill(128);
-                const dummyImage = new ImageData(new Uint8ClampedArray(dummyData), 4, 4);
-                this.uploadTexture(dummyImage);
+                // Run async to avoid blocking main thread on startup
+                setTimeout(() => {
+                    const dummyData = new Uint8Array(4 * 4 * 4);
+                    dummyData.fill(128);
+                    const dummyImage = new ImageData(new Uint8ClampedArray(dummyData), 4, 4);
+                    this.uploadTexture(dummyImage);
 
-                // Render a few frames
-                for (let i = 0; i < 3; i++) {
+                    // Render a single frame to force shader compilation
                     this.render(100, 100, 50, 50, 30);
-                }
-                console.log('[WebGL] Shader warmup complete');
+                    console.log('[WebGL] Shader warmup complete (Async)');
+                }, 100);
             }
 
             init() {
@@ -434,6 +435,19 @@
                     if (!isScrollbar) {
                         // Pass v_texCoord (uv) for texture sampling, NOT uv_corrected!
                         vec3 finalRGB = applyAestheticEffect(color.rgb, v_texCoord, u_texture, dist, u_intensity, periphery_start);
+                        
+                        // === VISUAL MEMORY MASK ===
+                        // Mix back to the original clear content where the mask is white
+                        if (u_useMask > 0.5) {
+                            float maskVal = texture2D(u_maskTexture, v_texCoord).r;
+                            // Mask: White = Clear (Fovea), Black = Peripheral
+                            // We want to show the 'finalRGB' (peripheral) where mask is Black (0.0)
+                            // And show 'color.rgb' (clear/original) where mask is White (1.0)
+                            // Wait, 'color.rgb' at this point is the base texture sample (swizzled).
+                            // So mixing finalRGB with color.rgb based on maskVal is correct.
+                            finalRGB = mix(finalRGB, color.rgb, maskVal);
+                        }
+                        
                         color.rgb = finalRGB;
                     }
                     

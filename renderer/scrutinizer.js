@@ -223,8 +223,9 @@
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             // Simple moving average for velocity to smooth out jitter
+            // Increased smoothing to 0.95 to prevent "bouncy" velocity on steady movements
             const instantVelocity = dt > 0 ? dist / dt : 0;
-            this.currentVelocity = this.currentVelocity * 0.8 + instantVelocity * 0.2;
+            this.currentVelocity = this.currentVelocity * 0.95 + instantVelocity * 0.05;
 
             this.lastMouseX = this.mouseX;
             this.lastMouseY = this.mouseY;
