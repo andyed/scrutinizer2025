@@ -128,7 +128,9 @@ This allows the visual simulation to be applied efficiently to even video conten
 
 ## Theoretical Foundation
 
-This project is grounded in research from vision science and cognitive psychology, including "Mongrel Theory" (Ruth Rosenholtz) and "Controlled Hallucination" (Anil Seth).
+This project is grounded in research from vision science and cognitive psychology.  Mapping blur to surround the mouse position has been a technique for decades, and is used in tools like the Restricted Focus Viewer (RFV) and the Eye Tracking Viewer (ETV). More recently, VR headsets have utilized foveated rendering to reduce the amount of pixels needed to render the scene. 
+
+Research into exactly how the periphery is perceived has progressed in recent years, with the development of the "Mongrel Theory" of vision. As of 2025, AI researchers are actively trying to develop a more accurate model of how the periphery is perceived so that they can better simulate it in their own tools. 
 
 - **[Scientific Literature Review](docs/scientific_literature_review.md)**: Deep dive into the science behind the simulation.
 - **[YouTube Playlists](https://www.youtube.com/@scrutinizer-app/playlists)**: Watch our curated videos on vision science and UX.
