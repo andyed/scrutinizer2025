@@ -98,18 +98,19 @@ npm start
 ## Usage & Controls
 
 1. **Navigate**: Use **File → Open URL** (Cmd+L) to enter a website address.
-2. **Enable**: Click the eye icon or press `Escape` to toggle foveal mode.
-3. **Adjust**:
+2. **Adjust**:
    - Use the **Simulation → Foveal Radius** menu to pick a radius preset.
    - Use **Simulation → Peripheral Intensity** to adjust the strength of peripheral degradation.
    - Or use **Left/Right arrow keys** (<>) while foveal mode is enabled.
+   - Cmd/Alt plus left and right arrows go back and forward, or use the Go menu. 
 4. **Observe**: Watch how easily key elements can be located using mostly peripheral vision.
+
+Adjustments are optimally used to calibrate the simulation to the user's posture and viewing distance. Large foveal settings reduce the disruption of browsing, and may be preferred for dogfooding use cases, where usability test observation may benefit from tighter foveal settings.  The smaller settings are more accurate simulations in most cases. 
 
 ### Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
-| `Escape` | Toggle foveal mode on/off |
 | `Right Arrow` (>) | Increase foveal radius (when foveal mode is enabled) |
 | `Left Arrow` (<) | Decrease foveal radius (when foveal mode is enabled) |
 | `Cmd+L` | Open URL dialog |
