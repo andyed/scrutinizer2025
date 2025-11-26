@@ -294,15 +294,13 @@ class WebGLRenderer {
                 
                 // === 7. ROD VISION (DESATURATION / TINT / GRAIN) ===
                 if (rodStrength > 0.0 && !isScrollbar) {
-                    // Exponential saturation falloff with global intensity baked in.
-                    float eccentricity = max(0.0, dist - fovea_radius);
-                    float saturation = exp(-3.0 * eccentricity);
-                    // Scale saturation loss by intensity (higher intensity = less saturation)
-                    // If intensity is 0, saturation should remain 1.0 (no loss)
-                    // But our logic is inverted: saturation is 0.0 at periphery.
-                    // Let's mix between original saturation and calculated saturation based on intensity.
+                    // Exponential saturation falloff (Steeper curve as requested)
+                    // saturation = 1.0 - sqrt(dist)
+                    float saturation = 1.0 - pow(dist, 0.5);
+                    saturation = clamp(saturation, 0.0, 1.0);
+                    
+                    // Modulate by intensity
                     saturation = mix(1.0, saturation, u_intensity);
-                    saturation = max(0.0, saturation); 
                     
                     float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
                     
@@ -317,8 +315,10 @@ class WebGLRenderer {
                     boostedGray += grain * 0.15 * u_intensity; 
                     boostedGray = clamp(boostedGray, 0.0, 1.0);
                     
-                    // Rod tint: cyan-ish gray, stronger in darker regions.
-                    vec3 rodTint = vec3(boostedGray * 0.6, boostedGray * 0.9, boostedGray * 1.0);
+                    // Rod tint: Eigengrau / Cold Dark Blue
+                    // Was: vec3(0.6, 0.9, 1.0) (Cyan)
+                    // New: vec3(0.5, 0.6, 0.8) (Cold Blue)
+                    vec3 rodTint = vec3(boostedGray * 0.5, boostedGray * 0.6, boostedGray * 0.8);
                     vec3 neutralGray = vec3(boostedGray);
                     
                     // Stronger tint in dark areas

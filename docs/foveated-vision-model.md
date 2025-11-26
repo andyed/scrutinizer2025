@@ -151,15 +151,15 @@ This creates colored fringes in the periphery, supporting illegibility without n
 
 Beyond the fovea, the shader gradually:
 
-- Reduces saturation.
+- Reduces saturation using an **exponential falloff** (`1.0 - sqrt(dist)`), making the far periphery effectively monochrome.
 - Increases contrast.
 - Adds high‑frequency grain.
-- Applies a cyan‑leaning tint stronger in darker regions (related to the **Purkinje shift** in scotopic vision).
+- Applies a **"Eigengrau" (Brain Grey)** tint (cold dark blue) in darker regions.
 
 This is blended based on both `rodStrength` and the local luminance, yielding a peripheral appearance that is:
 
-- More monochrome and grainy.
-- Slightly cyan‑shifted in dark regions, mimicking rod‑dominant vision.
+- Cold, colorless, and grainy.
+- Shifted towards a dark blue-grey, mimicking the lack of color data in the rod-dominated periphery.
 
 ---
 
