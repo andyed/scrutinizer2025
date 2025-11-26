@@ -37,17 +37,32 @@ The Magno-cellular pathway (motion/luminance) processes information faster than 
 
 ---
 
+**For detailed theoretical discussion**, see [`docs/beta_gemini3_discussion.md`](docs/beta_gemini3_discussion.md)
+
 ## Related Work & Theoretical Foundation
 
 ### Vision Science & Cognitive Psychology
-- **Ruth Rosenholtz (MIT)**: Mongrel Theory and peripheral summary statistics
-- **Anil Seth**: "Controlled hallucination" model of perception
-- **Peter Pirolli (Xerox PARC)**: Information Foraging Theory - "information scent"
-- **Cohen et al. (2020, PNAS)**: "Refrigerator Light" illusion
+
+* **Ruth Rosenholtz (MIT):** [Mongrel Theory and peripheral summary statistics](https://dspace.mit.edu/handle/1721.1/6763)
+    * *See also:* [The Visual System as a Statistician (PDF)](https://jov.arvojournals.org/article.aspx?articleid=2193856)
+* **Anil Seth:** [The "Controlled Hallucination" model of perception (TED Talk)](https://www.ted.com/talks/anil_seth_your_brain_hallucinates_your_conscious_reality)
+* **Peter Pirolli (Xerox PARC):** [Information Foraging Theory (Pirolli & Card, 1999)](https://review.ucsc.edu/fall09/images/Pirolli_Card_1999.pdf)
+    * *Concept:* "Information Scent"
+* **Cohen et al. (2020, PNAS):** ["The Refrigerator Light" illusion / The Bandwidth of Perceptual Experience](https://www.pnas.org/doi/10.1073/pnas.1915758117)
 
 ### UX & Design Practice
-- **Jeff Johnson**: *Designing with the Mind in Mind*
-- **Susan Weinschenk**: *100 Things Every Designer Needs to Know About People*
-- **Nielsen Norman Group**: The "heatmap lie"
 
-**For detailed theoretical discussion**, see [`docs/beta_gemini3_discussion.md`](docs/beta_gemini3_discussion.md)
+* **Jeff Johnson:** [*Designing with the Mind in Mind* (Elsevier)](https://www.sciencedirect.com/book/9780124079144/designing-with-the-mind-in-mind)
+* **Susan Weinschenk:** [*100 Things Every Designer Needs to Know About People*](https://theteamw.com/books/100-things-every-designer-needs-to-know-about-people/)
+* **Nielsen Norman Group:** [The "Heatmap Lie" / Eye Tracking Limitations](https://www.nngroup.com/articles/eye-tracking-setup/)
+    * *Note:* References the gap between where we look (foveal) and what we process (peripheral).
+
+
+
+### Use of Foveal Simulation for Web Design
+
+- **Alex Faaborg (2001)**: [Master's Thesis on Foveal Vision](http://alumni.media.mit.edu/~faaborg/research/cornell/cg_fovealvision_site/index.htm)
+- **Lagun, D. & Agichtein, E. (2011)**: ["ViewSer: A Tool for Large-Scale Studies of Web Search Result Examination"](http://www.mathcs.emory.edu/~dlagun/pubs/sigir636-lagun.pdf). *CHI 2011*.
+  - See also: [ResearchGate Publication](https://www.researchgate.net/publication/221300903_ViewSer_enabling_large-scale_remote_user_studies_of_web_search_examination_and_interaction)
+- **The Flashlight Project (2010)**: Schulte-Mecklenbeck, M., Murphy, R. O., & Hutzler, F. ["Flashlight: Recording Information Acquisition Online"](http://vlab.ethz.ch/flashlight/index.php). *SSRN*.
+  - Available at: [SSRN](http://ssrn.com/abstract=1433225) or [DOI](http://dx.doi.org/10.2139/ssrn.1433225)

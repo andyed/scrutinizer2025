@@ -120,7 +120,7 @@ npm start
 
 Scrutinizer uses a custom WebGL pipeline to simulate biological constraints like rod-weighted luminance, retinal ganglion density, and domain warping.
 
-For a detailed breakdown of the algorithms and biological models, see [Scientific Literature Review & Implementation Details](scientific_literature_review.md).
+For implementation details, see [Implementation Notes: The Biological Model](docs/foveated-vision-model.md). 
 
 ---
 
@@ -128,12 +128,12 @@ For a detailed breakdown of the algorithms and biological models, see [Scientifi
 
 This project is grounded in research from vision science and cognitive psychology, including "Mongrel Theory" (Ruth Rosenholtz) and "Controlled Hallucination" (Anil Seth).
 
-- **[Scientific Literature Review](scientific_literature_review.md)**: Deep dive into the science behind the simulation.
+- **[Scientific Literature Review](docs/scientific_literature_review.md)**: Deep dive into the science behind the simulation.
 - **[YouTube Playlists](https://www.youtube.com/@scrutinizer-app/playlists)**: Watch our curated videos on vision science and UX.
 
 ---
 
-## Limitations & Roadmap
+## Limitations
 
 > [!WARNING]
 > Scrutinizer is intentionally **approximate** and should be used as a **design constraint model**, not a precise physiological instrument.
@@ -141,8 +141,6 @@ This project is grounded in research from vision science and cognitive psycholog
 - It models **retinal input constraints**, not the brain's transsaccadic integration.
 - **Current implementation** uses Box Sampling with Noise, not full "Mongrel Theory" texture synthesis.
 - It assumes a fixed relationship between screen pixels and **visual angle**.
-
-See the [roadmap](./ROADMAP.md) for future plans.
 
 ---
 
