@@ -35,11 +35,30 @@ The Magno-cellular pathway (motion/luminance) processes information faster than 
     - **Green Channel**: Anchored.
 - **Effect**: High-contrast edges in the periphery develop color fringes (Red/Cyan), creating a "vibrating" or "3D" effect that simulates the difficulty of locking focus on peripheral objects.
 
----
+
 
 **For detailed theoretical discussion**, see [`docs/beta_gemini3_discussion.md`](docs/beta_gemini3_discussion.md)
 
+---
+
 ## Related Work & Theoretical Foundation
+
+### Use of Foveal Simulation for Web Design
+
+
+- **Lagun, D. & Agichtein, E. (2011)**: ["ViewSer: A Tool for Large-Scale Studies of Web Search Result Examination"](http://www.mathcs.emory.edu/~dlagun/pubs/sigir636-lagun.pdf). *CHI 2011*.
+  - See also: [ResearchGate Publication](https://www.researchgate.net/publication/221300903_ViewSer_enabling_large-scale_remote_user_studies_of_web_search_examination_and_interaction)
+  - Summary: This study introduced a "restricted focus viewer" (blurring the screen except for a clear window under the mouse) to track user attention on Search Engine Results Pages (SERPs). Crucially, they validated that cursor-contingent viewing strongly correlates with actual eye-tracking data.
+- **The Flashlight Project (2010)**: Schulte-Mecklenbeck, M., Murphy, R. O., & Hutzler, F. ["Flashlight: Recording Information Acquisition Online"](http://vlab.ethz.ch/flashlight/index.php). *SSRN*.
+  - Available at: [SSRN](http://ssrn.com/abstract=1433225) or [DOI](http://dx.doi.org/10.2139/ssrn.1433225)
+  - Summary: A process-tracing tool used in behavioral economics to study decision-making. It completely obscures the screen until the mouse hovers over a region, allowing researchers to record the exact sequence and duration of information acquisition (e.g., checking "Price" before "Rating").
+
+- **Bednarik, R. & Tukiainen, M. (2007)**: ["Validating the Restricted Focus Viewer: A study using eye-movement tracking"](https://www.researchgate.net/publication/6144967_Validating_the_Restricted_Focus_Viewer_A_study_using_eye-movement_tracking). Behavior Research Methods.
+  - Summary: A direct validation study comparing a "mouse-contingent" blur tool (Restricted Focus Viewer) against a hardware eye-tracker. They found that while task performance remained similar, the visual strategies differed—specifically, the artificial blur caused expert users to alter their natural scanning patterns.
+
+- **Blackwell, A. F., Jansen, A. R., & Marriott, K. (2003)**: ["A tool for tracking visual attention: The Restricted Focus Viewer"](https://www.researchgate.net/publication/10779779_A_tool_for_tracking_visual_attention_The_Restricted_Focus_Viewer). Behavior Research Methods.
+  - Summary: The seminal paper introducing the Restricted Focus Viewer (RFV). The authors developed a software tool that blurs the screen except for a mouse-driven window to study how people reason with diagrams. They demonstrated that for high-level cognitive tasks, mouse movements in the RFV provide a reliable proxy for visual attention.
+
 
 ### Vision Science & Cognitive Psychology
 
@@ -59,10 +78,3 @@ The Magno-cellular pathway (motion/luminance) processes information faster than 
 
 
 
-### Use of Foveal Simulation for Web Design
-
-- **Alex Faaborg (2001)**: [Master's Thesis on Foveal Vision](http://alumni.media.mit.edu/~faaborg/research/cornell/cg_fovealvision_site/index.htm)
-- **Lagun, D. & Agichtein, E. (2011)**: ["ViewSer: A Tool for Large-Scale Studies of Web Search Result Examination"](http://www.mathcs.emory.edu/~dlagun/pubs/sigir636-lagun.pdf). *CHI 2011*.
-  - See also: [ResearchGate Publication](https://www.researchgate.net/publication/221300903_ViewSer_enabling_large-scale_remote_user_studies_of_web_search_examination_and_interaction)
-- **The Flashlight Project (2010)**: Schulte-Mecklenbeck, M., Murphy, R. O., & Hutzler, F. ["Flashlight: Recording Information Acquisition Online"](http://vlab.ethz.ch/flashlight/index.php). *SSRN*.
-  - Available at: [SSRN](http://ssrn.com/abstract=1433225) or [DOI](http://dx.doi.org/10.2139/ssrn.1433225)
