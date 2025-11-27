@@ -19,7 +19,7 @@ class DomAdapter {
         const blocks = [];
         const zoom = webFrame.getZoomFactor();
 
-        // 1. Text Nodes
+        // 1. Text Nodes (unchanged - these are the most important)
         const walker = document.createTreeWalker(
             root,
             NodeFilter.SHOW_TEXT,
@@ -46,13 +46,11 @@ class DomAdapter {
                 // Parse Line Height
                 let lineHeight = parseFloat(style.lineHeight);
                 if (isNaN(lineHeight)) {
-                    // Normal line height is roughly 1.2 * fontSize
                     const fontSize = parseFloat(style.fontSize);
                     lineHeight = isNaN(fontSize) ? 16 : fontSize * 1.2;
                 }
 
                 // Calculate Density (Mass)
-                // Font weight: 100-900. Map to 0.2 - 1.0
                 const weight = parseFloat(style.fontWeight) || 400;
                 const density = Math.min(1.0, Math.max(0.2, weight / 900));
 
@@ -72,11 +70,11 @@ class DomAdapter {
             }
         }
 
-        // 2. Images & Iframes
-        const images = root.querySelectorAll('img, svg, video, canvas, iframe');
-        for (const img of images) {
-            const rect = img.getBoundingClientRect();
-            // Skip if off-screen
+        // 2. Media & Visual Elements - detect by tag type
+        // (Images, video, canvas, SVG, etc. - these need explicit checks)
+        const mediaElements = root.querySelectorAll('img, svg, video, canvas, iframe, picture, embed, object, meter, progress');
+        for (const el of mediaElements) {
+            const rect = el.getBoundingClientRect();
             if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
                 continue;
             }
@@ -87,18 +85,35 @@ class DomAdapter {
                     y: rect.top * zoom,
                     w: rect.width * zoom,
                     h: rect.height * zoom,
-                    type: 0.5, // Image
-                    density: 0.8, // High density for images
+                    type: 0.5, // Media
+                    density: 0.8,
                     lineHeight: 0
                 });
             }
         }
 
-        // 3. UI Elements (Buttons, Inputs, Textareas)
-        const uiElements = root.querySelectorAll('button, input, textarea, select, a.button, [role="button"], [contenteditable="true"]');
-        for (const el of uiElements) {
+        // 3. Interactive Elements - comprehensive detection
+        // Instead of listing every possible interactive element, use semantic attributes
+        const interactiveElements = root.querySelectorAll([
+            // Form controls
+            'button', 'input', 'textarea', 'select', 'option',
+            // Links
+            'a[href]',
+            // ARIA interactive roles
+            '[role="button"]', '[role="link"]', '[role="menuitem"]', '[role="tab"]',
+            '[role="checkbox"]', '[role="radio"]', '[role="switch"]', '[role="slider"]',
+            // Editable content
+            '[contenteditable="true"]',
+            // Details/Summary (disclosure widgets)
+            'summary', 'details',
+            // Media controls
+            'audio', 'video',
+            // Any element with onclick or tabindex (indicating interactivity)
+            '[onclick]', '[tabindex]:not([tabindex="-1"])'
+        ].join(', '));
+
+        for (const el of interactiveElements) {
             const rect = el.getBoundingClientRect();
-            // Skip if off-screen
             if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
                 continue;
             }
@@ -110,7 +125,7 @@ class DomAdapter {
                     w: rect.width * zoom,
                     h: rect.height * zoom,
                     type: 0.0, // UI
-                    density: 1.0, // Solid
+                    density: 1.0,
                     lineHeight: 0
                 });
             }
@@ -134,9 +149,10 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     let isScanning = false;
+    let scrollDebounceTimer = null;
 
-    // Throttled scan function
-    const scanAndSend = () => {
+    // Throttled scan function with differentiated handling for scroll vs mutations
+    const scanAndSend = (isScrollEvent = false) => {
         if (!domAdapter || isScanning) return;
         isScanning = true;
 
@@ -149,17 +165,33 @@ window.addEventListener('DOMContentLoaded', () => {
             } catch (err) {
                 console.error('[Preload] Scan failed:', err);
             } finally {
-                // Simple throttle: wait 100ms before allowing next scan
+                // Faster throttle for scroll events (16ms ~60fps) vs mutations (100ms)
+                const throttleMs = isScrollEvent ? 16 : 100;
                 setTimeout(() => {
                     isScanning = false;
-                }, 100);
+                }, throttleMs);
             }
         });
     };
 
+    // Debounced final scan to capture scroll endpoint
+    const scheduleFinalScan = () => {
+        if (scrollDebounceTimer) {
+            clearTimeout(scrollDebounceTimer);
+        }
+        scrollDebounceTimer = setTimeout(() => {
+            // One final scan after scrolling stops to ensure we have the final position
+            scanAndSend(true);
+        }, 100); // Wait 100ms after last scroll event
+    };
+
     // Trigger scans on relevant events
     if (domAdapter) {
-        window.addEventListener('scroll', scanAndSend, { passive: true });
+        // Scroll needs fast updates for smooth tracking
+        window.addEventListener('scroll', () => {
+            scanAndSend(true); // Immediate throttled scan
+            scheduleFinalScan(); // Schedule debounced final scan
+        }, { passive: true });
         window.addEventListener('resize', scanAndSend, { passive: true });
 
         // Observer for DOM mutations

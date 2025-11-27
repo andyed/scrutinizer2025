@@ -53,13 +53,12 @@ This document outlines the path from current alpha to a production-ready 1.0 rel
     - "Blueprint Blue" tint.
     - **Why**: Highlights Layout vs. Content. Proves the user sees the grid but misses the copy.
     - **Current State**:
-        - ✅ **Scroll Compensation**: Structure map aligns perfectly with content during scroll.
-        - ⚠️ **Data Issue**: "Red Tint" bug indicates structure map is capturing full-screen elements (likely `<body>` or `<html>`) or texture clearing is failing.
-        - 🔴 **Missing Tags**: `audio`, `summary`, `meter`, `progress` need to be added to `DomAdapter`.
+        - ✅ **Scroll Performance**: Structure map now updates at ~60fps (16ms throttle) for smooth tracking during scroll
+        - ✅ **HTML5 Coverage**: Added support for `audio`, `summary`, `meter`, `progress` tags
+        - � **Blueprint Mode**: Wireframe rendering functional, needs visual polish
     - **Todos**:
-        - [ ] Fix "Red Tint" data issue (ensure map is empty where no content exists).
-        - [ ] Implement proper Wireframe rendering (Blue blocks for UI, Green for Images, Red for Text).
-        - [ ] Tune opacity and blending for "UX Blueprint" look.
+        - [ ] Fix "Red Tint" visual overlay issue (whole page shows pink/red tint)
+        - [ ] Tune opacity and blending for "UX Blueprint" look
 
 #### 3. The "Cyberpunk/Neon" Tweak (VJ/Creative Aesthetic)
 *For "Eye Candy" & Creative Coding*

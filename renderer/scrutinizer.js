@@ -130,28 +130,6 @@
             });
         }
 
-        handleStructureUpdate(blocks) {
-            if (!this.renderer || !this.structureMap) return;
-
-            // console.log(`[Scrutinizer] Received structure update: ${blocks.length} blocks`);
-
-            // Ensure map size matches viewport
-            this.structureMap.resize(this.canvas.width, this.canvas.height);
-            this.structureMap.clear();
-
-            // Draw blocks
-            const dpr = this.dpr || 1;
-
-            for (const block of blocks) {
-                this.structureMap.drawBlock(
-                    block.x * dpr, block.y * dpr, block.w * dpr, block.h * dpr,
-                    block.type, block.density, block.lineHeight
-                );
-            }
-
-            // Upload to GPU
-            this.renderer.uploadStructureMap(this.structureMap.getCanvas());
-        }
         handleMouseMove(event) {
             const rect = this.canvas.getBoundingClientRect();
             // WebGL viewport handles scaling, but we need mouse in canvas pixel coords
