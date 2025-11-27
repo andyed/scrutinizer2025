@@ -64,6 +64,57 @@ This document outlines the path from current alpha to a production-ready 1.0 rel
         - [ ] Fix "Red Tint" visual overlay issue (whole page shows pink/red tint)
         - [ ] Tune opacity and blending for "UX Blueprint" look
 
+### Saliency Map Integration (Research Platform Enhancement)
+
+**Goal**: Transform from static geometric filter to dynamic, attention-driven system for biophysical accuracy.
+
+#### 1. Saccadic Planning and Guidance
+Leverage peripheral signal (Saliency) to drive foveal response (Saccades) and validate model against eye-tracking data.
+
+**Implementation:**
+- **Saliency Input**: Computational model processing entire visual field for bottom-up features (color, intensity, orientation contrast)
+- **Winner-Take-All (WTA) Network**: 
+  - Find maximum value on Saliency Map = predicted next saccade target
+  - Trigger simulated saccade after fixation threshold (200-300ms)
+  - Shift `u_mouse` (foveal center) toward WTA location
+- **Inhibition of Return (IOR)**: Set target area to zero post-saccade to force exploration
+- **Result**: Realistic scanpath generation for reading/search studies
+
+**Shader Integration:**
+```glsl
+uniform sampler2D u_saliencyMap;
+vec2 nextSaccadeTarget = findWTA(u_saliencyMap);
+// Animate u_mouse toward target over 30-50ms
+```
+
+#### 2. Saliency-Driven Feature Aggregation (Crowding Model)
+
+**Mechanism**: Model peripheral crowding where clutter prevents feature identification.
+
+**Implementation:**
+- **Clutter Strength Mask**: `ClutterStrength = 1.0 - SaliencyMap`
+- **Low Saliency → High Distortion**:
+  - Non-distinctive features (low saliency) = high clutter
+  - Modulate domain warping: `warpStrength *= ClutterStrength`
+  - Modulate jitter: `jitterAmount *= ClutterStrength`
+  
+**Biophysical Analogy**: High jitter/warping simulates brain mashing features together in peripheral clutter.
+
+**Shader Integration:**
+```glsl
+float clutterStrength = 1.0 - texture2D(u_saliencyMap, uv).r;
+float crowdingFactor = mix(1.0, clutterStrength, peripheralMask);
+warpOffset *= crowdingFactor;
+```
+
+**Result**: Distortion driven by feature density/uniqueness rather than just eccentricity distance.
+
+**Dependencies:**
+- [ ] Research/select computational saliency model (e.g., Itti-Koch, DeepGaze)
+- [ ] Implement WTA network with IOR
+- [ ] Integrate clutter mask with existing shader pipeline
+- [ ] Validate against eye-tracking datasets
+
 #### 3. The "Cyberpunk/Neon" Tweak (VJ/Creative Aesthetic)
 *For "Eye Candy" & Creative Coding*
 - **Concept**: Hyper-spectral periphery. Fovea is "Real", Periphery is "Digital/Hallucinogenic".
