@@ -222,7 +222,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 mouseMoveCount++;
                 // Log every 60th event to verify flow
                 if (mouseMoveCount % 60 === 0) {
-                    console.log(`[Preload] Mouse at (${e.clientX}, ${e.clientY}), zoom=${webFrame.getZoomFactor()}`);
+                    ipcRenderer.send('log:renderer', `[Preload] Mouse at (${e.clientX}, ${e.clientY}), zoom=${webFrame.getZoomFactor()}`);
                 }
                 ipcRenderer.send('browser:mousemove', e.clientX, e.clientY, webFrame.getZoomFactor());
                 ticking = false;
