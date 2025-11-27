@@ -102,6 +102,9 @@ class DomAdapter {
             // ARIA interactive roles
             '[role="button"]', '[role="link"]', '[role="menuitem"]', '[role="tab"]',
             '[role="checkbox"]', '[role="radio"]', '[role="switch"]', '[role="slider"]',
+            // Modal/Dialog/Overlay roles
+            '[role="dialog"]', '[role="alertdialog"]', '[aria-modal="true"]',
+            '[role="menu"]', '[role="listbox"]', '[role="combobox"]',
             // Editable content
             '[contenteditable="true"]',
             // Details/Summary (disclosure widgets)
