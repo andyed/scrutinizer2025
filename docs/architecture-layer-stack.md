@@ -55,10 +55,23 @@ Since the Overlay Window is click-through, it cannot natively detect mouse movem
 This pipeline generates the "Structure Map" texture used for the "Wireframe" and "Simulation" modes.
 
 1.  **Trigger**: `preload.js` detects `scroll`, `resize`, or `MutationObserver` events.
+    - **Scroll Performance**: Dual-strategy approach ensures smooth tracking with ~60fps updates during scroll and accurate final position capture:
+      - **Throttled scans** (16ms): Run continuously during scrolling for smooth visual tracking
+      - **Debounced final scan** (100ms): Always runs after scrolling stops to capture exact final position
+    - **Mutation handling**: Standard throttle (100ms) for DOM changes
 2.  **Scan**: `DomAdapter.scan(document.body)` traverses the DOM and extracts `StructureBlock` objects (rect, type, density, lineHeight).
+    - **Element Detection Strategy**: Uses semantic attributes instead of hardcoded tag lists:
+      - **Text**: TreeWalker for text nodes (highest priority)
+      - **Media**: Explicit tags (`img`, `svg`, `video`, `canvas`, `picture`, `embed`, `object`, `meter`, `progress`)
+      - **Interactive**: Semantic detection via:
+        - Form controls (`button`, `input`, `textarea`, `select`)
+        - Links with href (`a[href]`)
+        - ARIA roles (`[role="button"]`, `[role="link"]`, `[role="tab"]`, etc.)
+        - Interactivity markers (`[onclick]`, `[tabindex]`, `[contenteditable]`)
+    - This approach is robust to new HTML elements and modern web frameworks
 3.  **Send**: `preload.js` sends `ipcRenderer.send('structure-update', blocks)`.
 4.  **Route**: `main.js` forwards the data to the HUD window via `structure-update`.
-5.  **Rasterize**: `Scrutinizer.handleStructureUpdate` receives the blocks and uses `StructureMap` to draw them onto an offscreen canvas (encoding data into RGBA channels).
+5.  **Rasterize**: `Scrutinizer.handleStructureUpdate` receives the blocks and uses `StructureMap` to draw them onto an offscreen canvas (encoding data into RGBA channels at 50% resolution).
 6.  **Upload**: `WebGLRenderer.uploadStructureMap` uploads the offscreen canvas to the GPU as a texture (`u_structureMap`).
 7.  **Consume**: The Fragment Shader uses the texture to modulate distortion (clean whitespace) or draw wireframes.
 

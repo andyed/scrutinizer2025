@@ -128,8 +128,36 @@ interface StructureBlock {
 }
 ```
 
+### Performance Optimization: Scroll Tracking
+The structure map must stay synchronized with content during scrolling. The implementation uses a **dual-strategy approach**:
+
+- **Throttled scans** (16ms): Continuous updates during scroll for ~60fps tracking
+- **Debounced final scan** (100ms): Guarantees capture of exact final scroll position
+- **Mutation throttle** (100ms): Efficient handling of DOM changes
+
+This ensures smooth visual tracking during scroll with no lag or "snap-to-position" artifacts when scrolling stops.
+
+### Element Detection: Semantic Approach
+Instead of maintaining brittle lists of HTML tags, the scanner detects elements by **semantic characteristics**:
+
+**Text Detection** (TreeWalker):
+- Traverses all text nodes with non-empty content
+- Captures line height and font weight for rhythm/density encoding
+
+**Media Elements** (Explicit Tags):
+- Visual elements require tag-based detection: `img`, `svg`, `video`, `canvas`, `picture`, `embed`, `object`, `meter`, `progress`
+
+**Interactive Elements** (Semantic Attributes):
+- Form controls: `button`, `input`, `textarea`, `select`, `option`
+- Links: `a[href]`
+- ARIA roles: `[role="button"]`, `[role="link"]`, `[role="menuitem"]`, `[role="tab"]`, `[role="checkbox"]`, `[role="radio"]`, `[role="switch"]`, `[role="slider"]`
+- Editable: `[contenteditable="true"]`
+- Custom interactivity: `[onclick]`, `[tabindex]:not([tabindex="-1"])`
+
+This approach is **framework-agnostic** and captures modern web patterns (e.g., `<div role="button">`) without maintaining exhaustive tag lists.
+
 ### The Rasterizer: `StructureMap`
-These blocks are painted onto an off-screen `<canvas>` (25% resolution) to create the `u_structureMap` texture. This texture encodes semantic data into RGBA channels:
+These blocks are painted onto an off-screen `<canvas>` (50% resolution) to create the `u_structureMap` texture. This texture encodes semantic data into RGBA channels:
 
 | Channel | Data | Description |
 | :--- | :--- | :--- |
