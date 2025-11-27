@@ -530,14 +530,36 @@ function createScrutinizerWindow(startUrl) {
 
 
     // MOUSE TRACKING FALLBACK: Poll global mouse position
-    // This works even when DOM events are blocked by modals/popups
+    // This works as a FALLBACK when DOM events are blocked by modals/popups
+    // We still prefer DOM events when available (they carry element context)
     let mousePollingInterval = null;
+    let lastDOMEventTime = Date.now();
+    let mouseEventCount = 0; // Added for logging, as used in the provided snippet
+
+    // Listen for DOM events and update timestamp
+    ipcMain.on('browser:mousemove', (event, x, y, zoom = 1.0) => {
+        lastDOMEventTime = Date.now();
+        mouseEventCount++;
+        // Log every 60th event
+        if (mouseEventCount % 60 === 0) {
+            console.log(`[Main] Received DOM mousemove: (${x}, ${y}), zoom=${zoom}`);
+        }
+        const windows = BrowserWindow.getAllWindows();
+        const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
+        if (win && win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+            win.scrutinizerHud.webContents.send('browser:mousemove', x, y, zoom);
+        }
+    });
 
     const startMousePolling = () => {
         if (mousePollingInterval) return; // Already polling
 
         mousePollingInterval = setInterval(() => {
             if (win.isDestroyed() || !win.isFocused()) return;
+
+            // Only use polling if DOM hasn't sent events recently (modal blocking)
+            const timeSinceDOM = Date.now() - lastDOMEventTime;
+            if (timeSinceDOM < 100) return; // DOM is working, skip polling
 
             try {
                 const { screen } = require('electron');
