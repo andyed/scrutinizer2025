@@ -60,6 +60,26 @@ The Magno-cellular pathway (motion/luminance) processes information faster than 
   - Summary: The seminal paper introducing the Restricted Focus Viewer (RFV). The authors developed a software tool that blurs the screen except for a mouse-driven window to study how people reason with diagrams. They demonstrated that for high-level cognitive tasks, mouse movements in the RFV provide a reliable proxy for visual attention.
 
 
+
+### Ensemble Perception & Saccade Planning
+*Why simple blur is insufficient for simulating reading behavior.*
+
+* **Ariely, D. (2001)**: ["Seeing sets: Representation by statistical properties"](https://journals.sagepub.com/doi/10.1111/1467-9280.00327). *Psychological Science*.
+    * **The Insight**: The brain processes groups of objects in the periphery as a "set," instantly calculating the **mean size** and density, even when individual objects are unidentified.
+    * **Relevance to Scrutinizer**: This validates the **Wireframe Mode**. By rendering text as solid blocks of the *correct line height*, Scrutinizer provides the exact "statistical summary" (Mean Size) that the dorsal stream uses to categorize the region as "Text" vs "Image."
+
+* **Rayner, K. (1998)**: ["Eye movements in reading and information processing: 20 years of research"](https://psycnet.apa.org/record/1998-10886-001). *Psychological Bulletin*.
+    * **The Insight**: Saccade planning (deciding where to look next) relies heavily on low-spatial-frequency cues in the parafovea—specifically **word length** and **boundaries**.
+    * **Relevance to Scrutinizer**: Standard Gaussian blur destroys word boundaries, making natural scanning impossible. The **Structure Map** approach preserves the "landing zones" for the eye, allowing researchers to validly test "Information Foraging" behavior even when text is unreadable.
+
+* **Rosenholtz, R., et al. (2012)**: ["A summary statistic representation in peripheral vision explains visual search"](https://jov.arvojournals.org/article.aspx?articleid=2193856). *Journal of Vision*.
+    * **The Insight**: Peripheral vision represents the world as "Texture Statistics" (Mongrels). We don't just see "blurry" letters; we see a "texture of letters."
+    * **Relevance to Scrutinizer**: This motivates the **Simulation Mode**. Instead of blurring, we use the DOM's `font-weight` and `line-height` to drive a **Noise Field**. This ensures the "texture energy" of the periphery matches the reality of the document, preventing the "Pop-out Effect" (where a blurry gray bar looks *more* conspicuous than the original text).
+
+* **Whitney, D., & Yamanashi Leib, A. (2018)**: ["Ensemble Perception"](https://www.annualreviews.org/doi/abs/10.1146/annurev-psych-010416-044232). *Annual Review of Psychology*.
+    * **The Insight**: A comprehensive review of how the visual system compresses redundant information (like rows of text) into a "Gist."
+    * **Relevance to Scrutinizer**: Supports the use of **Quantization** (blocking). The visual system compresses 10 lines of text into a single "Text Object." Scrutinizer visualizes this compression algorithm in real-time.
+
 ### Vision Science & Cognitive Psychology
 
 * **Ruth Rosenholtz (MIT):** [Mongrel Theory and peripheral summary statistics](https://dspace.mit.edu/handle/1721.1/6763)
