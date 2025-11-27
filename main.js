@@ -265,6 +265,16 @@ ipcMain.on('browser:zoom-changed', (event, zoom) => {
     }
 });
 
+// Forward structure map updates from content to HUD
+ipcMain.on('structure-update', (event, blocks) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
+    if (win && win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+        console.log(`[Main] Forwarding ${blocks.length} structure blocks to HUD`);
+        win.scrutinizerHud.webContents.send('structure-update', blocks);
+    }
+});
+
 // Handle URL dialog responses
 ipcMain.on('url-dialog:go', (event, url) => {
     const windows = BrowserWindow.getAllWindows();

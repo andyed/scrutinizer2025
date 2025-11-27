@@ -185,8 +185,16 @@
             if (scrutinizer) scrutinizer.toggleCA(enabled);
         });
 
-        ipcRenderer.on('menu:toggle-debug-boundary', (event, enabled) => {
-            if (scrutinizer) scrutinizer.toggleDebugBoundary(enabled);
+        ipcRenderer.on('menu:toggle-debug-boundary', (e, enabled) => {
+            scrutinizer.toggleDebugBoundary(enabled);
+        });
+
+        ipcRenderer.on('menu:toggle-structure-map', (e, enabled) => {
+            scrutinizer.toggleStructureMap(enabled);
+        });
+
+        ipcRenderer.on('menu:toggle-enable-structure-map', (e, enabled) => {
+            scrutinizer.toggleEnableStructureMap(enabled);
         });
 
         ipcRenderer.on('menu:set-visual-memory', (event, limit) => {

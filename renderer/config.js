@@ -23,10 +23,16 @@ const CONFIG = {
     maskSmoothness: 1, // 0-1, higher = more responsive (0.2 = smooth but laggy, 1.0 = instant)
 
     // Experimental settings
-    useFoveatedBlur: true, // when true, use multi-resolution foveated blur instead of uniform blur
+    useFoveatedBlur: true, // when true, use multi-resolution foveated blur
+    chromaticAberration: true, // Enable chromatic aberration
+    mongrelMode: 1.0, // 0.0 = Noise, 1.0 = Shatter
 
     // Debug settings
-    enableLogger: true // Enable renderer logs passing through to main process terminal
+    enableLogger: true, // Enable renderer logs passing through to main process terminal
+    debugBoundary: 0.0,
+    debugStructure: 0.0,
+    enableStructureMap: true,
+    visualMemory: 0.0,
 };
 
 if (typeof module !== 'undefined' && module.exports) {

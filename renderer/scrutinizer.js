@@ -2,6 +2,7 @@
     const { ipcRenderer } = require('electron');
     const Logger = require('./logger');
     const WebGLRenderer = require('./webgl-renderer');
+    const StructureMap = require('./structure-map');
 
     class Scrutinizer {
         constructor(config) {
@@ -19,6 +20,9 @@
                 Logger.warn('WebGL is required for Scrutinizer. Visual effects will be disabled.');
                 // alert('WebGL is required for this version of Scrutinizer.'); // Suppressed to avoid spam
             }
+
+            // Initialize Structure Map
+            this.structureMap = new StructureMap();
 
             this.enabled = false;
             this.lastFrameBitmap = null;
@@ -46,6 +50,7 @@
             this.handleMouseMove = this.handleMouseMove.bind(this);
             this.handleResize = this.handleResize.bind(this);
             this.render = this.render.bind(this);
+            this.handleStructureUpdate = this.handleStructureUpdate.bind(this);
 
             this.setupEventListeners();
         }
@@ -53,6 +58,11 @@
         setupEventListeners() {
             window.addEventListener('mousemove', this.handleMouseMove);
             window.addEventListener('resize', this.handleResize);
+
+            // Listen for structure updates
+            ipcRenderer.on('structure-update', (event, blocks) => {
+                this.handleStructureUpdate(blocks);
+            });
 
             // Initial resize
             this.handleResize();
@@ -92,6 +102,7 @@
             // Listen for response (only once per resize)
             ipcRenderer.once('window-size', (event, { width, height }) => {
                 const dpr = window.devicePixelRatio || 1;
+                this.dpr = dpr; // Store for structure map updates
 
                 // Set CSS size to match window
                 this.canvas.style.width = width + 'px';
@@ -119,6 +130,28 @@
             });
         }
 
+        handleStructureUpdate(blocks) {
+            if (!this.renderer || !this.structureMap) return;
+
+            // console.log(`[Scrutinizer] Received structure update: ${blocks.length} blocks`);
+
+            // Ensure map size matches viewport
+            this.structureMap.resize(this.canvas.width, this.canvas.height);
+            this.structureMap.clear();
+
+            // Draw blocks
+            const dpr = this.dpr || 1;
+
+            for (const block of blocks) {
+                this.structureMap.drawBlock(
+                    block.x * dpr, block.y * dpr, block.w * dpr, block.h * dpr,
+                    block.type, block.density, block.lineHeight
+                );
+            }
+
+            // Upload to GPU
+            this.renderer.uploadStructureMap(this.structureMap.getCanvas());
+        }
         handleMouseMove(event) {
             const rect = this.canvas.getBoundingClientRect();
             // WebGL viewport handles scaling, but we need mouse in canvas pixel coords
@@ -331,7 +364,8 @@
             }
             this.renderCount++;
             if (this.renderCount === 1) {
-                Logger.log(`[Scrutinizer] First render call: canvas=${this.canvas.width}x${this.canvas.height}, mouse=(${this.mouseX},${this.mouseY}), radius=${effectiveRadius}`);}
+                Logger.log(`[Scrutinizer] First render call: canvas=${this.canvas.width}x${this.canvas.height}, mouse=(${this.mouseX},${this.mouseY}), radius=${effectiveRadius}`);
+            }
 
             // DEBUG: Log state occasionally
             if (Math.random() < 0.005) {
@@ -345,16 +379,18 @@
                 this.canvas.height,
                 this.mouseX,
                 this.mouseY,
-                effectiveRadius,
-                this.config.intensity !== undefined ? this.config.intensity : 0.6, // Default to 0.6
-                this.config.chromaticAberration !== undefined ? (this.config.chromaticAberration ? 1.0 : 0.0) : 1.0, // Default to ON
-                this.config.debugBoundary !== undefined ? (this.config.debugBoundary ? 1.0 : 0.0) : 0.0, // Default to OFF
+                this.config.fovealRadius,
+                this.config.peripheralIntensity,
+                this.config.caStrength,
+                this.config.debugBoundary,
+                this.config.debugStructure, // New arg
                 useMask ? 1.0 : 0.0,
-                this.config.mongrelMode !== undefined ? this.config.mongrelMode : 1.0, // Default to 1.0 (Shatter)
-                this.aestheticMode !== undefined ? this.aestheticMode : 0.0, // Default to 0.0 (High-Key)
+                this.config.mongrelMode,
+                this.aestheticMode,
                 this.currentVelocity,
-                this.stableMouseX, // Pass stable X
-                this.stableMouseY  // Pass stable Y
+                this.mouseX, // stableMouseX
+                this.mouseY, // stableMouseY
+                (this.hasStructure && this.config.enableStructureMap) ? 1.0 : 0.0 // hasStructure (only if enabled)
             );
         }
 
@@ -381,8 +417,18 @@
         }
 
         toggleDebugBoundary(enabled) {
-            this.config.debugBoundary = enabled;
-            console.log('[Scrutinizer] Debug Boundary set to:', enabled);
+            this.config.debugBoundary = enabled ? 1.0 : 0.0;
+            console.log(`[Scrutinizer] Debug Boundary set to: ${this.config.debugBoundary}`);
+        }
+
+        toggleStructureMap(enabled) {
+            this.config.debugStructure = enabled ? 1.0 : 0.0;
+            console.log(`[Scrutinizer] Debug Structure set to: ${this.config.debugStructure}`);
+        }
+
+        toggleEnableStructureMap(enabled) {
+            this.config.enableStructureMap = enabled;
+            console.log(`[Scrutinizer] Enable Structure Map set to: ${this.config.enableStructureMap}`);
         }
 
         setVisualMemoryLimit(limit) {
@@ -419,6 +465,29 @@
             console.log(msg);
             const { ipcRenderer } = require('electron');
             ipcRenderer.send('log:renderer', msg);
+        }
+
+        handleStructureUpdate(blocks) {
+            if (!this.renderer || !this.structureMap) return;
+
+            // console.log(`[Scrutinizer] Received structure update: ${blocks.length} blocks`);
+
+            // Ensure map size matches viewport
+            this.structureMap.resize(this.canvas.width, this.canvas.height);
+            this.structureMap.clear();
+
+            // Draw blocks
+            const dpr = window.devicePixelRatio || 1;
+            const yOffset = 0; //80px; // Toolbar height compensation
+            for (const block of blocks) {
+                this.structureMap.drawBlock(
+                    block.x * dpr, (block.y + yOffset) * dpr, block.w * dpr, block.h * dpr,
+                    block.type, block.density, block.lineHeight
+                );
+            }
+
+            // Upload to GPU
+            this.renderer.uploadStructureMap(this.structureMap.getCanvas());
         }
     }
 

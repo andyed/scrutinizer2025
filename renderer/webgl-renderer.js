@@ -28,7 +28,7 @@
                     Logger.error('[WebGL] Failed to initialize WebGL context. Your browser or hardware may not support it.');
                     throw new Error('WebGL not supported');
                 }
-                
+
                 const { ipcRenderer } = require('electron');
                 ipcRenderer.send('log:renderer', `[WebGLRenderer] WebGL context created: ${this.gl.constructor.name}`);
 
@@ -64,7 +64,7 @@
                     // Save original canvas size
                     const originalWidth = this.canvas.width;
                     const originalHeight = this.canvas.height;
-                    
+
                     const dummyData = new Uint8Array(4 * 4 * 4);
                     dummyData.fill(128);
                     const dummyImage = new ImageData(new Uint8ClampedArray(dummyData), 4, 4);
@@ -72,13 +72,13 @@
 
                     // Render a single frame to force shader compilation
                     this.render(100, 100, 50, 50, 30);
-                    
+
                     // Restore original canvas size
                     if (originalWidth > 0 && originalHeight > 0) {
                         this.canvas.width = originalWidth;
                         this.canvas.height = originalHeight;
                     }
-                    
+
                     console.log('[WebGL] Shader warmup complete (Async)');
                 }, 100);
             }
@@ -102,6 +102,7 @@
                 // === UNIFORMS ===
                 uniform sampler2D u_texture;      // Captured browser frame (Live)
                 uniform sampler2D u_maskTexture;  // Visual memory mask
+                uniform sampler2D u_structureMap; // Structure Map (R=Rhythm, G=Density, B=Type)
                 uniform float u_useMask;
                 
                 uniform vec2  u_resolution;
@@ -112,6 +113,8 @@
                 uniform float u_intensity;
                 uniform float u_ca_strength;
                 uniform float u_debug_boundary;
+                uniform float u_debug_structure;
+                uniform float u_has_structure;
                 uniform float u_velocity;         // Mouse velocity in px/ms
                 uniform float u_mongrel_mode;     // 0.0 = Noise, 1.0 = Shatter
                 uniform float u_aesthetic_mode;   // 0=HighKey, 1=Lab, 2=Frosted, 3=Blueprint, 4=Cyberpunk
@@ -157,14 +160,24 @@
                     return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
                 }
     
-                vec4 sampleMongrel(sampler2D tex, vec2 uv, float strength, float intensity) {
+                vec4 sampleMongrel(sampler2D tex, vec2 uv, float strength, float intensity, float rhythm) {
                     if (strength <= 0.01) return texture2D(tex, uv);
     
-                    // FIXED: Use constant cell density so the grid doesn't "swim" when strength changes
-                    float cellDensity = 120.0; 
+                    // Modulate Y-frequency based on Line Height (rhythm)
+                    // rhythm = 0.0 (small/none) -> High Freq (Shimmer)
+                    // rhythm = 1.0 (large) -> Low Freq (Wobble)
                     
-                    float xID = floor(uv.x * cellDensity);
-                    float yID = floor(uv.y * (cellDensity * 0.5));
+                    float baseDensity = 120.0;
+                    // If rhythm is present (>0), scale density down. 
+                    // rhythm 0.5 (50px) -> density ~ 20.0
+                    float densityY = mix(baseDensity, 10.0, rhythm);
+                    float densityX = baseDensity; // Keep X high freq to maintain horizontal shredding feel? Or scale both?
+                    // User said "lower the Y-frequency", implying X might stay high or scale differently.
+                    // Let's scale X slightly too but less aggressive.
+                    densityX = mix(baseDensity, 40.0, rhythm);
+
+                    float xID = floor(uv.x * densityX);
+                    float yID = floor(uv.y * densityY);
     
                     // Strength only affects the AMPLITUDE of the jitter, not the grid structure
                     float jitterScale = 0.04 * strength * intensity;
@@ -181,9 +194,31 @@
                     return mix(clean, ghost, 0.3);
                 }
     
-                vec3 applyAestheticEffect(vec3 col, vec2 uv, sampler2D tex, float dist, float intensity, float startThreshold) {
+                vec3 applyAestheticEffect(vec3 col, vec2 uv, sampler2D tex, float dist, float intensity, float startThreshold, vec4 structure) {
                     float effectFactor = smoothstep(startThreshold, startThreshold + 0.55, dist); 
                     effectFactor = clamp(effectFactor * intensity, 0.0, 1.0);
+                    
+                    // Structure Map Data
+                    float rhythm = structure.r;  // Line Height
+                    float density = structure.g; // Visual Mass
+                    float type = structure.b;    // Type (Text=1.0, Img=0.5, UI=0.0)
+
+                    // Ink Suppression Logic
+                    // If we have detected structure (u_has_structure > 0.5), we suppress the effect in "whitespace" (density ~ 0).
+                    // If we have NOT detected structure (e.g. video/canvas), we allow full effect (mask = 1.0).
+                    float inkMask = 1.0;
+                    if (u_has_structure > 0.5) {
+                        // Use density as mask. 
+                        // Text/Img/UI have density > 0.2. Whitespace has density 0.
+                        // We smoothstep to avoid harsh cutoffs.
+                        inkMask = smoothstep(0.0, 0.2, density);
+                        
+                        // Optional: Allow some faint effect in background?
+                        // inkMask = max(inkMask, 0.1); 
+                    }
+
+                    // Apply mask to effect factor
+                    effectFactor *= inkMask;
 
                     // Saccadic Suppression (Motion Blur/Washout)
                     // Increased threshold to 4.0 px/ms (4000px/s) to prevent flashing on small "jiggles"
@@ -246,62 +281,53 @@
                         return mix(col, frostedColor, effectFactor);
 
                     } else if (u_aesthetic_mode < 3.5) {
-                        // === 3: BLUEPRINT (UX) ===
-                        // Visual Scent: Quantized Structural Edges (Optimized)
+                        // === 3: BLUEPRINT (Wireframe / Terminator Vision) ===
+                        // Uses Structure Map Red Channel (Rhythm)
                         
-                        float strength = smoothstep(u_foveaRadius, u_foveaRadius + 0.4, dist);
+                        float strength = smoothstep(startThreshold - 0.1, startThreshold + 0.4, dist);
                         
-                        // 1. Quantize UVs (Mosaic)
-                        // FIXED: Use CONSTANT block size to prevent "swimming" grid when mouse moves
-                        float blockSize = 30.0; 
-                        vec2 blockDims = u_resolution / blockSize;
-                        vec2 quantUV = floor(uv * blockDims) / blockDims + (vec2(0.5) / blockDims);
+                        // Base: Dark Blueprint Blue
+                        vec3 bg = vec3(0.05, 0.1, 0.2);
+                        vec3 fg = vec3(0.4, 0.8, 1.0); // Cyan
                         
-                        // 2. Calculate Distortion ONCE (Optimization)
-                        // Inline Mongrel logic to avoid 5x function calls
-                        float cellDensity = 120.0; 
-                        float xID = floor(quantUV.x * cellDensity);
-                        float yID = floor(quantUV.y * (cellDensity * 0.5));
-                        float jitterScale = 0.04 * strength * u_intensity;
+                        // Grid
+                        vec2 gridUV = fract(uv * 40.0); // 40px grid
+                        float gridLine = step(0.95, gridUV.x) + step(0.95, gridUV.y);
+                        vec3 finalColor = mix(bg, bg * 1.5, gridLine * 0.3);
+
+                        // Content Bars (Terminator Vision)
+                        if (rhythm > 0.0) {
+                            // Rhythm is normalized 0-1. 1.0 = 100px line height.
+                            // We want to draw horizontal bars.
+                            // We don't know the exact Y position of the line here, only the local property.
+                            // But since the structure map is rasterized, 'rhythm' is present wherever text is.
+                            // So we just light up the pixel if rhythm > 0.
+                            
+                            // "Lock-On" Effect: Scanlines
+                            float scanline = sin(uv.y * 800.0 * rhythm) * 0.5 + 0.5;
+                            
+                            // Density modulates brightness
+                            float brightness = density * 0.8 + 0.2;
+                            
+                            // Type modulates color
+                            vec3 typeColor = fg;
+                            if (type < 0.2) typeColor = vec3(1.0, 0.5, 0.0); // UI = Orange
+                            if (type > 0.4 && type < 0.6) typeColor = vec3(0.0, 1.0, 0.5); // Image = Green
+                            
+                            finalColor = mix(finalColor, typeColor * brightness, 0.8 * scanline);
+                        }
                         
-                        float offX = (hash22(vec2(yID, xID)).x - 0.5) * jitterScale;
-                        float offY = (hash22(vec2(xID, yID + 13.0)).x - 0.5) * jitterScale;
-                        
-                        vec2 shatteredUV = quantUV + vec2(offX, offY);
-                        
-                        // 3. Base Color (Simple Lookup)
-                        vec3 baseCol = texture2D(tex, shatteredUV).rgb;
-                        
-                        // 4. Edge Detection (Simple Lookups on Shattered UV)
-                        // We assume the distortion is locally constant (valid for blocks)
-                        float structureScale = 2.0 + 4.0 * effectFactor;
-                        vec2 edgeStep = vec2(structureScale) / u_resolution;
-                        
-                        vec3 n = texture2D(tex, shatteredUV + vec2(0.0, edgeStep.y)).rgb;
-                        vec3 s = texture2D(tex, shatteredUV - vec2(0.0, edgeStep.y)).rgb;
-                        vec3 e = texture2D(tex, shatteredUV + vec2(edgeStep.x, 0.0)).rgb;
-                        vec3 w = texture2D(tex, shatteredUV - vec2(edgeStep.x, 0.0)).rgb;
-                        
-                        float lumaN = dot(n, vec3(0.299, 0.587, 0.114));
-                        float lumaS = dot(s, vec3(0.299, 0.587, 0.114));
-                        float lumaE = dot(e, vec3(0.299, 0.587, 0.114));
-                        float lumaW = dot(w, vec3(0.299, 0.587, 0.114));
-                        
-                        float edgeH = abs(lumaE - lumaW);
-                        float edgeV = abs(lumaN - lumaS);
-                        float edge = length(vec2(edgeH, edgeV));
-                        
-                        // 5. Sharpen & Threshold
-                        edge = smoothstep(0.05, 0.2, edge);
-                        
-                        // 6. Compose
-                        vec3 edgeColor = vec3(1.0) - baseCol;
-                        vec3 final = mix(baseCol, edgeColor, edge);
-                        
-                        return mix(col, final, effectFactor);
+                        return mix(col, finalColor, strength);
 
                     } else {
                         // === 4: CYBERPUNK (VJ) ===
+                        // Distortion Center
+                        // Use u_mouse (smoothed by JS) instead of u_mouse_stable to ensure tracking works
+                        vec2 center = u_mouse; 
+                        
+                        // Calculate distance from fovea (stable)
+                        float dist_stable = distance(gl_FragCoord.xy, center);
+                        
                         // High Contrast, Neon Tints
                         float luma = dot(col, vec3(0.299, 0.587, 0.114));
                         
@@ -351,6 +377,10 @@
                     
                     vec4 color;
                     
+                    // Sample Structure Map (Screen Space UV)
+                    vec4 structure = texture2D(u_structureMap, uv);
+                    float density = structure.g;
+                    
                     // Use REAL distance for the mask to prevent "lag" (fovea follows mouse)
                     // Use QUANTIZED strength to prevent "shimmer" (noise pattern steps)
                     
@@ -364,8 +394,17 @@
                         
                         if (isBlueprint) mongrelStrength = 0.0; // Disable shatter for Blueprint
                         
+                        // === STRUCTURE MAP MODULATION ===
+                        // Only apply shatter where there is content (density > 0)
+                        // This keeps whitespace clean!
+                        
+                        if (density < 0.1) {
+                            mongrelStrength = 0.0;
+                        }
+                        
                         // Sample using smooth strength (now stable because sampleMongrel is fixed)
-                        vec4 rawColor = sampleMongrel(u_texture, uv, mongrelStrength, u_intensity);
+                        // Pass rhythm (structure.r) to modulate frequency
+                        vec4 rawColor = sampleMongrel(u_texture, uv, mongrelStrength, u_intensity, structure.r);
                         
                         // BGRA Swizzle
                         color.r = rawColor.b;
@@ -380,6 +419,12 @@
                         warpStrength = pow(warpStrength, 0.5);
                         
                         if (isBlueprint) warpStrength = 0.0; // Disable noise for Blueprint
+                        
+                        // === STRUCTURE MAP MODULATION ===
+                        // Mask warp by density
+                        if (density < 0.1) {
+                            warpStrength = 0.0;
+                        }
                         
                         vec2 uv_noise = vec2(uv_corrected.x / 1.77, uv_corrected.y);
                         
@@ -448,7 +493,7 @@
                     
                     if (!isScrollbar) {
                         // Pass v_texCoord (uv) for texture sampling, NOT uv_corrected!
-                        vec3 finalRGB = applyAestheticEffect(color.rgb, v_texCoord, u_texture, dist, u_intensity, periphery_start);
+                        vec3 finalRGB = applyAestheticEffect(color.rgb, v_texCoord, u_texture, dist, u_intensity, periphery_start, structure);
                         
                         // === VISUAL MEMORY MASK ===
                         // Mix back to the original clear content where the mask is white
@@ -465,7 +510,7 @@
                         color.rgb = finalRGB;
                     }
                     
-                    // Debug Boundary
+                    // Debug Boundary (Foveal Ring)
                     if (u_debug_boundary > 0.5) {
                         float lineThickness = 0.003;
                         float border = 1.0 - smoothstep(0.0, lineThickness, abs(dist - fovea_radius));
@@ -473,6 +518,17 @@
                             vec3 lineColor = vec3(0.5, 0.5, 0.5);
                             float alpha = border * 0.6;
                             color.rgb = mix(color.rgb, lineColor, alpha);
+                        }
+                    }
+
+                    // Structure Map Visualization (Red Overlay)
+                    if (u_debug_structure > 0.5) {
+                        // Structure Map: G = Density (0.0-1.0)
+                        float mapDensity = structure.g;
+                        if (mapDensity > 0.0) {
+                            // Draw Red overlay where density > 0
+                            vec3 debugColor = vec3(1.0, 0.0, 0.0); 
+                            color.rgb = mix(color.rgb, debugColor, 0.3 * mapDensity);
                         }
                     }
     
@@ -512,8 +568,11 @@
                 this.intensityLocation = gl.getUniformLocation(this.program, "u_intensity");
                 this.caStrengthLocation = gl.getUniformLocation(this.program, "u_ca_strength");
                 this.debugBoundaryLocation = gl.getUniformLocation(this.program, "u_debug_boundary");
+                this.debugStructureLocation = gl.getUniformLocation(this.program, "u_debug_structure");
                 this.textureLocation = gl.getUniformLocation(this.program, "u_texture");
                 this.maskTextureLocation = gl.getUniformLocation(this.program, "u_maskTexture");
+                this.structureMapLocation = gl.getUniformLocation(this.program, "u_structureMap");
+                this.hasStructureLocation = gl.getUniformLocation(this.program, "u_has_structure");
                 this.useMaskLocation = gl.getUniformLocation(this.program, "u_useMask");
                 this.velocityLocation = gl.getUniformLocation(this.program, "u_velocity");
                 this.mongrelModeLocation = gl.getUniformLocation(this.program, "u_mongrel_mode");
@@ -559,6 +618,18 @@
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
                 const dummyMask = new Uint8Array([0, 0, 0, 255]);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, dummyMask);
+
+                // Create structure map texture
+                this.structureMapTexture = gl.createTexture();
+                gl.bindTexture(gl.TEXTURE_2D, this.structureMapTexture);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                // NEAREST filter is important for structure map to keep sharp edges for wireframe mode
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                // Initialize to WHITE (Full Density) so effects are visible by default before first scan
+                const dummyStructure = new Uint8Array([255, 255, 255, 255]);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, dummyStructure);
             }
 
             createProgram(gl, vsSource, fsSource) {
@@ -603,10 +674,10 @@
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
             }
 
-            uploadMask(image) {
+            uploadStructureMap(image) {
                 const gl = this.gl;
-                gl.activeTexture(gl.TEXTURE1);
-                gl.bindTexture(gl.TEXTURE_2D, this.maskTexture);
+                gl.activeTexture(gl.TEXTURE2);
+                gl.bindTexture(gl.TEXTURE_2D, this.structureMapTexture);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
             }
 
@@ -615,12 +686,12 @@
                 gl.clearColor(0.0, 0.0, 0.0, 0.0);
                 gl.clear(gl.COLOR_BUFFER_BIT);
             }
-            render(width, height, mouseX, mouseY, foveaRadius, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, useMask = 0.0, mongrelMode = 1.0, aestheticMode = 0.0, velocity = 0.0, stableMouseX = 0.0, stableMouseY = 0.0) {
+            render(width, height, mouseX, mouseY, foveaRadius, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, debugStructure = 0.0, useMask = 0.0, mongrelMode = 1.0, aestheticMode = 0.0, velocity = 0.0, stableMouseX = 0.0, stableMouseY = 0.0, hasStructure = 0.0) {
                 if (!this.program) {
                     console.error('[WebGLRenderer] render() called but program is null!');
                     return;
                 }
-                
+
                 // Log first render
                 if (!this.renderCallCount) {
                     this.renderCallCount = 0;
@@ -630,7 +701,7 @@
                     const { ipcRenderer } = require('electron');
                     ipcRenderer.send('log:renderer', `[WebGLRenderer] First render: ${width}x${height}, mouse=(${mouseX},${mouseY}), radius=${foveaRadius}, mode=${mongrelMode}`);
                 }
-                
+
                 const gl = this.gl;
 
                 if (this.canvas.width !== width || this.canvas.height !== height) {
@@ -638,7 +709,7 @@
                     this.canvas.height = height;
                 }
                 gl.viewport(0, 0, width, height);
-                
+
                 // Enable blending for transparent window composition
                 gl.enable(gl.BLEND);
                 gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -661,6 +732,10 @@
                 gl.bindTexture(gl.TEXTURE_2D, this.maskTexture);
                 gl.uniform1i(this.maskTextureLocation, 1);
 
+                gl.activeTexture(gl.TEXTURE2);
+                gl.bindTexture(gl.TEXTURE_2D, this.structureMapTexture);
+                gl.uniform1i(this.structureMapLocation, 2);
+
                 gl.uniform2f(this.resolutionLocation, width, height);
                 gl.uniform2f(this.mouseLocation, mouseX, mouseY);
                 gl.uniform2f(this.mouseStableLocation, stableMouseX, stableMouseY);
@@ -669,15 +744,17 @@
                 gl.uniform1f(this.intensityLocation, intensity);
                 gl.uniform1f(this.caStrengthLocation, caStrength);
                 gl.uniform1f(this.debugBoundaryLocation, debugBoundary);
+                gl.uniform1f(this.debugStructureLocation, debugStructure);
                 gl.uniform1f(this.useMaskLocation, useMask);
                 gl.uniform1f(this.velocityLocation, velocity);
                 gl.uniform1f(this.mongrelModeLocation, mongrelMode);
                 gl.uniform1f(this.aestheticModeLocation, aestheticMode);
+                gl.uniform1f(this.hasStructureLocation, hasStructure);
 
                 if (Math.random() < 0.01) {
                     // console.log(`[WebGL] Render Mode: ${mongrelMode}, Res: ${width}x${height}, Mouse: ${mouseX},${mouseY}`);
                 }
-                
+
                 // Log first drawArrays call
                 if (!this.drawCallCount) {
                     this.drawCallCount = 0;

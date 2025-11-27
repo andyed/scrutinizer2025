@@ -336,6 +336,18 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                 },
                 { type: 'separator' },
                 {
+                    label: 'Enable Structure Map',
+                    type: 'checkbox',
+                    checked: true,
+                    click: (menuItem) => sendToOverlays('menu:toggle-enable-structure-map', menuItem.checked)
+                },
+                {
+                    label: 'Show Structure Map',
+                    type: 'checkbox',
+                    checked: false,
+                    click: (menuItem) => sendToOverlays('menu:toggle-structure-map', menuItem.checked)
+                },
+                {
                     label: 'Debug: Show Boundary',
                     type: 'checkbox',
                     checked: false,
