@@ -215,9 +215,15 @@ window.addEventListener('DOMContentLoaded', () => {
     // Track mouse movement for foveal effect
     // Use capture phase (true) to ensure we catch events even over modals/popups
     let ticking = false;
+    let mouseMoveCount = 0;
     window.addEventListener('mousemove', (e) => {
         if (!ticking) {
             window.requestAnimationFrame(() => {
+                mouseMoveCount++;
+                // Log every 60th event to verify flow
+                if (mouseMoveCount % 60 === 0) {
+                    console.log(`[Preload] Mouse at (${e.clientX}, ${e.clientY}), zoom=${webFrame.getZoomFactor()}`);
+                }
                 ipcRenderer.send('browser:mousemove', e.clientX, e.clientY, webFrame.getZoomFactor());
                 ticking = false;
             });

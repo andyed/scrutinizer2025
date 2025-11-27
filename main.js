@@ -248,7 +248,13 @@ ipcMain.on('open-new-window', (event, url) => {
 });
 
 // Forward browser mouse position to HUD for foveal effect tracking
+let mouseEventCount = 0;
 ipcMain.on('browser:mousemove', (event, x, y, zoom = 1.0) => {
+    mouseEventCount++;
+    // Log every 60th event
+    if (mouseEventCount % 60 === 0) {
+        console.log(`[Main] Received mousemove: (${x}, ${y}), zoom=${zoom}`);
+    }
     const windows = BrowserWindow.getAllWindows();
     // Find the window that owns this content view
     const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
