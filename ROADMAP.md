@@ -52,10 +52,14 @@ This document outlines the path from current alpha to a production-ready 1.0 rel
     - High-pass filter in periphery (edges only).
     - "Blueprint Blue" tint.
     - **Why**: Highlights Layout vs. Content. Proves the user sees the grid but misses the copy.
-    - **Current State**:
-        - ✅ **Scroll Performance**: Structure map now updates at ~60fps (16ms throttle) for smooth tracking during scroll
-        - ✅ **HTML5 Coverage**: Added support for `audio`, `summary`, `meter`, `progress` tags
-        - � **Blueprint Mode**: Wireframe rendering functional, needs visual polish
+    ### Structure Map
+- [x] Scroll performance: reduce lag during scroll (16ms throttle + debounced final scan)
+- [x] HTML5 Tag Coverage: comprehensive semantic element detection (ARIA roles, modals, custom interactive)
+- [ ] **Known Limitation**: Mouse tracking doesn't work over popup modals (Google account menu, etc.) - DOM events blocked
+  - Future: Explore Electron screen.getCursorScreenPoint() polling, but needs careful coordinate validation
+- [x] Blueprint mode functional
+- [ ] Blueprint mode visual polish needed
+- [ ] Debug red tint overlay issue visual polish
     - **Todos**:
         - [ ] Fix "Red Tint" visual overlay issue (whole page shows pink/red tint)
         - [ ] Tune opacity and blending for "UX Blueprint" look
