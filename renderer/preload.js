@@ -213,6 +213,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // Track mouse movement for foveal effect
+    // Use capture phase (true) to ensure we catch events even over modals/popups
     let ticking = false;
     window.addEventListener('mousemove', (e) => {
         if (!ticking) {
@@ -222,7 +223,7 @@ window.addEventListener('DOMContentLoaded', () => {
             });
             ticking = true;
         }
-    });
+    }, true); // CAPTURE PHASE - important for catching events over modals
 
     // Track zoom/resize changes
     window.addEventListener('resize', () => {
