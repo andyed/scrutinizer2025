@@ -17,6 +17,14 @@ This document outlines the path from current alpha to a production-ready 1.0 rel
 - [x] WebGL-based "Mongrel" rendering pipeline
 - [x] "Rod Vision" (Eigengrau) simulation
 - [x] Visual Memory (Fog of War) mechanics
+- [x] **Scroll Compensation (CONFIDENT)**: Fixed alignment between structure map and content during scroll.
+  - `preload.js`: Send `scrollX/Y` with structure update
+  - `main.js`: Forward `browser:scroll` to HUD
+  - `scrutinizer.js`: Calculate `scrollDeltaY`
+  - `webgl-renderer.js`: Use `u_scroll_offset` in shader
+
+### 🔴 High Priority Fixes
+- [ ] **DomAdapter Refinements**: Add missing HTML tags: `audio`, `summary`, `meter`, `progress`
 
 
 
@@ -44,6 +52,14 @@ This document outlines the path from current alpha to a production-ready 1.0 rel
     - High-pass filter in periphery (edges only).
     - "Blueprint Blue" tint.
     - **Why**: Highlights Layout vs. Content. Proves the user sees the grid but misses the copy.
+    - **Current State**:
+        - ✅ **Scroll Compensation**: Structure map aligns perfectly with content during scroll.
+        - ⚠️ **Data Issue**: "Red Tint" bug indicates structure map is capturing full-screen elements (likely `<body>` or `<html>`) or texture clearing is failing.
+        - 🔴 **Missing Tags**: `audio`, `summary`, `meter`, `progress` need to be added to `DomAdapter`.
+    - **Todos**:
+        - [ ] Fix "Red Tint" data issue (ensure map is empty where no content exists).
+        - [ ] Implement proper Wireframe rendering (Blue blocks for UI, Green for Images, Red for Text).
+        - [ ] Tune opacity and blending for "UX Blueprint" look.
 
 #### 3. The "Cyberpunk/Neon" Tweak (VJ/Creative Aesthetic)
 *For "Eye Candy" & Creative Coding*
