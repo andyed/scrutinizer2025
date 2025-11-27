@@ -64,11 +64,75 @@ This document outlines the path from current alpha to a production-ready 1.0 rel
         - [ ] Fix "Red Tint" visual overlay issue (whole page shows pink/red tint)
         - [ ] Tune opacity and blending for "UX Blueprint" look
 
-### Saliency Map Integration (Research Platform Enhancement)
+### Structure Map: Figma Plugin Support (Prerequisite for Saliency)
 
-**Goal**: Transform from static geometric filter to dynamic, attention-driven system for biophysical accuracy.
+**Goal**: Extend structure map abstraction to Figma's scene graph, enabling unified pipeline for both web and design tools.
 
-#### 1. Saccadic Planning and Guidance
+**Why First**: Figma plugin is key distribution channel. Structure map must work there before adding saliency layer complexity.
+
+**Implementation:**
+- [ ] **Figma Scene Graph Adapter**
+  - Create `FigmaAdapter` class parallel to `DomAdapter`
+  - Extract layout blocks from Figma node tree via Plugin API
+  - Map Figma node types to `StructureBlock` semantics:
+    - Text nodes → `type: 'TEXT'`
+    - Images/vectors → `type: 'IMAGE'`
+    - Frames/components → `type: 'UI_CONTROL'`
+  
+- [ ] **Optimize for Figma's Node Structure**
+  - Figma has explicit layout properties (no DOM quirks)
+  - Leverage `node.absoluteBoundingBox` for precise geometry
+  - Handle auto-layout containers differently than flex/grid
+  - Respect component boundaries as semantic units
+
+- [ ] **Unified Pipeline**
+  - Same `StructureMap` rasterizer for both sources
+  - Same shader consumption (`u_structureMap` texture)
+  - Test that Blueprint mode works identically in Figma plugin
+
+**Dependencies:**
+- Review `scrutinizer-figma-plugin` codebase
+- Ensure Plugin API access to node tree traversal
+- Coordinate with existing capture pipeline
+
+---
+
+### Saliency Map: VFX Tool + Core Simulation Enhancement
+
+**Goal**: Dual-purpose saliency map - creative tool for visual effects AND biophysical accuracy for research.
+
+**Priority Justification**: 
+1. **VFX Tool**: Exposes saliency as controllable layer for creative effect development
+2. **Core Simulation**: Replaces distance-based distortion with attention-driven, clutter-sensitive model
+
+#### 1. Saliency Map Generation Pipeline
+
+**Implementation:**
+- [ ] Generate saliency map from captured frame (web) or scene graph (Figma)
+- [ ] Start simple: Edge detection + color contrast (bottom-up only)
+- [ ] Upload as `u_saliencyMap` texture uniform to shader
+- [ ] Add debug visualization mode to inspect saliency heatmap
+
+**Shader Integration:**
+```glsl
+uniform sampler2D u_saliencyMap;
+float saliency = texture2D(u_saliencyMap, uv).r;
+```
+
+#### 2. VFX Tool Exposure
+
+**Creative Controls:**
+- [ ] **Saliency Overlay Mode**: Visualize heatmap directly (research/debugging)
+- [ ] **Inverse Saliency Mask**: Use `1.0 - saliency` to highlight low-attention areas
+- [ ] **Blend Modes**: Multiply/add saliency with other masks for layered effects
+- [ ] **Threshold Controls**: Expose saliency cutoff sliders for binary masking
+
+**Use Cases for VFX Artists:**
+- Spotlight high-saliency regions (attention magnets)
+- Blur/distort low-saliency backgrounds
+- Drive particle systems or glitch effects from saliency gradients
+
+#### 3. Core Simulation Enhancement (Crowding Model)
 Leverage peripheral signal (Saliency) to drive foveal response (Saccades) and validate model against eye-tracking data.
 
 **Implementation:**
