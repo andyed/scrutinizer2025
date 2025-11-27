@@ -529,6 +529,56 @@ function createScrutinizerWindow(startUrl) {
 
 
 
+    // MOUSE TRACKING FALLBACK: Poll global mouse position
+    // This works even when DOM events are blocked by modals/popups
+    let mousePollingInterval = null;
+
+    const startMousePolling = () => {
+        if (mousePollingInterval) return; // Already polling
+
+        mousePollingInterval = setInterval(() => {
+            if (win.isDestroyed() || !win.isFocused()) return;
+
+            try {
+                const { screen } = require('electron');
+                const cursorPos = screen.getCursorScreenPoint();
+                const winBounds = win.getBounds();
+                const contentBounds = contentView.getBounds();
+
+                // Convert screen coords to window-relative coords
+                const x = cursorPos.x - winBounds.x - contentBounds.x;
+                const y = cursorPos.y - winBounds.y - contentBounds.y;
+
+                // Only send if cursor is within content view bounds
+                if (x >= 0 && x < contentBounds.width && y >= 0 && y < contentBounds.height) {
+                    const zoom = contentView.webContents.getZoomFactor();
+                    if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+                        win.scrutinizerHud.webContents.send('browser:mousemove', x, y, zoom);
+                    }
+                }
+            } catch (err) {
+                console.error('[Main] Mouse polling error:', err);
+            }
+        }, 16); // ~60fps
+    };
+
+    const stopMousePolling = () => {
+        if (mousePollingInterval) {
+            clearInterval(mousePollingInterval);
+            mousePollingInterval = null;
+        }
+    };
+
+    // Start/stop polling based on window focus
+    win.on('focus', startMousePolling);
+    win.on('blur', stopMousePolling);
+    win.on('closed', stopMousePolling);
+
+    // Start immediately if window is focused
+    if (win.isFocused()) {
+        startMousePolling();
+    }
+
     return win;
 }
 
