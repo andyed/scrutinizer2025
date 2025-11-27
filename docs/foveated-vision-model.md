@@ -112,7 +112,48 @@ Intuition:
 
 ---
 
-## 5. High‑frequency jitter (Bouma breaker)
+## 5. Universal Structure Map Pipeline (New in v2.0)
+
+To unify rendering across the Open Web (DOM) and Figma (Scene Graph), Scrutinizer v2.0 introduces an **Abstract Layout Provider** architecture. Instead of relying on ad-hoc heuristics, the renderer consumes a normalized data stream of layout blocks.
+
+### The Data Model: `StructureBlock`
+Layout data is extracted into a flat array of lightweight objects:
+```typescript
+interface StructureBlock {
+  x: number; y: number; w: number; h: number; // Viewport Geometry
+  type: 'TEXT' | 'IMAGE' | 'UI_CONTROL';      // Semantic Type
+  lineHeight: number;                         // Rhythm (px)
+  density: number;                            // Mass (0.0-1.0)
+  interaction: boolean;                       // Clickable?
+}
+```
+
+### The Rasterizer: `StructureMap`
+These blocks are painted onto an off-screen `<canvas>` (25% resolution) to create the `u_structureMap` texture. This texture encodes semantic data into RGBA channels:
+
+| Channel | Data | Description |
+| :--- | :--- | :--- |
+| **Red** | **Rhythm** | `lineHeight / 100.0`. Defines the vertical cadence of the content. |
+| **Green** | **Mass** | `density` (0.0-1.0). Defines visual weight (font weight, image brightness). |
+| **Blue** | **Semantics** | Type ID: Text (1.0), Image (0.5), UI (0.0). |
+| **Alpha** | **Interaction** | 1.0 = Content. Interaction is encoded in Blue (Text=1.0 vs UI=0.0). |
+
+### Shader Consumption
+The fragment shader reads this map to drive two distinct modes:
+
+#### Mode A: Wireframe ("Blueprint" / "Cyberpunk")
+Uses the **Red Channel (Rhythm)** to generate procedural geometry.
+-   **Logic**: `if (lineHeight > 0) draw_bar(height=lineHeight)`
+-   **Result**: A "Terminator-vision" overlay that reveals the underlying grid structure, ignoring the actual pixels.
+
+#### Mode B: Simulation ("Natural")
+Uses the **Green Channel (Mass)** to modulate the biological simulation.
+-   **Logic**: `finalNoise = baseNoise * density`
+-   **Result**: Noise and blur are only applied where there is actual content. Empty whitespace remains clean, preventing the "dirty screen" effect and improving realism.
+
+---
+
+## 6. High‑frequency jitter (Bouma breaker)
 
 To disrupt word‑shape (“Bouma”) recognition, the shader adds very high‑frequency jitter:
 
@@ -131,7 +172,7 @@ This combination ensures:
 
 ---
 
-## 6. Chromatic aberration (lens split)
+## 7. Chromatic aberration (lens split)
 
 Chromatic aberration is modeled by sampling the warped position three times:
 
