@@ -182,7 +182,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
             submenu: [
                 {
                     label: 'Toggle Foveal Mode',
-                    accelerator: 'CmdOrCtrl+F',
+                    accelerator: 'CmdOrCtrl+Shift+F',
                     click: () => sendToOverlays('menu:toggle-foveal')
                 },
                 { type: 'separator' },

@@ -532,6 +532,7 @@ function createScrutinizerWindow(startUrl) {
     // MOUSE TRACKING FALLBACK: Poll global mouse position
     // This works as a FALLBACK when DOM events are blocked by modals/popups
     // We still prefer DOM events when available (they carry element context)
+    // TEMPORARILY DISABLED: Testing if polling causes disruption when mouse stops
     let mousePollingInterval = null;
     let lastDOMEventTime = Date.now();
     let mouseEventCount = 0; // Added for logging, as used in the provided snippet
@@ -552,6 +553,11 @@ function createScrutinizerWindow(startUrl) {
     });
 
     const startMousePolling = () => {
+        // DISABLED FOR TESTING
+        console.log('[Main] Mouse polling disabled for testing');
+        return;
+
+        /* ORIGINAL CODE COMMENTED OUT
         if (mousePollingInterval) return; // Already polling
 
         mousePollingInterval = setInterval(() => {
@@ -582,6 +588,7 @@ function createScrutinizerWindow(startUrl) {
                 console.error('[Main] Mouse polling error:', err);
             }
         }, 16); // ~60fps
+        */
     };
 
     const stopMousePolling = () => {

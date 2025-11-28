@@ -63,7 +63,7 @@ See `docs/webcontentsview-migration.md` for full migration plan.
 ## Other Known Issues
 
 ### Browser Features
-- **Find in Page**: `Cmd+F` / `Ctrl+F` is currently not implemented. Users cannot search for text within the webview.
+- **Find in Page**: `Cmd+F` / `Ctrl+F` is currently not implemented. Users cannot search for text within the webview. (Note: Foveal toggle moved to `Cmd+Shift+F` to reserve `Cmd+F` for future find functionality.)
 - **Downloads**: File downloads happen silently in the background (to the default OS downloads folder) with no UI feedback or progress indicators.
 - **Complex Popups & Authentication**: OAuth flows (e.g., "Sign in with Google") that rely on specific window relationships or popup behavior may be broken, as `target="_blank"` links currently open in a new, detached Scrutinizer window.
 
