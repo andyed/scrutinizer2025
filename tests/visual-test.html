@@ -46,71 +46,102 @@
             const imageData = new ImageData(buffer, width, height);
             renderer.uploadTexture(imageData);
 
-            // Render a frame
-            // Use parameters that should produce visible output
+            // Helper to capture frame data
+            const captureFrame = () => {
+                const gl = renderer.gl;
+                const pixels = new Uint8Array(width * height * 4);
+                gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+                return pixels;
+            };
+
+            // Helper to compare frames (returns % difference)
+            const compareFrames = (pixelsA, pixelsB) => {
+                let diffCount = 0;
+                for (let i = 0; i < pixelsA.length; i += 4) {
+                    // Compare RGB only
+                    if (Math.abs(pixelsA[i] - pixelsB[i]) > 5 ||
+                        Math.abs(pixelsA[i + 1] - pixelsB[i + 1]) > 5 ||
+                        Math.abs(pixelsA[i + 2] - pixelsB[i + 2]) > 5) {
+                        diffCount++;
+                    }
+                }
+                return diffCount / (width * height);
+            };
+
+            // --- TEST 1: Basic Visibility ---
             renderer.render(
-                width,
-                height,
-                width / 2, // Mouse X
-                height / 2, // Mouse Y
-                150, // Radius
-                1.33, // Aspect Ratio
-                0.5, // Intensity
-                0.0, // CA
-                0.0, // Debug Boundary
-                0.0, // Debug Structure
-                0.0, // Use Mask
-                0.0, // Mongrel Mode (Noise) - usually produces visible distortion
-                0.0, // Aesthetic Mode (High Key) - produces visible output
-                0.0, // Velocity
-                width / 2, // Stable Mouse X
-                height / 2, // Stable Mouse Y
-                0.0 // Has Structure
+                width, height, width / 2, height / 2, 150, 1.33,
+                0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, width / 2, height / 2, 0.0
             );
-
-            // Check pixels
-            const gl = renderer.gl;
-            const pixels = new Uint8Array(width * height * 4);
-            gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-
-            // Analyze: Check if we have non-black pixels
-            // The default clear color is black (0,0,0,0) or (0,0,0,1) depending on setup
-            // Our texture is white. The effect should produce something visible.
+            const frameBasic = captureFrame();
 
             let nonBlackCount = 0;
-            let nonTransparentCount = 0;
-
-            for (let i = 0; i < pixels.length; i += 4) {
-                const r = pixels[i];
-                const g = pixels[i + 1];
-                const b = pixels[i + 2];
-                const a = pixels[i + 3];
-
-                if (a > 0) nonTransparentCount++;
-                if (r > 10 || g > 10 || b > 10) nonBlackCount++;
+            for (let i = 0; i < frameBasic.length; i += 4) {
+                if (frameBasic[i] > 10 || frameBasic[i + 1] > 10 || frameBasic[i + 2] > 10) nonBlackCount++;
             }
+            const coverage = nonBlackCount / (width * height);
 
-            const totalPixels = width * height;
-            const coverage = nonBlackCount / totalPixels;
-
-            ipcRenderer.send('log', `Non-black pixels: ${nonBlackCount} (${(coverage * 100).toFixed(2)}%)`);
-            ipcRenderer.send('log', `Non-transparent pixels: ${nonTransparentCount}`);
-
-            if (nonBlackCount > 0) {
-                ipcRenderer.send('test-result', { success: true, message: 'Visuals detected' });
-            } else {
-                ipcRenderer.send('test-result', {
-                    success: false,
-                    message: 'No visuals detected (all black)',
-                    details: 'The renderer produced a completely black image.'
-                });
+            if (coverage === 0) {
+                throw new Error('Test 1 Failed: Output is completely black');
             }
+            ipcRenderer.send('log', `Test 1 Passed: Visibility coverage ${(coverage * 100).toFixed(2)}%`);
+
+            // --- TEST 2: Distortion Application ---
+            // Render with NO intensity
+            renderer.render(
+                width, height, width / 2, height / 2, 150, 1.33,
+                0.0, // Intensity 0
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, width / 2, height / 2, 0.0
+            );
+            const frameNoDistortion = captureFrame();
+
+            // Render with HIGH intensity
+            renderer.render(
+                width, height, width / 2, height / 2, 150, 1.33,
+                0.8, // Intensity 0.8
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, width / 2, height / 2, 0.0
+            );
+            const frameHighDistortion = captureFrame();
+
+            const distortionDiff = compareFrames(frameNoDistortion, frameHighDistortion);
+            if (distortionDiff < 0.01) { // Expect at least 1% pixels to change
+                throw new Error(`Test 2 Failed: Changing intensity did not affect image (diff: ${distortionDiff})`);
+            }
+            ipcRenderer.send('log', `Test 2 Passed: Distortion applied (diff: ${(distortionDiff * 100).toFixed(2)}%)`);
+
+            // --- TEST 3: Motion Responsiveness ---
+            // Render at Left position
+            renderer.render(
+                width, height,
+                200, height / 2, // Mouse Left
+                150, 1.33, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                200, height / 2, 0.0
+            );
+            const frameLeft = captureFrame();
+
+            // Render at Right position
+            renderer.render(
+                width, height,
+                600, height / 2, // Mouse Right
+                150, 1.33, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                600, height / 2, 0.0
+            );
+            const frameRight = captureFrame();
+
+            const motionDiff = compareFrames(frameLeft, frameRight);
+            if (motionDiff < 0.05) { // Expect significant change
+                throw new Error(`Test 3 Failed: Moving mouse did not affect image (diff: ${motionDiff})`);
+            }
+            ipcRenderer.send('log', `Test 3 Passed: Motion detected (diff: ${(motionDiff * 100).toFixed(2)}%)`);
+
+            // All passed
+            ipcRenderer.send('test-result', { success: true, message: 'All visual tests passed' });
 
         } catch (err) {
             ipcRenderer.send('test-result', {
                 success: false,
-                message: 'Exception during test execution',
-                details: err.stack || err.message
+                message: err.message,
+                details: err.stack
             });
         }
     </script>

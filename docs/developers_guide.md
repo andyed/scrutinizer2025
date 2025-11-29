@@ -178,3 +178,35 @@ When developing new models that use these textures:
 4. **Consider performance** - texture lookups are fast, but avoid redundancy
 
 See `ROADMAP.md` for upcoming saliency map integration details.
+
+---
+
+## Testing
+
+Scrutinizer includes an automated visual smoke test to ensure the renderer is functioning correctly and producing expected visual output.
+
+### Running Tests
+
+To run the automated tests:
+
+```bash
+npm test
+```
+
+This command launches Electron in a special test mode (`TEST_MODE=true`), which executes the test suite defined in `tests/visual-test.html`.
+
+### Test Suite
+
+The test suite performs the following checks:
+
+1.  **Basic Visibility**: Verifies that the renderer produces non-black pixels (i.e., the shader is compiling and drawing).
+2.  **Distortion Application**: Verifies that changing the `intensity` parameter significantly alters the rendered image (ensures effects are being applied).
+3.  **Motion Responsiveness**: Verifies that moving the mouse position significantly alters the rendered image (ensures the fovea is tracking).
+
+### Adding New Tests
+
+To add new visual tests:
+1.  Open `tests/visual-test.html`.
+2.  Add a new test block following the existing pattern.
+3.  Use the `captureFrame()` and `compareFrames()` helpers to analyze the output.
+4.  Report success/failure via `ipcRenderer.send('test-result', ...)` or throw an error.
