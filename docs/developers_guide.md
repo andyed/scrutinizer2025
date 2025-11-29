@@ -181,6 +181,24 @@ See `ROADMAP.md` for upcoming saliency map integration details.
 
 ---
 
+## Troubleshooting
+
+### App won't launch / Stuck processes
+If the app refuses to launch or visual effects are missing, you may have zombie Electron processes running. Run this command to kill them all:
+
+```bash
+pkill -f Electron
+```
+
+### "ipcMain is undefined" Error
+If you see `TypeError: Cannot read properties of undefined (reading 'on')`, it means the environment variable `ELECTRON_RUN_AS_NODE` is set. The `npm run dev` script handles this automatically, but if you run electron directly, ensure you unset it:
+
+```bash
+unset ELECTRON_RUN_AS_NODE
+```
+
+---
+
 ## Testing
 
 Scrutinizer includes an automated visual smoke test to ensure the renderer is functioning correctly and producing expected visual output.

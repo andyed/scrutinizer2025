@@ -615,7 +615,11 @@ function createScrutinizerWindow(startUrl) {
 
 // Add this outside createScrutinizerWindow to ensure it's registered once
 ipcMain.on('log:renderer', (event, message) => {
-    console.log('[Renderer]', message);
+    try {
+        console.log('[Renderer]', message);
+    } catch (e) {
+        // Ignore EPIPE errors from logging
+    }
 });
 
 function createWindow() {
@@ -692,7 +696,7 @@ function runTestMode() {
     });
 }
 
-app.on('ready', () => {
+app.whenReady().then(() => {
     if (process.env.TEST_MODE === 'true') {
         runTestMode();
     } else {

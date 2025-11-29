@@ -4,15 +4,15 @@
   "description": "Foveal vision simulator - recreating the 2007 Scrutinizer browser",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron . --enable-logging",
+    "start": "ELECTRON_RUN_AS_NODE= electron .",
+    "dev": "ELECTRON_RUN_AS_NODE= electron . --enable-logging",
     "build": "electron-builder --mac",
     "build:unsigned": "electron-builder --mac --config.mac.identity=null",
     "release": "electron-builder --mac --publish always",
     "build:win": "electron-builder --win",
     "release:win": "electron-builder --win --publish always",
     "release:all": "electron-builder --mac --win --publish always",
-    "test": "TEST_MODE=true electron ."
+    "test": "ELECTRON_RUN_AS_NODE= TEST_MODE=true electron ."
   },
   "keywords": [
     "electron",
