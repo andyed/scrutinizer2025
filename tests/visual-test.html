@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Visual Smoke Test</title>
+</head>
+
+<body>
+    <canvas id="test-canvas" width="800" height="600"></canvas>
+    <script>
+        const { ipcRenderer } = require('electron');
+        const path = require('path');
+
+        // Mock Logger if needed, or rely on the real one if it works
+        // The real logger uses ipcRenderer.send('log:renderer', ...), which we haven't handled in run-test.js
+        // Let's mock it to be safe and redirect to our 'log' channel
+        const mockLogger = {
+            log: (msg) => ipcRenderer.send('log', msg),
+            error: (msg) => ipcRenderer.send('log', 'ERROR: ' + msg),
+            warn: (msg) => ipcRenderer.send('log', 'WARN: ' + msg)
+        };
+
+        // We need to intercept require('./logger') in webgl-renderer.js
+        // Since we can't easily mock require in this environment without more setup,
+        // let's hope the real logger works or fails gracefully.
+        // Actually, the real logger is simple. Let's just handle 'log:renderer' in the main process.
+        // But wait, we can't easily change the main process handling for 'log:renderer' without changing run-test.js
+        // Let's update run-test.js to handle 'log:renderer' as well.
+
+        try {
+            const WebGLRenderer = require('../renderer/webgl-renderer.js');
+
+            const canvas = document.getElementById('test-canvas');
+            const renderer = new WebGLRenderer(canvas);
+
+            // Create a dummy texture (white noise) to render
+            const width = 800;
+            const height = 600;
+            const buffer = new Uint8ClampedArray(width * height * 4);
+            for (let i = 0; i < buffer.length; i += 4) {
+                buffer[i] = 255;     // R
+                buffer[i + 1] = 255; // G
+                buffer[i + 2] = 255; // B
+                buffer[i + 3] = 255; // A
+            }
+            const imageData = new ImageData(buffer, width, height);
+            renderer.uploadTexture(imageData);
+
+            // Render a frame
+            // Use parameters that should produce visible output
+            renderer.render(
+                width,
+                height,
+                width / 2, // Mouse X
+                height / 2, // Mouse Y
+                150, // Radius
+                1.33, // Aspect Ratio
+                0.5, // Intensity
+                0.0, // CA
+                0.0, // Debug Boundary
+                0.0, // Debug Structure
+                0.0, // Use Mask
+                0.0, // Mongrel Mode (Noise) - usually produces visible distortion
+                0.0, // Aesthetic Mode (High Key) - produces visible output
+                0.0, // Velocity
+                width / 2, // Stable Mouse X
+                height / 2, // Stable Mouse Y
+                0.0 // Has Structure
+            );
+
+            // Check pixels
+            const gl = renderer.gl;
+            const pixels = new Uint8Array(width * height * 4);
+            gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+            // Analyze: Check if we have non-black pixels
+            // The default clear color is black (0,0,0,0) or (0,0,0,1) depending on setup
+            // Our texture is white. The effect should produce something visible.
+
+            let nonBlackCount = 0;
+            let nonTransparentCount = 0;
+
+            for (let i = 0; i < pixels.length; i += 4) {
+                const r = pixels[i];
+                const g = pixels[i + 1];
+                const b = pixels[i + 2];
+                const a = pixels[i + 3];
+
+                if (a > 0) nonTransparentCount++;
+                if (r > 10 || g > 10 || b > 10) nonBlackCount++;
+            }
+
+            const totalPixels = width * height;
+            const coverage = nonBlackCount / totalPixels;
+
+            ipcRenderer.send('log', `Non-black pixels: ${nonBlackCount} (${(coverage * 100).toFixed(2)}%)`);
+            ipcRenderer.send('log', `Non-transparent pixels: ${nonTransparentCount}`);
+
+            if (nonBlackCount > 0) {
+                ipcRenderer.send('test-result', { success: true, message: 'Visuals detected' });
+            } else {
+                ipcRenderer.send('test-result', {
+                    success: false,
+                    message: 'No visuals detected (all black)',
+                    details: 'The renderer produced a completely black image.'
+                });
+            }
+
+        } catch (err) {
+            ipcRenderer.send('test-result', {
+                success: false,
+                message: 'Exception during test execution',
+                details: err.stack || err.message
+            });
+        }
+    </script>
+</body>
+
+</html>

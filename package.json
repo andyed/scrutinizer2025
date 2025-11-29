@@ -11,7 +11,8 @@
     "release": "electron-builder --mac --publish always",
     "build:win": "electron-builder --win",
     "release:win": "electron-builder --win --publish always",
-    "release:all": "electron-builder --mac --win --publish always"
+    "release:all": "electron-builder --mac --win --publish always",
+    "test": "TEST_MODE=true electron ."
   },
   "keywords": [
     "electron",
@@ -79,7 +80,7 @@
   },
   "devDependencies": {
     "@electron/notarize": "^3.1.1",
-    "electron": "^30.0.0",
+    "electron": "^30.5.1",
     "electron-builder": "^26.0.12"
   },
   "dependencies": {

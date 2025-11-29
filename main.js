@@ -654,8 +654,50 @@ function createWindow() {
 app.commandLine.appendSwitch('ignore-gpu-blacklist');
 app.commandLine.appendSwitch('enable-transparent-visuals');
 
+// Test Mode Handler
+function runTestMode() {
+    console.log('[Main] Running in TEST MODE');
+    const testWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        show: false,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+            offscreen: true
+        }
+    });
+
+    testWindow.loadFile(path.join(__dirname, 'tests', 'visual-test.html'));
+
+    ipcMain.on('test-result', (event, result) => {
+        if (result.success) {
+            console.log('✅ TEST PASSED:', result.message);
+            app.exit(0);
+        } else {
+            console.error('❌ TEST FAILED:', result.message);
+            if (result.details) console.error('Details:', result.details);
+            app.exit(1);
+        }
+    });
+
+    // Handle logs from renderer during test
+    ipcMain.on('log', (event, msg) => {
+        console.log('[Test Renderer]', msg);
+    });
+
+    testWindow.webContents.on('crashed', () => {
+        console.error('❌ TEST FAILED: Renderer process crashed');
+        app.exit(1);
+    });
+}
+
 app.on('ready', () => {
-    createWindow();
+    if (process.env.TEST_MODE === 'true') {
+        runTestMode();
+    } else {
+        createWindow();
+    }
 
     // Register global shortcut for Open URL
     globalShortcut.register('CommandOrControl+L', () => {
