@@ -401,8 +401,31 @@
         }
 
         toggleStructureMap(enabled) {
-            this.config.debugStructure = enabled ? 1.0 : 0.0;
-            console.log(`[Scrutinizer] Debug Structure set to: ${this.config.debugStructure}`);
+            this.showStructureMap = enabled;
+            this.updateDebugMode();
+        }
+
+        toggleSaliencyMap(enabled) {
+            this.showSaliencyMap = enabled;
+            this.updateDebugMode();
+
+            // Force upload if enabling and map exists
+            if (enabled && this.structureMap && this.renderer) {
+                console.log('[Scrutinizer] Toggling Saliency ON - forcing structure map upload');
+                this.renderer.uploadStructureMap(this.structureMap.getCanvas());
+            }
+        }
+
+        updateDebugMode() {
+            // Priority: Saliency (2.0) > Structure (1.0) > None (0.0)
+            if (this.showSaliencyMap) {
+                this.config.debugStructure = 2.0;
+            } else if (this.showStructureMap) {
+                this.config.debugStructure = 1.0;
+            } else {
+                this.config.debugStructure = 0.0;
+            }
+            console.log(`[Scrutinizer] Debug Mode updated: ${this.config.debugStructure} (Saliency: ${this.showSaliencyMap}, Structure: ${this.showStructureMap})`);
         }
 
         toggleEnableStructureMap(enabled) {

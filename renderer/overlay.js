@@ -197,6 +197,10 @@
             scrutinizer.toggleEnableStructureMap(enabled);
         });
 
+        ipcRenderer.on('menu:toggle-saliency-map', (e, enabled) => {
+            scrutinizer.toggleSaliencyMap(enabled);
+        });
+
         ipcRenderer.on('menu:set-visual-memory', (event, limit) => {
             log(`[Overlay] Setting visual memory limit: ${limit}`);
             if (scrutinizer) scrutinizer.setVisualMemoryLimit(limit);

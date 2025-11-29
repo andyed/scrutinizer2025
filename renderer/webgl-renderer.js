@@ -523,11 +523,17 @@
                     }
 
                     // Structure Map Visualization (Red Overlay)
-                    if (u_debug_structure > 0.5) {
-                        // Structure Map: G = Density (0.0-1.0)
+                    // Debug Visualization
+                    if (u_debug_structure > 1.5) {
+                        // Saliency Map Visualization (Greyscale)
+                        // Saliency is stored in R channel of structure texture
+                        float saliency = structure.r;
+                        color.rgb = vec3(saliency, saliency, saliency);
+                    } else if (u_debug_structure > 0.5) {
+                        // Structure Map Visualization (Red Overlay)
+                        // Structure density is stored in G channel
                         float mapDensity = structure.g;
                         if (mapDensity > 0.0) {
-                            // Draw Red overlay where density > 0
                             vec3 debugColor = vec3(1.0, 0.0, 0.0); 
                             color.rgb = mix(color.rgb, debugColor, 0.3 * mapDensity);
                         }

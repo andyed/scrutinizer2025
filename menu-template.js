@@ -348,6 +348,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     click: (menuItem) => sendToOverlays('menu:toggle-structure-map', menuItem.checked)
                 },
                 {
+                    label: 'Show Saliency Map',
+                    type: 'checkbox',
+                    checked: false,
+                    click: (menuItem) => sendToOverlays('menu:toggle-saliency-map', menuItem.checked)
+                },
+                {
                     label: 'Debug: Show Boundary',
                     type: 'checkbox',
                     checked: false,

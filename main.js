@@ -13,6 +13,16 @@ let currentVisualMemory;
 
 let mainWindow;
 
+// Handle EPIPE errors globally (common when piping output or closing terminals)
+process.on('uncaughtException', (err) => {
+    if (err.code === 'EPIPE') {
+        // Ignore EPIPE errors
+        return;
+    }
+    console.error('Uncaught Exception:', err);
+    process.exit(1);
+});
+
 function sendToRenderer(channel, ...args) {
     const win = BrowserWindow.getFocusedWindow();
     if (win) {
@@ -189,20 +199,31 @@ ipcMain.on('get-window-size', (event) => {
 // Handle capture requests from HUD (for foveal effect)
 // Handle capture requests from HUD (for foveal effect)
 ipcMain.on('hud:capture:request', async (event) => {
-    // console.log('[Main] Received hud:capture:request'); // Keep this commented to avoid spam if loop is fast
+    console.log('[Main] Received hud:capture:request');
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
 
     if (win && win.scrutinizerView && win.scrutinizerHud) {
         try {
-            const image = await win.scrutinizerView.webContents.capturePage();
+            // Race capturePage against a timeout
+            const capturePromise = win.scrutinizerView.webContents.capturePage();
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Capture timed out')), 1000));
+
+            let image;
+            try {
+                image = await Promise.race([capturePromise, timeoutPromise]);
+            } catch (e) {
+                // console.warn('[Main] View capture failed/timed out, falling back to window capture:', e.message);
+                image = await win.capturePage();
+            }
+
             const buffer = image.toBitmap();
             const size = image.getSize();
 
             // Send back to HUD window (where canvas lives)
             // Log every 60th frame to avoid spam, or just once to verify
             if (Math.random() < 0.05) {
-                console.log(`[Main] Captured frame: ${size.width}x${size.height}, Buffer: ${buffer.length}`);
+                // console.log(`[Main] Captured frame: ${size.width}x${size.height}, Buffer: ${buffer.length}`);
             }
 
             win.scrutinizerHud.webContents.send('hud:frame-captured', {
