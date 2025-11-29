@@ -132,17 +132,13 @@
 
         handleMouseMove(event) {
             const rect = this.canvas.getBoundingClientRect();
-            // WebGL viewport handles scaling, but we need mouse in canvas pixel coords
-            // If canvas.width != rect.width (HiDPI), we need to scale
             const scaleX = this.canvas.width / rect.width;
             const scaleY = this.canvas.height / rect.height;
 
-            // Update zoom if provided in event (from synthetic event)
             if (event.zoom) {
                 this.currentZoom = event.zoom;
             }
 
-            // Apply zoom correction to client coordinates
             let clientX = event.clientX;
             let clientY = event.clientY;
 
@@ -232,9 +228,11 @@
             const dt = now - this.lastRenderTime;
             this.lastRenderTime = now;
 
-            // Smooth mouse
-            this.mouseX += (this.targetMouseX - this.mouseX) * this.config.maskSmoothness;
-            this.mouseY += (this.targetMouseY - this.mouseY) * this.config.maskSmoothness;
+            // Smooth mouse (skip if target coords not initialized)
+            if (this.targetMouseX !== 0 || this.targetMouseY !== 0) {
+                this.mouseX += (this.targetMouseX - this.mouseX) * this.config.maskSmoothness;
+                this.mouseY += (this.targetMouseY - this.mouseY) * this.config.maskSmoothness;
+            }
 
             // Calculate velocity (pixels per ms)
             // Use raw distance to avoid sqrt for perf? No, we need actual speed.

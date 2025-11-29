@@ -532,7 +532,6 @@ function createScrutinizerWindow(startUrl) {
     // MOUSE TRACKING FALLBACK: Poll global mouse position
     // This works as a FALLBACK when DOM events are blocked by modals/popups
     // We still prefer DOM events when available (they carry element context)
-    // TEMPORARILY DISABLED: Testing if polling causes disruption when mouse stops
     let mousePollingInterval = null;
     let lastDOMEventTime = Date.now();
     let mouseEventCount = 0; // Added for logging, as used in the provided snippet
@@ -553,42 +552,45 @@ function createScrutinizerWindow(startUrl) {
     });
 
     const startMousePolling = () => {
-        // DISABLED FOR TESTING
-        console.log('[Main] Mouse polling disabled for testing');
-        return;
+        if (mousePollingInterval) {
+            console.log('[Main] Polling already running');
+            return; // Already polling
+        }
 
-        /* ORIGINAL CODE COMMENTED OUT
-        if (mousePollingInterval) return; // Already polling
+        console.log('[Main] Starting mouse polling fallback');
 
         mousePollingInterval = setInterval(() => {
-            if (win.isDestroyed() || !win.isFocused()) return;
+            if (win.isDestroyed()) {
+                console.log('[Main] Polling stopped - window destroyed');
+                return;
+            }
+            if (!win.isFocused()) {
+                console.log('[Main] Polling skipped - window not focused');
+                return;
+            }
 
             // Only use polling if DOM hasn't sent events recently (modal blocking)
             const timeSinceDOM = Date.now() - lastDOMEventTime;
-            if (timeSinceDOM < 100) return; // DOM is working, skip polling
+            if (timeSinceDOM < 20) return; // Reduced from 100ms for faster dropdown response
 
             try {
                 const { screen } = require('electron');
                 const cursorPos = screen.getCursorScreenPoint();
-                const winBounds = win.getBounds();
-                const contentBounds = contentView.getBounds();
+                const contentBounds = win.getContentBounds();
 
-                // Convert screen coords to window-relative coords
-                const x = cursorPos.x - winBounds.x - contentBounds.x;
-                const y = cursorPos.y - winBounds.y - contentBounds.y;
+                const x = cursorPos.x - contentBounds.x;
+                const y = cursorPos.y - contentBounds.y;
 
-                // Only send if cursor is within content view bounds
                 if (x >= 0 && x < contentBounds.width && y >= 0 && y < contentBounds.height) {
-                    const zoom = contentView.webContents.getZoomFactor();
+                    // Send zoom=1.0 since coords are already window-relative
                     if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
-                        win.scrutinizerHud.webContents.send('browser:mousemove', x, y, zoom);
+                        win.scrutinizerHud.webContents.send('browser:mousemove', x, y, 1.0);
                     }
                 }
             } catch (err) {
                 console.error('[Main] Mouse polling error:', err);
             }
         }, 16); // ~60fps
-        */
     };
 
     const stopMousePolling = () => {

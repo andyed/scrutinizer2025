@@ -70,3 +70,4 @@ See `docs/webcontentsview-migration.md` for full migration plan.
 ### Visual Artifacts
 - **Scroll Lag**: Rapid scrolling may cause a momentary desynchronization between the overlay canvas (visuals) and the underlying webview (interaction targets).
 - **Cursor State**: The mouse cursor may not always correctly reflect the hover state (e.g., changing to a hand pointer) due to the overlay window intercepting events.
+- **Native Select Dropdown Tracking**: Native HTML `<select>` dropdowns (e.g., Amazon's department menu) may show peripheral distortion when open. This occurs because the OS renders these controls outside the browser's context and blocks mouse event reporting. The polling fallback system attempts to compensate using screen coordinates, but coordinate space misalignment causes inaccurate foveal positioning.
