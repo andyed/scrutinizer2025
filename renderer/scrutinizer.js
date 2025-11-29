@@ -350,12 +350,15 @@
                 console.log(`[Scrutinizer] Renderer exists: ${!!this.renderer}, Frame count: ${this.frameUploadCount || 0}`);
             }
 
+            const aspectRatio = this.config.fovealAspectRatio || 1.33;
+
             this.renderer.render(
                 this.canvas.width,
                 this.canvas.height,
                 this.mouseX,
                 this.mouseY,
                 this.config.fovealRadius,
+                aspectRatio,
                 this.config.peripheralIntensity,
                 this.config.caStrength,
                 this.config.debugBoundary,

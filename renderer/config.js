@@ -2,6 +2,7 @@
 const CONFIG = {
     // Foveal region settings
     fovealRadius: 180, // pixels - size of the clear vision area
+    fovealAspectRatio: 1.33, // width/height ratio of foveal shape (4:3 default)
 
     // Image processing settings
     blurRadius: 10, // pixels - amount of blur for peripheral vision (higher = more severe)

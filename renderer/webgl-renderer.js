@@ -109,6 +109,7 @@
                 uniform vec2  u_mouse;
                 uniform vec2  u_mouse_stable; // Hysteresis-smoothed mouse for distortion
                 uniform float u_foveaRadius;
+                uniform float u_fovea_aspect_ratio; // Aspect ratio of foveal shape
                 uniform float u_pixelation;
                 uniform float u_intensity;
                 uniform float u_ca_strength;
@@ -356,14 +357,14 @@
                     vec2 mouse_corrected = vec2(mouse_uv.x * aspect, mouse_uv.y);
                     
                     vec2 delta = uv_corrected - mouse_corrected;
-                    delta.x /= 1.77; 
+                    delta.x /= u_fovea_aspect_ratio; 
                     float dist = length(delta); // Real distance (for lighting/rod vision)
 
                     // Stable Mouse (for Distortion/Mongrel)
                     vec2 mouse_stable_uv = u_mouse_stable / u_resolution;
                     vec2 mouse_stable_corrected = vec2(mouse_stable_uv.x * aspect, mouse_stable_uv.y);
                     vec2 delta_stable = uv_corrected - mouse_stable_corrected;
-                    delta_stable.x /= 1.77;
+                    delta_stable.x /= u_fovea_aspect_ratio;
                     float dist_stable = length(delta_stable); // Stable distance (for distortion)
     
                     float radius_norm = u_foveaRadius / u_resolution.y;
@@ -426,7 +427,7 @@
                             warpStrength = 0.0;
                         }
                         
-                        vec2 uv_noise = vec2(uv_corrected.x / 1.77, uv_corrected.y);
+                        vec2 uv_noise = vec2(uv_corrected.x / u_fovea_aspect_ratio, uv_corrected.y);
                         
                         float coarseScaleX = isFarPeriphery ? 2000.0 : 200.0;
                         float coarseScaleY = isFarPeriphery ? 1000.0 : 100.0;
@@ -443,7 +444,7 @@
                         vec2 warpVector = vec2(n1_warp, n2_warp) * warpAmp * warpStrength * u_intensity;
                         
                         float fineScale = isFarPeriphery ? 15000.0 : 6000.0;
-                        vec2 warpedUV_noise = vec2((uv_corrected.x + warpVector.x) / 1.77, uv_corrected.y + warpVector.y);
+                        vec2 warpedUV_noise = vec2((uv_corrected.x + warpVector.x) / u_fovea_aspect_ratio, uv_corrected.y + warpVector.y);
                         
                         float n1_jitter = snoise(warpedUV_noise * fineScale);
                         float n2_jitter = snoise(warpedUV_noise * fineScale + vec2(100.0, 100.0));
@@ -564,6 +565,13 @@
                 this.mouseLocation = gl.getUniformLocation(this.program, "u_mouse");
                 this.mouseStableLocation = gl.getUniformLocation(this.program, "u_mouse_stable");
                 this.foveaRadiusLocation = gl.getUniformLocation(this.program, "u_foveaRadius");
+                this.foveaAspectRatioLocation = gl.getUniformLocation(this.program, "u_fovea_aspect_ratio");
+                if (!this.foveaAspectRatioLocation && this.foveaAspectRatioLocation !== 0) {
+                    // Note: getUniformLocation returns null if not found. It might return an object (WebGLUniformLocation).
+                    // In some browsers/implementations it might be strict.
+                    // If it's null, the uniform is optimized away or missing.
+                    console.warn('[WebGLRenderer] Warning: u_fovea_aspect_ratio uniform not found (may be optimized away if unused)');
+                }
                 this.pixelationLocation = gl.getUniformLocation(this.program, "u_pixelation");
                 this.intensityLocation = gl.getUniformLocation(this.program, "u_intensity");
                 this.caStrengthLocation = gl.getUniformLocation(this.program, "u_ca_strength");
@@ -686,7 +694,7 @@
                 gl.clearColor(0.0, 0.0, 0.0, 0.0);
                 gl.clear(gl.COLOR_BUFFER_BIT);
             }
-            render(width, height, mouseX, mouseY, foveaRadius, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, debugStructure = 0.0, useMask = 0.0, mongrelMode = 1.0, aestheticMode = 0.0, velocity = 0.0, stableMouseX = 0.0, stableMouseY = 0.0, hasStructure = 0.0) {
+            render(width, height, mouseX, mouseY, foveaRadius, foveaAspectRatio = 1.33, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, debugStructure = 0.0, useMask = 0.0, mongrelMode = 1.0, aestheticMode = 0.0, velocity = 0.0, stableMouseX = 0.0, stableMouseY = 0.0, hasStructure = 0.0) {
                 if (!this.program) {
                     console.error('[WebGLRenderer] render() called but program is null!');
                     return;
@@ -699,7 +707,12 @@
                 this.renderCallCount++;
                 if (this.renderCallCount === 1) {
                     const { ipcRenderer } = require('electron');
-                    ipcRenderer.send('log:renderer', `[WebGLRenderer] First render: ${width}x${height}, mouse=(${mouseX},${mouseY}), radius=${foveaRadius}, mode=${mongrelMode}`);
+                    ipcRenderer.send('log:renderer', `[WebGLRenderer] First render: ${width}x${height}, mouse=(${mouseX},${mouseY}), radius=${foveaRadius}, ratio=${foveaAspectRatio}, mode=${mongrelMode}`);
+                }
+
+                // Safety check for aspect ratio to prevent division by zero in shader
+                if (!foveaAspectRatio || foveaAspectRatio < 0.1) {
+                    foveaAspectRatio = 1.33;
                 }
 
                 const gl = this.gl;
@@ -740,6 +753,7 @@
                 gl.uniform2f(this.mouseLocation, mouseX, mouseY);
                 gl.uniform2f(this.mouseStableLocation, stableMouseX, stableMouseY);
                 gl.uniform1f(this.foveaRadiusLocation, foveaRadius);
+                gl.uniform1f(this.foveaAspectRatioLocation, foveaAspectRatio);
                 gl.uniform1f(this.pixelationLocation, 0.15 * intensity);
                 gl.uniform1f(this.intensityLocation, intensity);
                 gl.uniform1f(this.caStrengthLocation, caStrength);
