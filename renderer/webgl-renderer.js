@@ -616,12 +616,13 @@
                         float angle = atan(diff.y, diff.x);
                         
                         // Use manual pixel size calculation for crisp lines
+                        // 1.2px thickness for lighter weight (was 1.5px)
                         float pxSize = 1.0 / u_resolution.y; 
-                        float lineThickness = 1.5 * pxSize; 
+                        float lineThickness = 1.2 * pxSize; 
                         
                         // Mode 1: Fovea Only (Reticle Style)
                         if (u_debug_boundary > 0.5) {
-                            float tickLength = 0.01; 
+                            float tickLength = 0.007; // Shorter ticks (was 0.01)
                             float numTicks = 12.0;
                             
                             // Radial distance check
@@ -629,23 +630,23 @@
                             float tickRadial = 1.0 - smoothstep(tickLength - pxSize, tickLength + pxSize, distFromFovea);
                             
                             // Angular check using SIN for stability
-                            // sin(angle * N) creates N peaks and N troughs
-                            // We want sharp ticks.
                             float tickPattern = cos(angle * numTicks);
-                            // Sharpen the pattern: only show the peaks
                             float tickAngular = smoothstep(0.95, 0.98, tickPattern);
                             
                             float tickAlpha = tickRadial * tickAngular;
                             
                             if (tickAlpha > 0.0) {
                                 vec3 tickColor = vec3(0.0, 1.0, 1.0); // Cyan
-                                color.rgb = mix(color.rgb, tickColor, tickAlpha); 
+                                // Add transparency (0.7 alpha)
+                                color.rgb = mix(color.rgb, tickColor, tickAlpha * 0.7); 
                             }
                         }
                         
                         // Mode 2: Fovea + Parafovea
                         if (u_debug_boundary > 1.5) {
+                            // Corrected Parafovea Radius (2.5x Fovea)
                             float visualParafoveaRadius = fovea_radius * 2.5;
+                            
                             float parafoveaDist = abs(dist - visualParafoveaRadius);
                             float ringAlpha = 1.0 - smoothstep(lineThickness - pxSize, lineThickness + pxSize, parafoveaDist);
                             
@@ -657,7 +658,8 @@
                             
                             if (finalRingAlpha > 0.0) {
                                 vec3 ringColor = vec3(1.0, 0.5, 0.0); // Orange
-                                color.rgb = mix(color.rgb, ringColor, finalRingAlpha);
+                                // Add transparency (0.7 alpha)
+                                color.rgb = mix(color.rgb, ringColor, finalRingAlpha * 0.7);
                             }
                         }
                     }
