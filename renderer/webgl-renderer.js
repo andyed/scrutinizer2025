@@ -449,6 +449,11 @@
                         float warpStrength = smoothstep(fovea_radius, parafovea_radius, dist);
                         warpStrength = pow(warpStrength, 0.5);
                         
+                        // === FIDELITY BIAS: Saliency Modulation ===
+                        // Reduce degradation near salient areas to preserve detail for saccade guidance
+                        float saliency = texture2D(u_saliencyMap, uv).r;
+                        warpStrength *= (1.0 - saliency); // High saliency = less distortion
+                        
                         if (isBlueprint) warpStrength = 0.0; // Disable noise for Blueprint
                         
                         // === STRUCTURE MAP MODULATION ===
