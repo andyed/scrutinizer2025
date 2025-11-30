@@ -21,10 +21,14 @@
                 // alert('WebGL is required for this version of Scrutinizer.'); // Suppressed to avoid spam
             }
 
-            // Initialize Structure Map
+            // Structure Map (Content Density Texture)
+            const StructureMap = require('./structure-map.js');
             this.structureMap = new StructureMap();
+            this.hasStructure = false;
 
-            this.enabled = false;
+            // Saliency Map (Visual Attractiveness Texture)
+            const SaliencyMap = require('./saliency-map.js');
+            this.saliencyMap = new SaliencyMap();
             this.lastFrameBitmap = null;
 
             // Visual Memory (Fog of War)
@@ -365,6 +369,13 @@
             }
 
             const aspectRatio = this.config.fovealAspectRatio || 1.33;
+
+            // Compute and upload saliency map from current frame
+            if (this.canvas.width > 0 && this.canvas.height > 0) {
+                this.saliencyMap.resize(this.canvas.width, this.canvas.height);
+                this.saliencyMap.computeFromImage(this.canvas);
+                this.renderer.uploadSaliencyMap(this.saliencyMap.getCanvas());
+            }
 
             this.renderer.render(
                 this.canvas.width,

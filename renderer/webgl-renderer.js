@@ -103,6 +103,7 @@
                 uniform sampler2D u_texture;      // Captured browser frame (Live)
                 uniform sampler2D u_maskTexture;  // Visual memory mask
                 uniform sampler2D u_structureMap; // Structure Map (R=Rhythm, G=Density, B=Type)
+                uniform sampler2D u_saliencyMap;  // Saliency Map (R=Saliency, grayscale)
                 uniform float u_useMask;
                 
                 uniform vec2  u_resolution;
@@ -380,31 +381,31 @@
                     
                     // --- DEBUG: Structure Map ---
                     if (u_debug_structure > 0.5) {
-                        vec4 structure = texture2D(u_structureMap, uv);
-                        
                         if (u_debug_structure > 1.5) {
-                            // Mode 2: Saliency Map (Alpha Channel)
-                            // Visualize as Heatmap: Blue (Low) -> Green -> Red (High)
-                            float s = structure.a;
-                            vec3 heatmap = vec3(s, s, s); // Grayscale for now, simple and effective
+                            // Mode 2: Saliency Map (continuous gradients)
+                            float s = texture2D(u_saliencyMap, uv).r; // Read from dedicated saliency texture
+                            vec3 heatmap;
                             
-                            // Simple heatmap ramp
-                            if (s < 0.5) {
-                                heatmap = mix(vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 0.0), s * 2.0);
+                            // Blue (Low) -> Cyan -> Green -> Yellow -> Red (High)
+                            if (s < 0.25) {
+                                heatmap = mix(vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 1.0), s * 4.0);
+                            } else if (s < 0.5) {
+                                heatmap = mix(vec3(0.0, 1.0, 1.0), vec3(0.0, 1.0, 0.0), (s - 0.25) * 4.0);
+                            } else if (s < 0.75) {
+                                heatmap = mix(vec3(0.0, 1.0, 0.0), vec3(1.0, 1.0, 0.0), (s - 0.5) * 4.0);
                             } else {
-                                heatmap = mix(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), (s - 0.5) * 2.0);
+                                heatmap = mix(vec3(1.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), (s - 0.75) * 4.0);
                             }
                             
-                            // Blend with original content slightly so we can see context?
-                            // Or just show raw map. Let's show raw map for clarity.
-                            color = vec4(heatmap, 0.8); // 80% opacity
-                            gl_FragColor = color; // Directly output debug color
-                            return; // Exit early for debug visualization
+                            color = vec4(heatmap, 0.8);
+                            gl_FragColor = color;
+                            return;
                         } else {
                             // Mode 1: Structure Map (RGB)
+                            vec4 structure = texture2D(u_structureMap, uv);
                             color = vec4(structure.rgb, 0.8);
-                            gl_FragColor = color; // Directly output debug color
-                            return; // Exit early for debug visualization
+                            gl_FragColor = color;
+                            return;
                         }
                     }    
                     // Sample Structure Map (Screen Space UV)
@@ -615,6 +616,7 @@
                 this.textureLocation = gl.getUniformLocation(this.program, "u_texture");
                 this.maskTextureLocation = gl.getUniformLocation(this.program, "u_maskTexture");
                 this.structureMapLocation = gl.getUniformLocation(this.program, "u_structureMap");
+                this.saliencyMapLocation = gl.getUniformLocation(this.program, "u_saliencyMap");
                 this.hasStructureLocation = gl.getUniformLocation(this.program, "u_has_structure");
                 this.useMaskLocation = gl.getUniformLocation(this.program, "u_useMask");
                 this.velocityLocation = gl.getUniformLocation(this.program, "u_velocity");
@@ -673,6 +675,19 @@
                 // Initialize to WHITE (Full Density) so effects are visible by default before first scan
                 const dummyStructure = new Uint8Array([255, 255, 255, 255]);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, dummyStructure);
+
+                // Create saliency map texture (GL_TEXTURE3)
+                this.saliencyMapTexture = gl.createTexture();
+                gl.activeTexture(gl.TEXTURE3);
+                gl.bindTexture(gl.TEXTURE_2D, this.saliencyMapTexture);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                // LINEAR filter for smooth gradients
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                // Initialize to BLACK (low saliency everywhere)
+                const dummySaliency = new Uint8Array([0, 0, 0, 255]);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, dummySaliency);
             }
 
             createProgram(gl, vsSource, fsSource) {
@@ -726,6 +741,13 @@
                 gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
                 gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true); // Restore default
+            }
+
+            uploadSaliencyMap(image) {
+                const gl = this.gl;
+                gl.activeTexture(gl.TEXTURE3);
+                gl.bindTexture(gl.TEXTURE_2D, this.saliencyMapTexture);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
             }
 
             clear() {
@@ -787,6 +809,10 @@
                 gl.activeTexture(gl.TEXTURE2);
                 gl.bindTexture(gl.TEXTURE_2D, this.structureMapTexture);
                 gl.uniform1i(this.structureMapLocation, 2);
+
+                gl.activeTexture(gl.TEXTURE3);
+                gl.bindTexture(gl.TEXTURE_2D, this.saliencyMapTexture);
+                gl.uniform1i(this.saliencyMapLocation, 3);
 
                 gl.uniform2f(this.resolutionLocation, width, height);
                 gl.uniform2f(this.mouseLocation, mouseX, mouseY);
