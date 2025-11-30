@@ -593,45 +593,61 @@
                         float angle = atan(uv_corrected.y, uv_corrected.x);
                         float pi = 3.14159265359;
                         
+                        // Use manual pixel size calculation for crisp lines
+                        // We want lines to be ~2px thick for visibility
+                        float pxSize = 1.0 / u_resolution.y; 
+                        float lineThickness = 2.0 * pxSize; 
+                        
                         // Mode 1: Fovea Only (Reticle Style)
-                        // "Array of diagonal lines emanating from the cursor" -> Radial ticks at fovea radius
                         if (u_debug_boundary > 0.5) {
-                            float tickLength = 0.015; // Approx 10px depending on resolution
-                            float tickThickness = 0.002;
+                            float tickLength = 0.02; // Fixed length in UV space
                             float numTicks = 12.0;
                             
                             // Radial distance check (ring of ticks)
                             float distFromFovea = abs(dist - fovea_radius);
                             
-                            // Angular check (gaps between ticks)
+                            // Angular check
                             float angleMod = mod(angle + pi, (2.0 * pi) / numTicks);
-                            float angleWidth = (2.0 * pi) / numTicks * 0.25; // 25% fill
+                            float angleWidth = (2.0 * pi) / numTicks * 0.25; 
                             
-                            // Smooth edges for ticks
-                            float tickRadial = 1.0 - smoothstep(0.0, tickLength, distFromFovea);
-                            float tickAngular = smoothstep(0.0, 0.05, angleMod) * smoothstep(angleWidth + 0.05, angleWidth, angleMod);
+                            // Crisp Radial Edges
+                            float tickRadial = 1.0 - smoothstep(tickLength - pxSize, tickLength + pxSize, distFromFovea);
                             
-                            // Combine
+                            // Crisp Angular Edges
+                            // Approx fwidth(angle) = pxSize / dist
+                            // Clamp to avoid division by zero or extreme values near center
+                            float angleFw = pxSize / max(dist, 0.001);
+                            float tickAngular = smoothstep(0.0, angleFw * 2.0, angleMod) * smoothstep(angleWidth + angleFw * 2.0, angleWidth, angleMod);
+                            
                             float tickAlpha = tickRadial * tickAngular;
                             
                             if (tickAlpha > 0.0) {
-                                vec3 tickColor = vec3(0.0, 1.0, 1.0); // Cyan for high visibility
-                                color.rgb = mix(color.rgb, tickColor, tickAlpha * 0.8);
+                                vec3 tickColor = vec3(0.0, 1.0, 1.0); // Cyan
+                                // Use MAX mixing to prevent washing out
+                                color.rgb = mix(color.rgb, tickColor, tickAlpha); 
                             }
                         }
                         
                         // Mode 2: Fovea + Parafovea
                         if (u_debug_boundary > 1.5) {
-                            // Add Parafovea Ring (Dashed or Solid)
-                            float parafoveaDist = abs(dist - parafovea_radius);
-                            float ringThickness = 0.002;
-                            float ringAlpha = 1.0 - smoothstep(0.0, ringThickness, parafoveaDist);
+                            // Corrected Parafovea Radius (2.5x Fovea)
+                            // Note: We need to redefine parafovea_radius locally or use the multiplier
+                            // The global 'parafovea_radius' was 1.35x. Let's use 2.5x here for the visual.
+                            float visualParafoveaRadius = fovea_radius * 2.5;
                             
-                            // Make it dashed
-                            float dashPattern = sin(angle * 20.0);
-                            if (dashPattern > 0.0 && ringAlpha > 0.0) {
-                                vec3 ringColor = vec3(1.0, 0.5, 0.0); // Orange for parafovea
-                                color.rgb = mix(color.rgb, ringColor, ringAlpha * 0.6);
+                            float parafoveaDist = abs(dist - visualParafoveaRadius);
+                            float ringAlpha = 1.0 - smoothstep(lineThickness - pxSize, lineThickness + pxSize, parafoveaDist);
+                            
+                            // Dashed Pattern
+                            float dashPattern = sin(angle * 30.0);
+                            // Sharpen dash
+                            float dashAlpha = smoothstep(0.0, 0.1, dashPattern);
+                            
+                            float finalRingAlpha = ringAlpha * dashAlpha;
+                            
+                            if (finalRingAlpha > 0.0) {
+                                vec3 ringColor = vec3(1.0, 0.5, 0.0); // Orange
+                                color.rgb = mix(color.rgb, ringColor, finalRingAlpha);
                             }
                         }
                     }
