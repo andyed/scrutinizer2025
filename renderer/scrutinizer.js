@@ -334,9 +334,9 @@
                     velocityThreshold = Infinity; // Always paint
                 } else {
                     // Limited: Working Memory simulation
-                    // Bumped opacity significantly (0.05 -> 0.15) to make memory visible and reduce CA artifacts
-                    // Still requires ~7 frames (~100ms) to reach full clarity, so dwell is still needed but less punishing.
-                    brushOpacity = 0.15;
+                    // Increased opacity (0.15 -> 0.35) to make memory impact more visible
+                    // Now requires ~3 frames (~50ms) to reach full clarity
+                    brushOpacity = 0.35;
                     velocityThreshold = 0.5; // Fixation only
                 }
 
