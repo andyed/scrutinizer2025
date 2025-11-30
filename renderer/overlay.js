@@ -166,6 +166,9 @@
                 log(`[Overlay] Initializing visual memory: ${state.visualMemory}`);
                 if (scrutinizer) scrutinizer.setVisualMemoryLimit(state.visualMemory);
             }
+            if (state.intensity !== undefined) {
+                if (scrutinizer) scrutinizer.updateIntensity(state.intensity);
+            }
         });
 
         // Menu IPC handlers
@@ -178,7 +181,10 @@
         });
 
         ipcRenderer.on('menu:set-intensity', (event, intensity) => {
-            if (scrutinizer) scrutinizer.updateIntensity(intensity);
+            if (scrutinizer) {
+                scrutinizer.updateIntensity(intensity);
+                ipcRenderer.send('settings:intensity-changed', intensity);
+            }
         });
 
         ipcRenderer.on('menu:toggle-ca', (event, enabled) => {

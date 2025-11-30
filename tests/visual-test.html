@@ -86,7 +86,7 @@
             }
             ipcRenderer.send('log', `Test 1 Passed: Visibility coverage ${(coverage * 100).toFixed(2)}%`);
 
-            // --- TEST 2: Distortion Application ---
+            // --- TEST 2: Robust Zonal Distortion ---
             // Render with NO intensity
             renderer.render(
                 width, height, width / 2, height / 2, 150, 1.33,
@@ -103,11 +103,37 @@
             );
             const frameHighDistortion = captureFrame();
 
-            const distortionDiff = compareFrames(frameNoDistortion, frameHighDistortion);
-            if (distortionDiff < 0.01) { // Expect at least 1% pixels to change
-                throw new Error(`Test 2 Failed: Changing intensity did not affect image (diff: ${distortionDiff})`);
+            // Helper to check region difference
+            const checkRegionDiff = (x, y, w, h, name) => {
+                let diffCount = 0;
+                let totalPixels = 0;
+                for (let ry = y; ry < y + h; ry++) {
+                    for (let rx = x; rx < x + w; rx++) {
+                        const i = (ry * width + rx) * 4;
+                        if (Math.abs(frameNoDistortion[i] - frameHighDistortion[i]) > 5 ||
+                            Math.abs(frameNoDistortion[i + 1] - frameHighDistortion[i + 1]) > 5 ||
+                            Math.abs(frameNoDistortion[i + 2] - frameHighDistortion[i + 2]) > 5) {
+                            diffCount++;
+                        }
+                        totalPixels++;
+                    }
+                }
+                return diffCount / totalPixels;
+            };
+
+            // 1. Check Fovea (Center 50x50) - Should be STABLE (0% diff)
+            const foveaDiff = checkRegionDiff((width / 2) - 25, (height / 2) - 25, 50, 50, "Fovea");
+            if (foveaDiff > 0.01) {
+                throw new Error(`Test 2 Failed: Fovea should be clear but changed by ${(foveaDiff * 100).toFixed(2)}%`);
             }
-            ipcRenderer.send('log', `Test 2 Passed: Distortion applied (diff: ${(distortionDiff * 100).toFixed(2)}%)`);
+
+            // 2. Check Periphery (Top Left 50x50) - Should be DISTORTED (>1% diff)
+            const peripheryDiff = checkRegionDiff(0, 0, 50, 50, "Periphery");
+            if (peripheryDiff < 0.01) {
+                throw new Error(`Test 2 Failed: Periphery should be distorted but changed by only ${(peripheryDiff * 100).toFixed(2)}%`);
+            }
+
+            ipcRenderer.send('log', `Test 2 Passed: Zonal Distortion verified (Fovea: ${(foveaDiff * 100).toFixed(2)}%, Periphery: ${(peripheryDiff * 100).toFixed(2)}%)`);
 
             // --- TEST 3: Motion Responsiveness ---
             // Render at Left position
@@ -133,6 +159,45 @@
                 throw new Error(`Test 3 Failed: Moving mouse did not affect image (diff: ${motionDiff})`);
             }
             ipcRenderer.send('log', `Test 3 Passed: Motion detected (diff: ${(motionDiff * 100).toFixed(2)}%)`);
+
+            // --- TEST 4: Scrutinizer Config Flow ---
+            // We need to test that updateIntensity updates the config used by render
+            require('../renderer/scrutinizer.js'); // Executes IIFE, sets window.Scrutinizer
+
+            // Mock config
+            const mockConfig = {
+                fovealRadius: 100,
+                intensity: 0.5,
+                peripheralIntensity: undefined // Ensure this is gone/unused
+            };
+
+            // Mock canvas for Scrutinizer (it looks for 'overlay-canvas')
+            const overlayCanvas = document.createElement('canvas');
+            overlayCanvas.id = 'overlay-canvas';
+            overlayCanvas.width = 100;
+            overlayCanvas.height = 100;
+            document.body.appendChild(overlayCanvas);
+
+            const scrutinizer = new window.Scrutinizer(mockConfig);
+
+            // Verify initial state
+            if (scrutinizer.config.intensity !== 0.5) {
+                throw new Error(`Test 4 Failed: Initial intensity mismatch. Expected 0.5, got ${scrutinizer.config.intensity}`);
+            }
+
+            // Update intensity
+            scrutinizer.updateIntensity(0.9);
+            if (scrutinizer.config.intensity !== 0.9) {
+                throw new Error(`Test 4 Failed: Update intensity mismatch. Expected 0.9, got ${scrutinizer.config.intensity}`);
+            }
+
+            // Verify render call uses new intensity
+            // We can't easily spy on scrutinizer.renderer.render without mocking WebGLRenderer, 
+            // but we can check if the property that Scrutinizer passes is correct.
+            // Scrutinizer.render() calls this.renderer.render(..., this.config.intensity, ...)
+            // We verified the code change in scrutinizer.js, so checking config.intensity is sufficient proxy.
+
+            ipcRenderer.send('log', 'Test 4 Passed: Scrutinizer config updates correctly');
 
             // All passed
             ipcRenderer.send('test-result', { success: true, message: 'All visual tests passed' });

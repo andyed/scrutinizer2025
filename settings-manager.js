@@ -9,6 +9,7 @@ class SettingsManager {
         this.defaults = {
             radius: 180,
             blur: 10,
+            intensity: 0.6,
             enabled: true, // Default to enabled
             showWelcomePopup: true, // Default to showing popup
             startPage: 'https://github.com/andyed/scrutinizer2025?tab=readme-ov-file#what-is-scrutinizer',

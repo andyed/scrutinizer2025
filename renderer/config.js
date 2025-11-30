@@ -7,6 +7,7 @@ const CONFIG = {
     // Image processing settings
     blurRadius: 10, // pixels - amount of blur for peripheral vision (higher = more severe)
     desaturationAmount: 1.0, // 0-1, where 1 is full grayscale
+    intensity: 0.6, // 0-1, strength of distortion effect
 
     // ColorMatrix luminance weights (from original ActionScript)
     LUM_R: 0.212671,

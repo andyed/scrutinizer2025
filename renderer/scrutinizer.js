@@ -132,6 +132,10 @@
 
         handleMouseMove(event) {
             const rect = this.canvas.getBoundingClientRect();
+
+            // Guard against hidden canvas (display: none) causing divide by zero
+            if (rect.width === 0 || rect.height === 0) return;
+
             const scaleX = this.canvas.width / rect.width;
             const scaleY = this.canvas.height / rect.height;
 
@@ -227,6 +231,16 @@
             const now = performance.now();
             const dt = now - this.lastRenderTime;
             this.lastRenderTime = now;
+
+            // Self-heal NaN/Infinity coordinates
+            if (!Number.isFinite(this.mouseX) || !Number.isFinite(this.mouseY)) {
+                console.warn('[Scrutinizer] Detected NaN/Infinity mouse coordinates, resetting to center');
+                this.mouseX = this.canvas.width / 2;
+                this.mouseY = this.canvas.height / 2;
+                this.targetMouseX = this.mouseX;
+                this.targetMouseY = this.mouseY;
+                this.currentVelocity = 0;
+            }
 
             // Smooth mouse (skip if target coords not initialized)
             if (this.targetMouseX !== 0 || this.targetMouseY !== 0) {
@@ -359,7 +373,7 @@
                 this.mouseY,
                 this.config.fovealRadius,
                 aspectRatio,
-                this.config.peripheralIntensity,
+                this.config.intensity,
                 this.config.caStrength,
                 this.config.debugBoundary,
                 this.config.debugStructure, // New arg

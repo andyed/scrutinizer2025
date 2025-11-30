@@ -6,6 +6,7 @@ const settingsManager = require('./settings-manager');
 // Track current settings for menu state and new windows
 let currentRadius;
 let currentBlur;
+let currentIntensity;
 let currentEnabled;
 let currentShowWelcome;
 let currentStartPage;
@@ -61,6 +62,12 @@ ipcMain.on('settings:blur-changed', (event, blur) => {
     currentBlur = blur;
     settingsManager.set('blur', blur);
     rebuildMenu();
+});
+
+ipcMain.on('settings:intensity-changed', (event, intensity) => {
+    currentIntensity = intensity;
+    settingsManager.set('intensity', intensity);
+    // rebuildMenu(); // If menu needs update
 });
 
 ipcMain.on('settings:enabled-changed', (event, enabled) => {
@@ -538,6 +545,7 @@ function createScrutinizerWindow(startUrl) {
             const state = {
                 radius: currentRadius,
                 blur: currentBlur,
+                intensity: currentIntensity,
                 enabled: currentEnabled,
                 visualMemory: currentVisualMemory,
                 showWelcome: isFirstWindow ? currentShowWelcome : false
@@ -650,6 +658,7 @@ function createWindow() {
     // Load saved settings with defaults
     currentRadius = settingsManager.get('radius');
     currentBlur = settingsManager.get('blur');
+    currentIntensity = settingsManager.get('intensity');
     currentEnabled = true; // Force enabled for debugging
     // currentEnabled = settingsManager.get('enabled') !== undefined ? settingsManager.get('enabled') : true; // Default to true for debugging
     currentShowWelcome = settingsManager.get('showWelcomePopup');
