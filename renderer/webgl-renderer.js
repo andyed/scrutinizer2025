@@ -19,14 +19,12 @@
                     preserveDrawingBuffer: false
                 };
 
-                // Try WebGL 2 first, then WebGL 1, then experimental
-                this.gl = canvas.getContext('webgl2', contextAttributes) ||
-                    canvas.getContext('webgl', contextAttributes) ||
-                    canvas.getContext('experimental-webgl', contextAttributes);
+                // Require WebGL 2 for derivative functions (fwidth, dFdx, dFdy)
+                this.gl = canvas.getContext('webgl2', contextAttributes);
 
                 if (!this.gl) {
-                    Logger.error('[WebGL] Failed to initialize WebGL context. Your browser or hardware may not support it.');
-                    throw new Error('WebGL not supported');
+                    Logger.error('[WebGL] WebGL 2 is required but not supported by this browser. Please use Chrome 56+, Firefox 51+, or Safari 15+.');
+                    throw new Error('WebGL 2 not supported');
                 }
 
                 const { ipcRenderer } = require('electron');
@@ -86,17 +84,17 @@
             init() {
                 const gl = this.gl;
 
-                const vsSource = `
-                attribute vec2 a_position;
-                attribute vec2 a_texCoord;
-                varying vec2 v_texCoord;
+                const vsSource = `#version 300 es
+                in vec2 a_position;
+                in vec2 a_texCoord;
+                out vec2 v_texCoord;
                 void main() {
                     gl_Position = vec4(a_position, 0.0, 1.0);
                     v_texCoord = a_texCoord;
                 }
             `;
 
-                const fsSource = `
+                const fsSource = `#version 300 es
                 precision mediump float;
     
                 // === UNIFORMS ===
@@ -122,7 +120,8 @@
                 uniform float u_mongrel_mode;     // 0.0 = Noise, 1.0 = Shatter
                 uniform float u_aesthetic_mode;   // 0=HighKey, 1=Lab, 2=Frosted, 3=Blueprint, 4=Cyberpunk
     
-                varying vec2 v_texCoord;
+                in vec2 v_texCoord;
+                out vec4 fragColor;
     
                 // === NOISE HELPERS ===
                 vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
@@ -164,7 +163,7 @@
                 }
     
                 vec4 sampleMongrel(sampler2D tex, vec2 uv, float strength, float intensity, float rhythm) {
-                    if (strength <= 0.01) return texture2D(tex, uv);
+                    if (strength <= 0.01) return texture(tex, uv);
     
                     // Modulate Y-frequency based on Line Height (rhythm)
                     // rhythm = 0.0 (small/none) -> High Freq (Shimmer)
@@ -191,8 +190,8 @@
     
                     vec2 shatteredUV = uv + vec2(offX, offY);
                     
-                    vec4 clean = texture2D(tex, shatteredUV);
-                    vec4 ghost = texture2D(tex, shatteredUV + vec2(0.01 * strength, 0.0));
+                    vec4 clean = texture(tex, shatteredUV);
+                    vec4 ghost = texture(tex, shatteredUV + vec2(0.01 * strength, 0.0));
                     
                     return mix(clean, ghost, 0.3);
                 }
@@ -327,7 +326,7 @@
                         
                         // === SALIENCY-DRIVEN BLOCK SIZE ===
                         // Sample saliency to determine pixelation granularity
-                        float saliency = texture2D(u_saliencyMap, uv).r;
+                        float saliency = texture(u_saliencyMap, uv).r;
                         
                         // Map saliency to block size (inverse: high saliency = small blocks)
                         // 64px (Minecraft chunks) → 4px (fine detail)
@@ -338,7 +337,7 @@
                         vec2 quantizedUV = floor(uv / pixelSize) * pixelSize;
                         
                         // Sample color from quantized position (creates blocky effect)
-                        vec3 pixelColor = texture2D(u_texture, quantizedUV).rgb;
+                        vec3 pixelColor = texture(u_texture, quantizedUV).rgb;
                         
                         // === NEON CYBERPUNK AESTHETIC ===
                         // High Contrast, Neon Tints
@@ -397,7 +396,7 @@
                     if (u_debug_structure > 0.5) {
                         if (u_debug_structure > 1.5) {
                             // Mode 2: Saliency Map (continuous gradients)
-                            float s = texture2D(u_saliencyMap, uv).r; // Read from dedicated saliency texture
+                            float s = texture(u_saliencyMap, uv).r; // Read from dedicated saliency texture
                             vec3 heatmap;
                             
                             // Blue (Low) -> Cyan -> Green -> Yellow -> Red (High)
@@ -412,18 +411,18 @@
                             }
                             
                             color = vec4(heatmap, 0.8);
-                            gl_FragColor = color;
+                            fragColor = color;
                             return;
                         } else {
                             // Mode 1: Structure Map (RGB)
-                            vec4 structure = texture2D(u_structureMap, uv);
+                            vec4 structure = texture(u_structureMap, uv);
                             color = vec4(structure.rgb, 0.8);
-                            gl_FragColor = color;
+                            fragColor = color;
                             return;
                         }
                     }    
                     // Sample Structure Map (Screen Space UV)
-                    vec4 structure = texture2D(u_structureMap, uv);
+                    vec4 structure = texture(u_structureMap, uv);
                     float density = structure.g;
                     
                     // Use REAL distance for the mask to prevent "lag" (fovea follows mouse)
@@ -465,7 +464,7 @@
                         
                         // === FIDELITY BIAS: Saliency Modulation ===
                         // Reduce degradation near salient areas to preserve detail for saccade guidance
-                        float saliency = texture2D(u_saliencyMap, uv).r;
+                        float saliency = texture(u_saliencyMap, uv).r;
                         if (u_enable_saliency_modulation > 0.5) {
                             warpStrength *= (1.0 - saliency); // High saliency = less distortion
                         }
@@ -538,9 +537,9 @@
                         r_offset.x /= aspect;
                         b_offset.x /= aspect;
                         
-                        vec4 colorR = texture2D(u_texture, newUV - r_offset);
-                        vec4 colorG = texture2D(u_texture, newUV);
-                        vec4 colorB = texture2D(u_texture, newUV + b_offset);
+                        vec4 colorR = texture(u_texture, newUV - r_offset);
+                        vec4 colorG = texture(u_texture, newUV);
+                        vec4 colorB = texture(u_texture, newUV + b_offset);
                         
                         color.r = colorR.b; // BGRA swizzle
                         color.g = colorG.g;
@@ -558,13 +557,13 @@
                         // Check mask to see if this pixel is "remembered"
                         float maskVal = 0.0;
                         if (u_useMask > 0.5) {
-                            maskVal = texture2D(u_maskTexture, v_texCoord).r;
+                            maskVal = texture(u_maskTexture, v_texCoord).r;
                         }
                         
                         vec3 finalRGB;
                         if (maskVal > 0.99) {
                             // Remembered area - sample ORIGINAL undistorted texture
-                            vec4 clearColor = texture2D(u_texture, uv); // Use original UV, not distorted newUV
+                            vec4 clearColor = texture(u_texture, uv); // Use original UV, not distorted newUV
                             finalRGB.r = clearColor.b; // BGRA swizzle
                             finalRGB.g = clearColor.g;
                             finalRGB.b = clearColor.r;
@@ -574,7 +573,7 @@
                             
                             // Partially restore clarity based on mask value (for gradient edges)
                             if (maskVal > 0.0) {
-                                vec4 clearColor = texture2D(u_texture, uv);
+                                vec4 clearColor = texture(u_texture, uv);
                                 vec3 clearRGB;
                                 clearRGB.r = clearColor.b;
                                 clearRGB.g = clearColor.g;
@@ -587,12 +586,11 @@
                     }
                     
 
-
                     // Structure Map Visualization (Red Overlay)
                     // Debug Visualization
                     if (u_debug_structure > 2.5) {
                         // Mode 3: Visual Memory Mask (raw mask texture)
-                        float mask = texture2D(u_maskTexture, v_texCoord).r;
+                        float mask = texture(u_maskTexture, v_texCoord).r;
                         color.rgb = vec3(mask, mask, mask); // Grayscale: white = remembered, black = forgotten
                     } else if (u_debug_structure > 1.5) {
                         // Saliency Map Visualization (Greyscale)
@@ -610,26 +608,23 @@
                     }
                     
                     // Debug Boundary (Foveal Ring) - Rendered LAST to be on top
+                    // Using fwidth for perfect anti-aliasing (WebGL2 feature)
                     if (u_debug_boundary > 0.5) {
                         // Calculate vector from mouse to current pixel
                         vec2 diff = uv_corrected - mouse_corrected;
                         float angle = atan(diff.y, diff.x);
                         
-                        // Use manual pixel size calculation for crisp lines
-                        // 1.2px thickness for lighter weight (was 1.5px)
-                        float pxSize = 1.0 / u_resolution.y; 
-                        float lineThickness = 1.2 * pxSize; 
-                        
                         // Mode 1: Fovea Only (Reticle Style)
                         if (u_debug_boundary > 0.5) {
-                            float tickLength = 0.007; // Shorter ticks (was 0.01)
+                            float tickLength = 0.007; // Shorter ticks
                             float numTicks = 12.0;
                             
-                            // Radial distance check
+                            // Radial distance check with fwidth-based anti-aliasing
                             float distFromFovea = abs(dist - fovea_radius);
-                            float tickRadial = 1.0 - smoothstep(tickLength - pxSize, tickLength + pxSize, distFromFovea);
+                            float fw = fwidth(distFromFovea);
+                            float tickRadial = 1.0 - smoothstep(tickLength - fw, tickLength + fw, distFromFovea);
                             
-                            // Angular check using SIN for stability
+                            // Angular check using COS for stability
                             float tickPattern = cos(angle * numTicks);
                             float tickAngular = smoothstep(0.95, 0.98, tickPattern);
                             
@@ -648,7 +643,8 @@
                             float visualParafoveaRadius = fovea_radius * 2.5;
                             
                             float parafoveaDist = abs(dist - visualParafoveaRadius);
-                            float ringAlpha = 1.0 - smoothstep(lineThickness - pxSize, lineThickness + pxSize, parafoveaDist);
+                            float fw = fwidth(parafoveaDist);
+                            float ringAlpha = 1.0 - smoothstep(0.0, fw * 2.0, parafoveaDist);
                             
                             // Dashed Pattern
                             float dashPattern = sin(angle * 40.0);
@@ -664,7 +660,7 @@
                         }
                     }
                     
-                    gl_FragColor = color;
+                    fragColor = color;
                 }
             `;
 
@@ -726,7 +722,7 @@
                     1, 0,
                 ]), gl.STATIC_DRAW);
 
-                // Create texture
+                // Create texture (sRGB for accurate color reproduction)
                 this.texture = gl.createTexture();
                 gl.bindTexture(gl.TEXTURE_2D, this.texture);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -802,7 +798,8 @@
                 const gl = this.gl;
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, this.texture);
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+                // Use sRGB format for color-correct rendering
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
             }
 
             uploadMask(image) {

@@ -204,7 +204,6 @@ unset ELECTRON_RUN_AS_NODE
 Scrutinizer includes an automated visual smoke test to ensure the renderer is functioning correctly and producing expected visual output.
 
 ### Running Tests
-
 To run the automated tests:
 
 ```bash
@@ -212,6 +211,15 @@ npm test
 ```
 
 This command launches Electron in a special test mode (`TEST_MODE=true`), which executes the test suite defined in `tests/visual-test.html`.
+
+### Generating Screenshots
+To automatically generate screenshots of every test case (useful for visual regression testing or documentation):
+
+```bash
+SAVE_SCREENSHOTS=true npm test
+```
+
+Screenshots will be saved to `tests/screenshots/` with timestamps appended to the filenames.
 
 ### Test Suite
 

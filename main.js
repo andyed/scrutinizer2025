@@ -735,7 +735,8 @@ function runTestMode() {
             fs.mkdirSync(screenshotsDir, { recursive: true });
         }
 
-        const filePath = p.join(screenshotsDir, `${name}.png`);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filePath = p.join(screenshotsDir, `${name}_${timestamp}.png`);
         fs.writeFileSync(filePath, base64Data, 'base64');
         console.log(`[Test] Saved screenshot: ${filePath}`);
     });
