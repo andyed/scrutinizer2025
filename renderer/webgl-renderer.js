@@ -544,19 +544,26 @@
                     bool isScrollbar = distFromRightEdge < scrollbarWidth;
                     
                     if (!isScrollbar) {
-                        // Pass v_texCoord (uv) for texture sampling, NOT uv_corrected!
-                        vec3 finalRGB = applyAestheticEffect(color.rgb, v_texCoord, u_texture, dist, u_intensity, periphery_start, structure);
-                        
-                        // === VISUAL MEMORY MASK ===
-                        // Mix back to the original clear content where the mask is white
+                        // === VISUAL MEMORY MASK CHECK ===
+                        // Check mask FIRST - if this pixel is "remembered" (white), skip peripheral processing
+                        float maskVal = 0.0;
                         if (u_useMask > 0.5) {
-                            float maskVal = texture2D(u_maskTexture, v_texCoord).r;
-                            // Mask: White = Clear (Fovea), Black = Peripheral
-                            // We want to show the 'finalRGB' (peripheral) where mask is Black (0.0)
-                            // And show 'color.rgb' (clear/original) where mask is White (1.0)
-                            // Wait, 'color.rgb' at this point is the base texture sample (swizzled).
-                            // So mixing finalRGB with color.rgb based on maskVal is correct.
-                            finalRGB = mix(finalRGB, color.rgb, maskVal);
+                            maskVal = texture2D(u_maskTexture, v_texCoord).r;
+                        }
+                        
+                        // Only apply peripheral effects to non-remembered areas (mask < 0.99)
+                        vec3 finalRGB;
+                        if (maskVal > 0.99) {
+                            // Remembered area - use clear, unprocessed color
+                            finalRGB = color.rgb;
+                        } else {
+                            // Not remembered - apply peripheral processing
+                            finalRGB = applyAestheticEffect(color.rgb, v_texCoord, u_texture, dist, u_intensity, periphery_start, structure);
+                            
+                            // Partially restore clarity based on mask value (for gradient edges)
+                            if (maskVal > 0.0) {
+                                finalRGB = mix(finalRGB, color.rgb, maskVal);
+                            }
                         }
                         
                         color.rgb = finalRGB;
@@ -575,7 +582,11 @@
 
                     // Structure Map Visualization (Red Overlay)
                     // Debug Visualization
-                    if (u_debug_structure > 1.5) {
+                    if (u_debug_structure > 2.5) {
+                        // Mode 3: Visual Memory Mask (raw mask texture)
+                        float mask = texture2D(u_maskTexture, v_texCoord).r;
+                        color.rgb = vec3(mask, mask, mask); // Grayscale: white = remembered, black = forgotten
+                    } else if (u_debug_structure > 1.5) {
                         // Saliency Map Visualization (Greyscale)
                         // Saliency is stored in R channel of structure texture
                         float saliency = structure.r;
