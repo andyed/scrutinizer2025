@@ -512,7 +512,16 @@
                             jitterAmp = vec2(0.0, 0.0);
                         }
                         
-                        vec2 jitterVector = vec2(n1_jitter, n2_jitter) * jitterAmp * warpStrength * u_intensity;
+                        // === CROWDING MODEL: Saliency-Driven Jitter ===
+                        // Low saliency (clutter) → high jitter (feature confusion)
+                        // High saliency (distinctive) → low jitter (preserved detail)
+                        float jitterModulation = 1.0;
+                        if (u_enable_saliency_modulation > 0.5) {
+                            float clutterStrength = 1.0 - saliency; // Inverse saliency
+                            jitterModulation = mix(1.0, clutterStrength * 1.5, 0.7); // Boost jitter in cluttered areas
+                        }
+                        
+                        vec2 jitterVector = vec2(n1_jitter, n2_jitter) * jitterAmp * warpStrength * u_intensity * jitterModulation;
                         vec2 displacement = warpVector + jitterVector;
                         vec2 newUV = uv + displacement;
                         

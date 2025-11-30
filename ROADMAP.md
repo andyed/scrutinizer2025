@@ -144,24 +144,7 @@ float saliency = texture2D(u_saliencyMap, uv).r;
 - Show data-driven rationale for design decisions
 - Validate accessibility and scannability of interfaces
 
-#### 3. Core Simulation Enhancement (Crowding Model)
-Leverage peripheral signal (Saliency) to drive foveal response (Saccades) and validate model against eye-tracking data.
 
-**Implementation:**
-- **Saliency Input**: Computational model processing entire visual field for bottom-up features (color, intensity, orientation contrast)
-- **Winner-Take-All (WTA) Network**: 
-  - Find maximum value on Saliency Map = predicted next saccade target
-  - Trigger simulated saccade after fixation threshold (200-300ms)
-  - Shift `u_mouse` (foveal center) toward WTA location
-- **Inhibition of Return (IOR)**: Set target area to zero post-saccade to force exploration
-- **Result**: Realistic scanpath generation for reading/search studies
-
-**Shader Integration:**
-```glsl
-uniform sampler2D u_saliencyMap;
-vec2 nextSaccadeTarget = findWTA(u_saliencyMap);
-// Animate u_mouse toward target over 30-50ms
-```
 
 #### 2. Saliency-Driven Feature Aggregation (Crowding Model)
 
