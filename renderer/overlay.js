@@ -199,6 +199,10 @@
             scrutinizer.toggleStructureMap(enabled);
         });
 
+        ipcRenderer.on('menu:toggle-saliency-map', (e, enabled) => {
+            scrutinizer.toggleSaliencyMap(enabled);
+        });
+
         ipcRenderer.on('menu:toggle-enable-structure-map', (e, enabled) => {
             scrutinizer.toggleEnableStructureMap(enabled);
         });

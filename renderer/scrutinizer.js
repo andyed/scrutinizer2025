@@ -497,8 +497,14 @@
             const yOffset = 0; //80px; // Toolbar height compensation
             for (const block of blocks) {
                 this.structureMap.drawBlock(
-                    block.x * dpr, (block.y + yOffset) * dpr, block.w * dpr, block.h * dpr,
-                    block.type, block.density, block.lineHeight
+                    block.x * dpr,
+                    (block.y + yOffset) * dpr,
+                    block.w * dpr,
+                    block.h * dpr,
+                    block.type,
+                    block.density,
+                    block.lineHeight,
+                    block.saliency || 1.0
                 );
             }
 

@@ -64,6 +64,14 @@ class DomAdapter {
                 const weight = parseFloat(style.fontWeight) || 400;
                 const density = Math.min(1.0, Math.max(0.2, weight / 900));
 
+                // Calculate Saliency
+                // Base: 0.2 (Body text)
+                // Boost by size: >20px -> +0.3, >30px -> +0.5
+                // Boost by weight: >600 -> +0.2
+                // TODO: Saliency temporarily disabled (alpha < 1.0 breaks structure map)
+                // See: https://github.com/andyed/scrutinizer2025/issues/XXX
+                let saliency = 1.0; // TEMP: Always 1.0 until we move to packed R channel
+
                 // Add blocks for each line rect
                 for (let i = 0; i < rects.length; i++) {
                     const rect = rects[i];
@@ -79,7 +87,8 @@ class DomAdapter {
                         h: rect.height,
                         type: 1.0, // Text
                         density: density,
-                        lineHeight: lineHeight
+                        lineHeight: lineHeight,
+                        saliency: saliency
                     });
                 }
             }
@@ -102,7 +111,8 @@ class DomAdapter {
                     h: rect.height,
                     type: 0.5, // Image
                     density: 0.8, // High density for images
-                    lineHeight: 0
+                    lineHeight: 0,
+                    saliency: 1.0 // TEMP: Always 1.0
                 });
             }
         }
@@ -124,7 +134,8 @@ class DomAdapter {
                     h: rect.height,
                     type: 0.0, // UI
                     density: 1.0, // Solid
-                    lineHeight: 0
+                    lineHeight: 0,
+                    saliency: 1.0 // TEMP: Always 1.0
                 });
             }
         }

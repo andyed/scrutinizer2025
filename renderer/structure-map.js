@@ -46,7 +46,7 @@ class StructureMap {
      * @param {number} density - Visual Mass (0.0 - 1.0)
      * @param {number} lineHeight - Rhythm (pixels)
      */
-    drawBlock(x, y, w, h, type, density, lineHeight) {
+    drawBlock(x, y, w, h, type, density, lineHeight, saliency = 1.0) {
         const s = this.scale;
 
         // Encode channels
@@ -60,7 +60,8 @@ class StructureMap {
         // Blue: Type
         const b = Math.min(255, Math.floor(type * 255));
 
-        // Alpha: Interaction (assuming 1.0 for content)
+        // Alpha: Always 1.0 for now (saliency param ignored until proper implementation)
+        // TODO: Implement saliency in packed R channel or separate texture
         const a = 255;
 
         this.ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 1.0)`;
@@ -84,3 +85,4 @@ class StructureMap {
 }
 
 module.exports = StructureMap;
+module.exports.StructureMap = StructureMap;

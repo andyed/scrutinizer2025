@@ -378,6 +378,35 @@
                     
                     vec4 color;
                     
+                    // --- DEBUG: Structure Map ---
+                    if (u_debug_structure > 0.5) {
+                        vec4 structure = texture2D(u_structureMap, uv);
+                        
+                        if (u_debug_structure > 1.5) {
+                            // Mode 2: Saliency Map (Alpha Channel)
+                            // Visualize as Heatmap: Blue (Low) -> Green -> Red (High)
+                            float s = structure.a;
+                            vec3 heatmap = vec3(s, s, s); // Grayscale for now, simple and effective
+                            
+                            // Simple heatmap ramp
+                            if (s < 0.5) {
+                                heatmap = mix(vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 0.0), s * 2.0);
+                            } else {
+                                heatmap = mix(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), (s - 0.5) * 2.0);
+                            }
+                            
+                            // Blend with original content slightly so we can see context?
+                            // Or just show raw map. Let's show raw map for clarity.
+                            color = vec4(heatmap, 0.8); // 80% opacity
+                            gl_FragColor = color; // Directly output debug color
+                            return; // Exit early for debug visualization
+                        } else {
+                            // Mode 1: Structure Map (RGB)
+                            color = vec4(structure.rgb, 0.8);
+                            gl_FragColor = color; // Directly output debug color
+                            return; // Exit early for debug visualization
+                        }
+                    }    
                     // Sample Structure Map (Screen Space UV)
                     vec4 structure = texture2D(u_structureMap, uv);
                     float density = structure.g;
@@ -692,7 +721,11 @@
                 const gl = this.gl;
                 gl.activeTexture(gl.TEXTURE2);
                 gl.bindTexture(gl.TEXTURE_2D, this.structureMapTexture);
+                // CRITICAL: Disable alpha premultiplication to preserve RGB values
+                // Alpha channel stores saliency and must not affect RGB (rhythm, density, type)
+                gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+                gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true); // Restore default
             }
 
             clear() {
