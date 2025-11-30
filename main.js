@@ -204,9 +204,14 @@ ipcMain.on('get-window-size', (event) => {
 });
 
 // Handle capture requests from HUD (for foveal effect)
-// Handle capture requests from HUD (for foveal effect)
+// Capture request from overlay
+let captureRequestCount = 0;
 ipcMain.on('hud:capture:request', async (event) => {
-    console.log('[Main] Received hud:capture:request');
+    captureRequestCount++;
+    // Only log every 100th request to reduce console spam
+    if (captureRequestCount % 100 === 0) {
+        console.log(`[Main] Received hud:capture:request (#${captureRequestCount})`);
+    }
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
 
