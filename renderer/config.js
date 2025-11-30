@@ -34,6 +34,7 @@ const CONFIG = {
     debugBoundary: 0.0,
     debugStructure: 0.0,
     enableStructureMap: true,
+    enableSaliencyModulation: true, // Enable fidelity bias by default
     visualMemory: 0.0,
 };
 

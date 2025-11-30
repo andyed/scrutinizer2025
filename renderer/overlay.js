@@ -203,6 +203,10 @@
             scrutinizer.toggleSaliencyMap(enabled);
         });
 
+        ipcRenderer.on('menu:toggle-saliency-modulation', (e, enabled) => {
+            scrutinizer.toggleSaliencyModulation(enabled);
+        });
+
         ipcRenderer.on('menu:toggle-enable-structure-map', (e, enabled) => {
             scrutinizer.toggleEnableStructureMap(enabled);
         });

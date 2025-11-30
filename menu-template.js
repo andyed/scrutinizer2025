@@ -356,6 +356,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             type: 'checkbox',
                             checked: false,
                             click: (menuItem) => sendToOverlays('menu:toggle-saliency-map', menuItem.checked)
+                        },
+                        {
+                            label: 'Use Saliency Modulation',
+                            type: 'checkbox',
+                            checked: true,
+                            click: (menuItem) => sendToOverlays('menu:toggle-saliency-modulation', menuItem.checked)
                         }
                     ]
                 },

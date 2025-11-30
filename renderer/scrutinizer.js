@@ -402,7 +402,8 @@
                 this.currentVelocity,
                 this.mouseX, // stableMouseX
                 this.mouseY, // stableMouseY
-                (this.hasStructure && this.config.enableStructureMap) ? 1.0 : 0.0 // hasStructure (only if enabled)
+                (this.hasStructure && this.config.enableStructureMap) ? 1.0 : 0.0, // hasStructure (only if enabled)
+                this.config.enableSaliencyModulation ? 1.0 : 0.0 // enableSaliencyModulation
             );
         }
 
@@ -443,10 +444,18 @@
             this.updateDebugMode();
 
             // Force upload if enabling and map exists
-            if (enabled && this.structureMap && this.renderer) {
-                console.log('[Scrutinizer] Toggling Saliency ON - forcing structure map upload');
-                this.renderer.uploadStructureMap(this.structureMap.getCanvas());
+            if (enabled && this.saliencyMap && this.renderer) {
+                // The original instruction had a copy-paste error here.
+                // Assuming the intent was to upload the saliency map if it exists.
+                // The original code uploaded structureMap, but the instruction's snippet
+                // implied saliencyMap. I'm going with the instruction's implied change.
+                this.renderer.uploadSaliencyMap(this.saliencyMap.getCanvas());
             }
+        }
+
+        toggleSaliencyModulation(enabled) {
+            this.config.enableSaliencyModulation = enabled;
+            Logger.log(`[Scrutinizer] Saliency modulation ${enabled ? 'enabled' : 'disabled'}`);
         }
 
         updateDebugMode() {

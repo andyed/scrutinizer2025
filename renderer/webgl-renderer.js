@@ -117,6 +117,7 @@
                 uniform float u_debug_boundary;
                 uniform float u_debug_structure;
                 uniform float u_has_structure;
+                uniform float u_enable_saliency_modulation;
                 uniform float u_velocity;         // Mouse velocity in px/ms
                 uniform float u_mongrel_mode;     // 0.0 = Noise, 1.0 = Shatter
                 uniform float u_aesthetic_mode;   // 0=HighKey, 1=Lab, 2=Frosted, 3=Blueprint, 4=Cyberpunk
@@ -452,7 +453,9 @@
                         // === FIDELITY BIAS: Saliency Modulation ===
                         // Reduce degradation near salient areas to preserve detail for saccade guidance
                         float saliency = texture2D(u_saliencyMap, uv).r;
-                        warpStrength *= (1.0 - saliency); // High saliency = less distortion
+                        if (u_enable_saliency_modulation > 0.5) {
+                            warpStrength *= (1.0 - saliency); // High saliency = less distortion
+                        }
                         
                         if (isBlueprint) warpStrength = 0.0; // Disable noise for Blueprint
                         
@@ -623,6 +626,7 @@
                 this.structureMapLocation = gl.getUniformLocation(this.program, "u_structureMap");
                 this.saliencyMapLocation = gl.getUniformLocation(this.program, "u_saliencyMap");
                 this.hasStructureLocation = gl.getUniformLocation(this.program, "u_has_structure");
+                this.enableSaliencyModulationLocation = gl.getUniformLocation(this.program, "u_enable_saliency_modulation");
                 this.useMaskLocation = gl.getUniformLocation(this.program, "u_useMask");
                 this.velocityLocation = gl.getUniformLocation(this.program, "u_velocity");
                 this.mongrelModeLocation = gl.getUniformLocation(this.program, "u_mongrel_mode");
@@ -834,6 +838,7 @@
                 gl.uniform1f(this.mongrelModeLocation, mongrelMode);
                 gl.uniform1f(this.aestheticModeLocation, aestheticMode);
                 gl.uniform1f(this.hasStructureLocation, hasStructure);
+                gl.uniform1f(this.enableSaliencyModulationLocation, enableSaliencyModulation);
 
                 if (Math.random() < 0.01) {
                     // console.log(`[WebGL] Render Mode: ${mongrelMode}, Res: ${width}x${height}, Mouse: ${mouseX},${mouseY}`);
