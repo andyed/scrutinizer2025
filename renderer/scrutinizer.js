@@ -202,6 +202,20 @@
             // Upload texture
             this.renderer.uploadTexture(imageData);
 
+            // Compute saliency from SOURCE browser capture (before rendering effects)
+            if (width > 0 && height > 0) {
+                this.saliencyMap.resize(width, height);
+                // Create temporary canvas to hold imageData for saliency computation
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = width;
+                tempCanvas.height = height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.putImageData(imageData, 0, 0);
+
+                this.saliencyMap.computeFromImage(tempCanvas);
+                this.renderer.uploadSaliencyMap(this.saliencyMap.getCanvas());
+            }
+
             // Log occasionally
             if (!this.frameUploadCount) {
                 this.frameUploadCount = 0;
@@ -368,14 +382,8 @@
                 console.log(`[Scrutinizer] Renderer exists: ${!!this.renderer}, Frame count: ${this.frameUploadCount || 0}`);
             }
 
-            const aspectRatio = this.config.fovealAspectRatio || 1.33;
 
-            // Compute and upload saliency map from current frame
-            if (this.canvas.width > 0 && this.canvas.height > 0) {
-                this.saliencyMap.resize(this.canvas.width, this.canvas.height);
-                this.saliencyMap.computeFromImage(this.canvas);
-                this.renderer.uploadSaliencyMap(this.saliencyMap.getCanvas());
-            }
+            const aspectRatio = this.config.fovealAspectRatio || 1.33;
 
             this.renderer.render(
                 this.canvas.width,
