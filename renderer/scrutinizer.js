@@ -350,10 +350,12 @@
                     const maskY = this.mouseY * maskScaleY;
                     const maskRadius = effectiveRadius * maskScaleX; // Assume uniform scaling roughly
 
-                    // Draw "brush"
-                    const gradient = this.maskCtx.createRadialGradient(maskX, maskY, maskRadius * 0.5, maskX, maskY, maskRadius);
-                    gradient.addColorStop(0, `rgba(255, 255, 255, ${brushOpacity})`);
-                    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)'); // Fade out
+                    // Draw "brush" with soft gradient for natural blending
+                    const gradient = this.maskCtx.createRadialGradient(maskX, maskY, 0, maskX, maskY, maskRadius);
+                    gradient.addColorStop(0, `rgba(255, 255, 255, ${brushOpacity})`); // Center
+                    gradient.addColorStop(0.7, `rgba(255, 255, 255, ${brushOpacity * 0.5})`); // Mid
+                    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)'); // Edge (fade out)
+
 
                     this.maskCtx.globalCompositeOperation = 'screen'; // Additive light (accumulates up to 1.0)
                     this.maskCtx.fillStyle = gradient;
