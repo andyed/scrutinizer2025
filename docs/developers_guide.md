@@ -228,6 +228,27 @@ SCREENSHOT_MODE=update SAVE_SCREENSHOTS=true npm test
 - **Date Mode**: Saves as `testname_TIMESTAMP.png`. These are ignored by git.
 - **Update Mode**: Saves as `testname.png`. These should be committed as reference images.
 
+### Integration Tests
+To run full app integration tests (e.g., loading external sites):
+
+```bash
+# Test loading Figma.com, capturing modes 0 (Default) and 3 (Blueprint)
+TEST_URL=https://www.figma.com TEST_MODES=0,3 npm start
+```
+
+**Parameters:**
+- `TEST_URL`: The URL to load (Required)
+- `TEST_MODES`: Comma-separated list of aesthetic modes to capture (e.g., `0,3,4`)
+- `TEST_RADIUS`: Override foveal radius (pixels)
+- `TEST_INTENSITY`: Override peripheral intensity (0.0-1.0)
+- `SCREENSHOT_MODE`: `date` (default) or `update`
+
+**Custom Launch:**
+You can also use these parameters to launch the app in a specific state without running the test loop:
+```bash
+TEST_URL=https://google.com TEST_RADIUS=50 npm start
+```
+
 ### Test Suite
 
 The test suite performs the following checks:

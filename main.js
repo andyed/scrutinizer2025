@@ -758,8 +758,120 @@ function runTestMode() {
     });
 }
 
+function runIntegrationTest() {
+    const testUrl = process.env.TEST_URL;
+    const testModes = (process.env.TEST_MODES || '0').split(',').map(m => parseFloat(m.trim()));
+    const testRadius = process.env.TEST_RADIUS ? parseFloat(process.env.TEST_RADIUS) : null;
+    const testIntensity = process.env.TEST_INTENSITY ? parseFloat(process.env.TEST_INTENSITY) : null;
+
+    console.log(`[Main] Running INTEGRATION TEST`);
+    console.log(`[Main] URL: ${testUrl}`);
+    console.log(`[Main] Modes: ${testModes.join(', ')}`);
+
+    if (!testUrl) {
+        console.error('❌ TEST FAILED: TEST_URL env var is required');
+        app.exit(1);
+        return;
+    }
+
+    // Create window normally
+    createWindow();
+
+    // Wait for window to be ready
+    const checkWindow = setInterval(() => {
+        if (mainWindow && mainWindow.scrutinizerView && mainWindow.scrutinizerHud) {
+            clearInterval(checkWindow);
+            startScenario();
+        }
+    }, 100);
+
+    function startScenario() {
+        console.log(`[Test] Navigating to ${testUrl}...`);
+        mainWindow.scrutinizerView.webContents.loadURL(testUrl);
+
+        mainWindow.scrutinizerView.webContents.once('did-finish-load', () => {
+            console.log('[Test] Page loaded. Waiting for effects to stabilize...');
+
+            // Wait for 5 seconds for page to settle and effects to render
+            setTimeout(async () => {
+                console.log('[Test] Positioning fovea in center...');
+                const { width, height } = mainWindow.getContentBounds();
+                const centerX = Math.floor(width / 2);
+                const centerY = Math.floor(height / 2);
+
+                // Simulate mouse move to center
+                mainWindow.scrutinizerHud.webContents.send('browser:mousemove', centerX, centerY, 1.0);
+
+                // Apply overrides if present
+                if (testRadius !== null) {
+                    mainWindow.scrutinizerHud.webContents.send('menu:set-foveal-radius', testRadius);
+                }
+                if (testIntensity !== null) {
+                    mainWindow.scrutinizerHud.webContents.send('menu:set-intensity', testIntensity);
+                }
+
+                // Wait for fovea/params to update
+                setTimeout(async () => {
+                    // Iterate through modes
+                    for (const mode of testModes) {
+                        console.log(`[Test] Switching to Aesthetic Mode ${mode}...`);
+                        mainWindow.scrutinizerHud.webContents.send('menu:set-aesthetic-mode', mode);
+
+                        // Wait for render
+                        await new Promise(resolve => setTimeout(resolve, 500));
+
+                        console.log(`[Test] Capturing screenshot for Mode ${mode}...`);
+                        try {
+                            const image = await mainWindow.scrutinizerHud.capturePage();
+                            const buffer = image.toPNG();
+
+                            // Reuse save logic
+                            const fs = require('fs');
+                            const p = require('path');
+                            const screenshotsDir = p.join(__dirname, 'tests', 'screenshots');
+                            if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir, { recursive: true });
+
+                            const screenshotMode = process.env.SCREENSHOT_MODE || 'date';
+
+                            // Extract hostname for filename
+                            let hostname = 'unknown';
+                            try {
+                                hostname = new URL(testUrl).hostname.replace(/[^a-z0-9]/gi, '_');
+                            } catch (e) { }
+
+                            const baseName = `site_${hostname}_mode${mode}`;
+                            let filename;
+
+                            if (screenshotMode === 'update') {
+                                filename = `${baseName}.png`;
+                            } else {
+                                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                                filename = `${baseName}_${timestamp}.png`;
+                            }
+
+                            const filePath = p.join(screenshotsDir, filename);
+                            fs.writeFileSync(filePath, buffer);
+                            console.log(`[Test] Saved screenshot: ${filePath}`);
+                        } catch (err) {
+                            console.error('❌ TEST FAILED during capture:', err);
+                            app.exit(1);
+                        }
+                    }
+
+                    console.log('✅ INTEGRATION TEST PASSED');
+                    app.exit(0);
+
+                }, 1000);
+            }, 5000);
+        });
+    }
+}
+
 app.whenReady().then(() => {
-    if (process.env.TEST_MODE === 'true') {
+    if (process.env.TEST_URL && process.env.TEST_MODES) {
+        // If TEST_MODES is present, assume we want to run the capture loop
+        runIntegrationTest();
+    } else if (process.env.TEST_MODE === 'true') {
         runTestMode();
     } else {
         createWindow();
