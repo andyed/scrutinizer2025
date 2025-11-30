@@ -1,15 +1,30 @@
 const { app, shell } = require('electron');
 
-const RADIUS_OPTIONS = [20, 45, 90, 160, 250];
+const RADIUS_OPTIONS = [20, 45, 90, 180, 300, 450];
+const ASPECT_OPTIONS = [1.0, 1.33, 1.78, 2.33]; // Circular, 4:3, 16:9, 21:9
+const INTENSITY_OPTIONS = [0.0, 0.3, 0.6, 0.8, 1.0]; // Off, Subtle, Moderate, Strong, Maximum
 
 function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10) {
     const isMac = process.platform === 'darwin';
     const { BrowserWindow } = require('electron');
 
-    // Helper to find closest radius option
-    const isClosest = (target) => {
-        const closest = RADIUS_OPTIONS.reduce((prev, curr) => {
-            return (Math.abs(curr - currentRadius) < Math.abs(prev - currentRadius) ? curr : prev);
+    // Helper to find closest option (works for radius, aspect, intensity)
+    const isClosest = (target, type = 'radius') => {
+        let options, currentValue;
+
+        if (type === 'aspect') {
+            options = ASPECT_OPTIONS;
+            currentValue = 1.33; // Default aspect ratio
+        } else if (type === 'intensity') {
+            options = INTENSITY_OPTIONS;
+            currentValue = 0.6; // Default intensity
+        } else {
+            options = RADIUS_OPTIONS;
+            currentValue = currentRadius;
+        }
+
+        const closest = options.reduce((prev, curr) => {
+            return (Math.abs(curr - currentValue) < Math.abs(prev - currentValue) ? curr : prev);
         });
         return closest === target;
     };
