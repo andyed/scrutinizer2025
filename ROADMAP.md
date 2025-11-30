@@ -97,12 +97,12 @@ This document outlines the path from current alpha to a production-ready 1.0 rel
 
 ---
 
-### Saliency Map: VFX Tool + Core Simulation Enhancement
+### Saliency Map: Design Tool + Core Simulation Enhancement
 
 **Goal**: Dual-purpose saliency map - creative tool for visual effects AND biophysical accuracy for research.
 
 **Priority Justification**: 
-1. **VFX Tool**: Exposes saliency as controllable layer for creative effect development
+1. **Design Tool**: Exposes saliency as controllable layer for visual emphasis and critique
 2. **Core Simulation**: Replaces distance-based distortion with attention-driven, clutter-sensitive model
 
 #### 1. Saliency Map Generation Pipeline
@@ -119,7 +119,7 @@ uniform sampler2D u_saliencyMap;
 float saliency = texture2D(u_saliencyMap, uv).r;
 ```
 
-#### 2. VFX Tool Exposure
+#### 2. Design Tool Exposure
 
 **Creative Controls:**
 - [ ] **Saliency Overlay Mode**: Visualize heatmap directly (research/debugging)
@@ -127,10 +127,22 @@ float saliency = texture2D(u_saliencyMap, uv).r;
 - [ ] **Blend Modes**: Multiply/add saliency with other masks for layered effects
 - [ ] **Threshold Controls**: Expose saliency cutoff sliders for binary masking
 
-**Use Cases for VFX Artists:**
-- Spotlight high-saliency regions (attention magnets)
-- Blur/distort low-saliency backgrounds
-- Drive particle systems or glitch effects from saliency gradients
+**Use Cases for Designers:**
+
+**Individual Work:**
+- Identify visual hierarchy issues in layouts during iteration
+- Validate button/CTA prominence before handoff
+- Assess color contrast and visual weight distribution
+
+**Team Critique:**
+- Objectively discuss "what draws the eye" in design reviews
+- Debug attention flow in multi-screen workflows
+- Compare design variants for attention capture
+
+**Client Presentation:**
+- Demonstrate intentional visual hierarchy to stakeholders
+- Show data-driven rationale for design decisions
+- Validate accessibility and scannability of interfaces
 
 #### 3. Core Simulation Enhancement (Crowding Model)
 Leverage peripheral signal (Saliency) to drive foveal response (Saccades) and validate model against eye-tracking data.

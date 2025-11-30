@@ -116,13 +116,13 @@ float clutterStrength = 1.0 - saliency; // Inverse saliency
 float crowdingFactor = mix(1.0, clutterStrength, peripheralMask);
 warpOffset *= crowdingFactor;
 
-// Example: VFX spotlight - glow on high-saliency regions
+// Example: Design spotlight - emphasize high-saliency regions
 vec3 glowColor = vec3(1.0, 0.8, 0.2);
 vec3 spotlight = col + glowColor * saliency * 0.3;
 ```
 
 **Dual Purpose:**
-1. **VFX Tool**: Creative layer for visual artists
+1. **Design Tool**: Visual emphasis layer for designers and researchers
 2. **Core Simulation**: Biophysical accuracy (attention-driven distortion)
 
 ### Best Practices for Texture Sampling
