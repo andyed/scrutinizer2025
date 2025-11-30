@@ -362,6 +362,11 @@
                     this.maskCtx.beginPath();
                     this.maskCtx.arc(maskX, maskY, maskRadius, 0, Math.PI * 2);
                     this.maskCtx.fill();
+
+                    // DEBUG: Log painting (occasionally)
+                    if (Math.random() < 0.01) {
+                        console.log(`[Mask] Painted: pos=(${maskX.toFixed(0)}, ${maskY.toFixed(0)}), radius=${maskRadius.toFixed(0)}, opacity=${brushOpacity}, mode=${this.visualMemoryLimit}`);
+                    }
                 }
 
                 // Upload mask to GPU
