@@ -589,22 +589,6 @@
                             color.rgb = mix(color.rgb, debugColor, 0.3 * mapDensity);
                         }
                     }
-    
-                    // Visual Memory Overlay
-                    if (u_useMask > 0.5) {
-                        vec4 maskColor = texture2D(u_maskTexture, uv);
-                        float clarity = maskColor.r;
-                        clarity = smoothstep(0.1, 1.0, clarity);
-    
-                        vec4 cleanRaw = texture2D(u_texture, uv);
-                        vec4 cleanPixel;
-                        cleanPixel.r = cleanRaw.b;
-                        cleanPixel.g = cleanRaw.g;
-                        cleanPixel.b = cleanRaw.r;
-                        cleanPixel.a = 1.0;
-    
-                        color = mix(color, cleanPixel, clarity);
-                    }
                     
                     gl_FragColor = color;
                 }
