@@ -19,3 +19,6 @@ out/
 *.dmg
 *.zip
 *.blockmap
+
+# Test Artifacts
+tests/screenshots/*_*.png

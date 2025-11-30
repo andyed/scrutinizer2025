@@ -216,10 +216,17 @@ This command launches Electron in a special test mode (`TEST_MODE=true`), which 
 To automatically generate screenshots of every test case (useful for visual regression testing or documentation):
 
 ```bash
+# Mode 1: Timestamped (Default) - Good for history, ignored by git
 SAVE_SCREENSHOTS=true npm test
+# OR
+SCREENSHOT_MODE=date SAVE_SCREENSHOTS=true npm test
+
+# Mode 2: Update Reference (Clean filenames) - Overwrites existing files, commit these
+SCREENSHOT_MODE=update SAVE_SCREENSHOTS=true npm test
 ```
 
-Screenshots will be saved to `tests/screenshots/` with timestamps appended to the filenames.
+- **Date Mode**: Saves as `testname_TIMESTAMP.png`. These are ignored by git.
+- **Update Mode**: Saves as `testname.png`. These should be committed as reference images.
 
 ### Test Suite
 

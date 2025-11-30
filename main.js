@@ -735,8 +735,19 @@ function runTestMode() {
             fs.mkdirSync(screenshotsDir, { recursive: true });
         }
 
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filePath = p.join(screenshotsDir, `${name}_${timestamp}.png`);
+        // SCREENSHOT_MODE: 'update' (clean filenames) or 'date' (timestamped)
+        // Default to 'date' if SAVE_SCREENSHOTS is true but no mode specified
+        const mode = process.env.SCREENSHOT_MODE || 'date';
+
+        let filename;
+        if (mode === 'update') {
+            filename = `${name}.png`;
+        } else {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            filename = `${name}_${timestamp}.png`;
+        }
+
+        const filePath = p.join(screenshotsDir, filename);
         fs.writeFileSync(filePath, base64Data, 'base64');
         console.log(`[Test] Saved screenshot: ${filePath}`);
     });
