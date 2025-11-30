@@ -590,7 +590,7 @@
                         }
                     }
     
-                    // Fog of War
+                    // Visual Memory Overlay
                     if (u_useMask > 0.5) {
                         vec4 maskColor = texture2D(u_maskTexture, uv);
                         float clarity = maskColor.r;

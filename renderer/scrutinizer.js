@@ -31,7 +31,7 @@
             this.saliencyMap = new SaliencyMap();
             this.lastFrameBitmap = null;
 
-            // Visual Memory (Fog of War)
+            // Visual Memory
             this.visualMemoryLimit = 0; // 0 = Off, -1 = Infinite, >0 = Count
             this.maskCanvas = document.createElement('canvas');
             this.maskCtx = this.maskCanvas.getContext('2d', { alpha: false }); // No transparency needed, just B&W
@@ -285,7 +285,7 @@
             // Canvas height is usually ~1000px, so 5000px is safe
             const effectiveRadius = this.enabled ? this.config.fovealRadius : 5000.0;
 
-            // Update Mask (Fog of War)
+            // Update Visual Memory Mask
             // Only if enabled and visual memory is active
             const useMask = this.enabled && (this.visualMemoryLimit !== 0);
 
@@ -329,7 +329,7 @@
                 let velocityThreshold = 0.0;
 
                 if (this.visualMemoryLimit === -1) {
-                    // Infinite: Fog of War style
+                    // Infinite: Permanent memory
                     brushOpacity = 1.0; // Instant clear
                     velocityThreshold = Infinity; // Always paint
                 } else {

@@ -14,7 +14,7 @@ The WebGL renderer receives:
 
 In the fragment shader:
 
-- Texture coordinates `uv` are corrected for aspect ratio and squashed in X to approximate an elliptical (16:9) foveal footprint.
+- Texture coordinates `uv` are corrected for aspect ratio and squashed in X to approximate an elliptical (4:3) foveal footprint.
 - A normalized distance `dist` is computed from the foveal center in this corrected space.
 - A normalized radius is defined as:
   
@@ -22,7 +22,7 @@ In the fragment shader:
 
 This allows us to express all zones as **fractions of the configured foveal radius**, independent of actual pixel resolution.
 
-Biologically, the fovea is approximately circular. For screen-based reading and 16:9 layouts, we deliberately apply an **elliptical aspect correction** so that the “usable” sharp region better matches the horizontally biased saccades you make across lines of text.
+Biologically, the fovea is approximately circular. For screen-based reading and text layouts, we deliberately apply an **elliptical aspect correction** (default 4:3) so that the “usable” sharp region better matches the horizontally biased saccades you make across lines of text.
 
 ---
 

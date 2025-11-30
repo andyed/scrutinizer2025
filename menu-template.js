@@ -58,6 +58,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     label: 'New Window',
                     accelerator: 'CmdOrCtrl+N',
                     click: () => {
+                        // Update Visual Memory Mask
                         const { dialog } = require('electron');
                         const win = BrowserWindow.getFocusedWindow();
                         if (win && win.scrutinizerView) {
@@ -78,6 +79,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         const dialog = new BrowserWindow({
                             width: 500,
                             height: 207, // Increased by 15% (was 180) for better spacing
+                            // Visual Memory Overlay
                             parent: win,
                             modal: true,
                             show: false,
@@ -397,7 +399,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     click: () => sendToOverlays('menu:set-visual-memory', 10)
                                 },
                                 {
-                                    label: 'Infinite (Fog of War)',
+                                    label: 'Infinite',
                                     type: 'radio',
                                     click: () => sendToOverlays('menu:set-visual-memory', -1)
                                 }
