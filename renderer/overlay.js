@@ -233,7 +233,7 @@
         });
 
         ipcRenderer.on('hud:reset-visual-memory', () => {
-            if (scrutinizer && scrutinizer.config.visualMemory > 0) {
+            if (scrutinizer && scrutinizer.visualMemoryLimit !== 0) {
                 log('[Overlay] Resetting visual memory due to navigation');
                 scrutinizer.resetVisualMemory();
             }
