@@ -201,6 +201,23 @@
 
             // --- TEST 5: Visual Memory Mask ---
             // This test would have caught the shader compilation error from broken visual memory code
+
+            // First, create a patterned texture (checkerboard) so distortion is visible
+            const patternBuffer = new Uint8ClampedArray(width * height * 4);
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const i = (y * width + x) * 4;
+                    const isWhite = (Math.floor(x / 40) + Math.floor(y / 40)) % 2 === 0;
+                    const val = isWhite ? 255 : 100;
+                    patternBuffer[i] = val;
+                    patternBuffer[i + 1] = val;
+                    patternBuffer[i + 2] = val;
+                    patternBuffer[i + 3] = 255;
+                }
+            }
+            const patternData = new ImageData(patternBuffer, width, height);
+            renderer.uploadTexture(patternData);
+
             // Create a simple white mask (fully remembered)
             const maskCanvas = document.createElement('canvas');
             maskCanvas.width = width;
