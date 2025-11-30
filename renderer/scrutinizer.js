@@ -392,6 +392,10 @@
 
             const aspectRatio = this.config.fovealAspectRatio || 1.33;
 
+            // Auto-reduce intensity when visual memory is active to avoid heavy ghosting
+            // Remembered areas stay clear, forgotten areas get lighter blur instead of heavy distortion
+            const effectiveIntensity = useMask ? this.config.intensity * 0.6 : this.config.intensity;
+
             this.renderer.render(
                 this.canvas.width,
                 this.canvas.height,
@@ -399,7 +403,7 @@
                 this.mouseY,
                 this.config.fovealRadius,
                 aspectRatio,
-                this.config.intensity,
+                effectiveIntensity, // Use reduced intensity when memory is active
                 this.config.caStrength,
                 this.config.debugBoundary,
                 this.config.debugStructure, // New arg

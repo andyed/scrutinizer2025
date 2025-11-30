@@ -234,23 +234,25 @@
             const maskImageData = maskCtx.getImageData(0, 0, width, height);
             renderer.uploadMask(maskImageData);
 
-            // Render WITHOUT mask - should have peripheral distortion
+            // Render WITHOUT mask - center should be blurred (it's peripheral)
+            // Position fovea at TOP-LEFT corner so center region is in periphery
             renderer.render(
-                width, height, width / 2, height / 2, 150, 1.33,
+                width, height, 100, 100, 150, 1.33, // Fovea at (100,100)
                 0.8, // High intensity
                 0.0, 0.0, 0.0,
                 0.0, // useMask = 0 (off)
-                0.0, 0.0, 0.0, width / 2, height / 2, 0.0, 0.0
+                0.0, 0.0, 0.0, 100, 100, 0.0, 0.0
             );
             const frameNoMask = captureFrame();
 
-            // Render WITH mask - center should be clear, edges distorted
+            // Render WITH mask - center should be clear (remembered in mask)
+            // Same fovea position, but mask has white circle at center
             renderer.render(
-                width, height, width / 2, height / 2, 150, 1.33,
+                width, height, 100, 100, 150, 1.33, // Fovea at (100,100)
                 0.8, // High intensity
                 0.0, 0.0, 0.0,
                 1.0, // useMask = 1 (on) - THIS WOULD FAIL WITH BROKEN SHADER
-                0.0, 0.0, 0.0, width / 2, height / 2, 0.0, 0.0
+                0.0, 0.0, 0.0, 100, 100, 0.0, 0.0
             );
             const frameWithMask = captureFrame();
 
