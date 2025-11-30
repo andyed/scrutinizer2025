@@ -378,3 +378,17 @@ Improve how we sample the page for foveal/peripheral processing:
 - **Goal**: Decouple rendering from main thread to prevent UI jank.
 - **Ambiguity**: High complexity refactor. Current performance is GPU-bound, so CPU offloading might yield diminishing returns for the effort required.
 
+#### Upgrade to GLSL ES 3.0 / WebGL 2.0
+**Priority**: Medium
+**Effort**: Low
+
+- **Goal**: Modernize rendering pipeline to use WebGL 2.0 features.
+- **Benefits**:
+  - Native `fwidth` support for crisp, resolution-independent vector graphics (debug boundaries).
+  - Better performance and more advanced shader capabilities.
+  - High compatibility across modern browsers.
+- **Action Items**:
+  - Update shader version string to `#version 300 es`.
+  - Update shader syntax (attribute -> in, varying -> out/in, texture2D -> texture).
+  - Verify context creation ensures `webgl2`.
+
