@@ -54,11 +54,16 @@ This simulation visualizes the split-second mechanics of a glance—how your bra
 
 ## Features
 
-* **Binocular Foveal Mask:** A high-acuity window (distinctive 16:9 shape) that follows your mouse cursor.
-* **Neural Processing Model (WebGL):** Replaces standard optical blur with biologically accurate "Box Sampling with Noise" to simulate retinal ganglion density.
-* **Rod-Weighted Luminance:** Simulates the spectral sensitivity of peripheral rod cells (cyan/aqua elements glow while red vanishes).
-* **Crowding Simulation:** Uses "texture synthesis" algorithms (domain warping) to simulate where text and shapes disintegrate into statistical noise.
-* **Real-time Controls:** Progressive desaturation, scroll detection, and DOM mutation detection.
+* **Foveal/Peripheral Vision Simulation**: Toggle between clear central vision and degraded peripheral zones
+* **Content Analysis**:
+  - **Structure Map**: Analyzes page layout (text rhythm, density, semantic type)
+  - **Saliency Map**: Detects visual attention (edges, contrast, high-importance areas)
+  - **Fidelity Bias**: Reduces peripheral degradation near salient targets
+* **Aesthetic Modes**: High-Key Ghosting, Lab Mode, Frosted Glass, Blueprint, Cyberpunk (with saliency-driven pixelation)
+* **Visual Memory**: Simulates iconic memory decay (Off, Limited, Extended, Infinite)
+* **Chromatic Aberration**: Lens-like color fringing in periphery
+* **Adjustable Parameters**: Foveal radius (20-450px), shape (4 ratios), intensity (0-100%)
+* **Neural Processing Model (WebGL)**: Biologically accurate retinal simulation with domain warping
 
 ---
 
@@ -101,15 +106,22 @@ npm start
 
 ## Usage & Controls
 
-1. **Navigate**: Use **File → Open URL** (Cmd+L) to enter a website address.
-2. **Adjust**:
-   - Use the **Simulation → Foveal Radius** menu to pick a radius preset.
-   - Use **Simulation → Peripheral Intensity** to adjust the strength of peripheral degradation.
-   - Or use **Left/Right arrow keys** (<>) while foveal mode is enabled.
-   - Cmd/Alt plus left and right arrows go back and forward, or use the Go menu. 
-4. **Observe**: Watch how easily key elements can be located using mostly peripheral vision.
+### Basic Navigation
+1. **Navigate**: Use **File → Open URL** (`Cmd+L`) to enter a website address
+2. **Toggle simulation**: Press `Cmd+Shift+F` or use **Simulation → Foveal → Toggle Foveal Mode**
+3. **Quick adjust**: Use Left/Right arrow keys to change foveal radius
 
-Adjustments are optimally used to calibrate the simulation to the user's posture and viewing distance. Large foveal settings reduce the disruption of browsing, and may be preferred for dogfooding use cases, where usability test observation may benefit from tighter foveal settings.  The smaller settings are more accurate simulations in most cases. 
+### Menu Structure
+Access all features via **Simulation** menu:
+- **Foveal**: Toggle, Radius (6 sizes), Shape (4 ratios)
+- **Peripheral**: Intensity (5 levels), Mongrel Mode, Chromatic Aberration
+- **Behavior**: Aesthetic Mode (5 styles), Visual Memory (4 modes)
+- **Content Analysis**: Enable/Show Structure Map, Enable/Show Saliency Map
+
+### Debug Visualization
+- **Show Boundary**: View foveal edge
+- **Show Structure Map**: View layout analysis (RGB channels: rhythm, density, type)
+- **Show Saliency Map**: View attention heatmap (blue→cyan→green→yellow→red) 
 
 ### Keyboard Shortcuts
 
