@@ -13,48 +13,56 @@ Scrutinizer uses a custom WebGL renderer (`webgl-renderer.js`) to apply fragment
 3.  **`menu-template.js`**: Defines the critical application menu, including simulation settings.
 4.  **`docs/architecture-module-pattern.md`**: **CRITICAL** - Explains the hybrid CommonJS/Window module pattern used to prevent `ReferenceError`s. Read this before refactoring any class files.
 
-## Adding a New Peripheral Model (WIP API)
+## Neuro-Architecture Pipeline
 
-Currently, adding a new visual effect involves modifying the core shader code. We are working on a plugin API to allow dynamic loading of effects.
+The shader uses a modular architecture inspired by the human visual system to organize visual effects. While we use biological terms (LGN, V1, V4) as convenient labels for the pipeline stages, this is a **software architecture pattern**, not a rigorous biological simulation.
 
-### 1. Define the Mode
-Add a new mode ID in `menu-template.js` and `webgl-renderer.js`.
--   **0.0**: High-Key Ghosting (Default)
--   **1.0**: Lab Mode (Scotopic)
--   **2.0**: Frosted Glass
--   **3.0**: Blueprint
--   **4.0**: Cyberpunk
--   **5.0**: [Your New Model]
+### The Pipeline Stages
 
-### 2. Implement Shader Logic
-In `webgl-renderer.js`, locate the `applyAestheticEffect` function in the fragment shader. Add a new branch for your mode:
+1.  **Stage 1: LGN (Gating & Masking)**
+    *   **Role**: The "Gatekeeper". Handles content analysis and signal suppression.
+    *   **Function**: `processLGN`
+    *   **Logic**: Determines *where* effects should be applied. It reads the Structure and Saliency maps to create a `suppressionFactor`.
+    *   **Example**: "Don't distort text (High Structure Density)" or "Don't blur the fovea".
+
+2.  **Stage 2: V1 (Geometry & Distortion)**
+    *   **Role**: The "Feature Extractor". Handles geometric displacement.
+    *   **Function**: `processV1`
+    *   **Logic**: Determines *how* the image is warped. It uses the signal from the LGN to apply displacement.
+    *   **Types**:
+        *   **Noise**: Fluid, continuous distortion (e.g., Trippy mode).
+        *   **Shatter**: Blocky, discontinuous displacement (e.g., default peripheral blur).
+        *   **None**: No geometric change (e.g., Blueprint mode).
+
+3.  **Stage 3: V4 (Aesthetics & Style)**
+    *   **Role**: The "Interpreter". Handles color and stylistic rendering.
+    *   **Function**: `processV4`
+    *   **Logic**: Determines *what* the final pixel looks like. It applies color grading, overlays, and pixel-level effects.
+    *   **Examples**: High-Key ghosting, Neon colors, Wireframe overlays.
+
+### Adding a New Aesthetic Mode
+
+To add a new mode, you no longer write a monolithic `if/else` block. Instead, you define a **Configuration** for the pipeline.
+
+1.  **Register the Mode**: Add a new ID in `menu-template.js` (e.g., `6.0`).
+2.  **Configure the Pipeline**: In `webgl-renderer.js` (inside `main`), add a configuration block:
 
 ```glsl
-} else if (u_aesthetic_mode < 5.5) {
-    // === 5: YOUR NEW MODEL ===
-    // Implement your visual transform here
-    
-    // Example: Simple Red Tint
-    vec3 redTint = vec3(1.0, 0.0, 0.0);
-    vec3 final = mix(col, redTint, effectFactor);
-    
-    return mix(col, final, effectFactor);
+} else if (u_aesthetic_mode > 5.5) { // Mode 6: My New Mode
+    config.lgn_use_structure_mask = true;  // Protect text?
+    config.v1_distortion_type = 0;         // 0=Noise, 1=Shatter, 2=None
+    config.v1_strength_mult = 2.0;         // Double distortion?
+    config.v4_style_id = 6;                // Custom Style ID
 }
 ```
 
-**Best Practices:**
--   **Visual Scent**: The goal is to provide a "scent" of the content without full detail.
--   **Performance**: Avoid loops. Use `texture2D` lookups efficiently.
--   **Explicit Sequencing**: If using distortion, calculate the offset *once* and reuse it for all samples to save performance.
+3.  **Implement the Style**: In `processV4`, add the rendering logic for your `style_id`:
 
-### 3. Expose in UI
-Update `menu-template.js` to add a radio button for your new mode in the "Aesthetic Mode" submenu.
-
-```javascript
-{
-    label: 'My New Model',
-    type: 'radio',
-    click: () => sendToOverlays('menu:set-aesthetic-mode', 5)
+```glsl
+if (config.v4_style_id == 6) {
+    // My Custom Style
+    vec3 tint = vec3(1.0, 0.5, 0.0); // Orange
+    return mix(col, tint, effectFactor);
 }
 ```
 
@@ -232,13 +240,23 @@ SCREENSHOT_MODE=update SAVE_SCREENSHOTS=true npm test
 To run full app integration tests (e.g., loading external sites):
 
 ```bash
+### Integration Tests
+To run full app integration tests (e.g., loading external sites):
+
+```bash
 # Test loading Figma.com, capturing modes 0 (Default) and 3 (Blueprint)
 TEST_URL=https://www.figma.com TEST_MODES=0,3 npm start
 ```
 
 **Parameters:**
 - `TEST_URL`: The URL to load (Required)
-- `TEST_MODES`: Comma-separated list of aesthetic modes to capture (e.g., `0,3,4`)
+- `TEST_MODES`: Comma-separated list of aesthetic modes to capture:
+  - `0`: High-Key Ghosting
+  - `1`: Lab Mode
+  - `2`: Frosted Glass
+  - `3`: Blueprint
+  - `4`: Cyberpunk (Neon + Blocky)
+  - `5`: Trippy (Psychedelic + Curvy)
 - `TEST_RADIUS`: Override foveal radius (pixels)
 - `TEST_INTENSITY`: Override peripheral intensity (0.0-1.0)
 - `SCREENSHOT_MODE`: `date` (default) or `update`

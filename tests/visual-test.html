@@ -38,10 +38,13 @@
             const height = 600;
             const buffer = new Uint8ClampedArray(width * height * 4);
             for (let i = 0; i < buffer.length; i += 4) {
-                buffer[i] = 255;     // R
-                buffer[i + 1] = 255; // G
-                buffer[i + 2] = 255; // B
-                buffer[i + 3] = 255; // A
+                const x = (i / 4) % width;
+                const y = Math.floor((i / 4) / width);
+                const check = ((Math.floor(x / 20) + Math.floor(y / 20)) % 2 === 0) ? 255 : 0;
+                buffer[i] = check;     // R
+                buffer[i + 1] = check; // G
+                buffer[i + 2] = check; // B
+                buffer[i + 3] = 255;   // A
             }
             const imageData = new ImageData(buffer, width, height);
             renderer.uploadTexture(imageData);

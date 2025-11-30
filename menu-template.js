@@ -376,6 +376,11 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     label: 'Cyberpunk (Neon)',
                                     type: 'radio',
                                     click: () => sendToOverlays('menu:set-aesthetic-mode', 4)
+                                },
+                                {
+                                    label: 'Trippy (Psychedelic)',
+                                    type: 'radio',
+                                    click: () => sendToOverlays('menu:set-aesthetic-mode', 5)
                                 }
                             ]
                         },
