@@ -63,7 +63,11 @@ class SaliencyMap {
         }
 
         for (let i = 0; i < edges.length; i++) {
-            saliency[i] = Math.floor((edges[i] / maxEdge) * 255);
+            // Normalize and apply gamma correction (0.5) to boost mid-tones
+            // This ensures faint edges still register as salient, preventing the map from being too dark
+            const normalized = edges[i] / maxEdge;
+            const boosted = Math.pow(normalized, 0.5);
+            saliency[i] = Math.floor(boosted * 255);
         }
 
         // Step 5: Gaussian blur for smooth gradients

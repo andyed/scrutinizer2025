@@ -518,7 +518,8 @@
                         float jitterModulation = 1.0;
                         if (u_enable_saliency_modulation > 0.5) {
                             float clutterStrength = 1.0 - saliency; // Inverse saliency
-                            jitterModulation = mix(1.0, clutterStrength * 1.5, 0.7); // Boost jitter in cluttered areas
+                            // Increased contrast: 0.2x (salient) to 1.8x (cluttered)
+                            jitterModulation = mix(1.0, clutterStrength * 2.0, 0.8); 
                         }
                         
                         vec2 jitterVector = vec2(n1_jitter, n2_jitter) * jitterAmp * warpStrength * u_intensity * jitterModulation;
