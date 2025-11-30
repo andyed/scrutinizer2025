@@ -180,120 +180,157 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
         {
             label: 'Simulation',
             submenu: [
+                // === FOVEAL ===
                 {
-                    label: 'Toggle Foveal Mode',
-                    accelerator: 'CmdOrCtrl+Shift+F',
-                    click: () => sendToOverlays('menu:toggle-foveal')
-                },
-                { type: 'separator' },
-                {
-                    label: 'Foveal Radius',
+                    label: 'Foveal',
                     submenu: [
                         {
-                            label: 'Extra Small (20px)',
-                            type: 'radio',
-                            checked: isClosest(RADIUS_OPTIONS[0]),
-                            click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[0])
-                        },
-                        {
-                            label: 'Small (45px)',
-                            type: 'radio',
-                            checked: isClosest(RADIUS_OPTIONS[1]),
-                            click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[1])
-                        },
-                        {
-                            label: 'Medium (90px)',
-                            type: 'radio',
-                            checked: isClosest(RADIUS_OPTIONS[2]),
-                            click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[2])
-                        },
-                        {
-                            label: 'Large (160px)',
-                            type: 'radio',
-                            checked: isClosest(RADIUS_OPTIONS[3]),
-                            click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[3])
-                        },
-                        {
-                            label: 'Extra Large (250px)',
-                            type: 'radio',
-                            checked: isClosest(RADIUS_OPTIONS[4]),
-                            click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[4])
-                        }
-                    ]
-                },
-                {
-                    label: 'Peripheral Intensity',
-                    submenu: [
-                        {
-                            label: 'None (0%)',
-                            type: 'radio',
-                            checked: currentBlur === 0, // We might need to track intensity separately later, but for now 0 is 0
-                            click: () => sendToOverlays('menu:set-intensity', 0.0)
-                        },
-                        {
-                            label: 'Low (30%)',
-                            type: 'radio',
-                            click: () => sendToOverlays('menu:set-intensity', 0.3)
-                        },
-                        {
-                            label: 'Medium (60%)',
-                            type: 'radio',
-                            checked: true, // Default
-                            click: () => sendToOverlays('menu:set-intensity', 0.6)
-                        },
-                        {
-                            label: 'High (100%)',
-                            type: 'radio',
-                            click: () => sendToOverlays('menu:set-intensity', 1.0)
-                        },
-                        {
-                            label: 'Extreme (150%)',
-                            type: 'radio',
-                            click: () => sendToOverlays('menu:set-intensity', 1.5)
-                        }
-                    ]
-                },
-                {
-                    label: 'Visual Memory',
-                    submenu: [
-                        {
-                            label: 'Off (Default)',
-                            type: 'radio',
-                            checked: true, // Default
-                            click: () => sendToOverlays('menu:set-visual-memory', 0)
-                        },
-                        {
-                            label: 'Limited (5 items)',
-                            type: 'radio',
-                            click: () => sendToOverlays('menu:set-visual-memory', 5)
-                        },
-                        {
-                            label: 'Extended (10 items)',
-                            type: 'radio',
-                            click: () => sendToOverlays('menu:set-visual-memory', 10)
-                        },
-                        {
-                            label: 'Infinite (Fog of War)',
-                            type: 'radio',
-                            click: () => sendToOverlays('menu:set-visual-memory', -1)
-                        }
-                    ]
-                },
-                {
-                    label: 'Mongrel Mode',
-                    submenu: [
-                        {
-                            label: 'Shatter (Static)',
-                            type: 'radio',
-                            checked: true, // Default
-                            click: () => sendToOverlays('menu:set-mongrel-mode', 1)
-                        },
-                        {
-                            label: 'Noise (Dynamic)',
-                            type: 'radio',
-                            click: () => sendToOverlays('menu:set-mongrel-mode', 0)
+                            label: 'Toggle Foveal Mode',
+                            accelerator: 'CmdOrCtrl+Shift+F',
+                            click: () => sendToOverlays('menu:toggle-foveal')
                         },
                         { type: 'separator' },
+                        {
+                            label: 'Foveal Radius',
+                            submenu: [
+                                {
+                                    label: 'Extra Small (20px)',
+                                    type: 'radio',
+                                    checked: isClosest(RADIUS_OPTIONS[0], 'radius'),
+                                    click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[0])
+                                },
+                                {
+                                    label: 'Small (45px)',
+                                    type: 'radio',
+                                    checked: isClosest(RADIUS_OPTIONS[1], 'radius'),
+                                    click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[1])
+                                },
+                                {
+                                    label: 'Medium (90px)',
+                                    type: 'radio',
+                                    checked: isClosest(RADIUS_OPTIONS[2], 'radius'),
+                                    click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[2])
+                                },
+                                {
+                                    label: 'Large (180px)',
+                                    type: 'radio',
+                                    checked: isClosest(RADIUS_OPTIONS[3], 'radius'),
+                                    click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[3])
+                                },
+                                {
+                                    label: 'Extra Large (300px)',
+                                    type: 'radio',
+                                    checked: isClosest(RADIUS_OPTIONS[4], 'radius'),
+                                    click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[4])
+                                },
+                                {
+                                    label: 'Huge (450px)',
+                                    type: 'radio',
+                                    checked: isClosest(RADIUS_OPTIONS[5], 'radius'),
+                                    click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[5])
+                                }
+                            ]
+                        },
+                        {
+                            label: 'Foveal Shape',
+                            submenu: [
+                                {
+                                    label: 'Circular (1:1)',
+                                    type: 'radio',
+                                    checked: isClosest(ASPECT_OPTIONS[0], 'aspect'),
+                                    click: () => sendToOverlays('menu:set-aspect', ASPECT_OPTIONS[0])
+                                },
+                                {
+                                    label: 'Standard (4:3)',
+                                    type: 'radio',
+                                    checked: isClosest(ASPECT_OPTIONS[1], 'aspect'),
+                                    click: () => sendToOverlays('menu:set-aspect', ASPECT_OPTIONS[1])
+                                },
+                                {
+                                    label: 'Wide (16:9)',
+                                    type: 'radio',
+                                    checked: isClosest(ASPECT_OPTIONS[2], 'aspect'),
+                                    click: () => sendToOverlays('menu:set-aspect', ASPECT_OPTIONS[2])
+                                },
+                                {
+                                    label: 'Ultra-Wide (21:9)',
+                                    type: 'radio',
+                                    checked: isClosest(ASPECT_OPTIONS[3], 'aspect'),
+                                    click: () => sendToOverlays('menu:set-aspect', ASPECT_OPTIONS[3])
+                                }
+                            ]
+                        }
+                    ]
+                },
+
+                // === PERIPHERAL ===
+                {
+                    label: 'Peripheral',
+                    submenu: [
+                        {
+                            label: 'Intensity',
+                            submenu: [
+                                {
+                                    label: 'Off (0%)',
+                                    type: 'radio',
+                                    checked: isClosest(INTENSITY_OPTIONS[0], 'intensity'),
+                                    click: () => sendToOverlays('menu:set-intensity', INTENSITY_OPTIONS[0])
+                                },
+                                {
+                                    label: 'Subtle (30%)',
+                                    type: 'radio',
+                                    checked: isClosest(INTENSITY_OPTIONS[1], 'intensity'),
+                                    click: () => sendToOverlays('menu:set-intensity', INTENSITY_OPTIONS[1])
+                                },
+                                {
+                                    label: 'Moderate (60%)',
+                                    type: 'radio',
+                                    checked: isClosest(INTENSITY_OPTIONS[2], 'intensity'),
+                                    click: () => sendToOverlays('menu:set-intensity', INTENSITY_OPTIONS[2])
+                                },
+                                {
+                                    label: 'Strong (80%)',
+                                    type: 'radio',
+                                    checked: isClosest(INTENSITY_OPTIONS[3], 'intensity'),
+                                    click: () => sendToOverlays('menu:set-intensity', INTENSITY_OPTIONS[3])
+                                },
+                                {
+                                    label: 'Maximum (100%)',
+                                    type: 'radio',
+                                    checked: isClosest(INTENSITY_OPTIONS[4], 'intensity'),
+                                    click: () => sendToOverlays('menu:set-intensity', INTENSITY_OPTIONS[4])
+                                }
+                            ]
+                        },
+                        {
+                            label: 'Mongrel Mode',
+                            submenu: [
+                                {
+                                    label: 'Shatter (Static)',
+                                    type: 'radio',
+                                    checked: true,
+                                    click: () => sendToOverlays('menu:set-mongrel-mode', 1)
+                                },
+                                {
+                                    label: 'Noise (Dynamic)',
+                                    type: 'radio',
+                                    click: () => sendToOverlays('menu:set-mongrel-mode', 0)
+                                }
+                            ]
+                        },
+                        {
+                            label: 'Chromatic Aberration',
+                            type: 'checkbox',
+                            checked: true,
+                            click: (menuItem) => sendToOverlays('menu:toggle-ca', menuItem.checked)
+                        }
+                    ]
+                },
+
+                // === BEHAVIOR ===
+                {
+                    label: 'Behavior',
+                    submenu: [
                         {
                             label: 'Aesthetic Mode',
                             submenu: [
@@ -324,20 +361,39 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     click: () => sendToOverlays('menu:set-aesthetic-mode', 4)
                                 }
                             ]
+                        },
+                        {
+                            label: 'Visual Memory',
+                            submenu: [
+                                {
+                                    label: 'Off (Default)',
+                                    type: 'radio',
+                                    checked: true,
+                                    click: () => sendToOverlays('menu:set-visual-memory', 0)
+                                },
+                                {
+                                    label: 'Limited (5 items)',
+                                    type: 'radio',
+                                    click: () => sendToOverlays('menu:set-visual-memory', 5)
+                                },
+                                {
+                                    label: 'Extended (10 items)',
+                                    type: 'radio',
+                                    click: () => sendToOverlays('menu:set-visual-memory', 10)
+                                },
+                                {
+                                    label: 'Infinite (Fog of War)',
+                                    type: 'radio',
+                                    click: () => sendToOverlays('menu:set-visual-memory', -1)
+                                }
+                            ]
                         }
                     ]
                 },
-                { type: 'separator' },
+
+                // === CONTENT ANALYSIS ===
                 {
-                    label: 'Chromatic Aberration',
-                    type: 'checkbox',
-                    checked: true,
-                    click: (menuItem) => sendToOverlays('menu:toggle-ca', menuItem.checked)
-                },
-                { type: 'separator' },
-                { type: 'separator' },
-                {
-                    label: 'Content Signals',
+                    label: 'Content Analysis',
                     submenu: [
                         {
                             label: 'Enable Structure Map',
@@ -345,6 +401,13 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             checked: true,
                             click: (menuItem) => sendToOverlays('menu:toggle-enable-structure-map', menuItem.checked)
                         },
+                        {
+                            label: 'Enable Saliency Modulation',
+                            type: 'checkbox',
+                            checked: true,
+                            click: (menuItem) => sendToOverlays('menu:toggle-saliency-modulation', menuItem.checked)
+                        },
+                        { type: 'separator' },
                         {
                             label: 'Show Structure Map',
                             type: 'checkbox',
@@ -356,15 +419,11 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             type: 'checkbox',
                             checked: false,
                             click: (menuItem) => sendToOverlays('menu:toggle-saliency-map', menuItem.checked)
-                        },
-                        {
-                            label: 'Use Saliency Modulation',
-                            type: 'checkbox',
-                            checked: true,
-                            click: (menuItem) => sendToOverlays('menu:toggle-saliency-modulation', menuItem.checked)
                         }
                     ]
                 },
+
+                { type: 'separator' },
                 {
                     label: 'Debug: Show Boundary',
                     type: 'checkbox',

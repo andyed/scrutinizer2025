@@ -323,16 +323,26 @@
                         return mix(col, finalColor, strength);
 
                     } else {
-                        // === 4: CYBERPUNK (VJ) ===
-                        // Distortion Center
-                        // Use u_mouse (smoothed by JS) instead of u_mouse_stable to ensure tracking works
-                        vec2 center = u_mouse; 
+                        // === 4: CYBERPUNK (VJ + Saliency-Driven Pixelation) ===
                         
-                        // Calculate distance from fovea (stable)
-                        float dist_stable = distance(gl_FragCoord.xy, center);
+                        // === SALIENCY-DRIVEN BLOCK SIZE ===
+                        // Sample saliency to determine pixelation granularity
+                        float saliency = texture2D(u_saliencyMap, uv).r;
                         
+                        // Map saliency to block size (inverse: high saliency = small blocks)
+                        // 64px (Minecraft chunks) → 4px (fine detail)
+                        float blockSize = mix(64.0, 4.0, saliency);
+                        
+                        // Quantize UV to dynamic grid
+                        vec2 pixelSize = vec2(blockSize) / u_resolution;
+                        vec2 quantizedUV = floor(uv / pixelSize) * pixelSize;
+                        
+                        // Sample color from quantized position (creates blocky effect)
+                        vec3 pixelColor = texture2D(u_texture, quantizedUV).rgb;
+                        
+                        // === NEON CYBERPUNK AESTHETIC ===
                         // High Contrast, Neon Tints
-                        float luma = dot(col, vec3(0.299, 0.587, 0.114));
+                        float luma = dot(pixelColor, vec3(0.299, 0.587, 0.114));
                         
                         // Crush blacks, boost whites
                         float contrastLuma = smoothstep(0.2, 0.8, luma);
@@ -343,10 +353,13 @@
                         
                         vec3 cyberColor = mix(shadowColor, highlightColor, contrastLuma);
                         
-                        // Saccadic: Glitchy bright
+                        // Saccadic: Glitchy bright flashdistance
                         cyberColor = mix(cyberColor, vec3(1.0, 0.0, 1.0), saccadeFactor * 0.5); // Magenta flash
                         
-                        return mix(col, cyberColor, effectFactor);
+                        // Apply to pixelated color
+                        vec3 finalCyber = mix(pixelColor, cyberColor, effectFactor);
+                        
+                        return mix(col, finalCyber, effectFactor);
                     }
                 }
     
