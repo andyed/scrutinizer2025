@@ -545,24 +545,31 @@
                     
                     if (!isScrollbar) {
                         // === VISUAL MEMORY MASK CHECK ===
-                        // Check mask FIRST - if this pixel is "remembered" (white), skip peripheral processing
+                        // Check mask to see if this pixel is "remembered"
                         float maskVal = 0.0;
                         if (u_useMask > 0.5) {
                             maskVal = texture2D(u_maskTexture, v_texCoord).r;
                         }
                         
-                        // Only apply peripheral effects to non-remembered areas (mask < 0.99)
                         vec3 finalRGB;
                         if (maskVal > 0.99) {
-                            // Remembered area - use clear, unprocessed color
-                            finalRGB = color.rgb;
+                            // Remembered area - sample ORIGINAL undistorted texture
+                            vec4 clearColor = texture2D(u_texture, uv); // Use original UV, not distorted newUV
+                            finalRGB.r = clearColor.b; // BGRA swizzle
+                            finalRGB.g = clearColor.g;
+                            finalRGB.b = clearColor.r;
                         } else {
-                            // Not remembered - apply peripheral processing
+                            // Not remembered - use the distorted color and apply aesthetic effects
                             finalRGB = applyAestheticEffect(color.rgb, v_texCoord, u_texture, dist, u_intensity, periphery_start, structure);
                             
                             // Partially restore clarity based on mask value (for gradient edges)
                             if (maskVal > 0.0) {
-                                finalRGB = mix(finalRGB, color.rgb, maskVal);
+                                vec4 clearColor = texture2D(u_texture, uv);
+                                vec3 clearRGB;
+                                clearRGB.r = clearColor.b;
+                                clearRGB.g = clearColor.g;
+                                clearRGB.b = clearColor.r;
+                                finalRGB = mix(finalRGB, clearRGB, maskVal);
                             }
                         }
                         

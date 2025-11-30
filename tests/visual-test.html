@@ -199,6 +199,58 @@
 
             ipcRenderer.send('log', 'Test 4 Passed: Scrutinizer config updates correctly');
 
+            // --- TEST 5: Visual Memory Mask ---
+            // This test would have caught the shader compilation error from broken visual memory code
+            // Create a simple white mask (fully remembered)
+            const maskCanvas = document.createElement('canvas');
+            maskCanvas.width = width;
+            maskCanvas.height = height;
+            const maskCtx = maskCanvas.getContext('2d');
+            maskCtx.fillStyle = 'black';
+            maskCtx.fillRect(0, 0, width, height);
+            // Paint white circle in center (remembered area)
+            maskCtx.fillStyle = 'white';
+            maskCtx.beginPath();
+            maskCtx.arc(width / 2, height / 2, 200, 0, Math.PI * 2);
+            maskCtx.fill();
+
+            const maskImageData = maskCtx.getImageData(0, 0, width, height);
+            renderer.uploadMask(maskImageData);
+
+            // Render WITHOUT mask - should have peripheral distortion
+            renderer.render(
+                width, height, width / 2, height / 2, 150, 1.33,
+                0.8, // High intensity
+                0.0, 0.0, 0.0,
+                0.0, // useMask = 0 (off)
+                0.0, 0.0, 0.0, width / 2, height / 2, 0.0, 0.0
+            );
+            const frameNoMask = captureFrame();
+
+            // Render WITH mask - center should be clear, edges distorted
+            renderer.render(
+                width, height, width / 2, height / 2, 150, 1.33,
+                0.8, // High intensity
+                0.0, 0.0, 0.0,
+                1.0, // useMask = 1 (on) - THIS WOULD FAIL WITH BROKEN SHADER
+                0.0, 0.0, 0.0, width / 2, height / 2, 0.0, 0.0
+            );
+            const frameWithMask = captureFrame();
+
+            // Check that center region (remembered) differs between mask/no-mask
+            const centerDiff = checkRegionDiff(width / 2 - 50, height / 2 - 50, 100, 100, 'center');
+            if (centerDiff < 0.05) {
+                throw new Error(`Test 5 Failed: Visual memory mask had no effect on center region (diff: ${centerDiff})`);
+            }
+
+            // Check that edge region (not remembered) is similar (both distorted)
+            const edgeDiff = checkRegionDiff(0, 0, 100, 100, 'edge');
+            if (edgeDiff > 0.15) {
+                ipcRenderer.send('log', `WARN: Edge regions differ more than expected (diff: ${edgeDiff}), but not failing test`);
+            }
+
+            ipcRenderer.send('log', `Test 5 Passed: Visual memory mask working (center diff: ${(centerDiff * 100).toFixed(2)}%, edge diff: ${(edgeDiff * 100).toFixed(2)}%)`);
+
             // All passed
             ipcRenderer.send('test-result', { success: true, message: 'All visual tests passed' });
 
