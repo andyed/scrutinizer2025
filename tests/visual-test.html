@@ -215,8 +215,8 @@
             const patternData = new ImageData(patternBuffer, width, height);
             renderer.uploadTexture(patternData);
 
-            /*
             // --- TEST 5: Visual Memory Mask ---
+            // This test would have caught the shader compilation error from broken visual memory code
 
             // Create a simple white mask (fully remembered)
             const maskCanvas = document.createElement('canvas');
@@ -269,8 +269,6 @@
             }
 
             ipcRenderer.send('log', `Test 5 Passed: Visual memory mask working (center diff: ${(centerDiff * 100).toFixed(2)}%, edge diff: ${(edgeDiff * 100).toFixed(2)}%)`);
-            */
-            ipcRenderer.send('log', 'Test 5 Skipped (Debugging)');
 
             // --- TEST 6: Structure Map Toggle ---
             // Create a dummy structure map (solid red = high rhythm)

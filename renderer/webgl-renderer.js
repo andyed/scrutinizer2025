@@ -443,7 +443,7 @@
                         // Only apply shatter where there is content (density > 0)
                         // This keeps whitespace clean!
                         
-                        if (density < 0.1) {
+                        if (u_has_structure > 0.5 && density < 0.1) {
                             mongrelStrength = 0.0;
                         }
                         
@@ -474,7 +474,7 @@
                         
                         // === STRUCTURE MAP MODULATION ===
                         // Mask warp by density
-                        if (density < 0.1) {
+                        if (u_has_structure > 0.5 && density < 0.1) {
                             warpStrength = 0.0;
                         }
                         
