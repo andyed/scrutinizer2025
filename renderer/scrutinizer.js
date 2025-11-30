@@ -440,8 +440,8 @@
             console.log('[Scrutinizer] CA set to:', enabled);
         }
 
-        toggleDebugBoundary(enabled) {
-            this.config.debugBoundary = enabled ? 1.0 : 0.0;
+        setDebugBoundaryMode(mode) {
+            this.config.debugBoundary = parseFloat(mode);
             console.log(`[Scrutinizer] Debug Boundary set to: ${this.config.debugBoundary}`);
         }
 

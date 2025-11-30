@@ -443,9 +443,26 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                 { type: 'separator' },
                 {
                     label: 'Debug: Show Boundary',
-                    type: 'checkbox',
-                    checked: false,
-                    click: (menuItem) => sendToOverlays('menu:toggle-debug-boundary', menuItem.checked)
+                    submenu: [
+                        {
+                            label: 'Off',
+                            type: 'radio',
+                            checked: true,
+                            click: () => sendToOverlays('menu:set-debug-boundary', 0)
+                        },
+                        {
+                            label: 'Fovea Only (Reticle)',
+                            type: 'radio',
+                            checked: false,
+                            click: () => sendToOverlays('menu:set-debug-boundary', 1)
+                        },
+                        {
+                            label: 'Fovea + Parafovea',
+                            type: 'radio',
+                            checked: false,
+                            click: () => sendToOverlays('menu:set-debug-boundary', 2)
+                        }
+                    ]
                 }
             ]
         },

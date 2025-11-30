@@ -191,8 +191,8 @@
             if (scrutinizer) scrutinizer.toggleCA(enabled);
         });
 
-        ipcRenderer.on('menu:toggle-debug-boundary', (e, enabled) => {
-            scrutinizer.toggleDebugBoundary(enabled);
+        ipcRenderer.on('menu:set-debug-boundary', (e, mode) => {
+            scrutinizer.setDebugBoundaryMode(mode);
         });
 
         ipcRenderer.on('menu:toggle-structure-map', (e, enabled) => {
