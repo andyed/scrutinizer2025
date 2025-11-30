@@ -54,6 +54,14 @@
                 return pixels;
             };
 
+            // Helper to save screenshot if enabled
+            const saveScreenshot = (name) => {
+                if (process.env.SAVE_SCREENSHOTS === 'true') {
+                    const dataUrl = canvas.toDataURL('image/png');
+                    ipcRenderer.send('save-screenshot', { name, dataUrl });
+                }
+            };
+
             // Helper to compare frames (returns % difference)
             const compareFrames = (pixelsA, pixelsB) => {
                 let diffCount = 0;
@@ -94,6 +102,7 @@
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, width / 2, height / 2, 0.0
             );
             const frameNoDistortion = captureFrame();
+            saveScreenshot('test2_no_distortion');
 
             // Render with HIGH intensity
             renderer.render(
@@ -102,6 +111,7 @@
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, width / 2, height / 2, 0.0
             );
             const frameHighDistortion = captureFrame();
+            saveScreenshot('test2_high_distortion');
 
             // Helper to check region difference
             const checkRegionDiff = (x, y, w, h, name) => {
@@ -245,6 +255,7 @@
                 0.0, 0.0, 0.0, 100, 100, 0.0, 0.0
             );
             const frameNoMask = captureFrame();
+            saveScreenshot('test5_no_mask');
 
             // Render WITH mask - center should be clear (remembered in mask)
             // Same fovea position, but mask has white circle at center
@@ -256,6 +267,7 @@
                 0.0, 0.0, 0.0, 100, 100, 0.0, 0.0
             );
             const frameWithMask = captureFrame();
+            saveScreenshot('test5_with_mask');
 
             // Check that center region (remembered) differs between mask/no-mask
             const centerDiff = checkRegionDiff(width / 2 - 50, height / 2 - 50, 100, 100, 'center');
@@ -292,6 +304,7 @@
                 0.0
             );
             const frameStructureOn = captureFrame();
+            saveScreenshot('test6_structure_on');
 
             // Render with structure map DISABLED
             renderer.render(
@@ -301,6 +314,7 @@
                 0.0
             );
             const frameStructureOff = captureFrame();
+            saveScreenshot('test6_structure_off');
 
             const structureDiff = compareFrames(frameStructureOn, frameStructureOff);
             if (structureDiff < 0.001) {
@@ -333,6 +347,7 @@
                 1.0 // enableSaliencyModulation = 1.0 (ENABLED)
             );
             const frameSaliencyOn = captureFrame();
+            saveScreenshot('test7_saliency_on');
 
             // Render with saliency modulation DISABLED
             renderer.render(
@@ -342,6 +357,7 @@
                 0.0 // enableSaliencyModulation = 0.0 (DISABLED)
             );
             const frameSaliencyOff = captureFrame();
+            saveScreenshot('test7_saliency_off');
 
             const saliencyDiff = compareFrames(frameSaliencyOn, frameSaliencyOff);
             if (saliencyDiff < 0.001) {
@@ -369,6 +385,7 @@
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, width / 2, height / 2, 0.0, 1.0
             );
             const frameClean = captureFrame();
+            saveScreenshot('test8_clean');
 
             // 3. Capture Distorted (Intensity 1.0, Saliency ON)
             // Fovea far away so everything is peripheral
@@ -377,6 +394,7 @@
                 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1000, -1000, 0.0, 1.0
             );
             const frameDistorted = captureFrame();
+            saveScreenshot('test8_distorted');
 
             // 4. Compare Regions
             // Left Region (Low Saliency) vs Clean
@@ -426,6 +444,7 @@
                 0.0, width / 2, height / 2, 0.0, 0.0
             );
             const frameMode0 = captureFrame();
+            saveScreenshot('test9_mode0');
 
             // Render Mode 3 (Blueprint)
             renderer.render(
@@ -435,6 +454,7 @@
                 0.0, width / 2, height / 2, 0.0, 0.0
             );
             const frameMode3 = captureFrame();
+            saveScreenshot('test9_mode3');
 
             // Render Mode 4 (Cyberpunk)
             renderer.render(
@@ -444,6 +464,7 @@
                 0.0, width / 2, height / 2, 0.0, 0.0
             );
             const frameMode4 = captureFrame();
+            saveScreenshot('test9_mode4');
 
             const diff0vs3 = compareFrames(frameMode0, frameMode3);
             const diff0vs4 = compareFrames(frameMode0, frameMode4);

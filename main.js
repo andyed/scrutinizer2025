@@ -725,6 +725,21 @@ function runTestMode() {
         console.log('[Test Renderer]', msg);
     });
 
+    ipcMain.on('save-screenshot', (event, { name, dataUrl }) => {
+        const fs = require('fs');
+        const p = require('path'); // Use p to avoid conflict if path is already defined
+        const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
+        const screenshotsDir = p.join(__dirname, 'tests', 'screenshots');
+
+        if (!fs.existsSync(screenshotsDir)) {
+            fs.mkdirSync(screenshotsDir, { recursive: true });
+        }
+
+        const filePath = p.join(screenshotsDir, `${name}.png`);
+        fs.writeFileSync(filePath, base64Data, 'base64');
+        console.log(`[Test] Saved screenshot: ${filePath}`);
+    });
+
     testWindow.webContents.on('crashed', () => {
         console.error('❌ TEST FAILED: Renderer process crashed');
         app.exit(1);
