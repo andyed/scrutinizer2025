@@ -586,71 +586,7 @@
                         color.rgb = finalRGB;
                     }
                     
-                    // Debug Boundary (Foveal Ring)
-                    // Debug Boundary (Foveal Ring)
-                    if (u_debug_boundary > 0.5) {
-                        // Common calculations
-                        float angle = atan(uv_corrected.y, uv_corrected.x);
-                        float pi = 3.14159265359;
-                        
-                        // Use manual pixel size calculation for crisp lines
-                        // We want lines to be ~2px thick for visibility
-                        float pxSize = 1.0 / u_resolution.y; 
-                        float lineThickness = 2.0 * pxSize; 
-                        
-                        // Mode 1: Fovea Only (Reticle Style)
-                        if (u_debug_boundary > 0.5) {
-                            float tickLength = 0.02; // Fixed length in UV space
-                            float numTicks = 12.0;
-                            
-                            // Radial distance check (ring of ticks)
-                            float distFromFovea = abs(dist - fovea_radius);
-                            
-                            // Angular check
-                            float angleMod = mod(angle + pi, (2.0 * pi) / numTicks);
-                            float angleWidth = (2.0 * pi) / numTicks * 0.25; 
-                            
-                            // Crisp Radial Edges
-                            float tickRadial = 1.0 - smoothstep(tickLength - pxSize, tickLength + pxSize, distFromFovea);
-                            
-                            // Crisp Angular Edges
-                            // Approx fwidth(angle) = pxSize / dist
-                            // Clamp to avoid division by zero or extreme values near center
-                            float angleFw = pxSize / max(dist, 0.001);
-                            float tickAngular = smoothstep(0.0, angleFw * 2.0, angleMod) * smoothstep(angleWidth + angleFw * 2.0, angleWidth, angleMod);
-                            
-                            float tickAlpha = tickRadial * tickAngular;
-                            
-                            if (tickAlpha > 0.0) {
-                                vec3 tickColor = vec3(0.0, 1.0, 1.0); // Cyan
-                                // Use MAX mixing to prevent washing out
-                                color.rgb = mix(color.rgb, tickColor, tickAlpha); 
-                            }
-                        }
-                        
-                        // Mode 2: Fovea + Parafovea
-                        if (u_debug_boundary > 1.5) {
-                            // Corrected Parafovea Radius (2.5x Fovea)
-                            // Note: We need to redefine parafovea_radius locally or use the multiplier
-                            // The global 'parafovea_radius' was 1.35x. Let's use 2.5x here for the visual.
-                            float visualParafoveaRadius = fovea_radius * 2.5;
-                            
-                            float parafoveaDist = abs(dist - visualParafoveaRadius);
-                            float ringAlpha = 1.0 - smoothstep(lineThickness - pxSize, lineThickness + pxSize, parafoveaDist);
-                            
-                            // Dashed Pattern
-                            float dashPattern = sin(angle * 30.0);
-                            // Sharpen dash
-                            float dashAlpha = smoothstep(0.0, 0.1, dashPattern);
-                            
-                            float finalRingAlpha = ringAlpha * dashAlpha;
-                            
-                            if (finalRingAlpha > 0.0) {
-                                vec3 ringColor = vec3(1.0, 0.5, 0.0); // Orange
-                                color.rgb = mix(color.rgb, ringColor, finalRingAlpha);
-                            }
-                        }
-                    }
+
 
                     // Structure Map Visualization (Red Overlay)
                     // Debug Visualization
@@ -670,6 +606,59 @@
                         if (mapDensity > 0.0) {
                             vec3 debugColor = vec3(1.0, 0.0, 0.0); 
                             color.rgb = mix(color.rgb, debugColor, 0.3 * mapDensity);
+                        }
+                    }
+                    
+                    // Debug Boundary (Foveal Ring) - Rendered LAST to be on top
+                    if (u_debug_boundary > 0.5) {
+                        // Calculate vector from mouse to current pixel
+                        vec2 diff = uv_corrected - mouse_corrected;
+                        float angle = atan(diff.y, diff.x);
+                        
+                        // Use manual pixel size calculation for crisp lines
+                        float pxSize = 1.0 / u_resolution.y; 
+                        float lineThickness = 1.5 * pxSize; 
+                        
+                        // Mode 1: Fovea Only (Reticle Style)
+                        if (u_debug_boundary > 0.5) {
+                            float tickLength = 0.01; 
+                            float numTicks = 12.0;
+                            
+                            // Radial distance check
+                            float distFromFovea = abs(dist - fovea_radius);
+                            float tickRadial = 1.0 - smoothstep(tickLength - pxSize, tickLength + pxSize, distFromFovea);
+                            
+                            // Angular check using SIN for stability
+                            // sin(angle * N) creates N peaks and N troughs
+                            // We want sharp ticks.
+                            float tickPattern = cos(angle * numTicks);
+                            // Sharpen the pattern: only show the peaks
+                            float tickAngular = smoothstep(0.95, 0.98, tickPattern);
+                            
+                            float tickAlpha = tickRadial * tickAngular;
+                            
+                            if (tickAlpha > 0.0) {
+                                vec3 tickColor = vec3(0.0, 1.0, 1.0); // Cyan
+                                color.rgb = mix(color.rgb, tickColor, tickAlpha); 
+                            }
+                        }
+                        
+                        // Mode 2: Fovea + Parafovea
+                        if (u_debug_boundary > 1.5) {
+                            float visualParafoveaRadius = fovea_radius * 2.5;
+                            float parafoveaDist = abs(dist - visualParafoveaRadius);
+                            float ringAlpha = 1.0 - smoothstep(lineThickness - pxSize, lineThickness + pxSize, parafoveaDist);
+                            
+                            // Dashed Pattern
+                            float dashPattern = sin(angle * 40.0);
+                            float dashAlpha = smoothstep(0.0, 0.1, dashPattern);
+                            
+                            float finalRingAlpha = ringAlpha * dashAlpha;
+                            
+                            if (finalRingAlpha > 0.0) {
+                                vec3 ringColor = vec3(1.0, 0.5, 0.0); // Orange
+                                color.rgb = mix(color.rgb, ringColor, finalRingAlpha);
+                            }
                         }
                     }
                     
