@@ -434,21 +434,29 @@
                     // to avoid a hard jump in intensity (since effectFactor is likely high there).
                     float bypassTransition = smoothstep(0.25, 0.35, dist);
 
-                    if (config.v4_style_id == 0) { // High-Key
+                    if (config.v4_style_id == 0) { // High-Key (Now: Desaturated)
                         float luma = dot(col, vec3(0.299, 0.587, 0.114));
                         vec3 gray = vec3(luma);
-                        vec3 targetWhite = vec3(0.8, 0.85, 0.9);
+                        
+                        // User Request: "not dim the periphery just desaturate"
+                        // Previously we mixed with targetWhite, which lightened the periphery,
+                        // making the original fovea look dark by comparison.
+                        // Now we just desaturate.
+                        
+                        vec3 ghostColor = gray; // Pure desaturation
+                        
+                        // Optional: Very subtle lift to keep it "High Key" but not overpowering
+                        // ghostColor = mix(ghostColor, vec3(0.9), 0.1); 
+                        
+                        float noise = (rand(uv) - 0.5) * 0.05;
+                        ghostColor += noise;
                         
                         // Luma Mask: Only apply "Ghosting" to lighter tones.
                         // Deep blacks (luma < 0.2) should remain black.
                         float lumaMask = smoothstep(0.1, 0.4, luma);
                         
-                        vec3 ghostColor = mix(gray, targetWhite, 0.4); 
-                        float noise = (rand(uv) - 0.5) * 0.05;
-                        ghostColor += noise;
-                        ghostColor = mix(ghostColor, vec3(0.95, 0.98, 1.0), saccadeFactor * 0.5);
-                        
                         // Apply effect based on Luma Mask AND Bypass Transition
+                        // Luma Mask (0.1-0.4) protects deep blacks.
                         vec3 finalColor = mix(col, ghostColor, effectFactor * 0.95 * lumaMask * bypassTransition);
                         return finalColor;
                         
@@ -799,8 +807,10 @@
                 const gl = this.gl;
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, this.texture);
-                // Use sRGB format for color-correct rendering
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+                // Use RGBA (raw) instead of sRGB to prevent automatic linearization.
+                // This ensures the shader receives the exact color values from the source,
+                // avoiding gamma shifts (darkening) when outputting directly to the screen.
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
             }
 
             uploadMask(image) {
