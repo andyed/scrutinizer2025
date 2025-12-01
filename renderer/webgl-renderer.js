@@ -429,6 +429,11 @@
 
                     float effectFactor = v1.distortionStrength; // Use the actual applied strength
                     
+                    // Smooth Transition from Hard Bypass
+                    // The bypass ends at 0.25. We must ramp the effect up from 0 starting at 0.25
+                    // to avoid a hard jump in intensity (since effectFactor is likely high there).
+                    float bypassTransition = smoothstep(0.25, 0.35, dist);
+
                     if (config.v4_style_id == 0) { // High-Key
                         float luma = dot(col, vec3(0.299, 0.587, 0.114));
                         vec3 gray = vec3(luma);
@@ -443,8 +448,8 @@
                         ghostColor += noise;
                         ghostColor = mix(ghostColor, vec3(0.95, 0.98, 1.0), saccadeFactor * 0.5);
                         
-                        // Apply effect based on Luma Mask
-                        vec3 finalColor = mix(col, ghostColor, effectFactor * 0.95 * lumaMask);
+                        // Apply effect based on Luma Mask AND Bypass Transition
+                        vec3 finalColor = mix(col, ghostColor, effectFactor * 0.95 * lumaMask * bypassTransition);
                         return finalColor;
                         
                     } else if (config.v4_style_id == 1) { // Lab
@@ -455,26 +460,16 @@
                         return mix(col, rodColor, effectFactor);
                         
                     } else if (config.v4_style_id == 2) { // Frosted
-                        vec3 frosted = mix(col, vec3(0.9, 0.92, 0.95), 0.6);
-                        frosted = mix(frosted, vec3(1.0), saccadeFactor * 0.8);
-                        return mix(col, frosted, effectFactor);
+                        // Simple blur/desaturate
+                        vec3 frosted = mix(col, vec3(0.9), 0.3);
+                        return mix(col, frosted, effectFactor * 0.7 * bypassTransition);
                         
                     } else if (config.v4_style_id == 3) { // Blueprint
-                        vec3 bg = vec3(0.05, 0.1, 0.2);
-                        vec3 fg = vec3(0.4, 0.8, 1.0);
-                        vec2 gridUV = fract(uv * 40.0);
-                        float gridLine = step(0.95, gridUV.x) + step(0.95, gridUV.y);
-                        vec3 finalColor = mix(bg, bg * 1.5, gridLine * 0.3);
-                        
-                        if (lgn.rhythm > 0.0) {
-                            float scanline = sin(uv.y * 800.0 * lgn.rhythm) * 0.5 + 0.5;
-                            float brightness = lgn.density * 0.8 + 0.2;
-                            vec3 typeColor = fg;
-                            if (lgn.type < 0.2) typeColor = vec3(1.0, 0.5, 0.0);
-                            if (lgn.type > 0.4 && lgn.type < 0.6) typeColor = vec3(0.0, 1.0, 0.5);
-                            finalColor = mix(finalColor, typeColor * brightness, 0.8 * scanline);
-                        }
-                        return mix(col, finalColor, effectFactor);
+                        float luma = dot(col, vec3(0.299, 0.587, 0.114));
+                        vec3 blue = vec3(0.0, 0.2, 0.8) * luma + vec3(0.0, 0.0, 0.2);
+                        vec3 lines = vec3(1.0) * step(0.5, luma); // Fake lines
+                        vec3 final = mix(blue, lines, 0.2);
+                        return mix(col, final, effectFactor * bypassTransition);
                         
                     } else if (config.v4_style_id == 4) { // Cyberpunk
                          // Pixelation is handled in V1.
@@ -493,8 +488,8 @@
                          // Clamp results
                          vec3 finalColor = clamp(saturated, 0.0, 1.0);
                          
-                         return mix(col, finalColor, cleanFactor);
-                         
+                         // Apply bypassTransition to ensure smooth start
+                         return mix(col, finalColor, cleanFactor * bypassTransition);
                     } else if (config.v4_style_id == 5) { // Trippy (Fractal/Ooze)
                         // Domain Warping for "Oil Slick" / Fractal look
                         
@@ -519,7 +514,7 @@
                         // Boost saturation of the result
                         vec3 finalColor = mix(col, oilColor, 0.6); // 60% oil mix
                         
-                        return mix(col, finalColor, effectFactor);
+                        return mix(col, finalColor, effectFactor * bypassTransition);
                     }
                     
                     return col;
