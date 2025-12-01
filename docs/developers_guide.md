@@ -296,3 +296,43 @@ To add new visual tests:
 2.  Add a new test block following the existing pattern.
 3.  Use the `captureFrame()` and `compareFrames()` helpers to analyze the output.
 4.  Report success/failure via `ipcRenderer.send('test-result', ...)` or throw an error.
+
+---
+
+## Golden Methodology (Regression Prevention)
+
+To prevent "AI Hubris" and accidental regressions (like the "Blue Tint" or "Saliency Heatmap" incidents), we strictly adhere to a **Golden Image** workflow.
+
+### The Philosophy
+1.  **Chesterton's Fence**: Never change a visualization that looks "intentional" without checking git history first.
+2.  **Visual Contracts**: We treat the current visual output as a "contract". Any change to it is a breaking change unless explicitly desired.
+
+### The Workflow
+
+1.  **Establish Baseline**:
+    Before making *any* changes to the renderer, run the integration test to capture the current state:
+    ```bash
+    TEST_URL=https://www.figma.com TEST_MODES=0,saliency,structure npm start
+    ```
+    This saves screenshots to `tests/screenshots/`.
+
+2.  **Verify Against Golden**:
+    Compare these new screenshots against the "Golden Images" stored in `tests/golden/`.
+    *   If they match: You are safe to proceed.
+    *   If they differ: **STOP**. You have broken something. Revert immediately.
+
+3.  **Intentional Changes**:
+    If you are *intentionally* changing the visualization (e.g., a new aesthetic mode):
+    1.  Implement the change.
+    2.  Run the tests again.
+    3.  Verify the new output is correct.
+    4.  **Update Golden**: Copy the new screenshots to `tests/golden/` to establish the new baseline.
+    ```bash
+    cp tests/screenshots/*.png tests/golden/
+    ```
+    5.  Commit the new golden images with your code.
+
+### Golden Artifacts
+*   `tests/golden/`: Source of truth. Committed to git.
+*   `tests/screenshots/`: Ephemeral test output. Ignored by git.
+
