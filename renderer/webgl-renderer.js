@@ -425,11 +425,19 @@
                         float luma = dot(col, vec3(0.299, 0.587, 0.114));
                         vec3 gray = vec3(luma);
                         vec3 targetWhite = vec3(0.8, 0.85, 0.9);
+                        
+                        // Luma Mask: Only apply "Ghosting" to lighter tones.
+                        // Deep blacks (luma < 0.2) should remain black.
+                        float lumaMask = smoothstep(0.1, 0.4, luma);
+                        
                         vec3 ghostColor = mix(gray, targetWhite, 0.4); 
                         float noise = (rand(uv) - 0.5) * 0.05;
                         ghostColor += noise;
                         ghostColor = mix(ghostColor, vec3(0.95, 0.98, 1.0), saccadeFactor * 0.5);
-                        return mix(col, ghostColor, effectFactor * 0.95);
+                        
+                        // Apply effect based on Luma Mask
+                        vec3 finalColor = mix(col, ghostColor, effectFactor * 0.95 * lumaMask);
+                        return finalColor;
                         
                     } else if (config.v4_style_id == 1) { // Lab
                         float luma = dot(col, vec3(0.0, 0.6, 0.4)); 
