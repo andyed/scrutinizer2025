@@ -13,6 +13,18 @@ Scrutinizer uses a custom WebGL renderer (`webgl-renderer.js`) to apply fragment
 3.  **`menu-template.js`**: Defines the critical application menu, including simulation settings.
 4.  **`docs/architecture-module-pattern.md`**: **CRITICAL** - Explains the hybrid CommonJS/Window module pattern used to prevent `ReferenceError`s. Read this before refactoring any class files.
 
+### 4. Input Normalization Layer
+**Lesson Learned (The "Blue Tint" Incident):**
+Platform-specific quirks (like Electron's `desktopCapturer` returning BGRA textures instead of RGBA) should **never** leak into the core scientific model.
+
+**Best Practice:**
+Implement a dedicated **Input Normalization** stage at the very beginning of the shader pipeline.
+*   **Color Correction**: Swizzle BGRA to RGBA immediately.
+*   **Coordinate Correction**: Flip Y-axis if needed.
+*   **Range Normalization**: Ensure all inputs are 0.0-1.0.
+
+This ensures that the LGN, V1, and V4 stages operate on **ideal, platform-agnostic data**. If we switch capture methods or engines later, we only update the Normalization Layer, not the visual effects.
+
 ## Neuro-Architecture Pipeline
 
 The shader uses a modular architecture inspired by the human visual system to organize visual effects. While we use biological terms (LGN, V1, V4) as convenient labels for the pipeline stages, this is a **software architecture pattern**, not a rigorous biological simulation.

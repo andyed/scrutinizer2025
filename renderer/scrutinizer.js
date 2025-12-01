@@ -27,7 +27,9 @@
             this.hasStructure = false;
 
             // Saliency Map (Visual Attractiveness Texture)
-            const SaliencyMap = require('./saliency-map.js');
+            // Saliency Map (Visual Attractiveness Texture)
+            // Example: Swapped standard SaliencyMap for ColorSaliencyMap
+            const SaliencyMap = require('./color-saliency-map.js');
             this.saliencyMap = new SaliencyMap();
             this.lastFrameBitmap = null;
 
@@ -414,7 +416,8 @@
                 this.mouseX, // stableMouseX
                 this.mouseY, // stableMouseY
                 (this.hasStructure && this.config.enableStructureMap) ? 1.0 : 0.0, // hasStructure (only if enabled)
-                this.config.enableSaliencyModulation ? 1.0 : 0.0 // enableSaliencyModulation
+                this.config.enableSaliencyModulation ? 1.0 : 0.0, // enableSaliencyModulation
+                now / 1000.0 // time (seconds)
             );
         }
 

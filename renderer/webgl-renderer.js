@@ -50,7 +50,28 @@
                 this.useMaskLocation = null;
                 this.velocityLocation = null;
                 this.mongrelModeLocation = null;
-                this.aestheticModeLocation = null;
+                this.mongrelModeLocation = null;
+                // this.aestheticModeLocation = null; // Removed in favor of granular uniforms
+
+                // Granular Uniform Locations
+                this.lgnUseStructureMaskLocation = null;
+                this.lgnUseSaliencyGateLocation = null;
+                this.v1DistortionTypeLocation = null;
+                this.v1StrengthMultLocation = null;
+                this.v4StyleIdLocation = null;
+                this.lgnRampEndMultLocation = null;
+                this.v1AnimateLocation = null;
+
+                // Default Configuration
+                this.config = {
+                    lgn_use_structure_mask: true,
+                    lgn_use_saliency_gate: true,
+                    v1_distortion_type: 1, // Shatter
+                    v1_strength_mult: 1.0,
+                    v4_style_id: 0, // High-Key
+                    lgn_ramp_end_mult: 3.0,
+                    v1_animate: false
+                };
 
                 this.init();
                 this.warmup();
@@ -116,9 +137,19 @@
                 uniform float u_debug_structure;
                 uniform float u_has_structure;
                 uniform float u_enable_saliency_modulation;
+                uniform float u_time; // Time in seconds for animation
                 uniform float u_velocity;         // Mouse velocity in px/ms
                 uniform float u_mongrel_mode;     // 0.0 = Noise, 1.0 = Shatter
-                uniform float u_aesthetic_mode;   // 0=HighKey, 1=Lab, 2=Frosted, 3=Blueprint, 4=Cyberpunk
+
+                
+                // === GRANULAR CONFIGURATION UNIFORMS ===
+                uniform float u_lgn_use_structure_mask;
+                uniform float u_lgn_use_saliency_gate;
+                uniform int   u_v1_distortion_type;
+                uniform float u_v1_strength_mult;
+                uniform int   u_v4_style_id;
+                uniform float u_lgn_ramp_end_mult;
+                uniform float u_v1_animate;
     
                 in vec2 v_texCoord;
                 out vec4 fragColor;
@@ -205,6 +236,7 @@
                     float v1_strength_mult;      // Multiplier for distortion
                     int  v4_style_id;            // 0=HighKey, 1=Lab, 2=Frosted, 3=Blueprint, 4=Cyberpunk, 5=Trippy
                     float lgn_ramp_end_mult;     // Multiplier for fovea_radius to determine ramp end
+                    bool v1_animate;             // Should distortion move over time?
                 };
 
                 struct LGN_Signal {
@@ -299,19 +331,30 @@
                         signal.distortionStrength = strength;
                         
                     } else if (config.v1_distortion_type == 0) {
-                        // === NOISE (Curves) ===
+                        // === NOISE (Curves/Ooze) ===
                         // Calculate warp strength specifically for noise (different falloff than shatter usually)
                         // But we use the LGN passed strength for consistency now.
                         
                         vec2 uv_noise = vec2(uv_corrected.x / u_fovea_aspect_ratio, uv_corrected.y);
                         
+                        // Add time offset if animated
+                        vec2 timeOffset = vec2(0.0);
+                        if (config.v1_animate) {
+                            timeOffset = vec2(sin(u_time * 0.2), cos(u_time * 0.15)) * 10.0;
+                        }
+                        
                         float coarseScaleX = isFarPeriphery ? 2000.0 : 200.0;
                         float coarseScaleY = isFarPeriphery ? 1000.0 : 100.0;
-                        float n1 = snoise(vec2(uv_noise.x * coarseScaleX, uv_noise.y * coarseScaleY));
-                        float n2 = snoise(vec2(uv_noise.x * coarseScaleX, uv_noise.y * coarseScaleY) + vec2(50.0, 50.0));
+                        float n1 = snoise(vec2(uv_noise.x * coarseScaleX, uv_noise.y * coarseScaleY) + timeOffset);
+                        float n2 = snoise(vec2(uv_noise.x * coarseScaleX, uv_noise.y * coarseScaleY) + vec2(50.0, 50.0) - timeOffset);
                         
                         vec2 warpAmp = isFarPeriphery ? vec2(0.005, 0.004) : vec2(0.001, 0.0001);
                         vec2 warpVector = vec2(n1, n2) * warpAmp * strength * u_intensity;
+                        
+                        // Add "breathing" motion to strength if animated
+                        if (config.v1_animate) {
+                            warpVector *= (1.0 + 0.2 * sin(u_time * 1.5));
+                        }
                         
                         signal.displacement = warpVector; // Simplified for brevity, jitter added in full impl
                         signal.distortedUV = uv + signal.displacement;
@@ -323,21 +366,42 @@
                         // Stepped metric for distinct block levels
                         float steppedMetric = floor(combinedMetric * 4.0) / 4.0;
                         
-                        // Block size: Low saliency = Big blocks (64px), High saliency = Small blocks (2px)
-                        float maxBlock = 64.0;
-                        float minBlock = 2.0;
-                        float blockSize = mix(maxBlock, minBlock, steppedMetric);
+                        // Target Max Block Size: HUGE blocks for "Minecraft" look
+                        float targetMaxBlock = 192.0;
+                        float targetMinBlock = 32.0; 
+                        float limitBlockSize = mix(targetMaxBlock, targetMinBlock, steppedMetric);
                         
-                        // Apply strength: If strength is low (fovea), force small blocks (no pixelation)
-                        // Actually, we want NO pixelation in fovea.
-                        // So we mix the UVs? Or mix the block size?
-                        // Let's mix the UVs at the end.
+                        // Modulate ACTUAL block size by strength (distance from fovea)
+                        // "Squarified Pixels": Quantize block size to powers of 2 to avoid radial moire.
+                        // This creates distinct "rings" of resolution (1, 2, 4, 8, 16...) instead of a smooth warp.
+                        float logMax = log2(limitBlockSize);
+                        float logCurrent = strength * logMax;
+                        float currentBlockSize = exp2(floor(logCurrent));
                         
-                        vec2 pixelSize = vec2(blockSize) / u_resolution;
+                        currentBlockSize = max(1.0, currentBlockSize);
+                        
+                        vec2 pixelSize = vec2(currentBlockSize) / u_resolution;
                         vec2 quantizedUV = floor(uv / pixelSize) * pixelSize + pixelSize * 0.5;
                         
-                        // Mix based on strength (0 in fovea -> original UV, 1 in periphery -> pixelated UV)
-                        signal.distortedUV = mix(uv, quantizedUV, strength);
+                        // Glitch Displacement (Big Blocky Shifts)
+                        float motionGate = smoothstep(0.1, 5.0, u_velocity); 
+                        
+                        if (strength > 0.5 && steppedMetric < 0.5 && motionGate > 0.01) {
+                            float blockNoise = rand(quantizedUV + vec2(floor(u_time * 10.0))); 
+                            float threshold = 0.92 + (1.0 - motionGate) * 0.08; 
+                            
+                            if (blockNoise > threshold) { 
+                                float shift = (blockNoise - threshold) * 2.0; 
+                                quantizedUV.x += shift * 0.2 * strength * motionGate; 
+                            }
+                        }
+                        
+                        // Optimization: If strength is effectively zero (fovea), use exact UVs
+                        if (strength < 0.01) {
+                            signal.distortedUV = uv;
+                        } else {
+                            signal.distortedUV = quantizedUV;
+                        }
                         signal.distortionStrength = strength;
                     }
                     
@@ -348,12 +412,12 @@
                 vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float dist, float saccadeFactor) {
                     vec3 col = texture(u_texture, v1.distortedUV).rgb;
                     
-                    // Apply BGRA swizzle if using Mongrel/Shatter (legacy artifact, but kept for consistency)
-                    if (config.v1_distortion_type == 1) {
-                         vec3 temp = col;
-                         col.r = temp.b;
-                         col.b = temp.r;
-                    }
+                    // Fix BGRA input (Electron capture is BGRA)
+                    // Always swap R and B to get correct RGBA.
+                    // Previously only applied to Shatter, but Cyberpunk (and others) need it too.
+                    vec3 temp = col;
+                    col.r = temp.b;
+                    col.b = temp.r;
                     
                     float effectFactor = v1.distortionStrength; // Use the actual applied strength
                     
@@ -398,33 +462,53 @@
                         
                     } else if (config.v4_style_id == 4) { // Cyberpunk
                          // Pixelation is handled in V1.
-                         // Style: High Contrast, Saturated, No Tint + Scanlines.
+                         // Style: Saturated, No Tint, No Scanlines (Clean Digital Look).
+                         // User requested "pixelation instead" of "outline text".
+                         // Removing contrast boost and scanlines to avoid "etched" text artifacts.
                          
-                         // 1. Contrast Boost
-                         // Simple S-curve or linear contrast
-                         vec3 centered = col - 0.5;
-                         vec3 highContrast = centered * 1.5 + 0.5; // Boost contrast
+                         // HARD BYPASS
+                         if (dist < 0.25) { 
+                             return col;
+                         }
                          
-                         // 2. Saturation Boost
-                         float luma = dot(highContrast, vec3(0.299, 0.587, 0.114));
-                         vec3 saturated = mix(vec3(luma), highContrast, 1.5); // Boost saturation
+                         // Clean up Fovea
+                         float cleanFactor = smoothstep(0.4, 0.8, effectFactor);
                          
-                         // 3. Scanlines (CRT effect)
-                         float scanline = sin(uv.y * u_resolution.y * 0.5) * 0.1; // Subtle scanline
-                         saturated -= scanline; // Darken scanlines
+                         // 1. Saturation Boost ONLY
+                         // We skip contrast boost because it creates "outlines" on text.
+                         float luma = dot(col, vec3(0.299, 0.587, 0.114));
+                         vec3 saturated = mix(vec3(luma), col, 1.5); // Boost saturation of original color
                          
                          // Clamp results
                          vec3 finalColor = clamp(saturated, 0.0, 1.0);
                          
-                         return mix(col, finalColor, effectFactor);
+                         return mix(col, finalColor, cleanFactor);
                          
-                    } else if (config.v4_style_id == 5) { // Trippy
-                        float luma = dot(col, vec3(0.299, 0.587, 0.114));
-                        float hue = luma + dist * 2.0;
-                        vec3 k = vec3(1.0, 2.0/3.0, 1.0/3.0);
-                        vec3 p = abs(fract(vec3(hue) + k) * 6.0 - 3.0);
-                        vec3 rainbow = clamp(p - 1.0, 0.0, 1.0);
-                        return mix(col, rainbow, 0.3 * effectFactor); // Modulate mix by effect factor
+                    } else if (config.v4_style_id == 5) { // Trippy (Fractal/Ooze)
+                        // Domain Warping for "Oil Slick" / Fractal look
+                        
+                        // Use distorted UVs for the base color, but also use them for the noise lookup
+                        vec2 warpUV = v1.distortedUV * 2.0; // Scale up for detail
+                        
+                        // FBM-like layers
+                        float n = snoise(warpUV + vec2(u_time * 0.1));
+                        float n2 = snoise(warpUV * 2.0 - vec2(u_time * 0.15));
+                        
+                        // Combine noise to create a "fractal" value
+                        float fractal = (n + n2 * 0.5) * 0.5 + 0.5; // 0..1
+                        
+                        // Color Shift: Iridescent / Oil Slick
+                        // Shift hue based on fractal value + distance
+                        vec3 shift = vec3(fractal, fractal + 0.33, fractal + 0.66);
+                        
+                        // Soft mixing with original color
+                        // Instead of replacing, we tint/overlay
+                        vec3 oilColor = col * (0.5 + 0.5 * sin(shift * 6.28 + u_time));
+                        
+                        // Boost saturation of the result
+                        vec3 finalColor = mix(col, oilColor, 0.6); // 60% oil mix
+                        
+                        return mix(col, finalColor, effectFactor);
                     }
                     
                     return col;
@@ -460,42 +544,20 @@
                     // --- CONFIGURATION (The "Hooks") ---
                     ModeConfig config;
                     
-                    // Default: High-Key (0)
-                    config.lgn_use_structure_mask = true;
-                    config.lgn_use_saliency_gate = true;
-                    config.v1_distortion_type = 1; // Shatter
-                    config.v1_strength_mult = 1.0;
-                    config.v4_style_id = 0;
-                    config.lgn_ramp_end_mult = 3.0; // Slow ramp (Nuanced)
+                    // Map Uniforms to Config Struct
+                    config.lgn_use_structure_mask = u_lgn_use_structure_mask > 0.5;
+                    config.lgn_use_saliency_gate = u_lgn_use_saliency_gate > 0.5;
+                    config.v1_distortion_type = u_v1_distortion_type;
+                    config.v1_strength_mult = u_v1_strength_mult;
+                    config.v4_style_id = u_v4_style_id;
+                    config.lgn_ramp_end_mult = u_lgn_ramp_end_mult;
+                    config.v1_animate = u_v1_animate > 0.5;
                     
-                    if (u_aesthetic_mode > 0.5 && u_aesthetic_mode < 1.5) { // Lab (1)
-                        config.v4_style_id = 1;
-                        config.lgn_ramp_end_mult = 3.0;
-                    } else if (u_aesthetic_mode > 1.5 && u_aesthetic_mode < 2.5) { // Frosted (2)
-                        config.v4_style_id = 2;
-                        config.lgn_ramp_end_mult = 3.0;
-                    } else if (u_aesthetic_mode > 2.5 && u_aesthetic_mode < 3.5) { // Blueprint (3)
-                        config.v1_distortion_type = 2; // None
-                        config.v4_style_id = 3;
-                        config.lgn_ramp_end_mult = 2.0;
-                    } else if (u_aesthetic_mode > 3.5 && u_aesthetic_mode < 4.5) { // Cyberpunk (4)
-                        config.v1_distortion_type = 3; // Pixelate (Saliency-Guided)
-                        config.v4_style_id = 4;
-                        config.lgn_ramp_end_mult = 2.5; // Medium ramp
-                    } else if (u_aesthetic_mode > 4.5) { // Trippy (5)
-                        config.lgn_use_structure_mask = false; // Disable whitespace protection!
-                        config.v1_distortion_type = 0; // Noise (Curves)
-                        config.v1_strength_mult = 3.0; // Extra swirly
-                        config.v4_style_id = 5;
-                        config.lgn_ramp_end_mult = 1.5; // Fast ramp (Immediate distortion)
-                    }
-                    
-                    // Override V1 type if Mongrel Mode uniform says so (unless Trippy, which forces Noise)
+                    // Override V1 type if Mongrel Mode uniform says so (Legacy Toggle Support)
+                    // Only applies if we are in a "standard" mode (Shatter/Noise) to avoid breaking Cyberpunk/Blueprint
                     if (config.v4_style_id != 5 && config.v1_distortion_type != 2 && config.v1_distortion_type != 3) {
                         if (u_mongrel_mode < 0.5) {
                             config.v1_distortion_type = 0; // Noise
-                            // If switching to Noise via toggle, maybe tighten the ramp?
-                            // But let's keep the mode's ramp for stability.
                         }
                         else config.v1_distortion_type = 1; // Shatter
                     }
@@ -620,7 +682,17 @@
                 this.useMaskLocation = gl.getUniformLocation(this.program, "u_useMask");
                 this.velocityLocation = gl.getUniformLocation(this.program, "u_velocity");
                 this.mongrelModeLocation = gl.getUniformLocation(this.program, "u_mongrel_mode");
-                this.aestheticModeLocation = gl.getUniformLocation(this.program, "u_aesthetic_mode");
+                this.mongrelModeLocation = gl.getUniformLocation(this.program, "u_mongrel_mode");
+                // this.aestheticModeLocation = gl.getUniformLocation(this.program, "u_aesthetic_mode");
+
+                // Granular Uniforms
+                this.lgnUseStructureMaskLocation = gl.getUniformLocation(this.program, "u_lgn_use_structure_mask");
+                this.lgnUseSaliencyGateLocation = gl.getUniformLocation(this.program, "u_lgn_use_saliency_gate");
+                this.v1DistortionTypeLocation = gl.getUniformLocation(this.program, "u_v1_distortion_type");
+                this.v1StrengthMultLocation = gl.getUniformLocation(this.program, "u_v1_strength_mult");
+                this.v4StyleIdLocation = gl.getUniformLocation(this.program, "u_v4_style_id");
+                this.lgnRampEndMultLocation = gl.getUniformLocation(this.program, "u_lgn_ramp_end_mult");
+                this.v1AnimateLocation = gl.getUniformLocation(this.program, "u_v1_animate");
 
                 // Create buffers
                 this.positionBuffer = gl.createBuffer();
@@ -750,6 +822,42 @@
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
             }
 
+            updateConfigFromMode(modeId) {
+                // Default: High-Key (0)
+                this.config = {
+                    lgn_use_structure_mask: true,
+                    lgn_use_saliency_gate: true,
+                    v1_distortion_type: 1, // Shatter
+                    v1_strength_mult: 1.0,
+                    v4_style_id: 0,
+                    lgn_ramp_end_mult: 3.0,
+                    v1_animate: false
+                };
+
+                if (modeId > 0.5 && modeId < 1.5) { // Lab (1)
+                    this.config.v4_style_id = 1;
+                    this.config.lgn_ramp_end_mult = 3.0;
+                } else if (modeId > 1.5 && modeId < 2.5) { // Frosted (2)
+                    this.config.v4_style_id = 2;
+                    this.config.lgn_ramp_end_mult = 3.0;
+                } else if (modeId > 2.5 && modeId < 3.5) { // Blueprint (3)
+                    this.config.v1_distortion_type = 2; // None
+                    this.config.v4_style_id = 3;
+                    this.config.lgn_ramp_end_mult = 2.0;
+                } else if (modeId > 3.5 && modeId < 4.5) { // Cyberpunk (4)
+                    this.config.v1_distortion_type = 3; // Pixelate (Saliency-Guided)
+                    this.config.v4_style_id = 4;
+                    this.config.lgn_ramp_end_mult = 2.0;
+                } else if (modeId > 4.5) { // Trippy (5)
+                    this.config.lgn_use_structure_mask = false;
+                    this.config.v1_distortion_type = 0; // Noise
+                    this.config.v1_strength_mult = 3.0;
+                    this.config.v4_style_id = 5;
+                    this.config.lgn_ramp_end_mult = 1.5;
+                    this.config.v1_animate = true;
+                }
+            }
+
             clear() {
                 const gl = this.gl;
                 gl.clearColor(0.0, 0.0, 0.0, 0.0);
@@ -827,7 +935,20 @@
                 gl.uniform1f(this.useMaskLocation, useMask);
                 gl.uniform1f(this.velocityLocation, velocity);
                 gl.uniform1f(this.mongrelModeLocation, mongrelMode);
-                gl.uniform1f(this.aestheticModeLocation, aestheticMode);
+                gl.uniform1f(this.mongrelModeLocation, mongrelMode);
+                // gl.uniform1f(this.aestheticModeLocation, aestheticMode);
+
+                // Update Config based on Mode (Legacy Support / Preset Logic)
+                this.updateConfigFromMode(aestheticMode);
+
+                // Upload Granular Uniforms
+                gl.uniform1f(this.lgnUseStructureMaskLocation, this.config.lgn_use_structure_mask ? 1.0 : 0.0);
+                gl.uniform1f(this.lgnUseSaliencyGateLocation, this.config.lgn_use_saliency_gate ? 1.0 : 0.0);
+                gl.uniform1i(this.v1DistortionTypeLocation, this.config.v1_distortion_type);
+                gl.uniform1f(this.v1StrengthMultLocation, this.config.v1_strength_mult);
+                gl.uniform1i(this.v4StyleIdLocation, this.config.v4_style_id);
+                gl.uniform1f(this.lgnRampEndMultLocation, this.config.lgn_ramp_end_mult);
+                gl.uniform1f(this.v1AnimateLocation, this.config.v1_animate ? 1.0 : 0.0);
                 gl.uniform1f(this.hasStructureLocation, hasStructure);
                 gl.uniform1f(this.enableSaliencyModulationLocation, enableSaliencyModulation);
 
