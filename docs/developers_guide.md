@@ -178,9 +178,11 @@ if (u_debug_mode == 1.0) {
     gl_FragColor = vec4(structure.rgb, 1.0);
     return;
 } else if (u_debug_mode == 2.0) {
-    // Visualize saliency heatmap
+    // Visualize saliency heatmap (Blue -> Green -> Red)
     float saliency = texture2D(u_saliencyMap, uv).r;
-    vec3 heatmap = vec3(saliency, 0.0, 1.0 - saliency); // Red-to-blue
+    vec3 heatmap = vec3(0.0);
+    if (saliency < 0.5) heatmap = mix(vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 0.0), saliency * 2.0);
+    else heatmap = mix(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), (saliency - 0.5) * 2.0);
     gl_FragColor = vec4(heatmap, 1.0);
     return;
 }

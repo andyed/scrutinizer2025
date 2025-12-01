@@ -121,7 +121,7 @@ Access all features via **Simulation** menu:
 ### Debug Visualization
 - **Show Boundary**: View foveal edge
 - **Show Structure Map**: View layout analysis (RGB channels: rhythm, density, type)
-- **Show Saliency Map**: View attention heatmap (blue→cyan→green→yellow→red) 
+- **Show Saliency Map**: View attention heatmap (Blue=Low → Green=Medium → Red=High) 
 
 ### Keyboard Shortcuts
 

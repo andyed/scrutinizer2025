@@ -773,7 +773,10 @@ function runTestMode() {
 
 function runIntegrationTest() {
     const testUrl = process.env.TEST_URL;
-    const testModes = (process.env.TEST_MODES || '0').split(',').map(m => parseFloat(m.trim()));
+    const testModes = (process.env.TEST_MODES || '0').split(',').map(m => {
+        const val = parseFloat(m.trim());
+        return isNaN(val) ? m.trim() : val;
+    });
     const testRadius = process.env.TEST_RADIUS ? parseFloat(process.env.TEST_RADIUS) : null;
     const testIntensity = process.env.TEST_INTENSITY ? parseFloat(process.env.TEST_INTENSITY) : null;
 
@@ -827,8 +830,17 @@ function runIntegrationTest() {
                 setTimeout(async () => {
                     // Iterate through modes
                     for (const mode of testModes) {
-                        console.log(`[Test] Switching to Aesthetic Mode ${mode}...`);
-                        mainWindow.scrutinizerHud.webContents.send('menu:set-aesthetic-mode', mode);
+                        console.log(`[Test] Switching to Mode: ${mode}...`);
+
+                        // Handle Debug Modes vs Aesthetic Modes
+                        if (mode === 'saliency') {
+                            mainWindow.scrutinizerHud.webContents.send('menu:toggle-saliency-map', true);
+                        } else if (mode === 'structure') {
+                            mainWindow.scrutinizerHud.webContents.send('menu:toggle-structure-map', true);
+                        } else {
+                            // Numeric Aesthetic Mode
+                            mainWindow.scrutinizerHud.webContents.send('menu:set-aesthetic-mode', mode);
+                        }
 
                         // Wait for render
                         await new Promise(resolve => setTimeout(resolve, 500));
@@ -852,7 +864,7 @@ function runIntegrationTest() {
                                 hostname = new URL(testUrl).hostname.replace(/[^a-z0-9]/gi, '_');
                             } catch (e) { }
 
-                            const baseName = `site_${hostname}_mode${mode}`;
+                            const baseName = `site_${hostname}_mode_${mode}`;
                             let filename;
 
                             if (screenshotMode === 'update') {
@@ -868,6 +880,13 @@ function runIntegrationTest() {
                         } catch (err) {
                             console.error('❌ TEST FAILED during capture:', err);
                             app.exit(1);
+                        }
+
+                        // Cleanup Debug Modes
+                        if (mode === 'saliency') {
+                            mainWindow.scrutinizerHud.webContents.send('menu:toggle-saliency-map', false);
+                        } else if (mode === 'structure') {
+                            mainWindow.scrutinizerHud.webContents.send('menu:toggle-structure-map', false);
                         }
                     }
 

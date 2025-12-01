@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Scrutinizer Visual Regression Tests</title>
+    <style>
+        body {
+            margin: 0;
+            background: #222;
+            color: #eee;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #controls {
+            padding: 20px;
+            background: #333;
+            border-bottom: 1px solid #444;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #111;
+            position: relative;
+        }
+
+        canvas {
+            border: 1px solid #555;
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        #sidebar {
+            width: 300px;
+            background: #2a2a2a;
+            border-left: 1px solid #444;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        button {
+            padding: 8px 16px;
+            background: #444;
+            border: 1px solid #555;
+            color: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background: #555;
+        }
+
+        button.active {
+            background: #007acc;
+            border-color: #005c99;
+        }
+
+        h3 {
+            margin-top: 0;
+        }
+
+        .test-item {
+            padding: 10px;
+            background: #333;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .test-item:hover {
+            background: #444;
+        }
+
+        .test-item.selected {
+            border-left: 4px solid #007acc;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="controls">
+        <h2>Visual Tests</h2>
+        <button onclick="runSelectedTest()">Run Selected</button>
+        <button onclick="downloadScreenshot()">Save Screenshot</button>
+        <span id="status">Select a test...</span>
+    </div>
+    <div id="container">
+        <div id="canvas-container">
+            <canvas id="overlay-canvas" width="800" height="600"></canvas>
+        </div>
+        <div id="sidebar">
+            <h3>Test Cases</h3>
+            <div class="test-item" onclick="selectTest('saliency')" id="test-saliency">
+                <strong>Saliency Map</strong><br>
+                <small>Verifies Blue-Green-Red heatmap.</small>
+            </div>
+            <div class="test-item" onclick="selectTest('structure')" id="test-structure">
+                <strong>Structure Map</strong><br>
+                <small>Verifies Red density overlay.</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mocks and Dependencies -->
+    <script>
+        window.require = (name) => {
+            if (name === 'electron') return { ipcRenderer: { on: () => { }, send: () => { } } };
+            if (name === './logger') return { log: console.log, error: console.error, warn: console.warn };
+            return {};
+        };
+    </script>
+    <script src="../renderer/webgl-renderer.js"></script>
+    <script src="../renderer/color-saliency-map.js"></script>
+
+    <script>
+        let renderer;
+        let saliencyMap;
+        let currentTest = null;
+        const canvas = document.getElementById('overlay-canvas');
+        const status = document.getElementById('status');
+
+        async function init() {
+            try {
+                renderer = new WebGLRenderer(canvas);
+                saliencyMap = new ColorSaliencyMap();
+                console.log("Renderer initialized");
+            } catch (e) {
+                console.error(e);
+                status.textContent = "Init Failed: " + e.message;
+            }
+        }
+
+        function selectTest(id) {
+            currentTest = id;
+            document.querySelectorAll('.test-item').forEach(el => el.classList.remove('selected'));
+            document.getElementById('test-' + id).classList.add('selected');
+            status.textContent = `Selected: ${id}`;
+            runSelectedTest();
+        }
+
+        function createTestImage() {
+            const imgCanvas = document.createElement('canvas');
+            imgCanvas.width = 800;
+            imgCanvas.height = 600;
+            const ctx = imgCanvas.getContext('2d');
+
+            // Background (Dark Grey)
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0, 0, 800, 600);
+
+            // Shapes for Saliency/Structure
+            // 1. Red Box (High Saliency)
+            ctx.fillStyle = 'red';
+            ctx.fillRect(100, 100, 200, 200);
+
+            // 2. Blue Circle (Medium Saliency)
+            ctx.beginPath();
+            ctx.arc(600, 200, 100, 0, Math.PI * 2);
+            ctx.fillStyle = 'blue';
+            ctx.fill();
+
+            // 3. White Text (High Contrast/Structure)
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 48px sans-serif';
+            ctx.fillText("TEST", 350, 500);
+
+            return imgCanvas;
+        }
+
+        function runSelectedTest() {
+            if (!renderer) init();
+            if (!currentTest) return;
+
+            const img = createTestImage();
+            const ctx = img.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, 800, 600);
+
+            // Upload Base Texture
+            renderer.uploadTexture(imageData);
+
+            if (currentTest === 'saliency') {
+                // Compute & Upload Saliency
+                saliencyMap.resize(800, 600);
+                saliencyMap.computeFromImage(img);
+                renderer.uploadSaliencyMap(saliencyMap.getCanvas());
+
+                // Render Saliency Debug (Mode 2.0)
+                renderFrame(2.0, 0.0);
+                status.textContent = "Running Saliency Test... Check for Blue->Green->Red heatmap.";
+            } else if (currentTest === 'structure') {
+                // Create Mock Structure Map (Green Channel = Density)
+                const strCanvas = document.createElement('canvas');
+                strCanvas.width = 800;
+                strCanvas.height = 600;
+                const sCtx = strCanvas.getContext('2d');
+                sCtx.fillStyle = 'black';
+                sCtx.fillRect(0, 0, 800, 600);
+
+                // Draw density where text is
+                sCtx.fillStyle = 'rgb(0, 255, 0)'; // Full density
+                sCtx.font = 'bold 48px sans-serif';
+                sCtx.fillText("TEST", 350, 500);
+
+                const strData = sCtx.getImageData(0, 0, 800, 600);
+                renderer.uploadStructureMap(strData);
+
+                // Render Structure Debug (Mode 1.0)
+                renderFrame(0.0, 1.0); // Note: DebugStructure uniform handles both modes based on value
+                // Wait, updateDebugMode logic in scrutinizer.js sets debugStructure to 2.0 for saliency, 1.0 for structure.
+                // The renderer takes a float.
+                // Let's check renderer signature: debugStructure is the 10th arg.
+            }
+        }
+
+        function renderFrame(debugStructureValue, unused) {
+            renderer.render(
+                800, 600,
+                400, 300, // Mouse
+                100, 1.33, // Radius
+                0.5, 0.0, // Intensity, CA
+                0.0, // Debug Boundary
+                debugStructureValue, // Debug Structure (1.0=Structure, 2.0=Saliency)
+                0.0, 0, 0, 0, 400, 300, 0, 1.0, 0
+            );
+        }
+
+        // Override renderFrame for Structure to pass 1.0
+        // The logic in runSelectedTest was slightly off.
+        // Saliency -> debugStructure = 2.0
+        // Structure -> debugStructure = 1.0
+
+        // Let's fix runSelectedTest logic:
+        /*
+            if (currentTest === 'saliency') {
+                 // ... setup ...
+                 renderFrame(2.0);
+            } else if (currentTest === 'structure') {
+                 // ... setup ...
+                 renderFrame(1.0);
+            }
+        */
+
+        // Re-implementing runSelectedTest correctly below (overwriting previous function in memory effectively)
+        window.runSelectedTest = function () {
+            if (!renderer) init();
+            if (!currentTest) return;
+
+            const img = createTestImage();
+            const ctx = img.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, 800, 600);
+
+            renderer.uploadTexture(imageData);
+
+            if (currentTest === 'saliency') {
+                saliencyMap.resize(800, 600);
+                saliencyMap.computeFromImage(img);
+                renderer.uploadSaliencyMap(saliencyMap.getCanvas());
+
+                // Render with debugStructure = 2.0
+                renderer.render(800, 600, 400, 300, 100, 1.33, 0.5, 0.0, 0.0, 2.0, 0.0, 0, 0, 0, 400, 300, 0, 1.0, 0);
+                status.textContent = "Saliency: Should see Blue/Green/Red heatmap.";
+            } else if (currentTest === 'structure') {
+                const strCanvas = document.createElement('canvas');
+                strCanvas.width = 800;
+                strCanvas.height = 600;
+                const sCtx = strCanvas.getContext('2d');
+                sCtx.fillStyle = 'black';
+                sCtx.fillRect(0, 0, 800, 600);
+                sCtx.fillStyle = 'rgb(0, 255, 0)';
+                sCtx.font = 'bold 48px sans-serif';
+                sCtx.fillText("TEST", 350, 500);
+
+                // We need to pass the canvas or image data. uploadStructureMap takes image/canvas.
+                renderer.uploadStructureMap(strCanvas);
+
+                // Render with debugStructure = 1.0
+                renderer.render(800, 600, 400, 300, 100, 1.33, 0.5, 0.0, 0.0, 1.0, 0.0, 0, 0, 0, 400, 300, 0, 1.0, 0);
+                status.textContent = "Structure: Should see Red overlay on 'TEST'.";
+            }
+        }
+
+        function downloadScreenshot() {
+            const link = document.createElement('a');
+            link.download = `scrutinizer-test-${currentTest || 'screenshot'}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        // Auto-init
+        window.onload = init;
+    </script>
+</body>
+
+</html>
