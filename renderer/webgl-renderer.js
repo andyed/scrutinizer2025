@@ -414,11 +414,19 @@
                     
                     // Fix BGRA input (Electron capture is BGRA)
                     // Always swap R and B to get correct RGBA.
-                    // Previously only applied to Shatter, but Cyberpunk (and others) need it too.
                     vec3 temp = col;
                     col.r = temp.b;
                     col.b = temp.r;
                     
+                    // === ARCHITECTURAL GUARANTEE: FOVEA PROTECTION ===
+                    // The fovea must remain 100% authentic to the source.
+                    // We enforce a hard bypass if we are within the foveal radius.
+                    // We use a slightly larger safety margin (0.25) to ensure the transition
+                    // starts well outside the critical vision area.
+                    if (dist < 0.25) {
+                        return col;
+                    }
+
                     float effectFactor = v1.distortionStrength; // Use the actual applied strength
                     
                     if (config.v4_style_id == 0) { // High-Key
@@ -473,11 +481,6 @@
                          // Style: Saturated, No Tint, No Scanlines (Clean Digital Look).
                          // User requested "pixelation instead" of "outline text".
                          // Removing contrast boost and scanlines to avoid "etched" text artifacts.
-                         
-                         // HARD BYPASS
-                         if (dist < 0.25) { 
-                             return col;
-                         }
                          
                          // Clean up Fovea
                          float cleanFactor = smoothstep(0.4, 0.8, effectFactor);
