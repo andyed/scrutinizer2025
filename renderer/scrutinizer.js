@@ -219,6 +219,10 @@
 
                 this.saliencyMap.computeFromImage(tempCanvas);
                 this.renderer.uploadSaliencyMap(this.saliencyMap.getCanvas());
+
+                if (Math.random() < 0.01) {
+                    console.log(`[Scrutinizer] Uploaded Saliency Map (${width}x${height})`);
+                }
             }
 
             // Log occasionally

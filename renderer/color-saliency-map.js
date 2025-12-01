@@ -29,6 +29,8 @@ class ColorSaliencyMap {
             this.height = newHeight;
             this.canvas.width = this.width;
             this.canvas.height = this.height;
+            // Restore context state after resize
+            this.ctx.imageSmoothingEnabled = false;
         }
     }
 
@@ -76,10 +78,12 @@ class ColorSaliencyMap {
         }
 
         // 3. Normalize & Write Output
-        // Also apply center-bias (optional, but common in saliency)
-        // Let's keep it simple for now.
-
         if (maxVal < 0.001) maxVal = 1.0; // Prevent div by zero
+
+        // Debug Log (Throttled)
+        if (Math.random() < 0.01) {
+            console.log(`[ColorSaliencyMap] MaxVal: ${maxVal.toFixed(4)}`);
+        }
 
         for (let i = 0; i < len; i++) {
             // Normalize

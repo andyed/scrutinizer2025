@@ -685,7 +685,20 @@
                         float mask = texture(u_maskTexture, v_texCoord).r;
                         color.rgb = vec3(mask);
                     } else if (debugLevel > 1.5) {
-                        color.rgb = vec3(lgn.saliency);
+                        // Heatmap for Saliency (Blue -> Green -> Red)
+                        // Restored from commit 83e13f1 (User Preference)
+                        float s = lgn.saliency;
+                        vec3 heatmap = vec3(0.0);
+                        
+                        if (s < 0.5) {
+                            // Blue -> Green
+                            heatmap = mix(vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 0.0), s * 2.0);
+                        } else {
+                            // Green -> Red
+                            heatmap = mix(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), (s - 0.5) * 2.0);
+                        }
+
+                        color.rgb = heatmap;
                     } else if (debugLevel > 0.5) {
                         if (lgn.density > 0.0) {
                             color.rgb = mix(color.rgb, vec3(1.0, 0.0, 0.0), 0.3 * lgn.density);
