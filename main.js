@@ -533,6 +533,19 @@ function createScrutinizerWindow(startUrl) {
         return { action: 'deny' };
     });
 
+    // Sync window title with page title
+    const updateTitle = () => {
+        const title = contentView.webContents.getTitle();
+        if (title) win.setTitle(title);
+    };
+
+    contentView.webContents.on('page-title-updated', (event, title) => {
+        if (title) win.setTitle(title);
+    });
+
+    contentView.webContents.on('did-navigate', updateTitle);
+    contentView.webContents.on('did-finish-load', updateTitle);
+
     // Load start URL in the content view
     const urlToLoad = startUrl || currentStartPage || 'https://github.com/andyed/scrutinizer2025?tab=readme-ov-file#what-is-scrutinizer';
     contentView.webContents.loadURL(urlToLoad);
