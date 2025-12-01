@@ -83,7 +83,9 @@ This loop captures the browser content to use as the source texture for the WebG
 3.  **Capture**: `main.js` calls `win.scrutinizerView.webContents.capturePage()`.
 4.  **Send**: `main.js` sends the raw bitmap buffer back via `hud:frame-captured`.
 5.  **Process**: `overlay.js` receives the buffer and calls `Scrutinizer.processFrame`.
-6.  **Upload**: `WebGLRenderer.uploadTexture` uploads the bitmap to the GPU (`u_texture`).
+6.  **Upload**:
+    *   `WebGLRenderer.uploadTexture` uploads the bitmap to the GPU (`u_texture`).
+    *   **Color Correction**: Electron captures are BGRA. The Fragment Shader's `sampleSource` helper handles the BGRA->RGBA swizzle centrally to ensure correct colors.
 
 ---
 
@@ -100,6 +102,20 @@ This loop captures the browser content to use as the source texture for the WebG
     density: Number,// 0.0-1.0 (Visual mass)
     lineHeight: Number // px (For rhythm/wireframe bars)
 }
+```
+
+### Visual Memory Buffer (State)
+```javascript
+// Array of remembered fixation points
+[
+    {
+        x: Number,      // Canvas X
+        y: Number,      // Canvas Y
+        radius: Number, // Foveal radius at capture
+        timestamp: Number // Time of capture
+    },
+    // ...
+]
 ```
 
 ### Structure Map Encoding (RGBA)

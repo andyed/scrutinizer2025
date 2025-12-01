@@ -35,6 +35,9 @@
 
             // Visual Memory
             this.visualMemoryLimit = 0; // 0 = Off, -1 = Infinite, >0 = Count
+            this.visualMemoryBuffer = []; // Array of {x, y, radius, timestamp}
+            this.fixationStartTime = 0;
+            this.isFixating = false;
             this.maskCanvas = document.createElement('canvas');
             this.maskCtx = this.maskCanvas.getContext('2d', { alpha: false }); // No transparency needed, just B&W
             this.maskDirty = true;
@@ -292,84 +295,106 @@
             const useMask = this.enabled && (this.visualMemoryLimit !== 0);
 
             if (useMask) {
-                // 1. Decay Logic
-                // If limit > 0, we decay.
-                // 5 items ~ 1-2s persistence -> faster decay
-                // 10 items ~ 5-10s persistence -> slower decay
-                // Infinite (-1) -> No decay
+                // 1. Fixation Detection
+                // Threshold: < 0.5 px/ms (same as before)
+                // Dwell: > 2000ms
+                const isStable = this.currentVelocity < 0.5;
 
-                if (this.visualMemoryLimit > 0) {
-                    let baseDecay = 0.0;
-                    let interferenceDecay = 0.0;
+                if (isStable) {
+                    if (!this.isFixating) {
+                        this.isFixating = true;
+                        this.fixationStartTime = now;
+                    } else {
+                        const dwellTime = now - this.fixationStartTime;
+                        if (dwellTime > 2000) {
+                            // Confirmed fixation! Add/Update buffer
+                            // Check if we are close to an existing point to update it instead of adding new
+                            // Simple distance check: if within radius/2, update
+                            const existingIndex = this.visualMemoryBuffer.findIndex(p => {
+                                const dx = p.x - this.mouseX;
+                                const dy = p.y - this.mouseY;
+                                return Math.sqrt(dx * dx + dy * dy) < (effectiveRadius / 2);
+                            });
 
-                    if (this.visualMemoryLimit === 5) {
-                        baseDecay = 0.005; // Passive fade (scanning)
-                        interferenceDecay = 0.012; // Active displacement (was 0.025) - More retention
-                    } else if (this.visualMemoryLimit === 10) {
-                        baseDecay = 0.003; // Very slow passive fade (was 0.002)
-                        interferenceDecay = 0.006; // Weak displacement (was 0.004)
+                            if (existingIndex !== -1) {
+                                // Update existing
+                                this.visualMemoryBuffer[existingIndex].x = this.mouseX;
+                                this.visualMemoryBuffer[existingIndex].y = this.mouseY;
+                                this.visualMemoryBuffer[existingIndex].timestamp = now;
+                            } else {
+                                // Add new
+                                this.visualMemoryBuffer.push({
+                                    x: this.mouseX,
+                                    y: this.mouseY,
+                                    radius: effectiveRadius,
+                                    timestamp: now
+                                });
+
+                                // Enforce Limit
+                                if (this.visualMemoryLimit > 0 && this.visualMemoryBuffer.length > this.visualMemoryLimit) {
+                                    // Remove oldest (first element)
+                                    this.visualMemoryBuffer.shift();
+                                }
+                            }
+
+                            // Reset fixation timer to prevent spamming updates? 
+                            // No, we want to keep updating position if it drifts slightly.
+                            // But we don't want to re-add. The distance check handles that.
+                        }
                     }
-
-                    // Calculate effective decay
-                    // If velocity is low (fixation), we are encoding new info, so old info is displaced faster.
-                    let currentDecay = baseDecay;
-                    if (this.currentVelocity < 0.5) { // Same threshold as painting
-                        currentDecay += interferenceDecay;
-                    }
-
-                    // Apply global fade
-                    this.maskCtx.globalCompositeOperation = 'destination-out';
-                    this.maskCtx.fillStyle = `rgba(0, 0, 0, ${currentDecay})`;
-                    this.maskCtx.fillRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
-                }
-
-                // 2. Painting Logic
-                // Infinite (-1): Instant clear, no velocity check
-                // Limited (>0): Dwell-based clear, velocity check (fixation only)
-
-                let brushOpacity = 0.0;
-                let velocityThreshold = 0.0;
-
-                if (this.visualMemoryLimit === -1) {
-                    // Infinite: Permanent memory
-                    brushOpacity = 1.0; // Instant clear
-                    velocityThreshold = Infinity; // Always paint
                 } else {
-                    // Limited: Working Memory simulation
-                    // Increased opacity (0.15 -> 0.35) to make memory impact more visible
-                    // Now requires ~3 frames (~50ms) to reach full clarity
-                    brushOpacity = 0.35;
-                    velocityThreshold = 0.5; // Fixation only
+                    this.isFixating = false;
+                    this.fixationStartTime = 0;
                 }
 
-                if (this.currentVelocity < velocityThreshold) {
-                    // Draw soft white circle on mask at current mouse position
-                    // We need to map main canvas coords to mask canvas coords
-                    const maskScaleX = this.maskCanvas.width / this.canvas.width;
-                    const maskScaleY = this.maskCanvas.height / this.canvas.height;
+                // 2. Render Mask
+                // Clear to black
+                this.maskCtx.fillStyle = 'black';
+                this.maskCtx.fillRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
 
-                    const maskX = this.mouseX * maskScaleX;
-                    const maskY = this.mouseY * maskScaleY;
-                    const maskRadius = effectiveRadius * maskScaleX; // Assume uniform scaling roughly
+                // Draw all points in buffer
+                const maskScaleX = this.maskCanvas.width / this.canvas.width;
+                const maskScaleY = this.maskCanvas.height / this.canvas.height;
 
-                    // Draw "brush" with soft gradient for natural blending
+                this.maskCtx.globalCompositeOperation = 'screen'; // Additive
+
+                for (const point of this.visualMemoryBuffer) {
+                    const maskX = point.x * maskScaleX;
+                    const maskY = point.y * maskScaleY;
+                    const maskRadius = point.radius * maskScaleX;
+
+                    // Draw soft gradient
                     const gradient = this.maskCtx.createRadialGradient(maskX, maskY, 0, maskX, maskY, maskRadius);
-                    gradient.addColorStop(0, `rgba(255, 255, 255, ${brushOpacity})`); // Center
-                    gradient.addColorStop(0.7, `rgba(255, 255, 255, ${brushOpacity * 0.5})`); // Mid
-                    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)'); // Edge (fade out)
+                    gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)'); // Full clarity
+                    gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.5)');
+                    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
 
-
-                    this.maskCtx.globalCompositeOperation = 'screen'; // Additive light (accumulates up to 1.0)
                     this.maskCtx.fillStyle = gradient;
                     this.maskCtx.beginPath();
                     this.maskCtx.arc(maskX, maskY, maskRadius, 0, Math.PI * 2);
                     this.maskCtx.fill();
-
-                    // DEBUG: Log painting (occasionally)
-                    if (Math.random() < 0.01) {
-                        console.log(`[Mask] Painted: pos=(${maskX.toFixed(0)}, ${maskY.toFixed(0)}), radius=${maskRadius.toFixed(0)}, opacity=${brushOpacity}, mode=${this.visualMemoryLimit}`);
-                    }
                 }
+
+                // Also draw CURRENT fovea if not in buffer yet?
+                // The shader handles the current fovea separately (u_mouse), 
+                // but the mask is used to modulate blur.
+                // If useMask is 1.0, the shader uses the mask value.
+                // If the mask is black at u_mouse, the fovea will be blurred!
+                // SO WE MUST DRAW THE CURRENT FOVEA ON THE MASK TOO.
+
+                const maskX = this.mouseX * maskScaleX;
+                const maskY = this.mouseY * maskScaleY;
+                const maskRadius = effectiveRadius * maskScaleX;
+
+                const gradient = this.maskCtx.createRadialGradient(maskX, maskY, 0, maskX, maskY, maskRadius);
+                gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+                gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.5)');
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+
+                this.maskCtx.fillStyle = gradient;
+                this.maskCtx.beginPath();
+                this.maskCtx.arc(maskX, maskY, maskRadius, 0, Math.PI * 2);
+                this.maskCtx.fill();
 
                 // Upload mask to GPU
                 this.renderer.uploadMask(this.maskCanvas);
@@ -500,6 +525,7 @@
 
         resetVisualMemory() {
             console.log('[Scrutinizer] Resetting visual memory mask');
+            this.visualMemoryBuffer = [];
             this.maskCtx.fillStyle = 'black';
             this.maskCtx.fillRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
             this.maskDirty = true;

@@ -43,7 +43,7 @@ The Magno-cellular pathway (motion/luminance) processes information faster than 
 
 ## Related Work & Theoretical Foundation
 
-### Use of Foveal Simulation for Web Design
+### Use of Foveal Simulation for UX Design
 
 
 - **Lagun, D. & Agichtein, E. (2011)**: ["ViewSer: A Tool for Large-Scale Studies of Web Search Result Examination"](http://www.mathcs.emory.edu/~dlagun/pubs/sigir636-lagun.pdf). *CHI 2011*.

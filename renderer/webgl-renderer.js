@@ -154,6 +154,18 @@
                 in vec2 v_texCoord;
                 out vec4 fragColor;
     
+                // === HELPER: SOURCE SAMPLER (The "True View") ===
+                // Centralizes sampling of the source capture to ensure consistent color handling.
+                // Electron captures are BGRA, but WebGL treats them as RGBA.
+                // We MUST swap R and B here to get the correct color.
+                vec4 sampleSource(vec2 uv) {
+                    vec4 col = texture(u_texture, uv);
+                    float temp = col.r;
+                    col.r = col.b;
+                    col.b = temp;
+                    return col;
+                }
+
                 // === NOISE HELPERS ===
                 vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
                 float snoise(vec2 v){
@@ -194,7 +206,7 @@
                 }
     
                 vec4 sampleMongrel(sampler2D tex, vec2 uv, float strength, float intensity, float rhythm) {
-                    if (strength <= 0.01) return texture(tex, uv);
+                    if (strength <= 0.01) return sampleSource(uv);
     
                     // Modulate Y-frequency based on Line Height (rhythm)
                     // rhythm = 0.0 (small/none) -> High Freq (Shimmer)
@@ -221,8 +233,8 @@
     
                     vec2 shatteredUV = uv + vec2(offX, offY);
                     
-                    vec4 clean = texture(tex, shatteredUV);
-                    vec4 ghost = texture(tex, shatteredUV + vec2(0.01 * strength, 0.0));
+                    vec4 clean = sampleSource(shatteredUV);
+                    vec4 ghost = sampleSource(shatteredUV + vec2(0.01 * strength, 0.0));
                     
                     return mix(clean, ghost, 0.3);
                 }
@@ -305,6 +317,7 @@
                         // === SHATTER (Mongrel) ===
                         // Sample using smooth strength
                         // Pass rhythm (structure.r) to modulate frequency
+                        // Note: sampleMongrel now uses sampleSource internally
                         vec4 rawColor = sampleMongrel(u_texture, uv, strength, u_intensity, lgn.rhythm);
                         
                         // Mongrel sampler returns a color, not UVs directly easily.
@@ -410,13 +423,8 @@
 
                 // --- STAGE 3: V4 (Aesthetics) ---
                 vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float dist, float saccadeFactor) {
-                    vec3 col = texture(u_texture, v1.distortedUV).rgb;
-                    
-                    // Fix BGRA input (Electron capture is BGRA)
-                    // Always swap R and B to get correct RGBA.
-                    vec3 temp = col;
-                    col.r = temp.b;
-                    col.b = temp.r;
+                    // Use sampleSource for correct color
+                    vec3 col = sampleSource(v1.distortedUV).rgb;
                     
                     // === ARCHITECTURAL GUARANTEE: FOVEA PROTECTION ===
                     // The fovea must remain 100% authentic to the source.
@@ -605,13 +613,11 @@
                         }
                         
                         if (maskVal > 0.99) {
-                            vec4 clearColor = texture(u_texture, uv);
+                            // Use sampleSource for guaranteed correct color
+                            vec4 clearColor = sampleSource(uv);
                             color.rgb = clearColor.rgb;
-                            // Fix BGRA if needed (texture usually returns correct RGB, but if we swizzled before...)
-                            // Actually texture() returns RGB. Our V4 swizzles for Shatter.
-                            // Let's assume clearColor is correct RGB.
                         } else if (maskVal > 0.0) {
-                            vec4 clearColor = texture(u_texture, uv);
+                            vec4 clearColor = sampleSource(uv);
                             color.rgb = mix(color.rgb, clearColor.rgb, maskVal);
                         }
                     }

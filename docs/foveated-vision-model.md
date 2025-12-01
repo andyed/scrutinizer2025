@@ -412,3 +412,24 @@ The "Interpreter" stage determines *what* the final pixel looks like.
 
 ### Saccadic Suppression
 To prevent distracting "shimmering" during rapid eye movements, the renderer tracks mouse velocity. When velocity exceeds a threshold (>4000px/s), the V4 stage washes out the periphery, mimicking the brain's natural suppression of visual input during saccades.
+
+### Architectural Guarantee: Foveal Integrity
+The pipeline enforces a strict "Do No Harm" policy for the fovea.
+-   **Hard Bypass**: Pixels within `dist < 0.25` are strictly excluded from V1 distortion and V4 aesthetic processing.
+-   **True Color Sampling**: A centralized `sampleSource(uv)` helper ensures that the fovea (and any "clear" view) always receives the raw, correctly color-swizzled (BGRA->RGBA) image from the capture buffer. This prevents accidental color shifts or darkening in the critical vision area.
+
+---
+
+## 12. Visual Memory (Persistence)
+
+To simulate the brain's ability to "hold" visual information, Scrutinizer implements a **Visual Memory** system.
+
+### Mechanics
+-   **Dwell Activation**: When the user fixates (velocity < 0.5 px/ms) on a spot for >2000ms, that region is "committed" to memory.
+-   **Buffer System**: Remembered spots are stored in a FIFO buffer (`visualMemoryBuffer`).
+-   **Capacity**: The buffer size is configurable (`visualMemoryLimit`). When full, the oldest memory fades out.
+-   **Rendering**:
+    -   The buffer is rendered to a **Visual Memory Mask** (`u_maskTexture`).
+    -   This mask is used in the fragment shader to mix between the processed peripheral view and the clear source image.
+    -   **Blend Mode**: `Screen` blending is used to accumulate memories, ensuring that overlapping memories remain visible and don't darken each other.
+
