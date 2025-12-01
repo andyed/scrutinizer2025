@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Saliency Map Test</title>
+    <style>
+        body { margin: 0; background: #333; color: white; font-family: sans-serif; }
+        canvas { display: block; margin: 20px auto; border: 1px solid #555; }
+        #controls { text-align: center; padding: 20px; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <h2>Saliency Map Test</h2>
+        <p>This test loads an image, computes saliency, and displays the debug view.</p>
+        <button onclick="runTest()">Run Test</button>
+        <div id="status">Ready</div>
+    </div>
+    <canvas id="overlay-canvas" width="800" height="600"></canvas>
+
+    <script>
+        // Mock Electron IPC
+        window.require = (name) => {
+            if (name === 'electron') return { ipcRenderer: { on: () => {} } };
+            if (name === './logger') return { log: console.log, error: console.error, warn: console.warn };
+            if (name === './webgl-renderer') return WebGLRenderer;
+            if (name === './color-saliency-map.js') return ColorSaliencyMap;
+            return {};
+        };
+
+        // Load dependencies (simulated)
+        // We need to inline or load the scripts. Since we can't easily load local modules in browser without build,
+        // we will rely on the user running this in an environment where these are available or mocked.
+        // Actually, for a standalone test, I should probably inline the minimal logic or use the existing files if possible.
+        // But since I can't easily run a build step here, I'll assume the user runs this via Electron or I'll inline the classes.
+        
+        // For now, I'll just create a simple test that tries to use the existing renderer if loaded, 
+        // or just logs instructions.
+        // Wait, I can't really run this test without the modules.
+        // I'll create a test that assumes the app environment.
+    </script>
+    <script src="../renderer/webgl-renderer.js"></script>
+    <script src="../renderer/color-saliency-map.js"></script>
+    <script>
+        async function runTest() {
+            const canvas = document.getElementById('overlay-canvas');
+            const status = document.getElementById('status');
+            
+            try {
+                status.textContent = "Initializing...";
+                const renderer = new WebGLRenderer(canvas);
+                const saliencyMap = new ColorSaliencyMap();
+                
+                // Create a test image (gradient + shapes)
+                const imgCanvas = document.createElement('canvas');
+                imgCanvas.width = 800;
+                imgCanvas.height = 600;
+                const ctx = imgCanvas.getContext('2d');
+                
+                // Background
+                ctx.fillStyle = '#444';
+                ctx.fillRect(0, 0, 800, 600);
+                
+                // Red square (High Saliency)
+                ctx.fillStyle = 'red';
+                ctx.fillRect(100, 100, 200, 200);
+                
+                // Blue circle
+                ctx.beginPath();
+                ctx.arc(600, 400, 100, 0, Math.PI*2);
+                ctx.fillStyle = 'blue';
+                ctx.fill();
+                
+                // Compute Saliency
+                status.textContent = "Computing Saliency...";
+                saliencyMap.resize(800, 600);
+                saliencyMap.computeFromImage(imgCanvas);
+                
+                // Upload
+                status.textContent = "Uploading...";
+                const imageData = ctx.getImageData(0, 0, 800, 600);
+                renderer.uploadTexture(imageData);
+                renderer.uploadSaliencyMap(saliencyMap.getCanvas());
+                
+                // Render with Debug Mode
+                status.textContent = "Rendering...";
+                renderer.render(
+                    800, 600, 
+                    400, 300, // Mouse center
+                    100, 1.33, // Radius, Aspect
+                    0.5, 0.0, // Intensity, CA
+                    0.0, // Debug Boundary
+                    2.0, // Debug Structure (SALIENCY MODE)
+                    0.0, 0, 0, 0, 400, 300, 0, 1.0, 0 // Other args
+                );
+                
+                status.textContent = "Done! Check if you see the saliency map (Red square should be bright).";
+                
+            } catch (e) {
+                console.error(e);
+                status.textContent = "Error: " + e.message;
+            }
+        }
+    </script>
+</body>
+</html>
