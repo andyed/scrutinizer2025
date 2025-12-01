@@ -348,6 +348,8 @@
                 }
 
                 // 2. Render Mask
+                // Reset composite operation to ensure we actually clear the canvas
+                this.maskCtx.globalCompositeOperation = 'source-over';
                 // Clear to black
                 this.maskCtx.fillStyle = 'black';
                 this.maskCtx.fillRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
@@ -526,6 +528,7 @@
         resetVisualMemory() {
             console.log('[Scrutinizer] Resetting visual memory mask');
             this.visualMemoryBuffer = [];
+            this.maskCtx.globalCompositeOperation = 'source-over';
             this.maskCtx.fillStyle = 'black';
             this.maskCtx.fillRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
             this.maskDirty = true;
