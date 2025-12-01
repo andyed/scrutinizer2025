@@ -422,7 +422,7 @@
                 }
 
                 // --- STAGE 3: V4 (Aesthetics) ---
-                vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float dist, float saccadeFactor) {
+                vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float saccadeFactor) {
                     // Use sampleSource for correct color
                     vec3 col = sampleSource(v1.distortedUV).rgb;
                     
@@ -443,29 +443,83 @@
                     float bypassTransition = smoothstep(0.25, 0.35, dist);
 
                     if (config.v4_style_id == 0) { // High-Key (Now: Desaturated)
+                        
+                        // === CHROMATIC ABERRATION (CA) ===
+                        // User Formula: distDithered = dist + noise * 0.3
+                        // caStrength = smoothstep(periphery_start, periphery_start + 0.25, distDithered)
+                        
+                        // === SALIENCY DAMPENING (Partial Protection) ===
+                        // High saliency/structure gets LESS desaturation/CA, but not zero.
+                        // We mix from 1.0 (full effect) to 0.85 (high effect) based on protection level.
+                        // Was 0.5, which let too much color through for thumbnails.
+                        float protection = max(lgn.saliency, lgn.density);
+                        float dampener = mix(1.0, 0.85, protection);
+                        
+                        // Combined Strength Multiplier
+                        // Controlled by global intensity slider AND local saliency
+                        // REMAPPED: Desaturation reaches full strength at 0.6 intensity
+                        // This ensures strong "Rod Vision" even at moderate distortion levels.
+                        float desatIntensity = smoothstep(0.0, 0.6, u_intensity);
+                        float strengthMult = desatIntensity * dampener;
+
+                        float noiseVal = (rand(uv) - 0.5);
+                        float distDithered = dist + noiseVal * 0.3;
+                        
+                        // Recalculate periphery_start (radius_norm * 1.2)
+                        float periphery_start = fovea_radius * 1.2;
+                        
+                        float caFactor = smoothstep(periphery_start, periphery_start + 0.25, distDithered);
+                        
+                        // Apply Strength Modulation to CA
+                        caFactor *= strengthMult;
+                        
+                        // Apply CA if factor > 0
+                        if (caFactor > 0.01) {
+                            // Use ungated factor for CA strength too, or just the calculated caFactor
+                            // Let's use caFactor directly as it's distance based.
+                            float offset = 0.005 * caFactor; 
+                            vec2 caOffset = vec2(offset, 0.0); 
+                            
+                            col.r = sampleSource(v1.distortedUV + caOffset).r;
+                            col.b = sampleSource(v1.distortedUV - caOffset).b;
+                        }
+
+                        // === ROD VISION AESTHETIC ===
+                        // 1. Base Luma (Monochrome)
                         float luma = dot(col, vec3(0.299, 0.587, 0.114));
-                        vec3 gray = vec3(luma);
                         
-                        // User Request: "not dim the periphery just desaturate"
-                        // Previously we mixed with targetWhite, which lightened the periphery,
-                        // making the original fovea look dark by comparison.
-                        // Now we just desaturate.
+                        // 2. Contrast Boost
+                        // Rods have high contrast sensitivity.
+                        // Simple S-curve or linear boost.
+                        float contrast = 1.2;
+                        float lumaContrast = (luma - 0.5) * contrast + 0.5;
+                        lumaContrast = clamp(lumaContrast, 0.0, 1.0);
                         
-                        vec3 ghostColor = gray; // Pure desaturation
+                        // 3. Eigengrau Tint (Cold Dark Blue)
+                        // "Darker regions shifted towards dark blue-grey"
+                        // We map black (0.0) to Eigengrau, and white (1.0) to White.
+                        vec3 eigengrau = vec3(0.02, 0.02, 0.1); // Deep cold blue
+                        vec3 rodColor = mix(eigengrau, vec3(1.0), lumaContrast);
                         
-                        // Optional: Very subtle lift to keep it "High Key" but not overpowering
-                        // ghostColor = mix(ghostColor, vec3(0.9), 0.1); 
+                        // 4. Grain
+                        // High-frequency noise
+                        float grainStrength = 0.08;
+                        rodColor += noiseVal * grainStrength;
                         
-                        float noise = (rand(uv) - 0.5) * 0.05;
-                        ghostColor += noise;
+                        // === DECOUPLED DESATURATION ===
+                        // Calculate desaturation strength purely based on distance, IGNORING LGN gating.
+                        // This ensures "Rod Vision" applies to everything in the periphery (including Reddit logo).
+                        float rampEnd = fovea_radius * config.lgn_ramp_end_mult;
+                        float desaturationFactor = smoothstep(fovea_radius, rampEnd, dist);
                         
-                        // Luma Mask: Only apply "Ghosting" to lighter tones.
-                        // Deep blacks (luma < 0.2) should remain black.
-                        float lumaMask = smoothstep(0.1, 0.4, luma);
+                        // Apply Strength Modulation to Desaturation
+                        desaturationFactor *= strengthMult;
                         
-                        // Apply effect based on Luma Mask AND Bypass Transition
-                        // Luma Mask (0.1-0.4) protects deep blacks.
-                        vec3 finalColor = mix(col, ghostColor, effectFactor * 0.95 * lumaMask * bypassTransition);
+                        // Apply effect based on Bypass Transition AND the new independent factor
+                        // We combine them: bypassTransition handles the smooth start from 0.25
+                        // desaturationFactor handles the ramp over the periphery.
+                        
+                        vec3 finalColor = mix(col, rodColor, desaturationFactor * bypassTransition);
                         return finalColor;
                         
                     } else if (config.v4_style_id == 1) { // Lab
@@ -594,7 +648,7 @@
                     
                     // 3. V4: Aesthetics
                     float saccadeFactor = smoothstep(4.0, 10.0, u_velocity);
-                    vec3 finalRGB = processV4(uv, v1, lgn, config, dist, saccadeFactor);
+                    vec3 finalRGB = processV4(uv, v1, lgn, config, dist, fovea_radius, saccadeFactor);
                     
                     // --- POST-PROCESSING (Rod Vision, Masking, Debug) ---
                     
@@ -852,7 +906,7 @@
                     v1_distortion_type: 1, // Shatter
                     v1_strength_mult: 1.0,
                     v4_style_id: 0,
-                    lgn_ramp_end_mult: 3.0,
+                    lgn_ramp_end_mult: 2.0, // Was 3.0. Tightened to make desaturation reach full strength sooner.
                     v1_animate: false
                 };
 
