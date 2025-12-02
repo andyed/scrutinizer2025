@@ -653,6 +653,121 @@
             window.performance.now = memOriginalNow;
 
             ipcRenderer.send('log', 'Test 11 Passed: Infinite Memory screenshot generated');
+
+            // --- TEST 12: Memory Integrity (Source Match) ---
+            ipcRenderer.send('log', 'Starting Test 12: Memory Integrity (Source Match)');
+
+            // 1. Setup High Distortion Config
+            const integrityConfig = {
+                fovealRadius: 100,
+                intensity: 1.0, // Max distortion
+                maskSmoothness: 1.0,
+                visualMemoryLimit: 2, // Need 2 to hold center + current pos
+                debugBoundary: 0,
+                mongrelMode: 1, // Shatter mode (high geometric noise)
+                aestheticMode: 0
+            };
+
+            const intScrutinizer = new window.Scrutinizer(integrityConfig);
+            intScrutinizer.enable();
+
+            // Mock Time
+            let intVirtualTime = 40000;
+            window.performance.now = () => intVirtualTime;
+            intScrutinizer.lastRenderTime = intVirtualTime;
+
+            // Upload texture
+            const intPatternData = new ImageData(patternBuffer, width, height);
+            intScrutinizer.renderer.uploadTexture(intPatternData);
+
+            // 2. Create Memory at Center
+            // Dwell for 2.5s to burn in memory
+            const simulateIntDwell = (duration, x, y) => {
+                const step = 16;
+                const steps = duration / step;
+                intScrutinizer.mouseX = x; intScrutinizer.mouseY = y;
+                intScrutinizer.targetMouseX = x; intScrutinizer.targetMouseY = y;
+                intScrutinizer.lastMouseX = x; intScrutinizer.lastMouseY = y;
+                intScrutinizer.currentVelocity = 0;
+                for (let i = 0; i < steps; i++) {
+                    intVirtualTime += step;
+                    intScrutinizer.render();
+                }
+            };
+
+            simulateIntDwell(2500, 400, 300);
+
+            // 3. Move Away (to expose the memory bubble)
+            // Move to top-left so center is in periphery but remembered
+            intScrutinizer.currentVelocity = 50.0;
+            intVirtualTime += 16;
+            intScrutinizer.render();
+
+            intScrutinizer.mouseX = 100; intScrutinizer.mouseY = 100;
+            intScrutinizer.targetMouseX = 100; intScrutinizer.targetMouseY = 100;
+            intScrutinizer.lastMouseX = 100; intScrutinizer.lastMouseY = 100;
+            intScrutinizer.currentVelocity = 0;
+
+            // Render a few frames to settle
+            for (let i = 0; i < 10; i++) {
+                intVirtualTime += 16;
+                intScrutinizer.render();
+            }
+
+            // 4. Capture & Verify
+            // We want to check the center (400, 300) which should be remembered.
+            // It should match the source pattern EXACTLY.
+
+            const gl = intScrutinizer.renderer.gl;
+            const pixels = new Uint8Array(width * height * 4);
+            gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+            // Check a 10x10 block in the center
+            let diffCount = 0;
+            let totalPixels = 0;
+            const centerX = 400;
+            const centerY = 300; // In WebGL y is flipped? No, readPixels is bottom-up usually, but let's check center so it's safe.
+            // Actually, readPixels 0,0 is bottom-left. Canvas 0,0 is top-left.
+            // But our pattern is generated in JS (top-left 0,0).
+            // Let's just compare pixel values. 
+            // The source patternBuffer is RGBA.
+
+            // NOTE: WebGL readPixels returns bottom-to-top rows.
+            // We need to flip Y to match patternBuffer (which is top-to-bottom).
+
+            for (let y = centerY - 5; y < centerY + 5; y++) {
+                for (let x = centerX - 5; x < centerX + 5; x++) {
+                    // Source Index (Top-Down)
+                    const srcIdx = (y * width + x) * 4;
+
+                    // WebGL Index (Bottom-Up)
+                    const glY = height - 1 - y;
+                    const glIdx = (glY * width + x) * 4;
+
+                    const rSrc = patternBuffer[srcIdx];
+                    const gSrc = patternBuffer[srcIdx + 1];
+                    const bSrc = patternBuffer[srcIdx + 2];
+
+                    const rGl = pixels[glIdx];
+                    const gGl = pixels[glIdx + 1];
+                    const bGl = pixels[glIdx + 2];
+
+                    // Allow small tolerance for compression/rounding (though should be 0 for exact match)
+                    if (Math.abs(rSrc - rGl) > 2 || Math.abs(gSrc - gGl) > 2 || Math.abs(bSrc - bGl) > 2) {
+                        if (diffCount === 0) {
+                            ipcRenderer.send('log', `[Test 12 Debug] Mismatch at ${x},${y} (GL Y: ${glY}): Src=[${rSrc},${gSrc},${bSrc}] vs GL=[${rGl},${gGl},${bGl}]`);
+                        }
+                        diffCount++;
+                    }
+                    totalPixels++;
+                }
+            }
+
+            if (diffCount > 0) {
+                throw new Error(`Integrity Check Failed: ${diffCount}/${totalPixels} pixels mismatched in memory bubble.`);
+            }
+
+            ipcRenderer.send('log', 'Test 12 Passed: Memory Integrity Verified (0 mismatches)');
             ipcRenderer.send('test-result', { success: true, message: 'All visual tests passed' });
 
         } catch (err) {

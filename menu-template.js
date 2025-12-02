@@ -164,8 +164,9 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     accelerator: process.platform === 'darwin' ? 'Cmd+Left' : 'Alt+Left',
                     click: () => {
                         const win = BrowserWindow.getFocusedWindow();
-                        if (win && win.scrutinizerView) {
-                            win.scrutinizerView.webContents.goBack();
+                        if (win && win.scrutinizerHud) {
+                            // Send IPC to use the debounced navigation handler
+                            win.scrutinizerHud.webContents.send('menu:navigate-back');
                         }
                     }
                 },
@@ -174,8 +175,9 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     accelerator: process.platform === 'darwin' ? 'Cmd+Right' : 'Alt+Right',
                     click: () => {
                         const win = BrowserWindow.getFocusedWindow();
-                        if (win && win.scrutinizerView) {
-                            win.scrutinizerView.webContents.goForward();
+                        if (win && win.scrutinizerHud) {
+                            // Send IPC to use the debounced navigation handler
+                            win.scrutinizerHud.webContents.send('menu:navigate-forward');
                         }
                     }
                 },

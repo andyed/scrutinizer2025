@@ -298,7 +298,8 @@
                 }
 
                 // --- STAGE 2: V1 (Geometry & Distortion) ---
-                V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float parafovea_radius, bool isFarPeriphery, bool isParafovea) {
+                // --- STAGE 2: V1 (Geometry & Distortion) ---
+                V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float parafovea_radius, bool isFarPeriphery, bool isParafovea, float memoryStrength) {
                     V1_Signal signal;
                     signal.distortedUV = uv;
                     signal.distortionStrength = 0.0;
@@ -309,6 +310,13 @@
                     // Far Periphery (>8°): Aggressive scatter and dissolution
                     float eccentricityScale = isFarPeriphery ? 1.0 : 0.15; // 85% reduction in parafovea
                     float strength = lgn.suppressionFactor * config.v1_strength_mult * eccentricityScale;
+                    
+                    // VISUAL MEMORY MODULATION
+                    // If this area is remembered (memoryStrength > 0), we must reduce distortion
+                    // to ensure the underlying geometry aligns with the clear overlay.
+                    // memoryStrength 1.0 -> strength 0.0
+                    strength *= (1.0 - memoryStrength);
+                    
                     signal.distortionStrength = strength;
                     
                     if (config.v1_distortion_type == 2) {
@@ -700,11 +708,23 @@
 
                     // --- PIPELINE EXECUTION ---
                     
+                    // 0. Early Mask Sampling (Visual Memory)
+                    // We need this for LGN gating AND V1 modulation
+                    float memoryStrength = 0.0;
+                    if (u_useMask > 0.5) {
+                        float rawMask = texture(u_maskTexture, v_texCoord).r;
+                        // Apply gain to snap to 1.0 (anti-ghosting)
+                        memoryStrength = smoothstep(0.0, 0.5, rawMask);
+                    }
+
                     // 1. LGN: Analysis & Gating
+                    // Pass memoryStrength to LGN (we'll need to update the struct/function signature or just pass it)
+                    // Actually, let's just pass it to V1 directly since it's a geometric constraint.
                     LGN_Signal lgn = processLGN(uv, config, dist, fovea_radius);
                     
                     // 2. V1: Geometry
-                    V1_Signal v1 = processV1(uv, uv_corrected, lgn, config, dist_stable, fovea_radius, parafovea_radius, isFarPeriphery, isParafovea);
+                    // Modulate V1 with memoryStrength to prevent "unremembering" (discontinuity)
+                    V1_Signal v1 = processV1(uv, uv_corrected, lgn, config, dist_stable, fovea_radius, parafovea_radius, isFarPeriphery, isParafovea, memoryStrength);
                     
                     // 3. V4: Aesthetics
                     float saccadeFactor = smoothstep(4.0, 10.0, u_velocity);
@@ -720,19 +740,16 @@
                     bool isScrollbar = distFromRightEdge < scrollbarWidth;
                     
                     if (!isScrollbar) {
-                        // Visual Memory Mask
-                        float maskVal = 0.0;
-                        if (u_useMask > 0.5) {
-                            maskVal = texture(u_maskTexture, v_texCoord).r;
-                        }
-                        
-                        if (maskVal > 0.99) {
+                        // Visual Memory Mask (Post-Process Overlay)
+                        // We still overlay the clear image to ensure pixel-perfect clarity,
+                        // but now the underlying distortion (v1) should align with it.
+                        if (memoryStrength > 0.99) {
                             // Use sampleSource for guaranteed correct color
                             vec4 clearColor = sampleSource(uv);
                             color.rgb = clearColor.rgb;
-                        } else if (maskVal > 0.0) {
+                        } else if (memoryStrength > 0.0) {
                             vec4 clearColor = sampleSource(uv);
-                            color.rgb = mix(color.rgb, clearColor.rgb, maskVal);
+                            color.rgb = mix(color.rgb, clearColor.rgb, memoryStrength);
                         }
                     }
                     

@@ -308,16 +308,21 @@
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             // Simple moving average for velocity to smooth out jitter
-            // Adaptive smoothing:
-            // - If moving (instant > 1.0): High smoothing (0.95) to prevent jitter/false stops
-            // - If stopped (instant < 1.0): Low smoothing (0.5) to detect stop immediately
             const instantVelocity = dt > 0 ? dist / dt : 0;
 
-            if (instantVelocity < 1.0) {
-                this.currentVelocity = this.currentVelocity * 0.5 + instantVelocity * 0.5;
-            } else {
-                this.currentVelocity = this.currentVelocity * 0.95 + instantVelocity * 0.05;
-            }
+            // Adaptive smoothing (Time-based)
+            // We want consistent behavior regardless of FPS
+            // Target: 95% smoothing at 60fps (16ms) -> alpha ~0.05
+            // Formula: current = lerp(current, instant, 1 - exp(-decay * dt))
+
+            // Decay constants tuned for 60fps equivalent
+            const decayMove = 0.003; // Slow adaptation (stable)
+            const decayStop = 0.04;  // Fast adaptation (snappy stop)
+
+            const decay = instantVelocity < 1.0 ? decayStop : decayMove;
+            const alpha = 1.0 - Math.exp(-decay * dt);
+
+            this.currentVelocity = this.currentVelocity + (instantVelocity - this.currentVelocity) * alpha;
 
             this.lastMouseX = this.mouseX;
             this.lastMouseY = this.mouseY;

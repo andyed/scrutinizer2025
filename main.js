@@ -114,12 +114,33 @@ ipcMain.on('window:create', (event, url) => {
     createScrutinizerWindow(url);
 });
 
+// Navigation debounce to prevent double-firing (e.g., keyboard + button click)
+const navigationDebounce = new Map(); // Map of window ID -> timestamp
+const NAVIGATION_DEBOUNCE_MS = 300;
+
+const canNavigate = (windowId, direction) => {
+    const key = `${windowId}-${direction}`;
+    const now = Date.now();
+    const lastNavTime = navigationDebounce.get(key) || 0;
+    
+    if (now - lastNavTime < NAVIGATION_DEBOUNCE_MS) {
+        console.log(`[Main] Debouncing ${direction} navigation (${now - lastNavTime}ms since last)`);
+        return false;
+    }
+    
+    navigationDebounce.set(key, now);
+    return true;
+};
+
 // Navigation IPC handlers from HUD window
 ipcMain.on('hud:navigate:back', (event) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
     if (win && win.scrutinizerView) {
-        win.scrutinizerView.webContents.goBack();
+        if (canNavigate(win.id, 'back')) {
+            console.log('[Main] Navigating back (from HUD IPC)');
+            win.scrutinizerView.webContents.goBack();
+        }
     }
 });
 
@@ -128,7 +149,10 @@ ipcMain.on('navigate:back', (event) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
     if (win && win.scrutinizerView) {
-        win.scrutinizerView.webContents.goBack();
+        if (canNavigate(win.id, 'back')) {
+            console.log('[Main] Navigating back (from legacy IPC)');
+            win.scrutinizerView.webContents.goBack();
+        }
     }
 });
 
@@ -136,7 +160,10 @@ ipcMain.on('hud:navigate:forward', (event) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
     if (win && win.scrutinizerView) {
-        win.scrutinizerView.webContents.goForward();
+        if (canNavigate(win.id, 'forward')) {
+            console.log('[Main] Navigating forward (from HUD IPC)');
+            win.scrutinizerView.webContents.goForward();
+        }
     }
 });
 
@@ -145,7 +172,10 @@ ipcMain.on('navigate:forward', (event) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
     if (win && win.scrutinizerView) {
-        win.scrutinizerView.webContents.goForward();
+        if (canNavigate(win.id, 'forward')) {
+            console.log('[Main] Navigating forward (from legacy IPC)');
+            win.scrutinizerView.webContents.goForward();
+        }
     }
 });
 
@@ -347,16 +377,18 @@ ipcMain.on('keydown', (event, keyEvent) => {
     const isMac = process.platform === 'darwin';
     const cmdOrCtrl = isMac ? metaKey : ctrlKey;
 
-    // Navigation: Back / Forward
+    // Navigation: Back / Forward (with debouncing)
     if (code === 'ArrowLeft' && (cmdOrCtrl || altKey)) {
-        if (win.scrutinizerView) {
+        if (win.scrutinizerView && canNavigate(win.id, 'back')) {
+            console.log('[Main] Navigating back (from keyboard shortcut)');
             win.scrutinizerView.webContents.goBack();
         }
         return;
     }
 
     if (code === 'ArrowRight' && (cmdOrCtrl || altKey)) {
-        if (win.scrutinizerView) {
+        if (win.scrutinizerView && canNavigate(win.id, 'forward')) {
+            console.log('[Main] Navigating forward (from keyboard shortcut)');
             win.scrutinizerView.webContents.goForward();
         }
         return;
@@ -505,30 +537,32 @@ function createScrutinizerWindow(startUrl) {
     // Reset visual memory on navigation
     contentView.webContents.on('did-start-navigation', (event, url, isInPlace, isMainFrame) => {
         if (isMainFrame && !isInPlace) {
-            console.log('[Main] Top-level navigation started, resetting visual memory');
+            console.log('[Main] Navigation started:', url);
             if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
                 hudWindow.webContents.send('hud:reset-visual-memory');
             }
         } else {
-            console.log('[Main] In-page/Frame navigation ignored for memory reset');
+            console.log('[Main] In-page navigation (ignored for memory reset):', url);
         }
     });
 
     // Forward navigation events to update HUD URL bar
-    const sendUrlUpdate = (url) => {
+    const sendUrlUpdate = (url, eventType) => {
+        console.log(`[Main] ${eventType}: ${url}`);
         if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
             hudWindow.webContents.send('hud:browser:did-navigate', url);
             hudWindow.webContents.send('browser:did-navigate', url); // Legacy
         }
     };
 
+    // Only listen to did-navigate for main frame navigations
+    // did-navigate-in-page is for hash changes and single-page app navigations
     contentView.webContents.on('did-navigate', (event, url) => {
-        sendUrlUpdate(url);
+        sendUrlUpdate(url, 'did-navigate');
     });
 
-    contentView.webContents.on('did-navigate-in-page', (event, url) => {
-        sendUrlUpdate(url);
-    });
+    // Note: Removed did-navigate-in-page listener to avoid duplicate URL updates
+    // Hash changes and SPA navigations are handled by did-navigate
 
     // Intercept target="_blank" links
     contentView.webContents.setWindowOpenHandler(({ url }) => {

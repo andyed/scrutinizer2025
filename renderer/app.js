@@ -147,6 +147,15 @@ document.addEventListener('DOMContentLoaded', () => {
         ipcRenderer.send('overlay:set-radius', radius);
     });
 
+    // Menu navigation handlers (use debounced IPC)
+    ipcRenderer.on('menu:navigate-back', () => {
+        ipcRenderer.send('navigate:back');
+    });
+
+    ipcRenderer.on('menu:navigate-forward', () => {
+        ipcRenderer.send('navigate:forward');
+    });
+
 
     console.log('Scrutinizer initialized');
 });
