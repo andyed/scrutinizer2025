@@ -394,12 +394,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     click: () => sendToOverlays('menu:set-visual-memory', 0)
                                 },
                                 {
-                                    label: 'Limited (5 items)',
+                                    label: 'Limited (5 fixations)',
                                     type: 'radio',
                                     click: () => sendToOverlays('menu:set-visual-memory', 5)
                                 },
                                 {
-                                    label: 'Extended (10 items)',
+                                    label: 'Extended (10 fixations)',
                                     type: 'radio',
                                     click: () => sendToOverlays('menu:set-visual-memory', 10)
                                 },

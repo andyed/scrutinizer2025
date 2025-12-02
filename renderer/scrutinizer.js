@@ -39,7 +39,7 @@
             this.fixationStartTime = 0;
             this.isFixating = false;
             this.maskCanvas = document.createElement('canvas');
-            this.maskCtx = this.maskCanvas.getContext('2d', { alpha: false }); // No transparency needed, just B&W
+            this.maskCtx = this.maskCanvas.getContext('2d', { alpha: true }); // Enable alpha for proper blending
             this.maskDirty = true;
 
             // Velocity tracking for fixation detection
@@ -282,9 +282,16 @@
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             // Simple moving average for velocity to smooth out jitter
-            // Reduced smoothing to 0.8 for faster response to stops
+            // Adaptive smoothing:
+            // - If moving (instant > 1.0): High smoothing (0.95) to prevent jitter/false stops
+            // - If stopped (instant < 1.0): Low smoothing (0.5) to detect stop immediately
             const instantVelocity = dt > 0 ? dist / dt : 0;
-            this.currentVelocity = this.currentVelocity * 0.8 + instantVelocity * 0.2;
+
+            if (instantVelocity < 1.0) {
+                this.currentVelocity = this.currentVelocity * 0.5 + instantVelocity * 0.5;
+            } else {
+                this.currentVelocity = this.currentVelocity * 0.95 + instantVelocity * 0.05;
+            }
 
             this.lastMouseX = this.mouseX;
             this.lastMouseY = this.mouseY;
@@ -300,9 +307,13 @@
 
             if (useMask) {
                 // 1. Fixation Detection
-                // Threshold: < 2.0 px/ms (relaxed from 0.5)
-                // Dwell: > 1000ms (reduced from 2000ms)
-                const isStable = this.currentVelocity < 2.0;
+                // Threshold: < 20.0 px/ms (relaxed to allow slow reading motion)
+                // Dwell: > 50ms (very snappy accumulation)
+                // Bounds Check: Must be strictly inside the canvas
+                const isInside = this.mouseX > 0 && this.mouseX < this.canvas.width &&
+                    this.mouseY > 0 && this.mouseY < this.canvas.height;
+
+                const isStable = isInside && (this.currentVelocity < 20.0);
 
                 if (isStable) {
                     if (!this.isFixating) {
@@ -311,7 +322,7 @@
                         // console.log('[Scrutinizer] Fixation started');
                     } else {
                         const dwellTime = now - this.fixationStartTime;
-                        if (dwellTime > 1000) {
+                        if (dwellTime > 50) {
                             // Confirmed fixation! Add/Update buffer
                             // Check if we are close to an existing point to update it instead of adding new
                             // Simple distance check: if within radius/2, update
@@ -362,17 +373,16 @@
                 }
 
                 // 2. Render Mask
-                // Reset composite operation to ensure we actually clear the canvas
+                // Reset composite operation
                 this.maskCtx.globalCompositeOperation = 'source-over';
-                // Clear to black
-                this.maskCtx.fillStyle = 'black';
-                this.maskCtx.fillRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
+                // Clear to transparent black
+                this.maskCtx.clearRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
 
                 // Draw all points in buffer
                 const maskScaleX = this.maskCanvas.width / this.canvas.width;
                 const maskScaleY = this.maskCanvas.height / this.canvas.height;
 
-                this.maskCtx.globalCompositeOperation = 'screen'; // Additive
+                this.maskCtx.globalCompositeOperation = 'screen'; // Additive blending for white spots
 
                 for (const point of this.visualMemoryBuffer) {
                     const maskX = point.x * maskScaleX;
@@ -382,7 +392,7 @@
                     // Draw soft gradient
                     const gradient = this.maskCtx.createRadialGradient(maskX, maskY, 0, maskX, maskY, maskRadius);
                     gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)'); // Full clarity
-                    gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.5)');
+                    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.5)');
                     gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
 
                     this.maskCtx.fillStyle = gradient;
@@ -391,26 +401,25 @@
                     this.maskCtx.fill();
                 }
 
-                // Also draw CURRENT fovea if not in buffer yet?
-                // The shader handles the current fovea separately (u_mouse), 
-                // but the mask is used to modulate blur.
-                // If useMask is 1.0, the shader uses the mask value.
-                // If the mask is black at u_mouse, the fovea will be blurred!
-                // SO WE MUST DRAW THE CURRENT FOVEA ON THE MASK TOO.
-
+                // Also draw CURRENT fovea
                 const maskX = this.mouseX * maskScaleX;
                 const maskY = this.mouseY * maskScaleY;
                 const maskRadius = effectiveRadius * maskScaleX;
 
                 const gradient = this.maskCtx.createRadialGradient(maskX, maskY, 0, maskX, maskY, maskRadius);
                 gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
-                gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.5)');
+                gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.5)');
                 gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
 
                 this.maskCtx.fillStyle = gradient;
                 this.maskCtx.beginPath();
                 this.maskCtx.arc(maskX, maskY, maskRadius, 0, Math.PI * 2);
                 this.maskCtx.fill();
+
+                // Debug: Log mask drawing occasionally
+                if (Math.random() < 0.01) {
+                    console.log(`[Scrutinizer] Drawing mask at (${maskX.toFixed(1)}, ${maskY.toFixed(1)}), Radius: ${maskRadius.toFixed(1)}`);
+                }
 
                 // Upload mask to GPU
                 this.renderer.uploadMask(this.maskCanvas);

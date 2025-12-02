@@ -1046,6 +1046,12 @@
                 gl.uniform1f(this.debugBoundaryLocation, debugBoundary);
                 gl.uniform1f(this.debugStructureLocation, debugStructure);
                 gl.uniform1f(this.useMaskLocation, useMask);
+
+                if (Math.random() < 0.005) {
+                    const { ipcRenderer } = require('electron');
+                    ipcRenderer.send('log:renderer', `[WebGLRenderer] Render: useMask=${useMask}`);
+                }
+
                 gl.uniform1f(this.velocityLocation, velocity);
                 gl.uniform1f(this.mongrelModeLocation, mongrelMode);
                 gl.uniform1f(this.mongrelModeLocation, mongrelMode);
