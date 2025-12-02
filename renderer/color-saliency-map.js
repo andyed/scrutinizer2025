@@ -52,14 +52,20 @@ class ColorSaliencyMap {
 
         let maxVal = 0;
 
+        // Feature weight constants (pre-calculated for performance)
+        const W_I = 0.3;   // Intensity weight
+        const W_RG = 0.35; // Red-Green opponency weight
+        const W_BY = 0.35; // Blue-Yellow opponency weight
+
         // 1. Extract Features
         for (let i = 0; i < len; i++) {
             const r = pixels[i * 4] / 255.0;
             const g = pixels[i * 4 + 1] / 255.0;
             const b = pixels[i * 4 + 2] / 255.0;
 
-            // Intensity
-            const intensity = (r + g + b) / 3.0;
+            // Intensity (True Perceptual Luminance - ITU-R BT.709)
+            // Human vision is most sensitive to Green (72%), then Red (21%), then Blue (7%)
+            const intensity = 0.2126 * r + 0.7152 * g + 0.0722 * b;
             I[i] = intensity;
 
             // Color Opponency
@@ -70,9 +76,9 @@ class ColorSaliencyMap {
         }
 
         // 2. Combine Features (Linear Combination)
-        // Weights: Intensity=0.3, Color=0.7 (Bias towards color)
+        // Weights: Intensity=30%, Red-Green=35%, Blue-Yellow=35%
         for (let i = 0; i < len; i++) {
-            const val = 0.3 * I[i] + 0.35 * RG[i] + 0.35 * BY[i];
+            const val = W_I * I[i] + W_RG * RG[i] + W_BY * BY[i];
             saliency[i] = val;
             if (val > maxVal) maxVal = val;
         }
@@ -100,6 +106,14 @@ class ColorSaliencyMap {
         }
 
         this.ctx.putImageData(imageData, 0, 0);
+
+        // Expose raw saliency data for downstream processing
+        return {
+            data: saliency,
+            width: this.width,
+            height: this.height,
+            maxVal: maxVal
+        };
     }
 
     clear() {
