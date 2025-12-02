@@ -453,7 +453,8 @@
 
             // --- Saliency Smoothing ---
             // Blend Target -> Current to prevent flicker
-            if (this.saliencyTargetCanvas && this.saliencyCurrentCanvas) {
+            // OPTIMIZATION: Only update when active (countdown > 0) to save GPU bandwidth
+            if (this.saliencyTargetCanvas && this.saliencyCurrentCanvas && this.saliencyUpdateCountdown > 0) {
                 const ctx = this.saliencyCurrentCanvas.getContext('2d', { alpha: false });
 
                 // Draw Target over Current with low opacity to smooth changes
@@ -464,6 +465,9 @@
 
                 // Upload Current to GPU
                 this.renderer.uploadSaliencyMap(this.saliencyCurrentCanvas);
+
+                // Decrement activity timer
+                this.saliencyUpdateCountdown--;
             }
 
             // Log first render
@@ -819,8 +823,9 @@
 
             ctx.filter = 'none'; // Reset filter
 
-            // NOTE: We do NOT upload here anymore.
-            // The render loop (processFrame) will blend Target -> Current and upload Current.
+            // Activate the smoothing loop for 60 frames (~1 second)
+            // This ensures we blend to the new target, then stop uploading to save GPU.
+            this.saliencyUpdateCountdown = 60;
             // NOTE: We do NOT upload here anymore.
             // The render loop (processFrame) will blend Target -> Current and upload Current.
         }
