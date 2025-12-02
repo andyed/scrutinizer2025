@@ -1,0 +1,121 @@
+:root {
+    --bg-color: #202020;
+    --text-color: #e0e0e0;
+    --input-bg: #333;
+    --input-focus-bg: #404040;
+    --hover-bg: #3a3a3a;
+    --active-bg: #4a4a4a;
+    --border-color: #444;
+    --accent-color: #007bff;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    overflow: hidden;
+    user-select: none;
+}
+
+.toolbar {
+    display: flex;
+    align-items: center;
+    height: 100vh;
+    /* View height will be small, so fill it */
+    padding: 0 10px;
+    gap: 10px;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--border-color);
+}
+
+button {
+    background: transparent;
+    border: none;
+    color: var(--text-color);
+    padding: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+    width: 32px;
+    height: 32px;
+}
+
+button:hover {
+    background-color: var(--hover-bg);
+}
+
+button:active {
+    background-color: var(--active-bg);
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.nav-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.url-container {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+#url-input {
+    width: 100%;
+    background-color: var(--input-bg);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--text-color);
+    padding: 6px 10px;
+    font-size: 13px;
+    outline: none;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+#url-input:focus {
+    background-color: var(--input-focus-bg);
+    border-color: var(--accent-color);
+}
+
+/* Fovea Toggle Button */
+#fovea-toggle-btn {
+    color: #666;
+    /* Disabled state: Grey */
+    transition: color 0.2s, text-shadow 0.2s;
+    font-size: 18px;
+    /* Adjust icon size */
+}
+
+#fovea-toggle-btn.active {
+    color: var(--accent-color);
+    /* Enabled state: Blue */
+    text-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+/* Loading Animation */
+#fovea-toggle-btn.loading i {
+    animation: pulse-glow 1.5s infinite alternate;
+}
+
+@keyframes pulse-glow {
+    from {
+        text-shadow: 0 0 2px currentColor;
+        opacity: 0.7;
+    }
+
+    to {
+        text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+        opacity: 1;
+    }
+}

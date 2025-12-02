@@ -122,12 +122,12 @@ const canNavigate = (windowId, direction) => {
     const key = `${windowId}-${direction}`;
     const now = Date.now();
     const lastNavTime = navigationDebounce.get(key) || 0;
-    
+
     if (now - lastNavTime < NAVIGATION_DEBOUNCE_MS) {
         console.log(`[Main] Debouncing ${direction} navigation (${now - lastNavTime}ms since last)`);
         return false;
     }
-    
+
     navigationDebounce.set(key, now);
     return true;
 };
@@ -402,6 +402,56 @@ ipcMain.on('keydown', (event, keyEvent) => {
     }
 });
 
+// Toolbar IPC handlers
+ipcMain.on('toolbar:navigate-back', (event) => {
+    const windows = BrowserWindow.getAllWindows();
+    // Find window where toolbarView is the sender
+    const win = windows.find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
+    if (win && win.scrutinizerView && win.scrutinizerView.webContents.canGoBack()) {
+        win.scrutinizerView.webContents.goBack();
+    }
+});
+
+ipcMain.on('toolbar:navigate-forward', (event) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
+    if (win && win.scrutinizerView && win.scrutinizerView.webContents.canGoForward()) {
+        win.scrutinizerView.webContents.goForward();
+    }
+});
+
+ipcMain.on('toolbar:reload', (event) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
+    if (win && win.scrutinizerView) {
+        win.scrutinizerView.webContents.reload();
+    }
+});
+
+ipcMain.on('toolbar:navigate-to', (event, url) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
+    if (win && win.scrutinizerView) {
+        win.scrutinizerView.webContents.loadURL(url);
+    }
+});
+
+ipcMain.on('toolbar:toggle-fovea', (event) => {
+    currentEnabled = !currentEnabled;
+    settingsManager.set('enabled', currentEnabled);
+
+    // Notify all windows/HUDs
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach(win => {
+        if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+            win.scrutinizerHud.webContents.send('settings:enabled-changed', currentEnabled);
+        }
+        if (win.toolbarView && !win.toolbarView.webContents.isDestroyed()) {
+            win.toolbarView.webContents.send('toolbar:fovea-state', currentEnabled);
+        }
+    });
+});
+
 function createScrutinizerWindow(startUrl) {
     console.log('[Main] Creating new Scrutinizer window (dual-window architecture)', startUrl ? 'with URL: ' + startUrl : '(default URL)');
 
@@ -445,27 +495,46 @@ function createScrutinizerWindow(startUrl) {
         }
     });
 
-    // Add content view to main window
+    // Create Toolbar WebContentsView
+    const toolbarView = new WebContentsView({
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false
+        }
+    });
+    toolbarView.webContents.loadFile('renderer/toolbar.html');
+
+    // Add views to main window
+    win.contentView.addChildView(toolbarView);
     win.contentView.addChildView(contentView);
 
-    // Position content view to fill the window
+    const TOOLBAR_HEIGHT = 40;
+
+    // Position views
     const updateViewBounds = () => {
         const [width, height] = win.getSize();
-        contentView.setBounds({ x: 0, y: 0, width: width, height: height });
+        // Toolbar at top
+        toolbarView.setBounds({ x: 0, y: 0, width: width, height: TOOLBAR_HEIGHT });
+        // Content below toolbar
+        contentView.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width: width, height: height - TOOLBAR_HEIGHT });
     };
     updateViewBounds();
     win.on('resize', updateViewBounds);
 
     // ===== HUD WINDOW =====
     // Separate transparent window for toolbar + canvas
-    // Position it to match the content area of main window (not including title bar)
+    // Position it to match the content area of main window (not including title bar AND toolbar)
     const contentBounds = win.getContentBounds();
+    // Adjust for toolbar
+    const hudY = contentBounds.y + TOOLBAR_HEIGHT;
+    const hudHeight = contentBounds.height - TOOLBAR_HEIGHT;
+
     const hudWindow = new BrowserWindow({
         parent: win, // Attach to main window so it stays on top of it
         width: contentBounds.width,
-        height: contentBounds.height,
+        height: hudHeight,
         x: contentBounds.x,
-        y: contentBounds.y,
+        y: hudY,
         transparent: true,
         frame: false,
         modal: false, // Not modal, but stays above parent
@@ -489,6 +558,7 @@ function createScrutinizerWindow(startUrl) {
 
     // Store references
     win.scrutinizerView = contentView;
+    win.toolbarView = toolbarView;
     win.scrutinizerHud = hudWindow;
     hudWindow.mainBrowserWindow = win; // Reverse reference
 
@@ -497,7 +567,13 @@ function createScrutinizerWindow(startUrl) {
     const syncHudBounds = () => {
         if (!win.isDestroyed() && !hudWindow.isDestroyed()) {
             const contentBounds = win.getContentBounds();
-            hudWindow.setBounds(contentBounds);
+            // Adjust for toolbar
+            hudWindow.setBounds({
+                x: contentBounds.x,
+                y: contentBounds.y + TOOLBAR_HEIGHT,
+                width: contentBounds.width,
+                height: contentBounds.height - TOOLBAR_HEIGHT
+            });
         }
     };
     win.on('move', syncHudBounds);
@@ -520,6 +596,12 @@ function createScrutinizerWindow(startUrl) {
             hudWindow.webContents.send('hud:browser:did-start-loading');
             hudWindow.webContents.send('browser:did-start-loading'); // Legacy
         }
+        // Update Toolbar
+        if (toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+            toolbarView.webContents.send('toolbar:update-loading', true);
+            // Ensure fovea state is synced
+            toolbarView.webContents.send('toolbar:fovea-state', currentEnabled);
+        }
     });
 
     contentView.webContents.on('did-finish-load', () => {
@@ -528,10 +610,29 @@ function createScrutinizerWindow(startUrl) {
             hudWindow.webContents.send('hud:browser:did-finish-load');
             hudWindow.webContents.send('browser:did-finish-load'); // Legacy
         }
+        // Update Toolbar
+        if (toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+            toolbarView.webContents.send('toolbar:update-loading', false);
+            toolbarView.webContents.send('toolbar:update-nav-state', {
+                canGoBack: contentView.webContents.canGoBack(),
+                canGoForward: contentView.webContents.canGoForward()
+            });
+        }
+    });
+
+    // Also listen for did-stop-loading (covers stop button and some SPAs)
+    contentView.webContents.on('did-stop-loading', () => {
+        console.log('[Main] ContentView did-stop-loading');
+        if (toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+            toolbarView.webContents.send('toolbar:update-loading', false);
+        }
     });
 
     contentView.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
         console.error('[Main] ContentView did-fail-load:', errorCode, errorDescription);
+        if (toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+            toolbarView.webContents.send('toolbar:update-loading', false);
+        }
     });
 
     // Reset visual memory on navigation
@@ -552,6 +653,14 @@ function createScrutinizerWindow(startUrl) {
         if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
             hudWindow.webContents.send('hud:browser:did-navigate', url);
             hudWindow.webContents.send('browser:did-navigate', url); // Legacy
+        }
+        // Update Toolbar
+        if (toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
+            toolbarView.webContents.send('toolbar:update-url', url);
+            toolbarView.webContents.send('toolbar:update-nav-state', {
+                canGoBack: contentView.webContents.canGoBack(),
+                canGoForward: contentView.webContents.canGoForward()
+            });
         }
     };
 

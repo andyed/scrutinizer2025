@@ -180,6 +180,13 @@
             if (scrutinizer) scrutinizer.updateFovealRadius(radius, false);
         });
 
+        // Listen for global enable/disable from toolbar or other windows
+        ipcRenderer.on('settings:enabled-changed', (event, enabled) => {
+            if (fovealEnabled !== enabled) {
+                toggleFoveal(enabled);
+            }
+        });
+
         ipcRenderer.on('menu:set-intensity', (event, intensity) => {
             if (scrutinizer) {
                 scrutinizer.updateIntensity(intensity);

@@ -107,9 +107,18 @@ npm start
 ## Usage & Controls
 
 ### Basic Navigation
-1. **Navigate**: Use **File → Open URL** (`Cmd+L`) to enter a website address
-2. **Toggle simulation**: Press `Cmd+Shift+F` or use **Simulation → Foveal → Toggle Foveal Mode**
-3. **Quick adjust**: Use Left/Right arrow keys to change foveal radius
+1. **Navigate**: Use the **Toolbar** at the top to enter URLs, search, or navigate back/forward.
+2. **Toggle simulation**: Click the **Eye Icon** in the toolbar, press `Cmd+Shift+F`, or use **Simulation → Foveal → Toggle Foveal Mode**.
+3. **Quick adjust**: Use Left/Right arrow keys to change foveal radius.
+
+### Toolbar
+The new browser toolbar provides:
+-   **Navigation**: Back, Forward, and Reload buttons.
+-   **URL Bar**: Enter URLs or search terms (defaults to Google).
+-   **Fovea Toggle**: The eye icon on the right toggles the foveal effect.
+    -   **Blue**: Fovea enabled.
+    -   **Grey**: Fovea disabled.
+    -   **Pulsing**: Page is loading.
 
 ### Menu Structure
 Access all features via **Simulation** menu:
