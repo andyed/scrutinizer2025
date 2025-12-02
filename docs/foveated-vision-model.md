@@ -320,14 +320,51 @@ if (u_enable_saliency_modulation > 0.5) {
 }
 ```
 
+### 6. Extended Modulation (V1 & V4)
+
+Beyond the LGN suppression factor, saliency now modulates additional pipeline stages **in the far periphery only**, leveraging temporal smoothing to prevent flicker on dynamic content.
+
+**V1 (Geometry) Modulation**:
+```glsl
+// Shatter mode: Reduce jitter near salient areas (far periphery only)
+float saliencyJitterMod = 1.0;
+if (u_enable_saliency_modulation > 0.5 && isFarPeriphery) {
+    float s = lgn.saliency;
+    saliencyJitterMod = mix(1.0, 0.75, s); // 25% max reduction
+}
+jitterScale *= saliencyJitterMod;
+
+// Noise mode: Reduce warp near salient areas (far periphery only)
+float saliencyWarpMod = 1.0;
+if (u_enable_saliency_modulation > 0.5 && isFarPeriphery) {
+    float s = lgn.saliency;
+    saliencyWarpMod = mix(1.0, 0.75, s); // 25% max reduction
+}
+warpVector *= saliencyWarpMod;
+```
+
+**V4 (Aesthetics) Modulation**:
+```glsl
+// Rod vision: Reduce desaturation near salient areas (far periphery only)
+if (u_enable_saliency_modulation > 0.5 && dist > parafovea_radius) {
+    float s = lgn.saliency;
+    float rodMod = mix(1.0, 0.85, s); // 15% max reduction
+    desaturationFactor *= rodMod;
+}
+```
+
+**Effect**: Salient areas (logos, icons, UI elements) in the far periphery retain slightly more geometric stability and color, making them more recognizable for saccade guidance without compromising illegibility.
+
+**Key Design Constraints**:
+-   **Parafoveal Isolation**: Foveal and parafoveal motion cannot affect far periphery distortion
+-   **Conservative Modulation**: 15-25% max effect, ensuring periphery stays degraded
+-   **Temporal Smoothing**: Double-buffered saliency (15% blend/frame) prevents flicker on live video
+
 ## Future Enhancements
 
-From specification, not yet implemented:
-1. **Jitter Suppression**: `jitterVector *= (1.0 - saliency)`
-2. **Rod Vision Modulation**: `rodStrength *= (1.0 - saliency * 0.5)` (partial color preservation)
-3. **Multi-scale Saliency**: Combine detection at multiple blur levels
-4. **Temporal Coherence**: Smooth saliency across frames
-5. **Inhibition of Return**: Reduce saliency in recently-viewed areas
+1. **Multi-scale Saliency**: Combine detection at multiple blur levels
+2. **Inhibition of Return**: Reduce saliency in recently-viewed areas
+3. **Parafoveal Band Modulation**: Extend V1/V4 modulation into parafovea with tighter constraints
 
 ## Technical Details
 

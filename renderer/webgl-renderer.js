@@ -337,7 +337,17 @@
                         // Parafovea: Subtle positional jitter (preserves underlines, geometric cues)
                         // Far Periphery: High-frequency scatter
                         float baseJitter = isParafovea ? 0.008 : 0.04; // 5x reduction in parafovea
-                        float jitterScale = baseJitter * strength * u_intensity;
+                        
+                        // Saliency Modulation (Phase 2): Conservative, far-periphery only
+                        // Leverages temporal smoothing to prevent flicker on dynamic content
+                        float saliencyJitterMod = 1.0;
+                        if (u_enable_saliency_modulation > 0.5 && isFarPeriphery) {
+                            float s = lgn.saliency;
+                            // 25% max jitter reduction at maximum saliency
+                            saliencyJitterMod = mix(1.0, 0.75, s);
+                        }
+                        
+                        float jitterScale = baseJitter * strength * u_intensity * saliencyJitterMod;
                         float densityX = mix(120.0, 40.0, lgn.rhythm);
                         float densityY = mix(120.0, 10.0, lgn.rhythm);
                         float xID = floor(uv.x * densityX);
@@ -368,7 +378,16 @@
                         float n2 = snoise(vec2(uv_noise.x * coarseScaleX, uv_noise.y * coarseScaleY) + vec2(50.0, 50.0) - timeOffset);
                         
                         vec2 warpAmp = isFarPeriphery ? vec2(0.005, 0.004) : vec2(0.001, 0.0001);
-                        vec2 warpVector = vec2(n1, n2) * warpAmp * strength * u_intensity;
+                        
+                        // Saliency Modulation (Phase 2): Conservative, far-periphery only
+                        float saliencyWarpMod = 1.0;
+                        if (u_enable_saliency_modulation > 0.5 && isFarPeriphery) {
+                            float s = lgn.saliency;
+                            // 25% max warp reduction at maximum saliency
+                            saliencyWarpMod = mix(1.0, 0.75, s);
+                        }
+                        
+                        vec2 warpVector = vec2(n1, n2) * warpAmp * strength * u_intensity * saliencyWarpMod;
                         
                         // Add "breathing" motion to strength if animated
                         if (config.v1_animate) {
@@ -538,6 +557,16 @@
                         // Apply Strength Modulation to Desaturation
                         desaturationFactor *= strengthMult;
                         
+                        // Saliency Modulation (Phase 3): Conservative rod vision relief
+                        // Far-periphery only, leverages temporal smoothing
+                        if (u_enable_saliency_modulation > 0.5 && dist > parafovea_radius) {
+                            float s = lgn.saliency;
+                            // 15% max reduction in desaturation at maximum saliency
+                            // Allows salient areas to retain slightly more color
+                            float rodMod = mix(1.0, 0.85, s);
+                            desaturationFactor *= rodMod;
+                        }
+                        
                         // Apply effect based on Bypass Transition AND the new independent factor
                         // We combine them: bypassTransition handles the smooth start from 0.25
                         // desaturationFactor handles the ramp over the periphery.
@@ -550,7 +579,16 @@
                         vec3 rodColor = mix(vec3(0.02, 0.05, 0.1), vec3(0.6, 0.7, 0.8), luma) * 0.96;
                         rodColor += (rand(uv) - 0.5) * 0.1;
                         rodColor = mix(rodColor, vec3(0.01), saccadeFactor * 0.9);
-                        return mix(col, rodColor, effectFactor);
+                        
+                        // Saliency Modulation (Phase 3): Conservative rod vision relief
+                        float labEffectFactor = effectFactor;
+                        if (u_enable_saliency_modulation > 0.5 && dist > parafovea_radius) {
+                            float s = lgn.saliency;
+                            // 15% max reduction at maximum saliency
+                            labEffectFactor *= mix(1.0, 0.85, s);
+                        }
+                        
+                        return mix(col, rodColor, labEffectFactor);
                         
                     } else if (config.v4_style_id == 2) { // Frosted
                         // Simple blur/desaturate

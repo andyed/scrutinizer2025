@@ -431,11 +431,19 @@ Improve how we sample the page for foveal/peripheral processing:
 
 #### Saliency Modulation Expansion ✅
 **Priority**: Low  
-**Effort**: Low
+**Effort**: Low → Medium (required temporal smoothing foundation)
 
-- [x] **Jitter suppression**: Shatter mode jitter now modulated by `(1.0 - saliency)`
-- [x] **Warp suppression**: Noise mode warp now modulated by `(1.0 - saliency)`
-- [x] **Rod vision modulation**: High-Key and Lab modes now reduce desaturation by `(1.0 - saliency * 0.5)`
+**Completed (2025-12-02)**:
+- [x] **Temporal Smoothing**: Double-buffered saliency map (15% blend/frame) prevents flicker on dynamic content
+- [x] **Gestalt Grouping**: Structure block quantization (1px text, 10px UI) stabilizes map against micro-layout shifts
+- [x] **V1 Jitter Modulation**: Shatter mode jitter reduced by up to 25% near salient areas (far periphery only)
+- [x] **V1 Warp Modulation**: Noise mode warp reduced by up to 25% near salient areas (far periphery only)
+- [x] **V4 Rod Vision Modulation**: High-Key and Lab modes reduce desaturation by up to 15% near salient areas (far periphery only)
+
+**Key Constraints**:
+- **Parafoveal Isolation**: Foveal/parafoveal motion cannot affect far periphery
+- **Conservative Depth**: 15-25% max effect to maintain illegibility
+- **Spatial Gating**: Only applies beyond `parafovea_radius` (2.5x fovea)
 
 #### Smooth Zone Transitions (Peripheral Stability)
 **Priority**: Low  
