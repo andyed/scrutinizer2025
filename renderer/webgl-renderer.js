@@ -747,8 +747,9 @@
                             float tickAlpha = tickRadial * smoothstep(0.95, 0.98, cos(angle * 12.0));
                             if (tickAlpha > 0.0) color.rgb = mix(color.rgb, vec3(0.0, 1.0, 1.0), tickAlpha * 0.7);
                         }
-                        if (u_debug_boundary > 1.5) { // Mode 2
-                            float visualParafoveaRadius = fovea_radius * 2.5;
+                        if (u_debug_boundary > 1.5) { // Mode 2: Parafovea Boundary
+                            // CRITICAL: Match actual parafoveal radius (1.35x, not 2.5x)
+                            float visualParafoveaRadius = parafovea_radius; // Use the real value
                             float parafoveaDist = abs(dist - visualParafoveaRadius);
                             float fw = fwidth(parafoveaDist);
                             float ringAlpha = (1.0 - smoothstep(0.0, fw * 2.0, parafoveaDist)) * smoothstep(0.0, 0.1, sin(angle * 40.0));
