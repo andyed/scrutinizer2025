@@ -429,14 +429,13 @@ Improve how we sample the page for foveal/peripheral processing:
   - Throttled scans (16ms) during scroll
   - Debounced final scan (100ms) after scroll ends
 
-#### Saliency Modulation Expansion
+#### Saliency Modulation Expansion ✅
 **Priority**: Low  
 **Effort**: Low
 
-- **Issue**: Saliency only modulates `suppressionFactor` (warp strength), not jitter or rod vision
-- **Future Enhancement** (from docs):
-  - Jitter suppression: `jitterVector *= (1.0 - saliency)`
-  - Rod vision modulation: `rodStrength *= (1.0 - saliency * 0.5)`
+- [x] **Jitter suppression**: Shatter mode jitter now modulated by `(1.0 - saliency)`
+- [x] **Warp suppression**: Noise mode warp now modulated by `(1.0 - saliency)`
+- [x] **Rod vision modulation**: High-Key and Lab modes now reduce desaturation by `(1.0 - saliency * 0.5)`
 
 #### Smooth Zone Transitions (Peripheral Stability)
 **Priority**: Low  
