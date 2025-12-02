@@ -153,7 +153,7 @@
                 };
 
                 // --- TEST CASE 1: Fixation Logic ---
-                log('Test 1: Fixation Logic (Dwell 2s)', 'info');
+                log('Test 1: Fixation Logic (Dwell 50ms)', 'info');
 
                 // Move to 100,100
                 scrutinizer.mouseX = 100; scrutinizer.mouseY = 100;
@@ -164,24 +164,24 @@
                 // Render frame 1
                 scrutinizer.render();
 
-                // Advance 1s (Should NOT be in buffer yet)
-                tick(1000);
+                // Advance 20ms (Should NOT be in buffer yet, dwell is 50ms)
+                tick(20);
                 scrutinizer.render();
 
                 if (scrutinizer.visualMemoryBuffer.length === 0) {
-                    log('PASS: Buffer empty after 1s', 'pass');
+                    log('PASS: Buffer empty after 20ms', 'pass');
                 } else {
-                    log(`FAIL: Buffer has ${scrutinizer.visualMemoryBuffer.length} items after 1s`, 'fail');
+                    log(`FAIL: Buffer has ${scrutinizer.visualMemoryBuffer.length} items after 20ms`, 'fail');
                 }
 
-                // Advance another 1.5s (Total 2.5s -> Should be in buffer)
-                tick(1500);
+                // Advance another 40ms (Total 60ms -> Should be in buffer)
+                tick(40);
                 scrutinizer.render();
 
                 if (scrutinizer.visualMemoryBuffer.length === 1) {
-                    log('PASS: Buffer has 1 item after 2.5s', 'pass');
+                    log('PASS: Buffer has 1 item after 60ms', 'pass');
                 } else {
-                    log(`FAIL: Buffer has ${scrutinizer.visualMemoryBuffer.length} items after 2.5s`, 'fail');
+                    log(`FAIL: Buffer has ${scrutinizer.visualMemoryBuffer.length} items after 60ms`, 'fail');
                     log(`Debug: Velocity=${scrutinizer.currentVelocity}, Fixating=${scrutinizer.isFixating}, Dwell=${virtualTime - scrutinizer.fixationStartTime}`);
                 }
 
@@ -189,8 +189,8 @@
                 log('Test 2: FIFO Eviction (Limit 2)', 'info');
 
                 // Move to B (400, 400)
-                // Simulate movement velocity to break fixation
-                scrutinizer.currentVelocity = 10.0;
+                // Simulate movement velocity to break fixation (Threshold is 20.0, so use 50.0)
+                scrutinizer.currentVelocity = 50.0;
                 tick(100);
                 scrutinizer.render();
 
@@ -200,7 +200,7 @@
                 scrutinizer.currentVelocity = 0;
 
                 // Dwell at B
-                tick(2500);
+                tick(200); // > 50ms
                 scrutinizer.render();
 
                 if (scrutinizer.visualMemoryBuffer.length === 2) {
@@ -210,7 +210,7 @@
                 }
 
                 // Move to C (500, 500) -> Should evict A
-                scrutinizer.currentVelocity = 10.0;
+                scrutinizer.currentVelocity = 50.0;
                 tick(100);
                 scrutinizer.render();
 
@@ -220,7 +220,7 @@
                 scrutinizer.currentVelocity = 0;
 
                 // Dwell at C
-                tick(2500);
+                tick(200);
                 scrutinizer.render();
 
                 if (scrutinizer.visualMemoryBuffer.length === 2) {
@@ -255,7 +255,7 @@
 
                 for (const p of points) {
                     // Move
-                    scrutinizer.currentVelocity = 10.0;
+                    scrutinizer.currentVelocity = 50.0;
                     tick(100);
                     scrutinizer.render();
 
