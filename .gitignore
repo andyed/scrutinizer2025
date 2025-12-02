@@ -22,3 +22,4 @@ out/
 
 # Test Artifacts
 tests/screenshots/
+tests/golden/*Z.png
