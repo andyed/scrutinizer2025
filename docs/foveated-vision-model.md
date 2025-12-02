@@ -24,6 +24,23 @@ This allows us to express all zones as **fractions of the configured foveal radi
 
 Biologically, the fovea is approximately circular. For screen-based reading and text layouts, we deliberately apply an **elliptical aspect correction** (default 4:3) so that the “usable” sharp region better matches the horizontally biased saccades you make across lines of text.
 
+### Biological Calibration: The 5° Macular Region
+
+The **parafoveal region** (fovea + parafovea combined) corresponds to the **5° macular zone** in biological vision. On a high-density display at typical viewing distance (~60cm), this translates to approximately:
+
+- **Parafoveal diameter**: ~462px
+- **Parafoveal radius**: ~231px
+- **Implied foveal radius**: ~171px (since parafovea = 1.35x foveal radius)
+
+**Key Insight**: This ~462px diameter zone is where users can rapidly perceive holistic information and spatial cues without making a saccade (direct eye movement). Optimizing web layouts for this region leverages the brain's parafoveal processing for key tasks like:
+- Word length perception (saccade planning)
+- Link detection (contrast + geometric cues)
+- Layout structure (spatial relationships)
+
+**Recommended Settings**:
+- **Large (180px foveal radius)**: Close approximation to biological 5° parafovea (243px boundary)
+- **Extra Large (300px)**: Exaggerated simulation for presentations/demonstrations
+
 ---
 
 ## 2. Three spatial zones
