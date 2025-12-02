@@ -429,7 +429,7 @@
                 }
 
                 // --- STAGE 3: V4 (Aesthetics) ---
-                vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float saccadeFactor) {
+                vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float parafovea_radius, float saccadeFactor) {
                     // Use sampleSource for correct color
                     vec3 col = sampleSource(v1.distortedUV).rgb;
                     
@@ -671,7 +671,7 @@
                     
                     // 3. V4: Aesthetics
                     float saccadeFactor = smoothstep(4.0, 10.0, u_velocity);
-                    vec3 finalRGB = processV4(uv, v1, lgn, config, dist, fovea_radius, saccadeFactor);
+                    vec3 finalRGB = processV4(uv, v1, lgn, config, dist, fovea_radius, parafovea_radius, saccadeFactor);
                     
                     // --- POST-PROCESSING (Rod Vision, Masking, Debug) ---
                     
