@@ -24,7 +24,7 @@ This document outlines the path from current alpha to a production-ready 1.0 rel
   - `webgl-renderer.js`: Use `u_scroll_offset` in shader
 
 ### 🔴 High Priority Fixes
-- [ ] **DomAdapter Refinements**: Add missing HTML tags: `audio`, `summary`, `meter`, `progress`
+- [x] **DomAdapter Refinements**: Comprehensive semantic element detection (ARIA roles, media elements, interactive patterns)
 
 
 
@@ -391,4 +391,71 @@ Improve how we sample the page for foveal/peripheral processing:
   - Update shader version string to `#version 300 es`.
   - Update shader syntax (attribute -> in, varying -> out/in, texture2D -> texture).
   - Verify context creation ensures `webgl2`.
+
+---
+
+## Refactoring Opportunities
+
+### 🔧 Code Quality Improvements
+
+#### Extract Shader to Separate File
+**Priority**: Low  
+**Effort**: Medium
+
+- **Issue**: Fragment shader is 640+ lines embedded in `webgl-renderer.js`
+- **Benefits**:
+  - Better syntax highlighting in editors
+  - Easier testing and validation
+  - Cleaner separation of concerns
+- **Implementation**: Move to `renderer/shaders/peripheral.frag` and load via `fs.readFileSync` or bundler
+
+#### Consolidate Magic Numbers
+**Priority**: Low  
+**Effort**: Low
+
+- **Issue**: Several hardcoded values scattered through codebase
+- **Action**: Extract to named constants in `config.js`:
+  - Scrollbar width (17px)
+  - Fixation velocity threshold (20.0 px/ms)
+  - Dwell time threshold (50ms)
+  - Fovea bypass margin (0.5x radius)
+
+#### Structure Map Scroll Tracking
+**Priority**: Medium  
+**Effort**: Medium
+
+- **Issue**: Documentation describes throttled scroll tracking, but implementation relies on IPC events
+- **Action**: Add scroll event listeners in `dom-adapter.js` or `preload.js` with:
+  - Throttled scans (16ms) during scroll
+  - Debounced final scan (100ms) after scroll ends
+
+#### Saliency Modulation Expansion
+**Priority**: Low  
+**Effort**: Low
+
+- **Issue**: Saliency only modulates `suppressionFactor` (warp strength), not jitter or rod vision
+- **Future Enhancement** (from docs):
+  - Jitter suppression: `jitterVector *= (1.0 - saliency)`
+  - Rod vision modulation: `rodStrength *= (1.0 - saliency * 0.5)`
+
+#### Smooth Zone Transitions (Peripheral Stability)
+**Priority**: Low  
+**Effort**: Medium
+
+- **Issue**: Hard boolean jumps between parafovea/periphery zones cause visible "popping" when fovea moves
+- **Current**: `eccentricityScale = isFarPeriphery ? 1.0 : 0.15` (hard 6.7x jump)
+- **Attempted Fix**: Using `smoothstep` for gradual transition caused "flash of readability" regression
+- **Root Cause**: Smooth transitions interact poorly with the stable mouse hysteresis and frame timing
+- **Future Approach**: 
+  - Investigate temporal smoothing of zone transitions (per-pixel history)
+  - Or accept hard jumps but ensure they're visually masked by the distortion itself
+  - Consider velocity-gated transitions (only smooth when stationary)
+
+#### Remove Dead Code
+**Priority**: Low  
+**Effort**: Low
+
+- [x] Removed unused `saliency-map.js` (replaced by `color-saliency-map.js`)
+- [ ] Review and remove commented-out code blocks
+- [ ] Clean up unused uniform locations and config options
 

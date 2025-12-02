@@ -53,6 +53,9 @@
             this.mouseY = 0;
             this.targetMouseX = 0;
             this.targetMouseY = 0;
+            // Stable mouse for distortion (heavy hysteresis to prevent peripheral jiggle)
+            this.stableMouseX = 0;
+            this.stableMouseY = 0;
             this.currentZoom = 1.0;
 
             // Bind methods
@@ -135,6 +138,17 @@
                     this.maskCtx.fillStyle = 'black';
                     this.maskCtx.fillRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
                     this.maskDirty = true;
+
+                    // Resize saliency map (1/4 resolution is enough for heatmap)
+                    if (this.saliencyMap) {
+                        this.saliencyMap.resize(bufferWidth, bufferHeight);
+                    }
+                    // Create offscreen canvas for saliency generation if not exists
+                    if (!this.saliencyGenCanvas) {
+                        this.saliencyGenCanvas = document.createElement('canvas');
+                    }
+                    this.saliencyGenCanvas.width = Math.ceil(bufferWidth * maskScale);
+                    this.saliencyGenCanvas.height = Math.ceil(bufferHeight * maskScale);
                 }
             });
         }
@@ -586,10 +600,14 @@
             this.structureMap.resize(this.canvas.width, this.canvas.height);
             this.structureMap.clear();
 
+            // Gestalt Grouping: Merge adjacent text blocks into "Paragraphs"
+            // This reduces visual clutter and simulates "pre-attentive" grouping of text lines
+            const groupedBlocks = this.groupStructureBlocks(blocks);
+
             // Draw blocks
             const dpr = window.devicePixelRatio || 1;
             const yOffset = 0; //80px; // Toolbar height compensation
-            for (const block of blocks) {
+            for (const block of groupedBlocks) {
                 this.structureMap.drawBlock(
                     block.x * dpr,
                     (block.y + yOffset) * dpr,
@@ -598,15 +616,138 @@
                     block.type,
                     block.density,
                     block.lineHeight,
-                    block.saliency || 1.0
+                    block.color
                 );
             }
 
+            // Generate Saliency Map from grouped blocks
+            this.generateSaliencyMap(groupedBlocks, dpr, yOffset);
+
             // Upload to GPU
-            this.renderer.uploadStructureMap(this.structureMap.getCanvas());
+            if (this.renderer) {
+                this.renderer.uploadStructureMap(this.structureMap.getCanvas());
+            }
+        }
+
+        groupStructureBlocks(blocks) {
+            if (!blocks || blocks.length === 0) return [];
+
+            // 1. Filter only text blocks (type 0) for grouping. Keep others as is.
+            const textBlocks = blocks.filter(b => b.type === 0);
+            const otherBlocks = blocks.filter(b => b.type !== 0);
+
+            if (textBlocks.length === 0) return otherBlocks;
+
+            // 2. Sort by Y then X
+            textBlocks.sort((a, b) => a.y - b.y || a.x - b.x);
+
+            const merged = [];
+            let current = textBlocks[0];
+
+            for (let i = 1; i < textBlocks.length; i++) {
+                const next = textBlocks[i];
+
+                // Check for vertical adjacency and alignment
+                const verticalGap = next.y - (current.y + current.h);
+                const isVerticalNeighbor = verticalGap >= -5 && verticalGap <= (current.lineHeight * 1.5); // Allow small overlap or gap
+
+                // Check horizontal alignment (left aligned or similar width)
+                const isAligned = Math.abs(current.x - next.x) < 20 && Math.abs(current.w - next.w) < 50;
+
+                if (isVerticalNeighbor && isAligned) {
+                    // Merge 'next' into 'current'
+                    // New height includes the gap
+                    const newHeight = (next.y + next.h) - current.y;
+                    current.h = newHeight;
+                    // Use max width
+                    current.w = Math.max(current.w, next.w);
+                    // Keep density/lineHeight of the top block (simplification)
+                } else {
+                    // Push current and start new group
+                    merged.push(current);
+                    current = next;
+                }
+            }
+            merged.push(current);
+
+            return [...otherBlocks, ...merged];
+        }
+
+        generateSaliencyMap(blocks, dpr, yOffset) {
+            if (!this.saliencyGenCanvas || !this.renderer) return;
+
+            const ctx = this.saliencyGenCanvas.getContext('2d', { alpha: false });
+            const width = this.saliencyGenCanvas.width;
+            const height = this.saliencyGenCanvas.height;
+
+            // Scale factor from viewport to saliency map (0.25)
+            const scale = width / (this.canvas.width || 1);
+
+            // 1. Clear to base saliency (Low attention)
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, width, height);
+
+            // 2. Draw blocks with "Feature Integration" weights
+            // Images/Headers = High Saliency (Pop-out)
+            // Text = Low Saliency (Texture)
+
+            // Use additive blending to simulate "activation accumulation"
+            ctx.globalCompositeOperation = 'screen';
+
+            // Blur context for "Proximity Grouping" (Gestalt)
+            // Simulates the low-frequency nature of peripheral vision
+            ctx.filter = 'blur(8px)';
+
+            for (const block of blocks) {
+                let saliency = 0.0;
+
+                // --- FEATURE WEIGHTS ---
+                if (block.type === 1) { // Image
+                    saliency = 1.0; // High pop-out
+                } else if (block.type === 2) { // Header/Large Text
+                    // Heuristic: Larger text = higher saliency
+                    // Normalize line height (e.g. 16px = 0.2, 60px = 0.8)
+                    const normalizedSize = Math.min(block.lineHeight / 60.0, 1.0);
+                    saliency = 0.3 + (normalizedSize * 0.7);
+                } else { // Body Text
+                    saliency = 0.15; // Low baseline
+                }
+
+                // Draw "activation blob"
+                const x = block.x * dpr * scale;
+                const y = (block.y + yOffset) * dpr * scale;
+                const w = block.w * dpr * scale;
+                const h = block.h * dpr * scale;
+
+                // Color: Red channel = Saliency Strength
+                const intensity = Math.floor(saliency * 255);
+                ctx.fillStyle = `rgb(${intensity}, 0, 0)`;
+                ctx.fillRect(x, y, w, h);
+            }
+
+            ctx.filter = 'none'; // Reset filter
+
+            // 3. Center Bias (Optional - mimicking biological tendency)
+            // Draw a subtle radial gradient at the center
+            /*
+            const gradient = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, width * 0.6);
+            gradient.addColorStop(0, 'rgba(50, 0, 0, 0.3)'); // Slight boost at center
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, width, height);
+            */
+
+            // 4. Upload to GPU
+            // We use the existing uploadSaliencyMap method
+            // Note: The shader expects a texture. We can pass the canvas directly.
+            this.renderer.uploadSaliencyMap(this.saliencyGenCanvas);
         }
     }
 
-    // Expose to window
+    // Export for CommonJS AND window (needed for script tag loading in overlay.html)
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = Scrutinizer;
+    }
+    // Always expose to window for overlay.js which checks window.Scrutinizer
     window.Scrutinizer = Scrutinizer;
 })();

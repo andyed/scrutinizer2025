@@ -66,7 +66,7 @@ All non‑foveal processing is defined in terms of three concentric zones, expre
   - Visual: increasing domain warp and high‑frequency jitter. Features are present but positions are uncertain ("heat‑haze crowding").
 
 - **Far periphery**  
-  - Starts at: `1.2 × radius_norm` and beyond  
+  - Starts at: `2.5 × radius_norm` and beyond  
   - Visual: stronger warp/jitter, rod‑like desaturation and tint, and pixel scatter.
 
 Key constants in the shader:
@@ -183,7 +183,7 @@ Instead of maintaining brittle lists of HTML tags, the scanner detects elements 
 This approach is **framework-agnostic** and captures modern web patterns (e.g., `<div role="button">`) without maintaining exhaustive tag lists.
 
 ### The Rasterizer: `StructureMap`
-These blocks are painted onto an off-screen `<canvas>` (50% resolution) to create the `u_structureMap` texture. This texture encodes semantic data into RGBA channels:
+These blocks are painted onto an off-screen `<canvas>` (50% resolution for Structure Map, 25% for Saliency Map) to create the `u_structureMap` texture. This texture encodes semantic data into RGBA channels:
 
 | Channel | Data | Description |
 | :--- | :--- | :--- |
@@ -249,7 +249,7 @@ The **Saliency Map** implements computational visual attention, predicting where
 ## Implementation
 
 ### 1. Saliency Map Generation
-**File**: `renderer/saliency-map.js`
+**File**: `renderer/color-saliency-map.js`
 
 **Algorithm**:
 1. **Luminance Extraction**: RGB → grayscale (`0.299*R + 0.587*G + 0.114*B`)
@@ -263,9 +263,10 @@ The **Saliency Map** implements computational visual attention, predicting where
 - **GL_TEXTURE3**: Separate saliency texture (grayscale)
 - **Upload**: Computed from source browser capture each frame
 - **Sampling**: `float saliency = texture2D(u_saliencyMap, uv).r;`
+- **File**: `renderer/color-saliency-map.js`
 
 ### 3. Fidelity Bias Formula
-**File**: `renderer/webgl-renderer.js` (line ~454)
+**File**: `renderer/webgl-renderer.js` (in `processLGN` function)
 
 ```glsl
 // Sample saliency at current pixel
@@ -383,8 +384,8 @@ When enabled from the menu, the shader draws a subtle grey ring at the true fove
 
 The current implementation hard‑codes the key ratios:
 
-- `parafovea_radius / fovea_radius ≈ 1.35`
-- `periphery_start / fovea_radius ≈ 1.2`
+- `parafovea_radius / fovea_radius = 2.5` (biological macula: 0-5°)
+- `periphery_start / fovea_radius = 2.5` (same as parafovea boundary)
 
 In future versions, these can be exposed as user‑tunable parameters by mapping UI sliders to:
 
@@ -441,7 +442,7 @@ To prevent distracting "shimmering" during rapid eye movements, the renderer tra
 
 ### Architectural Guarantee: Foveal Integrity
 The pipeline enforces a strict "Do No Harm" policy for the fovea.
--   **Hard Bypass**: Pixels within `dist < 0.25` are strictly excluded from V1 distortion and V4 aesthetic processing.
+-   **Hard Bypass**: Pixels within `dist < fovea_radius * 0.5` are strictly excluded from V1 distortion and V4 aesthetic processing.
 -   **True Color Sampling**: A centralized `sampleSource(uv)` helper ensures that the fovea (and any "clear" view) always receives the raw, correctly color-swizzled (BGRA->RGBA) image from the capture buffer. This prevents accidental color shifts or darkening in the critical vision area.
 
 ---
@@ -451,7 +452,7 @@ The pipeline enforces a strict "Do No Harm" policy for the fovea.
 To simulate the brain's ability to "hold" visual information, Scrutinizer implements a **Visual Memory** system.
 
 ### Mechanics
--   **Dwell Activation**: When the user fixates (velocity < 0.5 px/ms) on a spot for >2000ms, that region is "committed" to memory.
+-   **Dwell Activation**: When the user fixates (velocity < 20.0 px/ms) on a spot for >50ms, that region is "committed" to memory.
 -   **Buffer System**: Remembered spots are stored in a FIFO buffer (`visualMemoryBuffer`).
 -   **Capacity**: The buffer size is configurable (`visualMemoryLimit`). When full, the oldest memory fades out.
 -   **Rendering**:

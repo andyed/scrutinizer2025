@@ -94,8 +94,8 @@ class DomAdapter {
             }
         }
 
-        // 2. Images
-        const images = root.querySelectorAll('img, svg, video, canvas');
+        // 2. Media Elements (Visual elements require tag-based detection)
+        const images = root.querySelectorAll('img, svg, video, canvas, picture, embed, object, meter, progress');
         for (const img of images) {
             const rect = img.getBoundingClientRect();
             // Skip if off-screen
@@ -117,8 +117,16 @@ class DomAdapter {
             }
         }
 
-        // 3. UI Elements (Buttons, Inputs)
-        const uiElements = root.querySelectorAll('button, input, select, a.button, [role="button"]');
+        // 3. Interactive Elements (Semantic Attributes)
+        // Form controls, links, ARIA roles, editable, custom interactivity
+        const uiElements = root.querySelectorAll(`
+            button, input, textarea, select, option,
+            a[href],
+            [role="button"], [role="link"], [role="menuitem"], [role="tab"],
+            [role="checkbox"], [role="radio"], [role="switch"], [role="slider"],
+            [contenteditable="true"],
+            [onclick], [tabindex]:not([tabindex="-1"])
+        `);
         for (const el of uiElements) {
             const rect = el.getBoundingClientRect();
             // Skip if off-screen

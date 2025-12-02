@@ -23,20 +23,22 @@ const WebGLRenderer = require('./webgl-renderer'); // Must be required!
 ```
 
 ### 2. Class Exposure (The "Dual Export")
-Classes defined in separate files (like `WebGLRenderer.js`) must be exposed in **two ways** to satisfy both `require()` consumers and global debugging/access.
+Classes defined in separate files (like `WebGLRenderer.js`) must be exposed in **two ways** to satisfy both `require()` consumers and `<script>` tag consumers (like `overlay.html`).
 
 **Pattern for Class Files:**
 ```javascript
 class MyClass { ... }
 
+// Export for CommonJS require()
 if (typeof module !== 'undefined' && module.exports) {
-    // 1. Export for CommonJS require()
     module.exports = MyClass;
-} else {
-    // 2. Fallback to window global (for non-Node contexts or debugging)
-    window.MyClass = MyClass;
 }
+// ALWAYS expose to window for script tag loading
+// This is NOT an else - both must happen in Electron!
+window.MyClass = MyClass;
 ```
+
+**Why not `else`?** In Electron with `nodeIntegration: true`, the `module` object exists even in renderer processes. If you use `else`, the class exports to `module.exports` but never to `window`. Files loaded via `<script src="...">` (like in `overlay.html`) check `window.MyClass`, not `module.exports`.
 
 ### 3. The Entry Point (`overlay.js`)
 The main entry point (`overlay.js`) is loaded via `<script src="overlay.js">`. It does **not** export anything. Instead, it:
@@ -57,6 +59,8 @@ To prevent polluting the global scope with internal variables, wrap file content
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = PublicClass;
     }
+    // Always expose to window (no else!)
+    window.PublicClass = PublicClass;
 })();
 ```
 

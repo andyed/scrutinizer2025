@@ -50,7 +50,6 @@
                 this.useMaskLocation = null;
                 this.velocityLocation = null;
                 this.mongrelModeLocation = null;
-                this.mongrelModeLocation = null;
                 // this.aestheticModeLocation = null; // Removed in favor of granular uniforms
 
                 // Granular Uniform Locations
@@ -453,18 +452,18 @@
                     // === ARCHITECTURAL GUARANTEE: FOVEA PROTECTION ===
                     // The fovea must remain 100% authentic to the source.
                     // We enforce a hard bypass if we are within the foveal radius.
-                    // We use a slightly larger safety margin (0.25) to ensure the transition
+                    // Use 50% of fovea_radius as safety margin to ensure the transition
                     // starts well outside the critical vision area.
-                    if (dist < 0.25) {
+                    if (dist < fovea_radius * 0.5) {
                         return col;
                     }
 
                     float effectFactor = v1.distortionStrength; // Use the actual applied strength
                     
                     // Smooth Transition from Hard Bypass
-                    // The bypass ends at 0.25. We must ramp the effect up from 0 starting at 0.25
+                    // The bypass ends at fovea_radius * 0.5. We must ramp the effect up from there
                     // to avoid a hard jump in intensity (since effectFactor is likely high there).
-                    float bypassTransition = smoothstep(0.25, 0.35, dist);
+                    float bypassTransition = smoothstep(fovea_radius * 0.5, fovea_radius * 0.7, dist);
 
                     if (config.v4_style_id == 0) { // High-Key (Now: Desaturated)
                         
@@ -793,7 +792,7 @@
                 this.useMaskLocation = gl.getUniformLocation(this.program, "u_useMask");
                 this.velocityLocation = gl.getUniformLocation(this.program, "u_velocity");
                 this.mongrelModeLocation = gl.getUniformLocation(this.program, "u_mongrel_mode");
-                this.mongrelModeLocation = gl.getUniformLocation(this.program, "u_mongrel_mode");
+                this.timeLocation = gl.getUniformLocation(this.program, "u_time");
                 // this.aestheticModeLocation = gl.getUniformLocation(this.program, "u_aesthetic_mode");
 
                 // Granular Uniforms
@@ -976,7 +975,7 @@
                 gl.clearColor(0.0, 0.0, 0.0, 0.0);
                 gl.clear(gl.COLOR_BUFFER_BIT);
             }
-            render(width, height, mouseX, mouseY, foveaRadius, foveaAspectRatio = 1.33, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, debugStructure = 0.0, useMask = 0.0, mongrelMode = 1.0, aestheticMode = 0.0, velocity = 0.0, stableMouseX = 0.0, stableMouseY = 0.0, hasStructure = 0.0, enableSaliencyModulation = 1.0) {
+            render(width, height, mouseX, mouseY, foveaRadius, foveaAspectRatio = 1.33, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, debugStructure = 0.0, useMask = 0.0, mongrelMode = 1.0, aestheticMode = 0.0, velocity = 0.0, stableMouseX = 0.0, stableMouseY = 0.0, hasStructure = 0.0, enableSaliencyModulation = 1.0, time = 0.0) {
                 if (!this.program) {
                     console.error('[WebGLRenderer] render() called but program is null!');
                     return;
@@ -1054,7 +1053,7 @@
 
                 gl.uniform1f(this.velocityLocation, velocity);
                 gl.uniform1f(this.mongrelModeLocation, mongrelMode);
-                gl.uniform1f(this.mongrelModeLocation, mongrelMode);
+                gl.uniform1f(this.timeLocation, time);
                 // gl.uniform1f(this.aestheticModeLocation, aestheticMode);
 
                 // Update Config based on Mode (Legacy Support / Preset Logic)
@@ -1096,10 +1095,9 @@
 
         if (typeof module !== 'undefined' && module.exports) {
             module.exports = WebGLRenderer;
-        } else {
-            window.WebGLRenderer = WebGLRenderer;
-            console.log('[WebGLRenderer] Class exposed to window');
         }
+        // Always expose to window for script tag loading
+        window.WebGLRenderer = WebGLRenderer;
     } catch (err) {
         const { ipcRenderer } = require('electron');
         ipcRenderer.send('log:renderer', `[WebGLRenderer] CRITICAL ERROR: ${err.message} `);
