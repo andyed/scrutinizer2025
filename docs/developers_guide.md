@@ -78,6 +78,38 @@ if (config.v4_style_id == 6) {
 }
 ```
 
+### Eccentricity-Based Scaling (Parafovea vs Far Periphery)
+
+**Problem**: The 3-5° parafovea should preserve geometric cues and luminance contrast (magnocellular pathway), but applying the same distortion strength as the far periphery (>8°) destroys underlines, contrast, and low-frequency features.
+
+**Solution**: In `processV1`, distortion strength is scaled by visual eccentricity:
+
+```glsl
+// Parafovea (3-5°): 85% reduction in strength
+// Far Periphery (>8°): Full strength
+float eccentricityScale = isFarPeriphery ? 1.0 : 0.15;
+float strength = lgn.suppressionFactor * config.v1_strength_mult * eccentricityScale;
+```
+
+**Tuning for Research**:
+- Adjust `0.15` (parafovea scale) to control how much distortion is applied in the near periphery
+- Lower values (e.g., `0.05`) preserve more geometry but reduce crowding simulation
+- Higher values (e.g., `0.4`) increase distortion but may destroy critical cues like underlines
+
+Additionally, jitter amplitude is reduced in parafovea to prevent dissolution of linear features:
+
+```glsl
+float baseJitter = isParafovea ? 0.008 : 0.04; // 5x reduction
+```
+
+**Magnocellular Contrast Preservation**: In `processV4`, luminance contrast is boosted to simulate the M-cell pathway:
+
+```glsl
+// 60% in parafovea, 30% in far periphery
+float contrastPreservation = dist < 1.35 * fovea_radius ? 0.6 : 0.3;
+col *= mix(1.0, lumaRatio, contrastPreservation);
+```
+
 ## Future Roadmap: Abstraction
 
 We plan to abstract the "Peripheral Model" into a pluggable system where shaders can be loaded dynamically or defined in separate files, making it easier to experiment with deep-learning-based texture synthesis models.

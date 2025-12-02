@@ -305,7 +305,11 @@
                     signal.distortionStrength = 0.0;
                     signal.displacement = vec2(0.0);
                     
-                    float strength = lgn.suppressionFactor * config.v1_strength_mult;
+                    // Eccentricity-Based Scaling: Parafovea vs Far Periphery
+                    // Parafovea (3-5°): Mild positional uncertainty, preserve geometry
+                    // Far Periphery (>8°): Aggressive scatter and dissolution
+                    float eccentricityScale = isFarPeriphery ? 1.0 : 0.15; // 85% reduction in parafovea
+                    float strength = lgn.suppressionFactor * config.v1_strength_mult * eccentricityScale;
                     signal.distortionStrength = strength;
                     
                     if (config.v1_distortion_type == 2) {
@@ -331,7 +335,10 @@
                         // Compromise: V1 calculates the *primary* distorted UV.
                         
                         // Re-implementing simplified Mongrel displacement for UV pipeline
-                        float jitterScale = 0.04 * strength * u_intensity;
+                        // Parafovea: Subtle positional jitter (preserves underlines, geometric cues)
+                        // Far Periphery: High-frequency scatter
+                        float baseJitter = isParafovea ? 0.008 : 0.04; // 5x reduction in parafovea
+                        float jitterScale = baseJitter * strength * u_intensity;
                         float densityX = mix(120.0, 40.0, lgn.rhythm);
                         float densityY = mix(120.0, 10.0, lgn.rhythm);
                         float xID = floor(uv.x * densityX);
@@ -425,6 +432,23 @@
                 vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float saccadeFactor) {
                     // Use sampleSource for correct color
                     vec3 col = sampleSource(v1.distortedUV).rgb;
+                    
+                    // === MAGNOCELLULAR PATHWAY: Luminance Contrast Preservation ===
+                    // M-cells are highly sensitive to luminance (brightness) but blind to color/detail.
+                    // Even when the image is heavily distorted, the M-pathway preserves contrast.
+                    // This ensures a blue link on white background stays clearly distinct.
+                    if (dist > fovea_radius) {
+                        vec3 cleanSample = sampleSource(uv).rgb; // Original, undistorted
+                        float cleanLuma = dot(cleanSample, vec3(0.299, 0.587, 0.114));
+                        float distortedLuma = dot(col, vec3(0.299, 0.587, 0.114));
+                        
+                  // Prevent division by zero
+                        float lumaRatio = cleanLuma / max(distortedLuma, 0.01);
+                        
+                        // Apply contrast boost (60% preservation in parafovea, less in far periphery)
+                        float contrastPreservation = dist < 1.35 * fovea_radius ? 0.6 : 0.3;
+                        col *= mix(1.0, lumaRatio, contrastPreservation);
+                    }
                     
                     // === ARCHITECTURAL GUARANTEE: FOVEA PROTECTION ===
                     // The fovea must remain 100% authentic to the source.
