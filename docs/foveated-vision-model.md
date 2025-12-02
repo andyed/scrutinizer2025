@@ -248,24 +248,38 @@ The **Saliency Map** implements computational visual attention, predicting where
 
 ## Implementation
 
-### 1. Saliency Map Generation
-**File**: `renderer/color-saliency-map.js`
+## Implementation
 
-**Algorithm**:
-1. **Luminance Extraction**: RGB → grayscale (`0.299*R + 0.587*G + 0.114*B`)
-2. **Sobel Edge Detection**: 3×3 convolution for gradient magnitude
-3. **Gaussian Blur**: 3-pass box blur (radius=5px) for smooth gradients
-4. **Normalization**: Map to 0-255 grayscale range
+### 1. Gestalt Grouping (Proximity)
+**File**: `renderer/scrutinizer.js`
 
-**Resolution**: 25% of screen (interpolated by GPU for performance)
+To simulate the brain's pre-attentive grouping of visual elements, the renderer processes the raw layout stream before generating maps.
+-   **Text Merging**: Vertically adjacent text blocks are merged into single "paragraph" clusters.
+-   **Quantization**: Block coordinates are snapped to a grid (1px for text, 10px for UI) to prevent sub-pixel jitter from causing "flicker" in the periphery during micro-layout shifts.
 
-### 2. Texture Pipeline
-- **GL_TEXTURE3**: Separate saliency texture (grayscale)
-- **Upload**: Computed from source browser capture each frame
-- **Sampling**: `float saliency = texture2D(u_saliencyMap, uv).r;`
-- **File**: `renderer/color-saliency-map.js`
+### 2. Saliency Map Generation
+**File**: `renderer/scrutinizer.js`
 
-### 3. Fidelity Bias Formula
+The Saliency Map is a heatmap generated from the grouped structure blocks, encoding "visual attractiveness" into the Red channel.
+
+**Feature Integration Weights**:
+-   **Images / Video** (Type 0.5): **1.0 (Max)**. High contrast, complex features pop out.
+-   **Headers** (Type 1.0, Large): **0.4 - 1.0**. Dynamic based on size.
+-   **UI Elements** (Type 0.0): **0.3**. Buttons and inputs have medium priority.
+-   **Body Text** (Type 1.0, Small): **0.15**. Low priority texture.
+
+**Temporal Smoothing**:
+To prevent "flicker" and "dropouts" during rapid content updates (e.g., video playback), the saliency map uses a **double-buffered** approach with temporal blending.
+-   **Target Buffer**: Renders the new state immediately.
+-   **Current Buffer**: Blends towards the Target by ~15% per frame.
+-   **Result**: Attention shifts feel organic and fluid, rather than snapping instantly.
+
+### 3. Texture Pipeline
+-   **GL_TEXTURE3**: Saliency texture (Red channel = intensity).
+-   **Upload**: The smoothed "Current" buffer is uploaded to the GPU every frame.
+-   **Sampling**: `float saliency = texture2D(u_saliencyMap, uv).r;`
+
+### 4. Fidelity Bias Formula
 **File**: `renderer/webgl-renderer.js` (in `processLGN` function)
 
 ```glsl
@@ -279,17 +293,17 @@ if (u_enable_saliency_modulation > 0.5) {
 ```
 
 **Effect**:
-- `saliency = 0.0` (low) → `warpStrength` unchanged (full degradation)
-- `saliency = 1.0` (high) → `warpStrength = 0` (no distortion, sharp)
-- Smooth gradient between extremes
+-   `saliency = 0.0` (low) → `warpStrength` unchanged (full degradation)
+-   `saliency = 1.0` (high) → `warpStrength = 0` (no distortion, sharp)
+-   Smooth gradient between extremes
 
-### 4. Validation Results
+### 5. Validation Results
 
 **Observed Behavior** (confirmed via A/B comparison):
-- **Social media icons** (Twitter, etc.): Visibly clearer than surrounding text
-- **Logos** (Bitrix24): Resist warping/jitter compared to background
-- **UI elements**: Retain structural integrity for saccade guidance
-- **Body text**: Full peripheral degradation applied normally
+-   **Social media icons** (Twitter, etc.): Visibly clearer than surrounding text
+-   **Logos** (Bitrix24): Resist warping/jitter compared to background
+-   **UI elements**: Retain structural integrity for saccade guidance
+-   **Body text**: Full peripheral degradation applied normally
 
 **Interpretation**: Successfully demonstrates shift from optical model to cognitive model, reflecting brain's prioritization of salient targets.
 

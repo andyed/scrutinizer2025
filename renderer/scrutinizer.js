@@ -144,11 +144,23 @@
                         this.saliencyMap.resize(bufferWidth, bufferHeight);
                     }
                     // Create offscreen canvas for saliency generation if not exists
-                    if (!this.saliencyGenCanvas) {
-                        this.saliencyGenCanvas = document.createElement('canvas');
+                    if (!this.saliencyTargetCanvas) {
+                        this.saliencyTargetCanvas = document.createElement('canvas');
                     }
-                    this.saliencyGenCanvas.width = Math.ceil(bufferWidth * maskScale);
-                    this.saliencyGenCanvas.height = Math.ceil(bufferHeight * maskScale);
+                    if (!this.saliencyCurrentCanvas) {
+                        this.saliencyCurrentCanvas = document.createElement('canvas');
+                    }
+
+                    const sWidth = Math.ceil(bufferWidth * maskScale);
+                    const sHeight = Math.ceil(bufferHeight * maskScale);
+
+                    this.saliencyTargetCanvas.width = sWidth;
+                    this.saliencyTargetCanvas.height = sHeight;
+
+                    // Resize current canvas but keep content if possible? 
+                    // No, resize usually clears. That's fine for resize events.
+                    this.saliencyCurrentCanvas.width = sWidth;
+                    this.saliencyCurrentCanvas.height = sHeight;
                 }
             });
         }
@@ -439,6 +451,21 @@
                 this.renderer.uploadMask(this.maskCanvas);
             }
 
+            // --- Saliency Smoothing ---
+            // Blend Target -> Current to prevent flicker
+            if (this.saliencyTargetCanvas && this.saliencyCurrentCanvas) {
+                const ctx = this.saliencyCurrentCanvas.getContext('2d', { alpha: false });
+
+                // Draw Target over Current with low opacity to smooth changes
+                // 0.1 = Slow smooth, 0.3 = Fast smooth
+                ctx.globalAlpha = 0.15;
+                ctx.drawImage(this.saliencyTargetCanvas, 0, 0);
+                ctx.globalAlpha = 1.0;
+
+                // Upload Current to GPU
+                this.renderer.uploadSaliencyMap(this.saliencyCurrentCanvas);
+            }
+
             // Log first render
             if (!this.renderCount) {
                 this.renderCount = 0;
@@ -594,6 +621,15 @@
         handleStructureUpdate(blocks) {
             if (!this.renderer || !this.structureMap) return;
 
+            // Optimization: Check if blocks have actually changed
+            // This prevents flicker on sites like YouTube where attributes change rapidly (progress bars)
+            // but the layout remains stable.
+            if (this.areBlocksEqual(this.lastBlocks, blocks)) {
+                // console.log('[Scrutinizer] Skipping redundant structure update');
+                return;
+            }
+            this.lastBlocks = blocks;
+
             // console.log(`[Scrutinizer] Received structure update: ${blocks.length} blocks`);
 
             // Ensure map size matches viewport
@@ -629,17 +665,62 @@
             }
         }
 
-        groupStructureBlocks(blocks) {
-            if (!blocks || blocks.length === 0) return [];
+        areBlocksEqual(prev, next) {
+            if (!prev && !next) return true;
+            if (!prev || !next) return false;
+            if (prev.length !== next.length) return false;
 
-            // 1. Filter only text blocks (type 0) for grouping. Keep others as is.
-            const textBlocks = blocks.filter(b => b.type === 0);
-            const otherBlocks = blocks.filter(b => b.type !== 0);
+            // Check a few random samples to fail fast? 
+            // Or just check all. For <1000 blocks, checking all is fast enough (sub-ms).
+            // We check geometry and type with a small epsilon for floats
+            const EPSILON = 0.1;
+            for (let i = 0; i < prev.length; i++) {
+                const p = prev[i];
+                const n = next[i];
+                if (Math.abs(p.x - n.x) > EPSILON ||
+                    Math.abs(p.y - n.y) > EPSILON ||
+                    Math.abs(p.w - n.w) > EPSILON ||
+                    Math.abs(p.h - n.h) > EPSILON ||
+                    p.type !== n.type ||
+                    Math.abs(p.lineHeight - n.lineHeight) > EPSILON ||
+                    Math.abs(p.density - n.density) > EPSILON) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        groupStructureBlocks(rawBlocks) {
+            if (!rawBlocks || rawBlocks.length === 0) return [];
+
+            // Quantize blocks to stabilize the structure map against small layout shifts
+            // Text: 1px grid (remove sub-pixel jitter)
+            // UI/Media: 10px grid (stabilize progress bars/animations)
+            const blocks = rawBlocks.map(b => {
+                const grid = b.type === 1 ? 1 : 10;
+                return {
+                    ...b,
+                    x: Math.round(b.x / grid) * grid,
+                    y: Math.round(b.y / grid) * grid,
+                    w: Math.round(b.w / grid) * grid,
+                    h: Math.round(b.h / grid) * grid
+                };
+            });
+
+            // 1. Filter only text blocks (type 1) for grouping. Keep others as is.
+            // FIX: Previously checked type 0 (UI), which caused instability with changing UI elements
+            const textBlocks = blocks.filter(b => b.type === 1);
+            const otherBlocks = blocks.filter(b => b.type !== 1);
 
             if (textBlocks.length === 0) return otherBlocks;
 
             // 2. Sort by Y then X
-            textBlocks.sort((a, b) => a.y - b.y || a.x - b.x);
+            // Quantize coordinates to prevent sub-pixel jitter from affecting sort order
+            textBlocks.sort((a, b) => {
+                const yDiff = Math.floor(a.y) - Math.floor(b.y);
+                if (yDiff !== 0) return yDiff;
+                return Math.floor(a.x) - Math.floor(b.x);
+            });
 
             const merged = [];
             let current = textBlocks[0];
@@ -674,11 +755,11 @@
         }
 
         generateSaliencyMap(blocks, dpr, yOffset) {
-            if (!this.saliencyGenCanvas || !this.renderer) return;
+            if (!this.saliencyTargetCanvas || !this.renderer) return;
 
-            const ctx = this.saliencyGenCanvas.getContext('2d', { alpha: false });
-            const width = this.saliencyGenCanvas.width;
-            const height = this.saliencyGenCanvas.height;
+            const ctx = this.saliencyTargetCanvas.getContext('2d', { alpha: false });
+            const width = this.saliencyTargetCanvas.width;
+            const height = this.saliencyTargetCanvas.height;
 
             // Scale factor from viewport to saliency map (0.25)
             const scale = width / (this.canvas.width || 1);
@@ -691,8 +772,9 @@
             // Images/Headers = High Saliency (Pop-out)
             // Text = Low Saliency (Texture)
 
-            // Use additive blending to simulate "activation accumulation"
-            ctx.globalCompositeOperation = 'screen';
+            // Use source-over to prevent "intensity explosion" from overlapping blocks
+            // This stabilizes the saliency map against small layout shifts/grouping changes
+            ctx.globalCompositeOperation = 'source-over';
 
             // Blur context for "Proximity Grouping" (Gestalt)
             // Simulates the low-frequency nature of peripheral vision
@@ -702,15 +784,25 @@
                 let saliency = 0.0;
 
                 // --- FEATURE WEIGHTS ---
-                if (block.type === 1) { // Image
+                // Types from preload.js:
+                // 1.0 = Text
+                // 0.5 = Media
+                // 0.0 = UI
+
+                if (block.type === 0.5) { // Media (Images, Video)
                     saliency = 1.0; // High pop-out
-                } else if (block.type === 2) { // Header/Large Text
-                    // Heuristic: Larger text = higher saliency
-                    // Normalize line height (e.g. 16px = 0.2, 60px = 0.8)
-                    const normalizedSize = Math.min(block.lineHeight / 60.0, 1.0);
-                    saliency = 0.3 + (normalizedSize * 0.7);
-                } else { // Body Text
-                    saliency = 0.15; // Low baseline
+                } else if (block.type === 1.0) { // Text
+                    // Check for Headers based on line height
+                    if (block.lineHeight > 24) {
+                        // Header/Large Text
+                        const normalizedSize = Math.min(block.lineHeight / 60.0, 1.0);
+                        saliency = 0.4 + (normalizedSize * 0.6);
+                    } else {
+                        // Body Text
+                        saliency = 0.15; // Low baseline
+                    }
+                } else { // UI (0.0) or others
+                    saliency = 0.3; // Medium saliency for interactive elements
                 }
 
                 // Draw "activation blob"
@@ -727,20 +819,10 @@
 
             ctx.filter = 'none'; // Reset filter
 
-            // 3. Center Bias (Optional - mimicking biological tendency)
-            // Draw a subtle radial gradient at the center
-            /*
-            const gradient = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, width * 0.6);
-            gradient.addColorStop(0, 'rgba(50, 0, 0, 0.3)'); // Slight boost at center
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, width, height);
-            */
-
-            // 4. Upload to GPU
-            // We use the existing uploadSaliencyMap method
-            // Note: The shader expects a texture. We can pass the canvas directly.
-            this.renderer.uploadSaliencyMap(this.saliencyGenCanvas);
+            // NOTE: We do NOT upload here anymore.
+            // The render loop (processFrame) will blend Target -> Current and upload Current.
+            // NOTE: We do NOT upload here anymore.
+            // The render loop (processFrame) will blend Target -> Current and upload Current.
         }
     }
 

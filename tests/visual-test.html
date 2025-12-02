@@ -431,6 +431,48 @@
             const frameMode4 = captureFrame();
             saveScreenshot('test9_mode4');
 
+            // --- TEST 10: Saliency Stability (Regression) ---
+            // Verify that the periphery doesn't "dance" (oscillate) when the mouse stops moving.
+            // We simulate a mouse move, then capture two frames in rapid succession.
+
+            // 1. Move mouse to a new position
+            const test10MouseX = width * 0.75;
+            const test10MouseY = height * 0.25;
+
+            // 2. Render Frame A
+            renderer.render(
+                width, height, test10MouseX, test10MouseY, 150, 1.33,
+                0.8, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, test10MouseX, test10MouseY,
+                0.0,
+                1.0, // enableSaliencyModulation = 1.0
+                10.0 // time = 10.0s
+            );
+            const frameStable1 = captureFrame();
+            saveScreenshot('test10_stable_1');
+
+            // 3. Render Frame B (Next frame, same mouse pos)
+            // We advance time slightly to ensure time-based effects (if any) are active,
+            // but the *saliency* effect itself should be stable if the map is stable.
+            renderer.render(
+                width, height, test10MouseX, test10MouseY, 150, 1.33,
+                0.8, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, test10MouseX, test10MouseY,
+                0.0,
+                1.0, // enableSaliencyModulation = 1.0
+                10.016 // time = 10.016s (16ms later)
+            );
+            const frameStable2 = captureFrame();
+            saveScreenshot('test10_stable_2');
+
+            // 4. Compare
+            const stabilityDiff = compareFrames(frameStable1, frameStable2);
+            // Note: If V1 animation is enabled, this might fail. 
+            // But by default v1_animate is false. 
+            // We expect near-zero diff.
+            if (stabilityDiff > 0.001) {
+                throw new Error(`Test 10 Failed: Output is unstable (diff: ${stabilityDiff}). Saliency oscillation detected?`);
+            }
+            ipcRenderer.send('log', `Test 10 Passed: Stability verified (diff: ${(stabilityDiff * 100).toFixed(4)}%)`);
+
             const diff0vs3 = compareFrames(frameMode0, frameMode3);
             const diff0vs4 = compareFrames(frameMode0, frameMode4);
 
