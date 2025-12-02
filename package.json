@@ -39,7 +39,7 @@
         "dmg",
         "zip"
       ],
-      "icon": "renderer/scrutinizer_512x512_icon.png",
+      "icon": "renderer/assets/scrutinizer_512x512_icon.png",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
@@ -48,7 +48,7 @@
     "dmg": {
       "sign": false,
       "title": "Scrutinizer ${version}",
-      "icon": "renderer/scrutinizer_512x512_icon.png"
+      "icon": "renderer/assets/scrutinizer_512x512_icon.png"
     },
     "win": {
       "target": [
@@ -65,7 +65,7 @@
           ]
         }
       ],
-      "icon": "renderer/scrutinizer_512x512_icon.png"
+      "icon": "renderer/assets/scrutinizer_512x512_icon.png"
     },
     "nsis": {
       "oneClick": true,
