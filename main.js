@@ -503,10 +503,14 @@ function createScrutinizerWindow(startUrl) {
     });
 
     // Reset visual memory on navigation
-    contentView.webContents.on('did-start-navigation', () => {
-        console.log('[Main] Navigation started, resetting visual memory');
-        if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
-            hudWindow.webContents.send('hud:reset-visual-memory');
+    contentView.webContents.on('did-start-navigation', (event, url, isInPlace, isMainFrame) => {
+        if (isMainFrame && !isInPlace) {
+            console.log('[Main] Top-level navigation started, resetting visual memory');
+            if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
+                hudWindow.webContents.send('hud:reset-visual-memory');
+            }
+        } else {
+            console.log('[Main] In-page/Frame navigation ignored for memory reset');
         }
     });
 
@@ -677,6 +681,7 @@ function createWindow() {
     currentRadius = settingsManager.get('radius');
     currentBlur = settingsManager.get('blur');
     currentIntensity = settingsManager.get('intensity');
+    currentVisualMemory = settingsManager.get('visualMemory'); // Load saved visual memory setting
     currentEnabled = true; // Force enabled for debugging
     // currentEnabled = settingsManager.get('enabled') !== undefined ? settingsManager.get('enabled') : true; // Default to true for debugging
     currentShowWelcome = settingsManager.get('showWelcomePopup');
@@ -720,7 +725,8 @@ function runTestMode() {
         }
     });
 
-    testWindow.loadFile(path.join(__dirname, 'tests', 'visual-test.html'));
+    const testFile = process.env.TEST_FILE || path.join('tests', 'visual-test.html');
+    testWindow.loadFile(path.join(__dirname, testFile));
 
     ipcMain.on('test-result', (event, result) => {
         if (result.success) {
@@ -805,8 +811,19 @@ function runIntegrationTest() {
         console.log(`[Test] Navigating to ${testUrl}...`);
         mainWindow.scrutinizerView.webContents.loadURL(testUrl);
 
-        mainWindow.scrutinizerView.webContents.once('did-finish-load', () => {
+        mainWindow.scrutinizerView.webContents.once('did-finish-load', async () => {
             console.log('[Test] Page loaded. Waiting for effects to stabilize...');
+
+            // Scroll to specified Y offset if TEST_SCROLL_Y is set
+            const scrollY = process.env.TEST_SCROLL_Y ? parseInt(process.env.TEST_SCROLL_Y, 10) : 0;
+            if (scrollY > 0) {
+                console.log(`[Test] Scrolling to Y offset: ${scrollY}px...`);
+                await mainWindow.scrutinizerView.webContents.executeJavaScript(`
+                    window.scrollTo(0, ${scrollY});
+                `);
+                // Wait for scroll to complete and re-render
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
 
             // Wait for 5 seconds for page to settle and effects to render
             setTimeout(async () => {

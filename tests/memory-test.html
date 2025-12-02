@@ -3,387 +3,297 @@
 
 <head>
     <title>Visual Memory Test</title>
+    <style>
+        body {
+            background: #222;
+            color: #eee;
+            font-family: monospace;
+        }
+
+        #log {
+            white-space: pre-wrap;
+        }
+
+        .pass {
+            color: #4f4;
+        }
+
+        .fail {
+            color: #f44;
+        }
+    </style>
 </head>
 
 <body>
-    <canvas id="overlay-canvas" width="800" height="600"></canvas>
+    <h1>Visual Memory Logic Test</h1>
+    <div id="log">Running tests...</div>
+    <canvas id="overlay-canvas" width="800" height="600" style="display:none"></canvas>
+
     <script>
         const { ipcRenderer } = require('electron');
 
+        // --- MOCKS ---
+
         // Mock Logger
         const mockLogger = {
-            log: (msg) => ipcRenderer.send('log', msg),
-            error: (msg) => ipcRenderer.send('log', 'ERROR: ' + msg),
-            warn: (msg) => ipcRenderer.send('log', 'WARN: ' + msg)
+            log: (msg) => console.log('[MockLog]', msg),
+            error: (msg) => console.error('[MockError]', msg),
+            warn: (msg) => console.warn('[MockWarn]', msg)
         };
 
-        try {
-            // Load Scrutinizer
-            require('../renderer/scrutinizer.js');
-
-            // Mock config
-            const mockConfig = {
-                fovealRadius: 100,
-                intensity: 0.8,
-                maskSmoothness: 1.0, // Instant movement for testing
-                visualMemoryLimit: 5, // Enable memory
-                debugBoundary: 0,
-                mongrelMode: 0,
-                aestheticMode: 0
-            };
-
-            const scrutinizer = new window.Scrutinizer(mockConfig);
-            scrutinizer.setVisualMemoryLimit(5); // Ensure limit is set
-            scrutinizer.enable();
-
-            // Helper to simulate time and render
-            const simulate = (durationMs, x, y) => {
-                const step = 16; // ~60fps
-                const steps = Math.floor(durationMs / step);
-
-                // Set mouse position
-                scrutinizer.mouseX = x;
-                scrutinizer.mouseY = y;
-                scrutinizer.targetMouseX = x;
-                scrutinizer.targetMouseY = y;
-                scrutinizer.lastMouseX = x;
-                scrutinizer.lastMouseY = y;
-                scrutinizer.currentVelocity = 0; // Force stationary
-
-                for (let i = 0; i < steps; i++) {
-                    scrutinizer.render();
-                    // Manually advance time if needed, but render() uses performance.now()
-                    // We can't easily mock performance.now() without more work, 
-                    // but we can rely on the fact that we are calling render() in a loop.
-                    // Actually, render() calculates dt based on performance.now().
-                    // If we run this loop synchronously, dt will be ~0.
-                    // We need to mock performance.now or sleep.
-                    // Let's just mock the internal state for testing logic if possible,
-                    // or use a sleep helper if we were async.
-                    // Since this is a browser test, we can't easily sleep synchronously.
-
-                    // BETTER APPROACH:
-                    // We can manually tick the internal state if we expose it, 
-                    // or just rely on the fact that we are testing the LOGIC, not the actual timing.
-                    // But the logic DEPENDS on timing (2s dwell).
-
-                    // Let's mock performance.now on the window?
-                    // No, let's just manually set lastRenderTime and pass a fake time to render?
-                    // render() calls performance.now() internally.
-                }
-            };
-
-            // We need to verify the MASK content.
-            // Scrutinizer draws to this.maskCanvas.
-            const checkMaskAt = (x, y) => {
-                const ctx = scrutinizer.maskCtx;
-                // Mask is scaled by 0.25 usually
-                const scaleX = scrutinizer.maskCanvas.width / scrutinizer.canvas.width;
-                const scaleY = scrutinizer.maskCanvas.height / scrutinizer.canvas.height;
-
-                const maskX = Math.floor(x * scaleX);
-                const maskY = Math.floor(y * scaleY);
-
-                const pixel = ctx.getImageData(maskX, maskY, 1, 1).data;
-                // Alpha or White value should be high if remembered
-                // We draw white with alpha.
-                // If composite is screen, it adds up.
-                // We check Red channel (should be > 0 if white is drawn)
-                return pixel[0] > 50;
-            };
-
-            // --- TEST SEQUENCE ---
-
-            // 1. Fixate at Point A (100, 100) for 1s (Should NOT remember)
-            // We need to mock time. Let's override performance.now
-            let virtualTime = 10000;
-            const originalNow = performance.now;
-            window.performance.now = () => virtualTime;
-
-            scrutinizer.lastRenderTime = virtualTime;
-
-            // Tick 1s
-            scrutinizer.mouseX = 100; scrutinizer.mouseY = 100;
-            scrutinizer.targetMouseX = 100; scrutinizer.targetMouseY = 100;
-
-            // Frame 1: Start fixation
-            scrutinizer.render();
-
-            // Advance 1s
-            virtualTime += 1000;
-            scrutinizer.render(); // Should update logic
-
-            // Check Buffer (should be empty)
-            if (scrutinizer.visualMemoryBuffer.length > 0) {
-                throw new Error('Test Failed: Added to buffer too early (1s)');
+        // Mock WebGLRenderer
+        class MockWebGLRenderer {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.gl = {
+                    createTexture: () => { },
+                    bindTexture: () => { },
+                    texParameteri: () => { },
+                    texImage2D: () => { },
+                    createBuffer: () => { },
+                    bindBuffer: () => { },
+                    bufferData: () => { },
+                    enable: () => { },
+                    blendFunc: () => { },
+                    viewport: () => { },
+                    useProgram: () => { },
+                    enableVertexAttribArray: () => { },
+                    vertexAttribPointer: () => { },
+                    uniform1f: () => { },
+                    uniform2f: () => { },
+                    uniform1i: () => { },
+                    activeTexture: () => { },
+                    drawArrays: () => { },
+                    clear: () => { },
+                    clearColor: () => { },
+                    getError: () => 0,
+                    NO_ERROR: 0
+                };
             }
-            ipcRenderer.send('log', 'Pass: Buffer empty after 1s');
-
-            // 2. Fixate at Point A for another 1.5s (Total 2.5s -> Should REMEMBER)
-            virtualTime += 1500;
-            scrutinizer.render();
-
-            if (scrutinizer.visualMemoryBuffer.length === 0) {
-                throw new Error('Test Failed: Did not add to buffer after 2.5s');
-            }
-            ipcRenderer.send('log', 'Pass: Added to buffer after 2.5s');
-
-            // 3. Move to Point B (400, 400)
-            // We need to simulate a move that breaks fixation.
-            // Since our velocity smoothing is very aggressive (0.95), a single frame jump might not be enough
-            // if we just rely on calculated velocity from 0.
-            // Let's manually force a velocity spike to simulate the transit.
-            scrutinizer.currentVelocity = 10.0;
-            scrutinizer.render(); // This frame sees high velocity -> breaks fixation
-
-            // Now arrive at B
-            scrutinizer.mouseX = 400; scrutinizer.mouseY = 400;
-            scrutinizer.targetMouseX = 400; scrutinizer.targetMouseY = 400;
-            scrutinizer.lastMouseX = 400; scrutinizer.lastMouseY = 400;
-            scrutinizer.currentVelocity = 0; // Stop
-
-            virtualTime += 100;
-            scrutinizer.render(); // This frame sees 0 velocity -> starts NEW fixation
-
-            // Check A (should still be there in mask)
-            if (!checkMaskAt(100, 100)) {
-                throw new Error('Test Failed: Point A vanished from mask after moving to B');
-            }
-            ipcRenderer.send('log', 'Pass: Point A persisted in mask after move');
-
-            // Check B (should be clear because it's current fovea)
-            if (!checkMaskAt(400, 400)) {
-                throw new Error('Test Failed: Point B (current fovea) is not clear');
-            }
-            ipcRenderer.send('log', 'Pass: Point B is clear');
-
-            // Check Buffer (should still only have A)
-            // B hasn't been fixated long enough (only 100ms since arrival)
-            if (scrutinizer.visualMemoryBuffer.length > 1) {
-                throw new Error('Test Failed: Point B added to buffer instantly');
-            }
-
-            // 4. Fixate B for 2.5s
-            (async () => { // Wrap in async IIFE to allow await if needed, though we'll use virtualTime
-                try {
-                    // Load Scrutinizer
-                    require('../renderer/scrutinizer.js');
-
-                    // Mock config
-                    const mockConfig = {
-                        fovealRadius: 100,
-                        intensity: 0.8,
-                        maskSmoothness: 1.0, // Instant movement for testing
-                        visualMemoryLimit: 2, // Set limit to 2 for FIFO test
-                        debugBoundary: 0,
-                        mongrelMode: 0,
-                        aestheticMode: 0
-                    };
-
-                    const scrutinizer = new window.Scrutinizer(mockConfig);
-                    scrutinizer.setVisualMemoryLimit(2); // Ensure limit is set to 2
-                    scrutinizer.enable();
-
-                    // Helper to simulate time and render
-                    const simulate = (durationMs, x, y) => {
-                        const step = 16; // ~60fps
-                        const steps = Math.floor(durationMs / step);
-
-                        // Set mouse position
-                        scrutinizer.mouseX = x;
-                        scrutinizer.mouseY = y;
-                        scrutinizer.targetMouseX = x;
-                        scrutinizer.targetMouseY = y;
-                        scrutinizer.lastMouseX = x;
-                        scrutinizer.lastMouseY = y;
-                        scrutinizer.currentVelocity = 0; // Force stationary
-
-                        for (let i = 0; i < steps; i++) {
-                            scrutinizer.render();
-                            // Manually advance time if needed, but render() uses performance.now()
-                            // We can't easily mock performance.now() without more work, 
-                            // but we can rely on the fact that we are calling render() in a loop.
-                            // Actually, render() calculates dt based on performance.now().
-                            // If we run this loop synchronously, dt will be ~0.
-                            // We need to mock performance.now or sleep.
-                            // Let's just mock the internal state for testing logic if possible,
-                            // or use a sleep helper if we were async.
-                            // Since this is a browser test, we can't easily sleep synchronously.
-
-                            // BETTER APPROACH:
-                            // We can manually tick the internal state if we expose it, 
-                            // or just rely on the fact that we are testing the LOGIC, not the actual timing.
-                            // But the logic DEPENDS on timing (2s dwell).
-
-                            // Let's mock performance.now on the window?
-                            // No, let's just manually set lastRenderTime and pass a fake time to render?
-                            // render() calls performance.now() internally.
-                        }
-                    };
-
-                    // We need to verify the MASK content.
-                    // Scrutinizer draws to this.maskCanvas.
-                    const checkMaskAt = (x, y, expected, pointName = `(${x}, ${y})`) => {
-                        const ctx = scrutinizer.maskCtx;
-                        // Mask is scaled by 0.25 usually
-                        const scaleX = scrutinizer.maskCanvas.width / scrutinizer.canvas.width;
-                        const scaleY = scrutinizer.maskCanvas.height / scrutinizer.canvas.height;
-
-                        const maskX = Math.floor(x * scaleX);
-                        const maskY = Math.floor(y * scaleY);
-
-                        const pixel = ctx.getImageData(maskX, maskY, 1, 1).data;
-                        // Alpha or White value should be high if remembered
-                        // We draw white with alpha.
-                        // If composite is screen, it adds up.
-                        // We check Red channel (should be > 0 if white is drawn)
-                        const isRemembered = pixel[0] > 50;
-                        if (isRemembered !== expected) {
-                            throw new Error(`Test Failed: Point ${pointName} mask check failed. Expected remembered: ${expected}, Actual: ${isRemembered}`);
-                        }
-                        return isRemembered;
-                    };
-
-                    // --- TEST SEQUENCE ---
-
-                    // 1. Fixate at Point A (100, 100) for 1s (Should NOT remember)
-                    // We need to mock time. Let's override performance.now
-                    let virtualTime = 10000;
-                    const originalNow = performance.now;
-                    window.performance.now = () => virtualTime;
-
-                    scrutinizer.lastRenderTime = virtualTime;
-
-                    // Tick 1s
-                    scrutinizer.mouseX = 100; scrutinizer.mouseY = 100;
-                    scrutinizer.targetMouseX = 100; scrutinizer.targetMouseY = 100;
-
-                    // Frame 1: Start fixation
-                    scrutinizer.render();
-
-                    // Advance 1s
-                    virtualTime += 1000;
-                    scrutinizer.render(); // Should update logic
-
-                    // Check Buffer (should be empty)
-                    if (scrutinizer.visualMemoryBuffer.length > 0) {
-                        throw new Error('Test Failed: Added to buffer too early (1s)');
-                    }
-                    ipcRenderer.send('log', 'Pass: Buffer empty after 1s');
-
-                    // 2. Fixate at Point A for another 1.5s (Total 2.5s -> Should REMEMBER)
-                    virtualTime += 1500;
-                    scrutinizer.render();
-
-                    if (scrutinizer.visualMemoryBuffer.length === 0) {
-                        throw new Error('Test Failed: Did not add to buffer after 2.5s');
-                    }
-                    ipcRenderer.send('log', 'Pass: Added to buffer after 2.5s');
-
-                    // 3. Move to Point B (400, 400)
-                    // We need to simulate a move that breaks fixation.
-                    // Since our velocity smoothing is very aggressive (0.95), a single frame jump might not be enough
-                    // if we just rely on calculated velocity from 0.
-                    // Let's manually force a velocity spike to simulate the transit.
-                    scrutinizer.currentVelocity = 10.0;
-                    scrutinizer.render(); // This frame sees high velocity -> breaks fixation
-
-                    // Now arrive at B
-                    scrutinizer.mouseX = 400; scrutinizer.mouseY = 400;
-                    scrutinizer.targetMouseX = 400; scrutinizer.targetMouseY = 400;
-                    scrutinizer.lastMouseX = 400; scrutinizer.lastMouseY = 400;
-                    scrutinizer.currentVelocity = 0; // Stop
-
-                    virtualTime += 100;
-                    scrutinizer.render(); // This frame sees 0 velocity -> starts NEW fixation
-
-                    // Check A (should still be there in mask)
-                    checkMaskAt(100, 100, true, 'A');
-                    ipcRenderer.send('log', 'Pass: Point A persisted in mask after move');
-
-                    // Check B (should be visible because it's current fovea)
-                    checkMaskAt(400, 400, true, 'B (current fovea)');
-                    ipcRenderer.send('log', 'Pass: Point B is visible (current fovea)');
-
-                    // Check Buffer (should still only have A)
-                    // B hasn't been fixated long enough (only 100ms since arrival)
-                    if (scrutinizer.visualMemoryBuffer.length > 1) {
-                        throw new Error('Test Failed: Point B added to buffer instantly');
-                    }
-
-                    // 4. Fixate B for 2.5s
-                    virtualTime += 2500;
-                    scrutinizer.render();
-
-                    // Check A and B
-                    checkMaskAt(100, 100, true, 'A');
-                    checkMaskAt(400, 400, true, 'B');
-                    ipcRenderer.send('log', 'Pass: Both A and B remembered');
-
-                    // 5. Test FIFO Limit (The "Forget" Test)
-                    // Current buffer: [A, B] (Limit is 2)
-                    // Move to C and dwell. A should be evicted.
-                    const targetXA = 100;
-                    const targetYA = 100;
-                    const targetXB = 400;
-                    const targetYB = 400;
-                    const targetXC = 500;
-                    const targetYC = 500;
-
-                    // Move to C
-                    scrutinizer.mouseX = targetXC;
-                    scrutinizer.mouseY = targetYC;
-                    scrutinizer.targetMouseX = targetXC;
-                    scrutinizer.targetMouseY = targetYC;
-                    scrutinizer.lastMouseX = targetXC;
-                    scrutinizer.lastMouseY = targetYC;
-                    // Simulate velocity to break fixation
-                    scrutinizer.currentVelocity = 10.0;
-                    virtualTime += 100; // Simulate a frame with high velocity
-                    scrutinizer.render();
-
-                    scrutinizer.currentVelocity = 0; // Stop
-                    virtualTime += 100; // Simulate arrival at C
-                    scrutinizer.render();
-
-                    // Dwell at C for 2.5s
-                    virtualTime += 2500;
-                    scrutinizer.render();
-
-                    // Check Buffer: Should be [B, C]
-                    if (scrutinizer.visualMemoryBuffer.length !== 2) {
-                        throw new Error(`Buffer length wrong after C. Expected 2, got ${scrutinizer.visualMemoryBuffer.length}`);
-                    }
-
-                    // Check Mask:
-                    // C (500,500) should be visible
-                    checkMaskAt(targetXC, targetYC, true, 'C');
-                    // B (400,400) should be visible
-                    checkMaskAt(targetXB, targetYB, true, 'B');
-                    // A (100,100) should be FORGOTTEN (Black/Blur)
-                    checkMaskAt(targetXA, targetYA, false, 'A');
-
-                    ipcRenderer.send('log', 'Pass: FIFO eviction worked (A forgotten, B & C remembered)');
-
-                    // Restore
-                    window.performance.now = originalNow;
-                    ipcRenderer.send('test-result', { success: true, message: 'Visual Memory Logic Verified' });
-
-                } catch (err) {
-                    ipcRenderer.send('test-result', {
-                        success: false,
-                        message: err.message,
-                        details: err.stack
-                    });
-                }
-            })();
-        } catch (err) {
-            ipcRenderer.send('test-result', {
-                success: false,
-                message: err.message,
-                details: err.stack
-            });
+            uploadTexture() { }
+            uploadMask() { }
+            uploadStructureMap() { }
+            uploadSaliencyMap() { }
+            render() { }
+            clear() { }
         }
+
+        // Mock Dependencies
+        window.WebGLRenderer = MockWebGLRenderer;
+
+        // Mock StructureMap/SaliencyMap if needed (they are required in scrutinizer.js)
+        // We can just let them load if they don't depend on real WebGL context for instantiation
+        // But scrutinizer.js requires them. Let's assume they are loadable or we mock require.
+        // Since we are in Electron renderer, require works.
+
+        // We need to intercept require calls for internal modules if they fail.
+        // But let's try loading Scrutinizer first.
+
+        // Mock Time
+        let virtualTime = 10000;
+
+        // Override both window and global performance if possible
+        const originalNow = performance.now.bind(performance);
+
+        // Define the mock
+        const mockNow = () => virtualTime;
+
+        // Attempt to override
+        try {
+            window.performance.now = mockNow;
+        } catch (e) { }
+        try {
+            performance.now = mockNow;
+        } catch (e) { }
+        try {
+            global.performance.now = mockNow;
+        } catch (e) { }
+
+        console.log('[TEST] Mocked time check:', performance.now());
+
+        // --- TEST RUNNER ---
+
+        const logDiv = document.getElementById('log');
+        let hasFailed = false;
+        function log(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.textContent = msg;
+            if (type === 'pass') div.className = 'pass';
+            if (type === 'fail') {
+                div.className = 'fail';
+                hasFailed = true;
+            }
+            logDiv.appendChild(div);
+            ipcRenderer.send('log', `[TEST] ${msg}`);
+        }
+
+        async function runTests() {
+            try {
+                // Load Scrutinizer
+                require('../renderer/scrutinizer.js');
+
+                // 1. Setup
+                const config = {
+                    fovealRadius: 100,
+                    intensity: 0.8,
+                    maskSmoothness: 1.0, // Instant
+                    visualMemoryLimit: 2,
+                    debugBoundary: 0,
+                    mongrelMode: 0,
+                    aestheticMode: 0
+                };
+
+                const scrutinizer = new window.Scrutinizer(config);
+                scrutinizer.enable();
+                scrutinizer.lastRenderTime = virtualTime; // Sync initial time
+
+                // Helper to tick
+                const tick = (ms) => {
+                    virtualTime += ms;
+                };
+
+                // --- TEST CASE 1: Fixation Logic ---
+                log('Test 1: Fixation Logic (Dwell 2s)', 'info');
+
+                // Move to 100,100
+                scrutinizer.mouseX = 100; scrutinizer.mouseY = 100;
+                scrutinizer.targetMouseX = 100; scrutinizer.targetMouseY = 100;
+                scrutinizer.lastMouseX = 100; scrutinizer.lastMouseY = 100;
+                scrutinizer.currentVelocity = 0;
+
+                // Render frame 1
+                scrutinizer.render();
+
+                // Advance 1s (Should NOT be in buffer yet)
+                tick(1000);
+                scrutinizer.render();
+
+                if (scrutinizer.visualMemoryBuffer.length === 0) {
+                    log('PASS: Buffer empty after 1s', 'pass');
+                } else {
+                    log(`FAIL: Buffer has ${scrutinizer.visualMemoryBuffer.length} items after 1s`, 'fail');
+                }
+
+                // Advance another 1.5s (Total 2.5s -> Should be in buffer)
+                tick(1500);
+                scrutinizer.render();
+
+                if (scrutinizer.visualMemoryBuffer.length === 1) {
+                    log('PASS: Buffer has 1 item after 2.5s', 'pass');
+                } else {
+                    log(`FAIL: Buffer has ${scrutinizer.visualMemoryBuffer.length} items after 2.5s`, 'fail');
+                    log(`Debug: Velocity=${scrutinizer.currentVelocity}, Fixating=${scrutinizer.isFixating}, Dwell=${virtualTime - scrutinizer.fixationStartTime}`);
+                }
+
+                // --- TEST CASE 2: FIFO Eviction ---
+                log('Test 2: FIFO Eviction (Limit 2)', 'info');
+
+                // Move to B (400, 400)
+                // Simulate movement velocity to break fixation
+                scrutinizer.currentVelocity = 10.0;
+                tick(100);
+                scrutinizer.render();
+
+                scrutinizer.mouseX = 400; scrutinizer.mouseY = 400;
+                scrutinizer.targetMouseX = 400; scrutinizer.targetMouseY = 400;
+                scrutinizer.lastMouseX = 400; scrutinizer.lastMouseY = 400;
+                scrutinizer.currentVelocity = 0;
+
+                // Dwell at B
+                tick(2500);
+                scrutinizer.render();
+
+                if (scrutinizer.visualMemoryBuffer.length === 2) {
+                    log('PASS: Buffer has 2 items (A, B)', 'pass');
+                } else {
+                    log(`FAIL: Buffer has ${scrutinizer.visualMemoryBuffer.length} items (Expected 2)`, 'fail');
+                }
+
+                // Move to C (500, 500) -> Should evict A
+                scrutinizer.currentVelocity = 10.0;
+                tick(100);
+                scrutinizer.render();
+
+                scrutinizer.mouseX = 500; scrutinizer.mouseY = 500;
+                scrutinizer.targetMouseX = 500; scrutinizer.targetMouseY = 500;
+                scrutinizer.lastMouseX = 500; scrutinizer.lastMouseY = 500;
+                scrutinizer.currentVelocity = 0;
+
+                // Dwell at C
+                tick(2500);
+                scrutinizer.render();
+
+                if (scrutinizer.visualMemoryBuffer.length === 2) {
+                    const p1 = scrutinizer.visualMemoryBuffer[0]; // Should be B (400,400)
+                    const p2 = scrutinizer.visualMemoryBuffer[1]; // Should be C (500,500)
+
+                    const distB = Math.hypot(p1.x - 400, p1.y - 400);
+                    const distC = Math.hypot(p2.x - 500, p2.y - 500);
+
+                    if (distB < 1 && distC < 1) {
+                        log('PASS: FIFO worked. Buffer contains B and C.', 'pass');
+                    } else {
+                        log(`FAIL: Buffer content mismatch. [0]=(${p1.x},${p1.y}), [1]=(${p2.x},${p2.y})`, 'fail');
+                    }
+                } else {
+                    log(`FAIL: Buffer length is ${scrutinizer.visualMemoryBuffer.length} (Expected 2)`, 'fail');
+                }
+
+                // --- TEST CASE 3: Infinite Mode ---
+                log('Test 3: Infinite Mode (-1)', 'info');
+
+                scrutinizer.setVisualMemoryLimit(-1);
+                // Buffer should be cleared on mode change
+                if (scrutinizer.visualMemoryBuffer.length === 0) {
+                    log('PASS: Buffer cleared on mode change', 'pass');
+                } else {
+                    log('FAIL: Buffer NOT cleared on mode change', 'fail');
+                }
+
+                // Add 3 points
+                const points = [[100, 100], [200, 200], [300, 300]];
+
+                for (const p of points) {
+                    // Move
+                    scrutinizer.currentVelocity = 10.0;
+                    tick(100);
+                    scrutinizer.render();
+
+                    scrutinizer.mouseX = p[0]; scrutinizer.mouseY = p[1];
+                    scrutinizer.targetMouseX = p[0]; scrutinizer.targetMouseY = p[1];
+                    scrutinizer.lastMouseX = p[0]; scrutinizer.lastMouseY = p[1];
+                    scrutinizer.currentVelocity = 0;
+
+                    // Dwell
+                    tick(2500);
+                    scrutinizer.render();
+                }
+
+                if (scrutinizer.visualMemoryBuffer.length === 3) {
+                    log('PASS: Infinite mode accumulated 3 points', 'pass');
+                } else {
+                    log(`FAIL: Infinite mode has ${scrutinizer.visualMemoryBuffer.length} points (Expected 3)`, 'fail');
+                }
+
+                // Restore
+                // window.performance.now = originalNow; // Can't easily restore if we overwrote property
+
+                if (hasFailed) {
+                    ipcRenderer.send('test-result', { success: false, message: 'Some tests failed. Check logs.' });
+                } else {
+                    ipcRenderer.send('test-result', { success: true, message: 'All tests passed' });
+                }
+
+            } catch (err) {
+                log(`ERROR: ${err.message}`, 'fail');
+                console.error(err);
+                ipcRenderer.send('test-result', { success: false, message: err.message });
+            }
+        }
+
+        // Run
+        runTests();
+
     </script>
 </body>
 

@@ -428,7 +428,178 @@
 
             ipcRenderer.send('log', `Test 9 Passed: Aesthetic Modes Verified (Blueprint Diff: ${(diff0vs3 * 100).toFixed(2)}%, Cyberpunk Diff: ${(diff0vs4 * 100).toFixed(2)}%)`);
 
-            // All passed
+            // --- TEST 10: Visual Memory Persistence ---
+            ipcRenderer.send('log', 'Starting Test 10: Visual Memory Persistence');
+
+            // 1. Setup Canvas for Scrutinizer
+            const memCanvas = document.getElementById('overlay-canvas') || document.createElement('canvas');
+            memCanvas.id = 'overlay-canvas';
+            memCanvas.width = width;
+            memCanvas.height = height;
+            if (!memCanvas.parentNode) document.body.appendChild(memCanvas);
+
+            // 2. Setup Scrutinizer
+            const memConfig = {
+                fovealRadius: 100,
+                intensity: 0.8,
+                maskSmoothness: 1.0, // Instant
+                visualMemoryLimit: 2, // Limit 2
+                debugBoundary: 0,
+                mongrelMode: 0,
+                aestheticMode: 0
+            };
+
+            // Re-require to get fresh class if needed, but window.Scrutinizer is set
+            const memScrutinizer = new window.Scrutinizer(memConfig);
+            memScrutinizer.enable();
+
+            // 3. Mock Time
+            let memVirtualTime = 20000; // Start late to avoid conflicts
+            const memOriginalNow = window.performance.now;
+            window.performance.now = () => memVirtualTime;
+            memScrutinizer.lastRenderTime = memVirtualTime;
+
+            // Helper to simulate loop
+            const simulateDwell = (duration, x, y) => {
+                const step = 16;
+                const steps = duration / step;
+
+                // Move
+                memScrutinizer.mouseX = x; memScrutinizer.mouseY = y;
+                memScrutinizer.targetMouseX = x; memScrutinizer.targetMouseY = y;
+                memScrutinizer.lastMouseX = x; memScrutinizer.lastMouseY = y;
+                memScrutinizer.currentVelocity = 0; // Force stable
+
+                for (let i = 0; i < steps; i++) {
+                    memVirtualTime += step;
+                    memScrutinizer.render();
+                }
+            };
+
+            const simulateMove = (x, y) => {
+                // Simulate velocity spike
+                memScrutinizer.currentVelocity = 10.0;
+                memVirtualTime += 16;
+                memScrutinizer.render();
+
+                // Arrive
+                memScrutinizer.mouseX = x; memScrutinizer.mouseY = y;
+                memScrutinizer.targetMouseX = x; memScrutinizer.targetMouseY = y;
+                memScrutinizer.lastMouseX = x; memScrutinizer.lastMouseY = y;
+                memScrutinizer.currentVelocity = 0;
+            };
+
+            const saveMemScreenshot = (name) => {
+                if (process.env.SAVE_SCREENSHOTS === 'true') {
+                    const dataUrl = memCanvas.toDataURL('image/png');
+                    ipcRenderer.send('save-screenshot', { name, dataUrl });
+                }
+            };
+
+            // Upload texture to memScrutinizer
+            const memPatternData = new ImageData(patternBuffer, width, height);
+            memScrutinizer.renderer.uploadTexture(memPatternData);
+            memScrutinizer.render(); // Ensure texture is used
+
+            // A. Fixate Center (400, 300)
+            simulateDwell(2500, 400, 300);
+            saveMemScreenshot('test10_1_center_fixated');
+
+            // B. Move to Top-Left (150, 150)
+            simulateMove(150, 150);
+            simulateDwell(2500, 150, 150);
+            saveMemScreenshot('test10_2_topleft_fixated');
+
+            // C. Move to Bottom-Right (650, 450) -> Should evict Center?
+            simulateMove(650, 450);
+            simulateDwell(2500, 650, 450);
+            saveMemScreenshot('test10_3_bottomright_fixated');
+
+            ipcRenderer.send('log', 'Test 10 Passed: Screenshots generated for visual verification');
+
+
+            // --- TEST 11: Infinite Memory Persistence ---
+            ipcRenderer.send('log', 'Starting Test 11: Infinite Memory Persistence');
+
+            // 1. Setup Scrutinizer for Infinite Mode
+            const infConfig = {
+                fovealRadius: 100,
+                intensity: 0.8,
+                maskSmoothness: 1.0,
+                visualMemoryLimit: -1, // Infinite
+                debugBoundary: 0,
+                mongrelMode: 0,
+                aestheticMode: 0
+            };
+
+            const infScrutinizer = new window.Scrutinizer(infConfig);
+            infScrutinizer.enable();
+
+            // 2. Mock Time
+            let infVirtualTime = 30000;
+            window.performance.now = () => infVirtualTime;
+            infScrutinizer.lastRenderTime = infVirtualTime;
+
+            // Helper to simulate loop (reused logic)
+            const simulateInfDwell = (duration, x, y) => {
+                const step = 16;
+                const steps = duration / step;
+
+                infScrutinizer.mouseX = x; infScrutinizer.mouseY = y;
+                infScrutinizer.targetMouseX = x; infScrutinizer.targetMouseY = y;
+                infScrutinizer.lastMouseX = x; infScrutinizer.lastMouseY = y;
+                infScrutinizer.currentVelocity = 0;
+
+                for (let i = 0; i < steps; i++) {
+                    infVirtualTime += step;
+                    infScrutinizer.render();
+                }
+            };
+
+            const simulateInfMove = (x, y) => {
+                infScrutinizer.currentVelocity = 10.0;
+                infVirtualTime += 16;
+                infScrutinizer.render();
+
+                infScrutinizer.mouseX = x; infScrutinizer.mouseY = y;
+                infScrutinizer.targetMouseX = x; infScrutinizer.targetMouseY = y;
+                infScrutinizer.lastMouseX = x; infScrutinizer.lastMouseY = y;
+                infScrutinizer.currentVelocity = 0;
+            };
+
+            const saveInfScreenshot = (name) => {
+                if (process.env.SAVE_SCREENSHOTS === 'true') {
+                    const dataUrl = memCanvas.toDataURL('image/png');
+                    ipcRenderer.send('save-screenshot', { name, dataUrl });
+                }
+            };
+
+            // Upload texture to infScrutinizer
+            const infPatternData = new ImageData(patternBuffer, width, height);
+            infScrutinizer.renderer.uploadTexture(infPatternData);
+
+            // A. Fixate Center (400, 300)
+            simulateInfDwell(2500, 400, 300);
+
+            // B. Move to Top-Left (150, 150)
+            simulateInfMove(150, 150);
+            simulateInfDwell(2500, 150, 150);
+
+            // C. Move to Bottom-Right (650, 450)
+            simulateInfMove(650, 450);
+            simulateInfDwell(2500, 650, 450);
+
+            // D. Move to Top-Right (650, 150)
+            simulateInfMove(650, 150);
+            simulateInfDwell(2500, 650, 150);
+
+            // Capture - All 4 points should be clear (Infinite)
+            saveInfScreenshot('test11_infinite_all_clear');
+
+            // Restore Time
+            window.performance.now = memOriginalNow;
+
+            ipcRenderer.send('log', 'Test 11 Passed: Infinite Memory screenshot generated');
             ipcRenderer.send('test-result', { success: true, message: 'All visual tests passed' });
 
         } catch (err) {

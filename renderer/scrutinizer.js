@@ -34,7 +34,7 @@
             this.lastFrameBitmap = null;
 
             // Visual Memory
-            this.visualMemoryLimit = 0; // 0 = Off, -1 = Infinite, >0 = Count
+            this.visualMemoryLimit = config.visualMemoryLimit !== undefined ? config.visualMemoryLimit : 0; // 0 = Off, -1 = Infinite, >0 = Count
             this.visualMemoryBuffer = []; // Array of {x, y, radius, timestamp}
             this.fixationStartTime = 0;
             this.isFixating = false;
@@ -282,9 +282,9 @@
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             // Simple moving average for velocity to smooth out jitter
-            // Increased smoothing to 0.95 to prevent "bouncy" velocity on steady movements
+            // Reduced smoothing to 0.8 for faster response to stops
             const instantVelocity = dt > 0 ? dist / dt : 0;
-            this.currentVelocity = this.currentVelocity * 0.95 + instantVelocity * 0.05;
+            this.currentVelocity = this.currentVelocity * 0.8 + instantVelocity * 0.2;
 
             this.lastMouseX = this.mouseX;
             this.lastMouseY = this.mouseY;
@@ -300,17 +300,18 @@
 
             if (useMask) {
                 // 1. Fixation Detection
-                // Threshold: < 0.5 px/ms (same as before)
-                // Dwell: > 2000ms
-                const isStable = this.currentVelocity < 0.5;
+                // Threshold: < 2.0 px/ms (relaxed from 0.5)
+                // Dwell: > 1000ms (reduced from 2000ms)
+                const isStable = this.currentVelocity < 2.0;
 
                 if (isStable) {
                     if (!this.isFixating) {
                         this.isFixating = true;
                         this.fixationStartTime = now;
+                        // console.log('[Scrutinizer] Fixation started');
                     } else {
                         const dwellTime = now - this.fixationStartTime;
-                        if (dwellTime > 2000) {
+                        if (dwellTime > 1000) {
                             // Confirmed fixation! Add/Update buffer
                             // Check if we are close to an existing point to update it instead of adding new
                             // Simple distance check: if within radius/2, update
@@ -325,6 +326,7 @@
                                 this.visualMemoryBuffer[existingIndex].x = this.mouseX;
                                 this.visualMemoryBuffer[existingIndex].y = this.mouseY;
                                 this.visualMemoryBuffer[existingIndex].timestamp = now;
+                                // console.log('[Scrutinizer] Updated existing fixation point');
                             } else {
                                 // Add new
                                 this.visualMemoryBuffer.push({
@@ -333,11 +335,16 @@
                                     radius: effectiveRadius,
                                     timestamp: now
                                 });
+                                // console.log(`[Scrutinizer] Added new fixation point. Buffer size: ${this.visualMemoryBuffer.length}, Limit: ${this.visualMemoryLimit}`);
 
                                 // Enforce Limit
+                                // Limit > 0: FIFO
+                                // Limit == -1: Infinite (no removal)
+                                // Limit == 0: Disabled (handled by useMask check above)
                                 if (this.visualMemoryLimit > 0 && this.visualMemoryBuffer.length > this.visualMemoryLimit) {
                                     // Remove oldest (first element)
                                     this.visualMemoryBuffer.shift();
+                                    // console.log('[Scrutinizer] Limit reached, evicted oldest point');
                                 }
                             }
 
@@ -347,6 +354,9 @@
                         }
                     }
                 } else {
+                    if (this.isFixating) {
+                        // console.log('[Scrutinizer] Fixation broken (movement)');
+                    }
                     this.isFixating = false;
                     this.fixationStartTime = 0;
                 }
