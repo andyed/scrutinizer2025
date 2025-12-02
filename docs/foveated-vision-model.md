@@ -28,18 +28,28 @@ Biologically, the fovea is approximately circular. For screen-based reading and 
 
 The **parafoveal region** (fovea + parafovea combined) corresponds to the **5° macular zone** in biological vision. On a high-density display at typical viewing distance (~60cm), this translates to approximately:
 
-- **Parafoveal diameter**: ~462px
-- **Parafoveal radius**: ~231px
-- **Implied foveal radius**: ~171px (since parafovea = 1.35x foveal radius)
+- **Macular (0-5°) diameter**: ~462px
+- **Macular (0-5°) radius**: ~231px
+- **Foveal (0-2°) radius**: ~92px
+- **Ratio**: 231/92 = **2.5x**
 
 **Key Insight**: This ~462px diameter zone is where users can rapidly perceive holistic information and spatial cues without making a saccade (direct eye movement). Optimizing web layouts for this region leverages the brain's parafoveal processing for key tasks like:
 - Word length perception (saccade planning)
 - Link detection (contrast + geometric cues)
 - Layout structure (spatial relationships)
 
-**Recommended Settings**:
-- **Large (180px foveal radius)**: Close approximation to biological 5° parafovea (243px boundary)
-- **Extra Large (300px)**: Exaggerated simulation for presentations/demonstrations
+**Parafoveal Boundaries by Foveal Setting**:
+
+| Foveal Setting | Foveal Radius | Parafoveal Boundary (2.5x) | Biological Mapping |
+|----------------|---------------|----------------------------|-------------------|
+| Extra Small    | 20px          | 50px                       | -                 |
+| Small          | 45px          | 113px                      | -                 | 
+| Medium         | 90px          | 225px                      | ~5° macula        |
+| **Large**      | **180px**     | **450px**                  | Exaggerated       |
+| Extra Large    | 300px         | 750px                      | Demo/presentation |
+| Huge           | 450px         | 1125px                     | Extreme demo      |
+
+**Recommended Setting**: **Medium (90px)** provides the closest match to biological reality (~231px macular boundary).
 
 ---
 
@@ -52,8 +62,8 @@ All non‑foveal processing is defined in terms of three concentric zones, expre
   - Visual: crystal‑clear, full color, no positional warping or jitter.
 
 - **Parafovea**  
-  - Range: `1.0 × radius_norm → 1.35 × radius_norm`  
-  - Visual: increasing domain warp and high‑frequency jitter. Features are present but positions are uncertain (“heat‑haze crowding”).
+  - Range: `1.0 × radius_norm → 2.5 × radius_norm` (biological macula: 0-5°)
+  - Visual: increasing domain warp and high‑frequency jitter. Features are present but positions are uncertain ("heat‑haze crowding").
 
 - **Far periphery**  
   - Starts at: `1.2 × radius_norm` and beyond  
@@ -62,10 +72,9 @@ All non‑foveal processing is defined in terms of three concentric zones, expre
 Key constants in the shader:
 
 - `fovea_radius = radius_norm`
-- `parafovea_radius = radius_norm * 1.35`
-- `periphery_start = radius_norm * 1.2`
+- `parafovea_radius = radius_norm * 2.5`
 
-There is a deliberate **Transition Band** between `1.2 × radius_norm` and `1.35 × radius_norm` where parafoveal and periphery effects **overlap**. In this region, the “heat-haze” warp and the more aggressive “digital noise” / scatter coexist. This shared band removes a hard handoff between zones and prevents a visible seam at any single radius.
+The parafoveal region (2-5°) represents the **macular zone** where users can perceive holistic information without direct fixation.
 
 The **debug boundary overlay** is drawn exactly at `dist == fovea_radius`, so the visible grey ring matches the true edge of the sharp foveal zone.
 

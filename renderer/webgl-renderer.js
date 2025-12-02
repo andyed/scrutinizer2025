@@ -446,7 +446,7 @@
                         float lumaRatio = cleanLuma / max(distortedLuma, 0.01);
                         
                         // Apply contrast boost (60% preservation in parafovea, less in far periphery)
-                        float contrastPreservation = dist < 1.35 * fovea_radius ? 0.6 : 0.3;
+                        float contrastPreservation = dist < parafovea_radius ? 0.6 : 0.3;
                         col *= mix(1.0, lumaRatio, contrastPreservation);
                     }
                     
@@ -635,11 +635,10 @@
     
                     float radius_norm = u_foveaRadius / u_resolution.y;
                     float fovea_radius = radius_norm;
-                    float parafovea_radius = radius_norm * 1.35;
-                    float periphery_start = radius_norm * 1.2;
+                    float parafovea_radius = radius_norm * 2.5; // Macula: 0-5° (2.5x fovea)
                     
-                    bool isParafovea = dist_stable > fovea_radius && dist_stable <= periphery_start;
-                    bool isFarPeriphery = dist_stable > periphery_start; 
+                    bool isParafovea = dist_stable > fovea_radius && dist_stable <= parafovea_radius;
+                    bool isFarPeriphery = dist_stable > parafovea_radius; 
                     
                     // --- CONFIGURATION (The "Hooks") ---
                     ModeConfig config;
