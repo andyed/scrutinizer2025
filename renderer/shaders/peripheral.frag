@@ -234,6 +234,26 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     
     signal.distortionStrength = strength;
     
+    signal.distortionStrength = strength;
+    
+    // === TRIPPY MODE (Flowing Wave) ===
+    if (config.v4_style_id == 5) {
+        // Flowing Wave: Faster, stronger, more fluid than "Slow Wave"
+        float waveSpeed = 0.5; 
+        float waveFreq = 3.0;
+        
+        float waveX = sin(uv.y * waveFreq + u_time * waveSpeed);
+        float waveY = cos(uv.x * waveFreq + u_time * waveSpeed * 0.7);
+        
+        // Higher amplitude for "Trippy" feel
+        vec2 waveOffset = vec2(waveX, waveY) * 0.015 * strength * u_intensity;
+        
+        signal.displacement = waveOffset;
+        signal.distortedUV = uv + signal.displacement;
+        signal.distortionStrength = strength;
+        return signal;
+    }
+
     if (config.v1_distortion_type == 2) {
         // None (but strength is passed to V4)
         return signal;
@@ -553,28 +573,20 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             // Apply bypassTransition to ensure smooth start
             return mix(col, finalColor, cleanFactor * bypassTransition);
     } else if (config.v4_style_id == 5) { // Trippy (Fractal/Ooze)
-        // Domain Warping for "Oil Slick" / Fractal look
+        // CLEAN TRIPPY: Just the flowing wave + saturation boost
+        // Removed the "Oil Slick" (Red/Green) pattern as requested.
         
-        // Use distorted UVs for the base color, but also use them for the noise lookup
-        vec2 warpUV = v1.distortedUV * 2.0; // Scale up for detail
+        // 1. Saturation Boost
+        float luma = dot(col, vec3(0.299, 0.587, 0.114));
+        vec3 saturated = mix(vec3(luma), col, 1.6); // Strong saturation
         
-        // FBM-like layers
+        // 2. Subtle Fractal Noise Overlay (Optional, keeping it very subtle)
+        // Use distorted UVs for organic feel
+        vec2 warpUV = v1.distortedUV * 2.0;
         float n = snoise(warpUV + vec2(u_time * 0.1));
-        float n2 = snoise(warpUV * 2.0 - vec2(u_time * 0.15));
+        float subtleNoise = n * 0.05 * effectFactor;
         
-        // Combine noise to create a "fractal" value
-        float fractal = (n + n2 * 0.5) * 0.5 + 0.5; // 0..1
-        
-        // Color Shift: Iridescent / Oil Slick
-        // Shift hue based on fractal value + distance
-        vec3 shift = vec3(fractal, fractal + 0.33, fractal + 0.66);
-        
-        // Soft mixing with original color
-        // Instead of replacing, we tint/overlay
-        vec3 oilColor = col * (0.5 + 0.5 * sin(shift * 6.28 + u_time));
-        
-        // Boost saturation of the result
-        vec3 finalColor = mix(col, oilColor, 0.6); // 60% oil mix
+        vec3 finalColor = clamp(saturated + subtleNoise, 0.0, 1.0);
         
         return mix(col, finalColor, effectFactor * bypassTransition);
     }
