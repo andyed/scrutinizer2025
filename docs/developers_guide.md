@@ -102,14 +102,26 @@ if (config.v4_style_id == 6) {
 
 The following table details the rendering characteristics of each built-in mode (as of v1.2):
 
-| ID | Mode | Variation Type | Distortion (vs Baseline) | Style (vs Baseline) |
-| :--- | :--- | :--- | :--- | :--- |
-| **0** | **High-Key (Baseline)** | *Biological Simulation* | **Baseline** (Natural Noise) | **Baseline** (Rod Vision: Desaturated, Blue Shift) |
-| **1** | **Lab Mode** | *Clinical / Debug* | **Shatter** (Discontinuous) | **Grayscale + Red Overlay** (High Contrast) |
-| **2** | **Frosted Glass** | *Privacy / UI* | *Same* | **Gaussian Blur** (No Blue Shift) |
-| **3** | **Wireframe** | *Gestalt / Structural* | **Quantized** (Pixelated) | **Edge Detection** (Cyan/White Lines) |
-| **4** | **Cyberpunk** | *Stylized / Sci-Fi* | **Massive Blocks** (1200px) | **Neon Saturation** & Halftone (No Desaturation) |
-| **5** | **Trippy** | *Psychedelic* | **Flowing Waves** (Dynamic) | **Boosted Saturation** (Vibrant) |
+| Mode | Stage | Configuration / Effect |
+| :--- | :--- | :--- |
+| **0: High-Key** | **LGN** | **Standard**: Structure Masking + Saliency Gating |
+| *(Baseline)* | **V1** | **Mongrel / Shatter**: Slow Wave Distortion (0.1Hz). *Controlled by Mongrel Mode toggle.* |
+| | **V4** | **Rod Vision**: Desaturation + "Eigengrau" Blue Shift + Contrast Boost. |
+| **1: Lab** | **LGN** | Standard |
+| | **V1** | Same as Baseline |
+| | **V4** | **Clinical**: High-contrast Grayscale + Red Overlay. |
+| **2: Frosted** | **LGN** | Standard |
+| | **V1** | Same as Baseline |
+| | **V4** | **Privacy**: Simple Gaussian Blur (No Blue Shift/Tint). |
+| **3: Wireframe** | **LGN** | Standard |
+| | **V1** | **Quantized**: Pixelated UVs (Type 3). |
+| | **V4** | **Gestalt**: Sobel Edge Detection on Distorted UVs (Cyan/White). |
+| **4: Cyberpunk** | **LGN** | Standard |
+| | **V1** | **Massive Pixelate**: Up to 1200px blocks (Type 3). |
+| | **V4** | **Neon**: Progressive Contrast (1.0->2.5) + Halftone Texture. |
+| **5: Trippy** | **LGN** | Standard |
+| | **V1** | **Flowing Wave**: High-amplitude Sine Wave (Custom). |
+| | **V4** | **Vibrant**: Saturation Boost + Subtle Fractal Noise. |
 
 ### Eccentricity-Based Scaling (Parafovea vs Far Periphery)
 
