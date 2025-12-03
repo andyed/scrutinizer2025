@@ -1,8 +1,6 @@
 const { app, shell } = require('electron');
 
-const RADIUS_OPTIONS = [20, 45, 90, 180, 300, 450];
-const ASPECT_OPTIONS = [1.0, 1.33, 1.78, 2.33]; // Circular, 4:3, 16:9, 21:9
-const INTENSITY_OPTIONS = [0.0, 0.3, 0.6, 0.8, 1.0]; // Off, Subtle, Moderate, Strong, Maximum
+const { RADIUS_OPTIONS, ASPECT_OPTIONS, INTENSITY_OPTIONS } = require('../shared/constants.json');
 
 function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10) {
     const isMac = process.platform === 'darwin';

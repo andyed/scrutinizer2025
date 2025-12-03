@@ -782,7 +782,7 @@ void main() {
         // Visual Memory Mask (Post-Process Overlay)
         // We still overlay the clear image to ensure pixel-perfect clarity,
         // but now the underlying distortion (v1) should align with it.
-        if (memoryStrength > 0.99) {
+        if (memoryStrength > 0.9) {
             // Use sampleSource for guaranteed correct color
             vec4 clearColor = sampleSource(uv);
             color.rgb = clearColor.rgb;
