@@ -31,9 +31,10 @@ class SettingsManager {
                 // Merge defaults to ensure all keys exist
                 const mergedSettings = { ...this.defaults, ...userSettings };
 
-                // FIX: Reset radius to 180 (Large) if it's stuck at 300 (Extra Large) from previous session
-                // This ensures the user's request for "Large" default is respected despite saved state.
-                if (mergedSettings.radius === 300) {
+                // Migration: Reset radius to 180 (Large) if it's >= 240.
+                // This ensures users with previously saved "Extra Large" (300) or "Huge" (450)
+                // settings are reset to a reasonable default, as those sizes are now considered too large for default.
+                if (mergedSettings.radius >= 240) {
                     mergedSettings.radius = 180;
                 }
 

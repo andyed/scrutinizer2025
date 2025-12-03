@@ -53,6 +53,15 @@ function rebuildMenu() {
     const blur = currentBlur || 10;
     const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur));
     Menu.setApplicationMenu(menu);
+
+    // Explicitly set for all non-HUD windows (Windows/Linux)
+    if (process.platform !== 'darwin') {
+        BrowserWindow.getAllWindows().forEach(win => {
+            if (!win.scrutinizerHud && !win.isDestroyed()) {
+                win.setMenu(menu);
+            }
+        });
+    }
 }
 
 // Listen for settings changes from renderer to update menu (global listeners)
@@ -487,6 +496,12 @@ function createScrutinizerWindow(startUrl) {
             contextIsolation: true
         }
     });
+
+    // Explicitly set menu for Windows/Linux
+    if (process.platform !== 'darwin') {
+        const menu = Menu.getApplicationMenu();
+        if (menu) win.setMenu(menu);
+    }
 
     // Save bounds on resize/move (debounced)
     let saveTimeout;
@@ -1146,4 +1161,9 @@ app.on('activate', function () {
     if (mainWindow === null) {
         createWindow();
     }
+});
+
+// Handle "New Window" menu action
+app.on('create-new-window', () => {
+    createScrutinizerWindow();
 });

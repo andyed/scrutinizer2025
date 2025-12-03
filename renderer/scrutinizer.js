@@ -561,7 +561,7 @@
             } else {
                 newRadius = value;
             }
-            newRadius = Math.max(20, Math.min(300, newRadius));
+            newRadius = Math.max(20, Math.min(500, newRadius));
             this.config.fovealRadius = newRadius;
             console.log('[Scrutinizer] Updated foveal radius to:', newRadius);
         }
