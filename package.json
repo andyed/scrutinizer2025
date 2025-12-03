@@ -11,7 +11,6 @@
     "release": "electron-builder --mac --publish always",
     "build:win": "electron-builder --win",
     "release:win": "electron-builder --win --publish always",
-    "release:all": "electron-builder --mac --win --publish always",
     "test": "cross-env TEST_MODE=true node scripts/run-electron.js ."
   },
   "keywords": [
@@ -43,7 +42,8 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist"
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "afterSign": "scripts/notarize.js"
     },
     "dmg": {
       "sign": false,
@@ -70,7 +70,9 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": false
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     },
     "publish": {
       "provider": "github",
