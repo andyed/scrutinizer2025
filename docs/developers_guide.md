@@ -102,14 +102,14 @@ if (config.v4_style_id == 6) {
 
 The following table details the rendering characteristics of each built-in mode (as of v1.2):
 
-| ID | Name | V1 Distortion | V4 Color/Style | Key Features |
+| ID | Mode | Variation Type | Distortion (vs Baseline) | Style (vs Baseline) |
 | :--- | :--- | :--- | :--- | :--- |
-| **0** | **High-Key (Default)** | **Noise** (Curves) | **Rod Vision** | Desaturated periphery, chromatic aberration, "Eigengrau" blue shift in darks. Simulates biological rod vision. |
-| **1** | **Lab Mode** | **Shatter** (Mongrel) | **Grayscale + Red** | High-contrast grayscale with red overlay. Used for clinical testing of peripheral awareness. |
-| **2** | **Frosted Glass** | **Noise** (Curves) | **Blur** | Simple Gaussian blur and desaturation. Mimics privacy glass. |
-| **3** | **Wireframe** | **Pixelate** (Quantized) | **Edge Detect** | "Gestalt" style. Quantized Sobel edge detection on blocky UVs. Cyan/White lines on dark background. |
-| **4** | **Cyberpunk** | **Pixelate** (Massive) | **Neon** | Massive blocks (up to 1200px), progressive contrast (1.0->2.5), solid neon fills, halftone texture. |
-| **5** | **Trippy** | **Wave** (Flowing) | **Saturation** | Smooth, flowing sine-wave distortion with boosted saturation. No color cycling (clean look). |
+| **0** | **High-Key (Baseline)** | *Biological Simulation* | **Baseline** (Natural Noise) | **Baseline** (Rod Vision: Desaturated, Blue Shift) |
+| **1** | **Lab Mode** | *Clinical / Debug* | **Shatter** (Discontinuous) | **Grayscale + Red Overlay** (High Contrast) |
+| **2** | **Frosted Glass** | *Privacy / UI* | *Same* | **Gaussian Blur** (No Blue Shift) |
+| **3** | **Wireframe** | *Gestalt / Structural* | **Quantized** (Pixelated) | **Edge Detection** (Cyan/White Lines) |
+| **4** | **Cyberpunk** | *Stylized / Sci-Fi* | **Massive Blocks** (1200px) | **Neon Saturation** & Halftone (No Desaturation) |
+| **5** | **Trippy** | *Psychedelic* | **Flowing Waves** (Dynamic) | **Boosted Saturation** (Vibrant) |
 
 ### Eccentricity-Based Scaling (Parafovea vs Far Periphery)
 
