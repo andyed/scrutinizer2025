@@ -237,11 +237,15 @@ window.addEventListener('DOMContentLoaded', () => {
     });
 
     // Forward keyboard events to main process for shortcuts
-    window.addEventListener('keydown', (e) => {
-        // Forward Escape and Left/Right arrow keys
-        if (e.code === 'Escape' || e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
-            console.log('[Preload] Forwarding key:', e.code);
-            ipcRenderer.send('keydown', {
+    // Forward keyboard events to main process for shortcuts and modifier tracking
+    const forwardKeyEvent = (e, type) => {
+        // Forward Escape, Arrows, and Modifiers (Shift, Cmd/Meta, Ctrl, Alt)
+        const isModifier = ['Shift', 'Meta', 'Control', 'Alt'].includes(e.key);
+        const isNavKey = ['Escape', 'ArrowLeft', 'ArrowRight'].includes(e.code);
+
+        if (isModifier || isNavKey) {
+            // console.log(`[Preload] Forwarding ${type}:`, e.code);
+            ipcRenderer.send(type, {
                 code: e.code,
                 key: e.key,
                 altKey: e.altKey,
@@ -250,7 +254,10 @@ window.addEventListener('DOMContentLoaded', () => {
                 shiftKey: e.shiftKey
             });
         }
-    }, true); // Use capture phase to get events before page handlers
+    };
+
+    window.addEventListener('keydown', (e) => forwardKeyEvent(e, 'keydown'), true);
+    window.addEventListener('keyup', (e) => forwardKeyEvent(e, 'keyup'), true);
 
     // Intercept clicks on links with target="_blank"
     window.addEventListener('click', (e) => {

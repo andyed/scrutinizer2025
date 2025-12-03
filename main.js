@@ -14,6 +14,10 @@ let currentVisualMemory;
 
 let mainWindow;
 
+// Track modifier keys for screenshot detection (Cmd+Shift+4)
+let isCmdPressed = false;
+let isShiftPressed = false;
+
 // Handle EPIPE errors globally (common when piping output or closing terminals)
 process.on('uncaughtException', (err) => {
     if (err.code === 'EPIPE') {
@@ -371,7 +375,12 @@ ipcMain.on('keydown', (event, keyEvent) => {
     const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
     if (!win) return;
 
-    const { code, altKey, ctrlKey, metaKey } = keyEvent || {};
+    const { code, altKey, ctrlKey, metaKey, key, shiftKey } = keyEvent || {};
+
+    // Track modifiers
+    if (key === 'Meta') isCmdPressed = true;
+    if (key === 'Shift') isShiftPressed = true;
+    // console.log(`[Main] KeyDown: ${key}, Cmd=${isCmdPressed}, Shift=${isShiftPressed}`);
 
     // Platform helpers
     const isMac = process.platform === 'darwin';
@@ -400,6 +409,13 @@ ipcMain.on('keydown', (event, keyEvent) => {
             win.scrutinizerHud.webContents.send('webview:keydown', keyEvent);
         }
     }
+});
+
+ipcMain.on('keyup', (event, keyEvent) => {
+    const { key } = keyEvent || {};
+    if (key === 'Meta') isCmdPressed = false;
+    if (key === 'Shift') isShiftPressed = false;
+    // console.log(`[Main] KeyUp: ${key}, Cmd=${isCmdPressed}, Shift=${isShiftPressed}`);
 });
 
 // Toolbar IPC handlers
@@ -760,6 +776,14 @@ function createScrutinizerWindow(startUrl) {
             }
             if (!win.isFocused()) {
                 console.log('[Main] Polling skipped - window not focused');
+                return;
+            }
+
+            // Check for screenshot shortcut (Cmd+Shift) on macOS
+            // If user is taking a screenshot, we MUST stop updating the fovea
+            // so the system cursor freeze works as expected.
+            if (process.platform === 'darwin' && isCmdPressed && isShiftPressed) {
+                // console.log('[Main] Polling skipped - Screenshot mode detected (Cmd+Shift)');
                 return;
             }
 

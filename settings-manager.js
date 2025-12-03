@@ -29,7 +29,15 @@ class SettingsManager {
                 const data = fs.readFileSync(this.settingsFile, 'utf8');
                 const userSettings = JSON.parse(data);
                 // Merge defaults to ensure all keys exist
-                return { ...this.defaults, ...userSettings };
+                const mergedSettings = { ...this.defaults, ...userSettings };
+
+                // FIX: Reset radius to 180 (Large) if it's stuck at 300 (Extra Large) from previous session
+                // This ensures the user's request for "Large" default is respected despite saved state.
+                if (mergedSettings.radius === 300) {
+                    mergedSettings.radius = 180;
+                }
+
+                return mergedSettings;
             }
         } catch (error) {
             console.error('Failed to load settings:', error);
