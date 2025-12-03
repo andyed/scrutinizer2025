@@ -65,7 +65,9 @@
           ]
         }
       ],
-      "icon": "renderer/assets/scrutinizer_512x512_icon.png"
+      "icon": "renderer/assets/scrutinizer_512x512_icon.png",
+      "certificateFile": "build/certs/windows_cert.pfx",
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": true,

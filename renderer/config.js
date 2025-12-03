@@ -24,6 +24,14 @@ const CONFIG = {
     // Animation settings
     maskSmoothness: 1, // 0-1, higher = more responsive (0.2 = smooth but laggy, 1.0 = instant)
 
+    // Fixation detection thresholds
+    fixationVelocityThreshold: 20.0, // px/ms - max velocity to count as fixation (relaxed for slow reading)
+    dwellTimeThreshold: 50, // ms - minimum dwell time to confirm fixation
+    saccadicSuppressionThreshold: 2.5, // px/ms - velocity above which to skip heavy processing
+    velocityDecayMove: 0.003, // Slow adaptation when moving (stable)
+    velocityDecayStop: 0.04, // Fast adaptation when stopping (snappy)
+    foveaBypassMargin: 0.5, // Fraction of radius for visual memory proximity check
+
     // Experimental settings
     useFoveatedBlur: true, // when true, use multi-resolution foveated blur
     chromaticAberration: true, // Enable chromatic aberration

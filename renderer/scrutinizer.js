@@ -250,8 +250,7 @@
 
             // Saccadic Suppression: Skip heavy processing during rapid eye movement
             // This simulates "saccadic blindness" and frees up resources for the moment of fixation
-            // Threshold: 2.5 px/ms (approx 2500px/s)
-            if (this.currentVelocity > 2.5) {
+            if (this.currentVelocity > this.config.saccadicSuppressionThreshold) {
                 // if (Math.random() < 0.05) console.log(`[Scrutinizer] Saccade suppressed (Vel: ${this.currentVelocity.toFixed(1)})`);
                 return;
             }
@@ -349,10 +348,7 @@
             // Formula: current = lerp(current, instant, 1 - exp(-decay * dt))
 
             // Decay constants tuned for 60fps equivalent
-            const decayMove = 0.003; // Slow adaptation (stable)
-            const decayStop = 0.04;  // Fast adaptation (snappy stop)
-
-            const decay = instantVelocity < 1.0 ? decayStop : decayMove;
+            const decay = instantVelocity < 1.0 ? this.config.velocityDecayStop : this.config.velocityDecayMove;
             const alpha = 1.0 - Math.exp(-decay * dt);
 
             this.currentVelocity = this.currentVelocity + (instantVelocity - this.currentVelocity) * alpha;
@@ -371,13 +367,11 @@
 
             if (useMask) {
                 // 1. Fixation Detection
-                // Threshold: < 20.0 px/ms (relaxed to allow slow reading motion)
-                // Dwell: > 50ms (very snappy accumulation)
                 // Bounds Check: Must be strictly inside the canvas
                 const isInside = this.mouseX > 0 && this.mouseX < this.canvas.width &&
                     this.mouseY > 0 && this.mouseY < this.canvas.height;
 
-                const isStable = isInside && (this.currentVelocity < 20.0);
+                const isStable = isInside && (this.currentVelocity < this.config.fixationVelocityThreshold);
 
                 if (isStable) {
                     if (!this.isFixating) {
@@ -386,14 +380,13 @@
                         // console.log('[Scrutinizer] Fixation started');
                     } else {
                         const dwellTime = now - this.fixationStartTime;
-                        if (dwellTime > 50) {
+                        if (dwellTime > this.config.dwellTimeThreshold) {
                             // Confirmed fixation! Add/Update buffer
                             // Check if we are close to an existing point to update it instead of adding new
-                            // Simple distance check: if within radius/2, update
                             const existingIndex = this.visualMemoryBuffer.findIndex(p => {
                                 const dx = p.x - this.mouseX;
                                 const dy = p.y - this.mouseY;
-                                return Math.sqrt(dx * dx + dy * dy) < (effectiveRadius / 2);
+                                return Math.sqrt(dx * dx + dy * dy) < (effectiveRadius * this.config.foveaBypassMargin);
                             });
 
                             if (existingIndex !== -1) {

@@ -119,7 +119,7 @@ The following table details the rendering characteristics of each built-in mode 
 | **4: Cyberpunk** | **LGN** | Standard |
 | | **V1** | **Massive Pixelate**: Up to 1200px blocks (Type 3). |
 | | **V4** | **Neon**: Progressive Contrast (1.0->2.5) + Halftone Texture. |
-| **5: Trippy** | **LGN** | Standard |
+| **5: Trippy** | **LGN** | **Bypassed**: No Gating (Stream Integration). |
 | | **V1** | **Flowing Wave**: High-amplitude Sine Wave (Custom). |
 | | **V4** | **Vibrant**: Saturation Boost + Subtle Fractal Noise. |
 

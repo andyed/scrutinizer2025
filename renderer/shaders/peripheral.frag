@@ -700,6 +700,15 @@ void main() {
     config.lgn_ramp_end_mult = u_lgn_ramp_end_mult;
     config.v1_animate = u_v1_animate > 0.5;
     
+    // === TRIPPY MODE OVERRIDE ===
+    // "Psychologically plausible as LGN is the stream separator"
+    // In a psychedelic state, the LGN's gating function is compromised, leading to
+    // a flood of unfiltered information (stream integration).
+    if (config.v4_style_id == 5) {
+        config.lgn_use_structure_mask = false;
+        config.lgn_use_saliency_gate = false;
+    }
+    
     // Override V1 type if Mongrel Mode uniform says so (Legacy Toggle Support)
     // Only applies if we are in a "standard" mode (Shatter/Noise) to avoid breaking Cyberpunk/Blueprint
     if (config.v4_style_id != 5 && config.v1_distortion_type != 2 && config.v1_distortion_type != 3) {

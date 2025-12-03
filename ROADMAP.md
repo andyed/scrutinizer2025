@@ -1,101 +1,7 @@
 # Scrutinizer 1.0 Roadmap
 
 ## Overview
-This document outlines the path from current alpha to a production-ready 1.0 release.
 
----
-
-## Priority 1: Core Functionality
-
-### ✅ Already Complete
-- [x] Foveal vision simulation with mouse tracking
-- [x] Adjustable blur and radius controls
-- [x] Keyboard shortcuts (Escape, Left/Right arrows)
-- [x] Basic navigation (back/forward, URL bar)
-- [x] Scroll and DOM mutation detection
-- [x] Basic browser controls (open url, back, forward)
-- [x] WebGL-based "Mongrel" rendering pipeline
-- [x] "Rod Vision" (Eigengrau) simulation
-- [x] Visual Memory (Fog of War) mechanics
-- [x] **Scroll Compensation (CONFIDENT)**: Fixed alignment between structure map and content during scroll.
-  - `preload.js`: Send `scrollX/Y` with structure update
-  - `main.js`: Forward `browser:scroll` to HUD
-  - `scrutinizer.js`: Calculate `scrollDeltaY`
-  - `webgl-renderer.js`: Use `u_scroll_offset` in shader
-
-### 🔴 High Priority Fixes
-- [x] **DomAdapter Refinements**: Comprehensive semantic element detection (ARIA roles, media elements, interactive patterns)
-
-
-
----
-
-## Priority 2: Aesthetic Pivot (The "Cinematic" Update)
-
-**Goal**: Move from "Clinical/Horror" (simulating blindness/disease) to "Cinematic/Focus" (directing attention). The periphery should look "unimportant" rather than "broken."
-
-### 🎨 New Aesthetic Directions
-
-#### 1. The "Frosted Glass" Tweak (Apple/iOS Aesthetic)
-*For Pitching & Client Demos*
-- **Concept**: Treat the periphery as if it's behind textured privacy glass.
-- **Implementation**:
-    - Reduce high-frequency jitter (larger, softer shards).
-    - Smooth, prismatic chromatic aberration.
-    - Preserve luminance (no darkening).
-    - **Why**: Feels like a UI state, not a rendering error.
-
-#### 2. The "Blueprint" Tweak (UX Research Aesthetic)
-*For Design Reviews & A/B Testing*
-- **Concept**: "Visual Scent" - show layout/grid but hide content details.
-- **Implementation**:
-    - High-pass filter in periphery (edges only).
-    - "Blueprint Blue" tint.
-    - **Why**: Highlights Layout vs. Content. Proves the user sees the grid but misses the copy.
-    ### Structure Map
-- [x] Scroll performance: reduce lag during scroll (16ms throttle + debounced final scan)
-- [x] HTML5 Tag Coverage: comprehensive semantic element detection (ARIA roles, modals, custom interactive)
-- [ ] **Known Limitation**: Mouse tracking doesn't work over popup modals (Google account menu, etc.) - DOM events blocked
-  - Future: Explore Electron screen.getCursorScreenPoint() polling, but needs careful coordinate validation
-- [x] Blueprint mode functional
-- [ ] Blueprint mode visual polish needed
-- [ ] Debug red tint overlay issue visual polish
-    - **Todos**:
-        - [ ] Fix "Red Tint" visual overlay issue (whole page shows pink/red tint)
-        - [ ] Tune opacity and blending for "UX Blueprint" look
-
-### Structure Map: Figma Plugin Support (Prerequisite for Saliency)
-
-**Goal**: Extend structure map abstraction to Figma's scene graph, enabling unified pipeline for both web and design tools.
-
-**Why First**: Figma plugin is key distribution channel. Structure map must work there before adding saliency layer complexity.
-
-**Implementation:**
-- [ ] **Figma Scene Graph Adapter**
-  - Create `FigmaAdapter` class parallel to `DomAdapter`
-  - Extract layout blocks from Figma node tree via Plugin API
-  - Map Figma node types to `StructureBlock` semantics:
-    - Text nodes → `type: 'TEXT'`
-    - Images/vectors → `type: 'IMAGE'`
-    - Frames/components → `type: 'UI_CONTROL'`
-  
-- [ ] **Optimize for Figma's Node Structure**
-  - Figma has explicit layout properties (no DOM quirks)
-  - Leverage `node.absoluteBoundingBox` for precise geometry
-  - Handle auto-layout containers differently than flex/grid
-  - Respect component boundaries as semantic units
-
-- [ ] **Unified Pipeline**
-  - Same `StructureMap` rasterizer for both sources
-  - Same shader consumption (`u_structureMap` texture)
-  - Test that Blueprint mode works identically in Figma plugin
-
-**Dependencies:**
-- Review `scrutinizer-figma-plugin` codebase
-- Ensure Plugin API access to node tree traversal
-- Coordinate with existing capture pipeline
-
----
 
 ### Saliency Map: Design Tool + Core Simulation Enhancement
 
@@ -286,9 +192,7 @@ Create:
 ---
 
 
-## Priority 6: Future Enhancements (Post-1.0)
-
-### 🔵 Version 1.1+
+## Priority 6: Future Enhancements 
 
 #### Preferences UI
 - Persistent settings panel
@@ -398,36 +302,18 @@ Improve how we sample the page for foveal/peripheral processing:
 
 ### 🔧 Code Quality Improvements
 
-#### Extract Shader to Separate File
-**Priority**: Low  
-**Effort**: Medium
 
-- **Issue**: Fragment shader is 640+ lines embedded in `webgl-renderer.js`
-- **Benefits**:
-  - Better syntax highlighting in editors
-  - Easier testing and validation
-  - Cleaner separation of concerns
-- **Implementation**: Move to `renderer/shaders/peripheral.frag` and load via `fs.readFileSync` or bundler
-
-#### Consolidate Magic Numbers
+#### Consolidate Magic Numbers ✅
 **Priority**: Low  
 **Effort**: Low
 
-- **Issue**: Several hardcoded values scattered through codebase
-- **Action**: Extract to named constants in `config.js`:
-  - Scrollbar width (17px)
-  - Fixation velocity threshold (20.0 px/ms)
-  - Dwell time threshold (50ms)
-  - Fovea bypass margin (0.5x radius)
+**Completed**: Extracted fixation detection constants to `config.js`:
+- [x] `fixationVelocityThreshold` (20.0 px/ms)
+- [x] `dwellTimeThreshold` (50ms)
+- [x] `saccadicSuppressionThreshold` (2.5 px/ms)
+- [x] `velocityDecayMove` / `velocityDecayStop`
+- [x] `foveaBypassMargin` (0.5x radius)
 
-#### Structure Map Scroll Tracking
-**Priority**: Medium  
-**Effort**: Medium
-
-- **Issue**: Documentation describes throttled scroll tracking, but implementation relies on IPC events
-- **Action**: Add scroll event listeners in `dom-adapter.js` or `preload.js` with:
-  - Throttled scans (16ms) during scroll
-  - Debounced final scan (100ms) after scroll ends
 
 #### Saliency Modulation Expansion ✅
 **Priority**: Low  
