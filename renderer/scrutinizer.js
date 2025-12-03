@@ -27,10 +27,15 @@
             this.hasStructure = false;
 
             // Saliency Map (Visual Attractiveness Texture)
-            // Saliency Map (Visual Attractiveness Texture)
-            // Example: Swapped standard SaliencyMap for ColorSaliencyMap
-            const SaliencyMap = require('./color-saliency-map.js');
-            this.saliencyMap = new SaliencyMap();
+            // Moved to Web Worker for performance
+            this.saliencyWorker = new Worker('./saliency-worker.js');
+            this.saliencyWorker.onmessage = (e) => {
+                const { imageData } = e.data;
+                if (this.renderer && imageData) {
+                    this.renderer.uploadSaliencyMap(imageData);
+                    // if (Math.random() < 0.01) console.log(`[Scrutinizer] Received Saliency Map from Worker`);
+                }
+            };
             this.lastFrameBitmap = null;
 
             // Visual Memory
@@ -227,27 +232,39 @@
                 return;
             }
 
+            // Saccadic Suppression: Skip heavy processing during rapid eye movement
+            // This simulates "saccadic blindness" and frees up resources for the moment of fixation
+            // Threshold: 2.5 px/ms (approx 2500px/s)
+            if (this.currentVelocity > 2.5) {
+                // if (Math.random() < 0.05) console.log(`[Scrutinizer] Saccade suppressed (Vel: ${this.currentVelocity.toFixed(1)})`);
+                return;
+            }
+
             // Create ImageData from buffer
             const imageData = new ImageData(new Uint8ClampedArray(buffer), width, height);
-
             // Upload texture
             this.renderer.uploadTexture(imageData);
 
             // Compute saliency from SOURCE browser capture (before rendering effects)
+            // Compute saliency from SOURCE browser capture (before rendering effects)
             if (width > 0 && height > 0) {
-                this.saliencyMap.resize(width, height);
-                // Create temporary canvas to hold imageData for saliency computation
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = width;
-                tempCanvas.height = height;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.putImageData(imageData, 0, 0);
+                // Throttle Saliency: Only compute every N frames (e.g., 15 frames ~ 250ms at 60fps)
+                // This is an expensive CPU operation (pixel analysis) so we shouldn't run it every frame.
+                if (!this.saliencyFrameCounter) this.saliencyFrameCounter = 0;
+                this.saliencyFrameCounter++;
 
-                this.saliencyMap.computeFromImage(tempCanvas);
-                this.renderer.uploadSaliencyMap(this.saliencyMap.getCanvas());
+                if (this.saliencyFrameCounter % 15 === 0) {
+                    // Create ImageBitmap for efficient transfer to worker
+                    createImageBitmap(imageData).then(bitmap => {
+                        this.saliencyWorker.postMessage({
+                            imageBitmap: bitmap,
+                            id: this.saliencyFrameCounter
+                        }, [bitmap]);
+                    });
 
-                if (Math.random() < 0.01) {
-                    console.log(`[Scrutinizer] Uploaded Saliency Map (${width}x${height})`);
+                    if (Math.random() < 0.01) {
+                        console.log(`[Scrutinizer] Uploaded Saliency Map (${width}x${height})`);
+                    }
                 }
             }
 

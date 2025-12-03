@@ -110,6 +110,27 @@ float contrastPreservation = dist < 1.35 * fovea_radius ? 0.6 : 0.3;
 col *= mix(1.0, lumaRatio, contrastPreservation);
 ```
 
+// 60% in parafovea, 30% in far periphery
+float contrastPreservation = dist < 1.35 * fovea_radius ? 0.6 : 0.3;
+col *= mix(1.0, lumaRatio, contrastPreservation);
+```
+
+### Performance Optimizations
+
+#### 1. Saccadic Blindness (Saccadic Suppression)
+**Problem**: Processing heavy visual effects (saliency maps, texture uploads) during rapid eye movement (saccades) causes frame drops, making the foveal "snap" feel laggy when the eye stops.
+
+**Solution**: We implement **Saccadic Suppression** in `scrutinizer.js`.
+*   **Mechanism**: We track mouse velocity. If `velocity > 2.5 px/ms`, we skip expensive operations (texture uploads, saliency updates).
+*   **Result**: The system remains responsive during movement. The foveal image may briefly pause/blur (simulating biological saccadic masking), but the critical "fixation" moment is processed instantly.
+
+#### 2. Web Worker Saliency
+**Problem**: Computing saliency maps (pixel-by-pixel color analysis) on the main thread blocks the UI, causing stutter even during slow movements.
+
+**Solution**: Saliency computation is offloaded to a **Web Worker** (`renderer/saliency-worker.js`).
+*   **Tech**: Uses `OffscreenCanvas` for image resizing and `Transferable` objects (`ImageBitmap`, `ArrayBuffer`) for zero-copy data transfer.
+*   **Benefit**: The main thread is never blocked by image analysis. Saliency maps update asynchronously (~4fps) without affecting the 60fps rendering loop.
+
 ## Future Roadmap: Abstraction
 
 We plan to abstract the "Peripheral Model" into a pluggable system where shaders can be loaded dynamically or defined in separate files, making it easier to experiment with deep-learning-based texture synthesis models.
