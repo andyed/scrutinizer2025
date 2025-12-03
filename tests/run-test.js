@@ -41,8 +41,17 @@ app.whenReady().then(() => {
     });
 
     // Handle screenshots (optional, mock for now)
+    // Handle screenshots
     ipcMain.on('save-screenshot', (event, { name, dataUrl }) => {
-        console.log(`[Screenshot] Saved ${name}`);
+        const fs = require('fs');
+        const screenshotsDir = path.join(__dirname, 'screenshots');
+        if (!fs.existsSync(screenshotsDir)) {
+            fs.mkdirSync(screenshotsDir);
+        }
+        const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
+        const filePath = path.join(screenshotsDir, `${name}.png`);
+        fs.writeFileSync(filePath, base64Data, 'base64');
+        console.log(`[Screenshot] Saved ${name} to ${filePath}`);
     });
 
     win.loadFile(path.resolve(process.cwd(), testFile));

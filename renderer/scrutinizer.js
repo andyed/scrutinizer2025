@@ -31,9 +31,25 @@
             this.saliencyWorker = new Worker('./saliency-worker.js');
             this.saliencyWorker.onmessage = (e) => {
                 const { imageData } = e.data;
-                if (this.renderer && imageData) {
-                    this.renderer.uploadSaliencyMap(imageData);
-                    // if (Math.random() < 0.01) console.log(`[Scrutinizer] Received Saliency Map from Worker`);
+                if (imageData) {
+                    // Fix Oscillation: Route through smoothing canvas instead of direct upload
+                    // This ensures the render() loop's smoothing logic (Target -> Current) works,
+                    // preventing the "fight" between raw worker updates and smoothed frames.
+
+                    if (!this.saliencyTargetCanvas) {
+                        // Should be init in handleResize, but safety first
+                        this.saliencyTargetCanvas = document.createElement('canvas');
+                        this.saliencyTargetCanvas.width = imageData.width;
+                        this.saliencyTargetCanvas.height = imageData.height;
+                    }
+
+                    // Update Target Canvas
+                    const ctx = this.saliencyTargetCanvas.getContext('2d');
+                    ctx.putImageData(imageData, 0, 0);
+
+                    // Trigger smoothing loop in render()
+                    // 60 frames = ~1 second of smoothing updates
+                    this.saliencyUpdateCountdown = 60;
                 }
             };
             this.lastFrameBitmap = null;

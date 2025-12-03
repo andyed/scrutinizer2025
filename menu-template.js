@@ -370,7 +370,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     click: () => sendToOverlays('menu:set-aesthetic-mode', 2)
                                 },
                                 {
-                                    label: 'Blueprint (UX)',
+                                    label: 'Wireframe (Gestalt)',
                                     type: 'radio',
                                     click: () => sendToOverlays('menu:set-aesthetic-mode', 3)
                                 },

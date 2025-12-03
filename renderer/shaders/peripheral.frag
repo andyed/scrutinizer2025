@@ -108,6 +108,24 @@ float snoise(vec2 v){
     return 130.0 * dot(m, g);
 }
 
+// === EDGE DETECTION HELPERS ===
+float sobel(vec2 uv) {
+    vec2 pixelSize = 1.0 / u_resolution;
+    float t = texture(u_texture, uv + vec2(0.0, -pixelSize.y)).r;
+    float b = texture(u_texture, uv + vec2(0.0, pixelSize.y)).r;
+    float l = texture(u_texture, uv + vec2(-pixelSize.x, 0.0)).r;
+    float r = texture(u_texture, uv + vec2(pixelSize.x, 0.0)).r;
+    float tl = texture(u_texture, uv + vec2(-pixelSize.x, -pixelSize.y)).r;
+    float tr = texture(u_texture, uv + vec2(pixelSize.x, -pixelSize.y)).r;
+    float bl = texture(u_texture, uv + vec2(-pixelSize.x, pixelSize.y)).r;
+    float br = texture(u_texture, uv + vec2(pixelSize.x, pixelSize.y)).r;
+    
+    float gx = (tl + 2.0*l + bl) - (tr + 2.0*r + br);
+    float gy = (tl + 2.0*t + tr) - (bl + 2.0*b + br);
+    
+    return sqrt(gx*gx + gy*gy);
+}
+
 // === STATIC MONGREL SAMPLER ===
 vec2 hash22(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973));
@@ -223,7 +241,16 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     // Eccentricity-Based Scaling: Parafovea vs Far Periphery
     // Parafovea (3-5°): Mild positional uncertainty, preserve geometry
     // Far Periphery (>8°): Aggressive scatter and dissolution
-    float eccentricityScale = isFarPeriphery ? 1.0 : 0.15; // Reverted to 0.15 (85% reduction) for smoother parafovea
+    // Parafovea (3-5°): Mild positional uncertainty, preserve geometry
+    // Far Periphery (>8°): Aggressive scatter and dissolution
+    float eccentricityScale = isFarPeriphery ? 1.0 : 0.15; 
+    
+    // Cyberpunk/Wireframe Override: We want structural distortion (blocks) to start immediately
+    // in the parafovea to create a strong "tech" aesthetic.
+    if (config.v4_style_id == 4 || config.v4_style_id == 3) {
+        eccentricityScale = 1.0;
+    }
+    
     float strength = lgn.suppressionFactor * config.v1_strength_mult * eccentricityScale;
     
     // VISUAL MEMORY MODULATION
@@ -341,6 +368,13 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         // Target Max Block Size: HUGE blocks for "Minecraft" look
         float targetMaxBlock = 192.0;
         float targetMinBlock = 32.0; 
+        
+        // Cyberpunk: 3-5x larger blocks as requested
+        if (config.v4_style_id == 4) {
+            targetMaxBlock = 1200.0; // Massive blocks (was 800)
+            targetMinBlock = 160.0;  // Big start (was 128)
+        }
+        
         float limitBlockSize = mix(targetMaxBlock, targetMinBlock, steppedMetric);
         
         // Modulate ACTUAL block size by strength (distance from fovea)
@@ -546,29 +580,63 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         vec3 frosted = mix(col, vec3(0.9), 0.3);
         return mix(col, frosted, effectFactor * 0.7 * bypassTransition);
         
-    } else if (config.v4_style_id == 3) { // Blueprint
-        float luma = dot(col, vec3(0.299, 0.587, 0.114));
-        vec3 blue = vec3(0.0, 0.2, 0.8) * luma + vec3(0.0, 0.0, 0.2);
-        vec3 lines = vec3(1.0) * step(0.5, luma); // Fake lines
-        vec3 final = mix(blue, lines, 0.2);
-        return mix(col, final, effectFactor * bypassTransition);
+    } else if (config.v4_style_id == 3) { // Wireframe (Gestalt)
+        // === QUANTIZED WIREFRAME (Gestalt) ===
+        // V1 is now forced to Type 3 (Pixelate), so v1.distortedUV is already blocky.
         
-    } else if (config.v4_style_id == 4) { // Cyberpunk
-            // Pixelation is handled in V1.
-            // Style: Saturated, No Tint, No Scanlines (Clean Digital Look).
-            // User requested "pixelation instead" of "outline text".
-            // Removing contrast boost and scanlines to avoid "etched" text artifacts.
+        // 1. Detect Edges on the PIXELATED UVs
+        // This naturally finds the edges between the V1 blocks.
+        float edge = sobel(v1.distortedUV);
+        
+        // 2. Compute Edge Intensity
+        // Crisp lines
+        float edgeIntensity = smoothstep(0.05, 0.1, edge);
+        
+        // 3. Aesthetic Coloring
+        // User requested NO desaturation.
+        // We use the original (blurred) color as the base.
+        vec3 baseColor = col;
+        
+        // Lines: Cyan/White
+        // Modulate line brightness by saliency
+        // Sample saliency using the distorted UVs to match the blocks
+        float s = texture(u_saliencyMap, v1.distortedUV).r; 
+        vec3 lineCol = mix(vec3(0.0, 0.4, 0.6), vec3(0.5, 0.9, 1.0), s);
+        
+        // Overlay lines on top of base color
+        // We add the lines to the base color (Screen/Add blend) or Mix?
+        // Mix ensures visibility.
+        return mix(baseColor, lineCol, edgeIntensity);
+        
+    } else if (config.v4_style_id == 4) { // Cyberpunk (Neon)
+            // Pixelation is handled in V1 (now with larger blocks).
             
             // Clean up Fovea
             float cleanFactor = smoothstep(0.4, 0.8, effectFactor);
             
-            // 1. Saturation Boost ONLY
-            // We skip contrast boost because it creates "outlines" on text.
+            // 1. Solid Fill (Halftone-ish)
+            // Boost saturation significantly for that "Neon" look
             float luma = dot(col, vec3(0.299, 0.587, 0.114));
-            vec3 saturated = mix(vec3(luma), col, 1.5); // Boost saturation of original color
+            vec3 saturated = mix(vec3(luma), col, 1.8); 
+            
+            // 2. Progressive Contrast Boost
+            // "Ideally we'd do so progressively from the parafovea outward"
+            // Ramp contrast from 1.0 (fovea) to 2.0 (periphery)
+            float contrastRamp = smoothstep(fovea_radius, parafovea_radius * 2.0, dist);
+            float contrastAmount = mix(1.0, 2.5, contrastRamp); // Strong contrast in periphery
+            
+            vec3 contrasted = (saturated - 0.5) * contrastAmount + 0.5;
+            
+            // 3. Halftone / Texture
+            // Simple dot pattern or noise
+            vec2 pixelUV = uv * u_resolution;
+            float dotPattern = sin(pixelUV.x * 0.5) * sin(pixelUV.y * 0.5); // High freq grid
+            
+            // Mix texture: mostly solid (0.9), tiny bit of texture (0.1)
+            vec3 textured = contrasted * (0.95 + 0.05 * dotPattern);
             
             // Clamp results
-            vec3 finalColor = clamp(saturated, 0.0, 1.0);
+            vec3 finalColor = clamp(textured, 0.0, 1.0);
             
             // Apply bypassTransition to ensure smooth start
             return mix(col, finalColor, cleanFactor * bypassTransition);
@@ -639,6 +707,11 @@ void main() {
             config.v1_distortion_type = 0; // Noise
         }
         else config.v1_distortion_type = 1; // Shatter
+    }
+    
+    // Force Pixelate (Type 3) for Wireframe (Style 3) to get "rectangular closed shapes"
+    if (config.v4_style_id == 3) {
+        config.v1_distortion_type = 3;
     }
 
     // --- PIPELINE EXECUTION ---
