@@ -102,6 +102,10 @@ Additionally, jitter amplitude is reduced in parafovea to prevent dissolution of
 float baseJitter = isParafovea ? 0.008 : 0.04; // 5x reduction
 ```
 
+**Second Pass Softening (v1.2)**:
+The "Shatter" mode now uses a **Slow Wave** distortion (0.1Hz sine wave) instead of random jitter to reduce motion sickness. A `sampleBlurred` helper function applies a variable Gaussian blur (up to 15px) in the periphery to replace blocky artifacts.
+
+
 **Magnocellular Contrast Preservation**: In `processV4`, luminance contrast is boosted to simulate the M-cell pathway:
 
 ```glsl

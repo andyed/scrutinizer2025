@@ -224,6 +224,11 @@ This combination ensures:
 - Just outside the fovea, characters wobble enough to be hard to parse but not fully pixelated.
 - Further out, both local letter structure and global word envelopes are heavily disrupted.
 
+### Second Pass Softening (v1.2)
+To improve perceptual comfort and reduce motion sickness, the "Second Pass" update introduced:
+1.  **Variable Gaussian Blur**: Replaces blocky pixelation with a smooth blur that increases exponentially with eccentricity (0px -> 3px -> 15px+).
+2.  **Slow Wave Distortion**: Replaces high-frequency "glitch" jitter with a slow (0.1Hz), smooth sine-wave warp. This maintains the "underwater" feel without the rapid, distracting shaking.
+
 ---
 
 # Saliency Map & Fidelity Bias
@@ -359,6 +364,11 @@ if (u_enable_saliency_modulation > 0.5 && dist > parafovea_radius) {
 -   **Parafoveal Isolation**: Foveal and parafoveal motion cannot affect far periphery distortion
 -   **Conservative Modulation**: 15-25% max effect, ensuring periphery stays degraded
 -   **Temporal Smoothing**: Double-buffered saliency (15% blend/frame) prevents flicker on live video
+
+### 7. Saliency Stabilization (Movie Mode)
+To mitigate "breathing" artifacts on full-motion video, the Saliency Map is used to **stabilize** the "Slow Wave" distortion.
+-   **Logic**: `waveOffset *= (1.0 - saliency * 0.9)`
+-   **Effect**: High-saliency areas (faces, text) in the periphery remain relatively static, while the background continues to wave organically. This creates "islands of stability" that reduce distraction without breaking the overall effect.
 
 ## Future Enhancements
 

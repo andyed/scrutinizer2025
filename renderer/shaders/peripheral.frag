@@ -49,6 +49,37 @@ vec4 sampleSource(vec2 uv) {
     return col;
 }
 
+// === HELPER: VARIABLE BLUR ===
+// Approximates Gaussian blur with variable radius using a 5-tap pattern.
+// Radius is in pixels.
+vec4 sampleBlurred(vec2 uv, float radius) {
+    if (radius < 0.5) return sampleSource(uv);
+    
+    vec2 pixelSize = 1.0 / u_resolution;
+    vec4 sum = vec4(0.0);
+    float totalWeight = 0.0;
+    
+    // Center
+    sum += sampleSource(uv) * 0.4;
+    totalWeight += 0.4;
+    
+    // 4 Cardinal Neighbors
+    // Stride increases with radius
+    float stride = radius; 
+    vec2 off1 = vec2(stride, 0.0) * pixelSize;
+    vec2 off2 = vec2(-stride, 0.0) * pixelSize;
+    vec2 off3 = vec2(0.0, stride) * pixelSize;
+    vec2 off4 = vec2(0.0, -stride) * pixelSize;
+    
+    sum += sampleSource(uv + off1) * 0.15;
+    sum += sampleSource(uv + off2) * 0.15;
+    sum += sampleSource(uv + off3) * 0.15;
+    sum += sampleSource(uv + off4) * 0.15;
+    totalWeight += 0.6;
+    
+    return sum / totalWeight;
+}
+
 // === NOISE HELPERS ===
 vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
 float snoise(vec2 v){
@@ -192,7 +223,7 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     // Eccentricity-Based Scaling: Parafovea vs Far Periphery
     // Parafovea (3-5°): Mild positional uncertainty, preserve geometry
     // Far Periphery (>8°): Aggressive scatter and dissolution
-    float eccentricityScale = isFarPeriphery ? 1.0 : 0.15; // 85% reduction in parafovea
+    float eccentricityScale = isFarPeriphery ? 1.0 : 0.15; // Reverted to 0.15 (85% reduction) for smoother parafovea
     float strength = lgn.suppressionFactor * config.v1_strength_mult * eccentricityScale;
     
     // VISUAL MEMORY MODULATION
@@ -209,45 +240,36 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     }
     
     if (config.v1_distortion_type == 1) {
-        // === SHATTER (Mongrel) ===
-        // Sample using smooth strength
-        // Pass rhythm (structure.r) to modulate frequency
-        // Note: sampleMongrel now uses sampleSource internally
-        vec4 rawColor = sampleMongrel(u_texture, uv, strength, u_intensity, lgn.rhythm);
+        // === SHATTER (Mongrel) -> REPLACED WITH SLOW WAVE (Comfort Mode) ===
+        // User requested to remove rapid glitching.
+        // We replace the high-freq jitter with a slow, smooth sine wave warp.
         
-        // Mongrel sampler returns a color, not UVs directly easily.
-        // For the pipeline, we need to adapt. 
-        // The original code mixed colors. Here we might need to cheat a bit or refactor sampleMongrel.
-        // To keep it clean, let's assume sampleMongrel does the heavy lifting and we just pass the result
-        // via a "virtual" UV or just handle it in V4. 
-        // ACTUALLY: The original code returned a color. 
-        // Let's stick to the pattern: V1 calculates UVs.
-        // But Mongrel is a multi-sample effect. 
-        // Compromise: V1 calculates the *primary* distorted UV.
+        // Slow Wave Distortion
+        // Frequency: Very Low (0.1 Hz) - barely moving
+        // Amplitude: Reduced for subtlety
         
-        // Re-implementing simplified Mongrel displacement for UV pipeline
-        // Parafovea: Subtle positional jitter (preserves underlines, geometric cues)
-        // Far Periphery: High-frequency scatter
-        float baseJitter = isParafovea ? 0.008 : 0.04; // 5x reduction in parafovea
+        float waveSpeed = 0.1; // Was 0.5
+        float waveFreq = 2.0;  // Was 4.0
         
-        // Saliency Modulation (Phase 2): Conservative, far-periphery only
-        // Leverages temporal smoothing to prevent flicker on dynamic content
-        float saliencyJitterMod = 1.0;
-        if (u_enable_saliency_modulation > 0.5 && isFarPeriphery) {
-            float s = lgn.saliency;
-            // 25% max jitter reduction at maximum saliency
-            saliencyJitterMod = mix(1.0, 0.75, s);
+        // Create a slow rolling wave
+        float waveX = sin(uv.y * waveFreq + u_time * waveSpeed);
+        float waveY = cos(uv.x * waveFreq + u_time * waveSpeed * 0.8);
+        
+        // Amplitude scales with strength (eccentricity)
+        // Parafovea: Tiny warp
+        // Periphery: Larger warp
+        
+        // Saliency Stabilization
+        // Dampen wave amplitude in high-saliency areas to prevent "breathing" artifacts on faces/text.
+        float waveDampener = 1.0;
+        if (u_enable_saliency_modulation > 0.5) {
+            // Reduce wave by up to 90% in highly salient areas
+            waveDampener = 1.0 - (lgn.saliency * 0.9);
         }
         
-        float jitterScale = baseJitter * strength * u_intensity * saliencyJitterMod;
-        float densityX = mix(120.0, 40.0, lgn.rhythm);
-        float densityY = mix(120.0, 10.0, lgn.rhythm);
-        float xID = floor(uv.x * densityX);
-        float yID = floor(uv.y * densityY);
-        float offX = (hash22(vec2(yID, xID)).x - 0.5) * jitterScale;
-        float offY = (hash22(vec2(xID, yID + 13.0)).x - 0.5) * jitterScale;
+        vec2 waveOffset = vec2(waveX, waveY) * 0.005 * strength * u_intensity * waveDampener;
         
-        signal.displacement = vec2(offX, offY);
+        signal.displacement = waveOffset;
         signal.distortedUV = uv + signal.displacement;
         signal.distortionStrength = strength;
         
@@ -340,8 +362,25 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
 
 // --- STAGE 3: V4 (Aesthetics) ---
 vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float parafovea_radius, float saccadeFactor) {
-    // Use sampleSource for correct color
-    vec3 col = sampleSource(v1.distortedUV).rgb;
+    // === VARIABLE BLUR (Gaussian Roll-off) ===
+    // Calculate blur radius based on eccentricity
+    float blurRadius = 0.0;
+    
+    if (dist > fovea_radius) {
+        if (dist <= parafovea_radius) {
+            // Parafovea (2-5°): 1px to 3px
+            float t = (dist - fovea_radius) / (parafovea_radius - fovea_radius);
+            blurRadius = mix(0.0, 3.0, t);
+        } else {
+            // Periphery (>5°): 3px to 15px+
+            // Exponential increase
+            float distFromPara = dist - parafovea_radius;
+            blurRadius = 3.0 + distFromPara * 40.0; // Rapid increase
+        }
+    }
+    
+    // Use sampleBlurred instead of raw sampleSource
+    vec3 col = sampleBlurred(v1.distortedUV, blurRadius).rgb;
     
     // === MAGNOCELLULAR PATHWAY: Luminance Contrast Preservation ===
     // M-cells are highly sensitive to luminance (brightness) but blind to color/detail.
@@ -613,6 +652,28 @@ void main() {
     // 3. V4: Aesthetics
     float saccadeFactor = smoothstep(4.0, 10.0, u_velocity);
     vec3 finalRGB = processV4(uv, v1, lgn, config, dist, fovea_radius, parafovea_radius, saccadeFactor);
+    
+    // === PARAFOVEAL ENHANCEMENTS (Pivot) ===
+    // 1. Saturation Boost (2-5° region)
+    // Boost saturation to compensate for lower acuity and guide attention.
+    if (isParafovea) {
+        vec3 col = finalRGB;
+        float luma = dot(col, vec3(0.299, 0.587, 0.114));
+        // Boost saturation by mixing away from grayscale
+        // 20% boost seems appropriate for "slightly boost"
+        finalRGB = mix(vec3(luma), col, 1.2); 
+    }
+
+    // 2. Peripheral Vignetting (>5°)
+    // REMOVED: User feedback indicated this was an antipattern (dimming).
+    // Keeping the block commented out for reference or future toggle.
+    /*
+    if (isFarPeriphery) {
+        float vignetteDist = dist - parafovea_radius;
+        float vignetteFactor = smoothstep(0.0, 0.5, vignetteDist);
+        finalRGB *= mix(1.0, 0.7, vignetteFactor);
+    }
+    */
     
     // --- POST-PROCESSING (Rod Vision, Masking, Debug) ---
     
