@@ -797,7 +797,9 @@ function createScrutinizerWindow(startUrl) {
                 const contentBounds = win.getContentBounds();
 
                 const x = cursorPos.x - contentBounds.x;
-                const y = cursorPos.y - contentBounds.y;
+                // Fix: Subtract toolbar height (40) because contentBounds starts at window top (below titlebar),
+                // but our content view (and HUD) starts 40px lower.
+                const y = cursorPos.y - contentBounds.y - 40;
 
                 if (x >= 0 && x < contentBounds.width && y >= 0 && y < contentBounds.height) {
                     // Send zoom=1.0 since coords are already window-relative

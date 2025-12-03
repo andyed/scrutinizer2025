@@ -25,6 +25,26 @@ Implement a dedicated **Input Normalization** stage at the very beginning of the
 
 This ensures that the LGN, V1, and V4 stages operate on **ideal, platform-agnostic data**. If we switch capture methods or engines later, we only update the Normalization Layer, not the visual effects.
 
+### 5. Dual Mouse Listening Strategy
+**Problem:**
+Relying solely on DOM `mousemove` events fails when the cursor hovers over native UI elements (like `<select>` dropdowns), system menus, or when the main thread is blocked. This causes the fovea to "stick" or disappear.
+
+**Solution:**
+We implement a **Dual Strategy** in `main.js`:
+
+1.  **Primary (DOM Events)**:
+    *   **Source**: `ipcMain.on('browser:mousemove')` from the renderer.
+    *   **Pros**: High frequency, perfectly synced with content, provides element context.
+    *   **Cons**: Blocked by native UI/heavy load.
+    *   **Priority**: Always preferred when available.
+
+2.  **Fallback (Global Polling)**:
+    *   **Source**: `screen.getCursorScreenPoint()` polled every 16ms in `main.js`.
+    *   **Trigger**: Activates when no DOM events are received for >20ms.
+    *   **Pros**: Works everywhere (system-wide), immune to DOM blocking.
+    *   **Cons**: Lower fidelity, requires manual coordinate mapping.
+    *   **Critical Detail**: When calculating Y-coordinate, we MUST subtract the `TOOLBAR_HEIGHT` (40px) because the visual overlay's origin is offset from the window's content origin.
+
 ## Neuro-Architecture Pipeline
 
 The shader uses a modular architecture inspired by the human visual system to organize visual effects. While we use biological terms (LGN, V1, V4) as convenient labels for the pipeline stages, this is a **software architecture pattern**, not a rigorous biological simulation.
