@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node scripts/run-electron.js .",
     "dev": "node scripts/run-electron.js . --enable-logging",
-    "build": "electron-builder --mac",
+    "build": "node scripts/build-signed.js",
     "build:unsigned": "electron-builder --mac --config.mac.identity=null",
     "release": "electron-builder --mac --publish always",
     "build:win": "electron-builder --win",
@@ -29,9 +29,11 @@
       "main.js",
       "menu-template.js",
       "settings-manager.js",
+      "shared/**/*",
       "renderer/**/*",
       "!renderer/**/*.md"
     ],
+    "afterSign": "scripts/notarize.js",
     "mac": {
       "category": "public.app-category.utilities",
       "target": [
@@ -42,8 +44,7 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
-      "afterSign": "scripts/notarize.js"
+      "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "dmg": {
       "sign": false,
@@ -66,7 +67,7 @@
         }
       ],
       "icon": "renderer/assets/scrutinizer_512x512_icon.png",
-      "certificateFile": "build/certs/windows_cert.pfx",
+      "cscLink": "build/certs/windows_cert.pfx",
       "verifyUpdateCodeSignature": false
     },
     "nsis": {
@@ -85,6 +86,7 @@
   "devDependencies": {
     "@electron/notarize": "^3.1.1",
     "cross-env": "^10.1.0",
+    "dotenv": "^17.2.3",
     "electron": "^30.5.1",
     "electron-builder": "^26.0.12"
   },

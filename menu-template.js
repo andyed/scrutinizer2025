@@ -1,6 +1,6 @@
 const { app, shell } = require('electron');
 
-const { RADIUS_OPTIONS, ASPECT_OPTIONS, INTENSITY_OPTIONS } = require('../shared/constants.json');
+const { RADIUS_OPTIONS, ASPECT_OPTIONS, INTENSITY_OPTIONS } = require('./shared/constants.json');
 
 function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10) {
     const isMac = process.platform === 'darwin';
