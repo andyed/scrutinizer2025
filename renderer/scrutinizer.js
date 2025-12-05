@@ -76,7 +76,8 @@
             this.lastFrameBitmap = null;
 
             // Visual Memory
-            this.visualMemoryLimit = config.visualMemoryLimit !== undefined ? config.visualMemoryLimit : 0; // 0 = Off, -1 = Infinite, >0 = Count
+            this.visualMemoryLimit = config.visualMemoryLimit !== undefined ? Number(config.visualMemoryLimit) : 0; // 0 = Off, -1 = Infinite, >0 = Count
+            console.log(`[Scrutinizer] Initial Visual Memory Limit: ${this.visualMemoryLimit} (Type: ${typeof this.visualMemoryLimit})`);
             this.visualMemoryBuffer = []; // Array of {x, y, radius, timestamp}
             this.fixationStartTime = 0;
             this.isFixating = false;
