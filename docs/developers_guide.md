@@ -460,3 +460,27 @@ To prevent "AI Hubris" and accidental regressions (like the "Blue Tint" or "Sali
 *   `tests/golden/`: Source of truth. Committed to git.
 *   `tests/screenshots/`: Ephemeral test output. Ignored by git.
 
+
+---
+
+## Release & Builds
+
+### Building for macOS
+To create a signed and notarized `.dmg`:
+```bash
+npm run build
+```
+*   **Signature**: Handled automatically by `electron-builder` using Apple ID env vars.
+*   **Notarization**: Handled by `scripts/notarize.js`.
+
+### Building for Windows
+To create an installer (`.exe`) and ZIP:
+```bash
+# 1. Install dependencies (on a Windows machine)
+npm install
+
+# 2. Build Release
+npm run build:win
+```
+*   **Output**: `dist/Scrutinizer Setup 1.2.0.exe` (NSIS Installer) + `dist/Scrutinizer-1.2.0-win.zip`.
+*   **Certificates**: Windows signing configuration is in `package.json` (`cscLink`), but typically requires a manual setup for the first run if keys are missing.
