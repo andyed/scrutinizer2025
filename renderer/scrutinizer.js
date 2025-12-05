@@ -394,59 +394,66 @@
                 const isInside = this.mouseX > 0 && this.mouseX < this.canvas.width &&
                     this.mouseY > 0 && this.mouseY < this.canvas.height;
 
-                const isStable = isInside && (this.currentVelocity < this.config.fixationVelocityThreshold);
-
-                if (isStable) {
-                    if (!this.isFixating) {
-                        this.isFixating = true;
-                        this.fixationStartTime = now;
-                        // console.log('[Scrutinizer] Fixation started');
-                    } else {
-                        const dwellTime = now - this.fixationStartTime;
-                        if (dwellTime > this.config.dwellTimeThreshold) {
-                            // Confirmed fixation! Add/Update buffer
-                            // Check if we are close to an existing point to update it instead of adding new
-                            const existingIndex = this.visualMemoryBuffer.findIndex(p => {
-                                const dx = p.x - this.mouseX;
-                                const dy = p.y - this.mouseY;
-                                return Math.sqrt(dx * dx + dy * dy) < (effectiveRadius * this.config.foveaBypassMargin);
-                            });
-
-                            if (existingIndex !== -1) {
-                                // Update existing
-                                this.visualMemoryBuffer[existingIndex].x = this.mouseX;
-                                this.visualMemoryBuffer[existingIndex].y = this.mouseY;
-                                this.visualMemoryBuffer[existingIndex].timestamp = now;
-                                // console.log('[Scrutinizer] Updated existing fixation point');
-                            } else {
-                                // Add new
-                                this.visualMemoryBuffer.push({
-                                    x: this.mouseX,
-                                    y: this.mouseY,
-                                    radius: effectiveRadius,
-                                    timestamp: now
+                // 1. Update Fixation State for "Visual Memory"
+                // Only run if Visual Memory is enabled (limit != 0)
+                if (this.visualMemoryLimit !== 0) {
+                    // Velocity-based fixation detection
+                    // If moving slow enough, we are fixating
+                    if (this.currentVelocity < 0.1) { // Threshold 0.1 px/ms = 100px/s (Adjust as needed)
+                        if (!this.isFixating) {
+                            this.isFixating = true;
+                            this.fixationStartTime = now;
+                            // console.log('[Scrutinizer] Fixation started');
+                        } else {
+                            const dwellTime = now - this.fixationStartTime;
+                            if (dwellTime > this.config.dwellTimeThreshold) {
+                                // Confirmed fixation! Add/Update buffer
+                                // Check if we are close to an existing point to update it instead of adding new
+                                const existingIndex = this.visualMemoryBuffer.findIndex(p => {
+                                    const dx = p.x - this.mouseX;
+                                    const dy = p.y - this.mouseY;
+                                    return Math.sqrt(dx * dx + dy * dy) < (effectiveRadius * this.config.foveaBypassMargin);
                                 });
-                                // console.log(`[Scrutinizer] Added new fixation point. Buffer size: ${this.visualMemoryBuffer.length}, Limit: ${this.visualMemoryLimit}`);
 
-                                // Enforce Limit
-                                // Limit > 0: FIFO
-                                // Limit == -1: Infinite (no removal)
-                                // Limit == 0: Disabled (handled by useMask check above)
-                                if (this.visualMemoryLimit > 0 && this.visualMemoryBuffer.length > this.visualMemoryLimit) {
-                                    // Remove oldest (first element)
-                                    this.visualMemoryBuffer.shift();
-                                    // console.log('[Scrutinizer] Limit reached, evicted oldest point');
+                                if (existingIndex !== -1) {
+                                    // Update existing
+                                    this.visualMemoryBuffer[existingIndex].x = this.mouseX;
+                                    this.visualMemoryBuffer[existingIndex].y = this.mouseY;
+                                    this.visualMemoryBuffer[existingIndex].timestamp = now;
+                                    // console.log('[Scrutinizer] Updated existing fixation point');
+                                } else {
+                                    // Add new
+                                    this.visualMemoryBuffer.push({
+                                        x: this.mouseX,
+                                        y: this.mouseY,
+                                        radius: effectiveRadius,
+                                        timestamp: now
+                                    });
+                                    // console.log(`[Scrutinizer] Added new fixation point. Buffer size: ${this.visualMemoryBuffer.length}, Limit: ${this.visualMemoryLimit}`);
+
+                                    // Enforce Limit
+                                    // Limit > 0: FIFO
+                                    // Limit == -1: Infinite (no removal)
+                                    if (this.visualMemoryLimit > 0 && this.visualMemoryBuffer.length > this.visualMemoryLimit) {
+                                        // Remove oldest (first element)
+                                        this.visualMemoryBuffer.shift();
+                                        // console.log('[Scrutinizer] Limit reached, evicted oldest point');
+                                    }
                                 }
                             }
-
-                            // Reset fixation timer to prevent spamming updates? 
-                            // No, we want to keep updating position if it drifts slightly.
-                            // But we don't want to re-add. The distance check handles that.
                         }
+                    } else {
+                        if (this.isFixating) {
+                            // console.log('[Scrutinizer] Fixation broken (movement)');
+                        }
+                        this.isFixating = false;
+                        this.fixationStartTime = 0;
                     }
                 } else {
-                    if (this.isFixating) {
-                        // console.log('[Scrutinizer] Fixation broken (movement)');
+                    // Behavior if Memory is OFF (Limit 0)
+                    // Ensure buffer is empty so we don't draw stale trails if user just toggled it off
+                    if (this.visualMemoryBuffer.length > 0) {
+                        this.visualMemoryBuffer = [];
                     }
                     this.isFixating = false;
                     this.fixationStartTime = 0;
