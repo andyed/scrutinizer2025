@@ -62,10 +62,10 @@ return { data: saliency, width: this.width, height: this.height, maxVal };
 
 ## Medium-Term Improvements
 
-### 4. Merge Feature Extraction and Combination Loops
+### 4. ✅ Merge Feature Extraction and Combination Loops
 **Priority**: MEDIUM | **Effort**: MEDIUM | **Impact**: MEDIUM
 
-**Current**: 3 separate passes (Extract → Combine → Normalize)
+**Current**: 2 passes (Extract+Combine → Normalize+Write)
 
 **Improved**: 2 passes (Extract+Combine → Normalize+Write)
 
@@ -77,10 +77,10 @@ return { data: saliency, width: this.width, height: this.height, maxVal };
 
 ---
 
-### 5. Adaptive Resolution Scaling  
+### 5. ✅ Adaptive Resolution Scaling  
 **Priority**: LOW | ** Effort**: LOW | **Impact**: LOW
 
-**Current**: Fixed `scale = 0.25` (25% resolution)
+**Current**: Adaptive target max dimension (e.g., 256px)
 
 **Improved**: Target maximum dimension (e.g., 256px)
 ```javascript
@@ -127,7 +127,7 @@ For each feature map (I, RG, BY):
 
 ---
 
-### 7. Web Workers for Off-Main-Thread Processing
+### 7. ✅ Web Workers for Off-Main-Thread Processing
 **Priority**: MEDIUM | **Effort**: HIGH | **Impact**: HIGH (for frame rate)
 
 **Current**: Saliency computation blocks main thread (~5-10ms)
@@ -183,9 +183,9 @@ Current weights (`W_I = 0.3`, `W_RG = 0.35`, `W_BY = 0.35`) are heuristic. Consi
 ## Implementation Order
 
 1. ✅ **Phase 1** (This session): True luminance, expose data, pre-calc weights
-2. **Phase 2** (Next): Merge loops, adaptive scaling
+2. ✅ **Phase 2** (This session): Merge loops, adaptive scaling
 3. **Phase 3** (Research): Center-surround mechanism
-4. **Phase 4** (Optimization): Web Workers
+4. ✅ **Phase 4** (Optimization): Web Workers (Implemented in `renderer/saliency-worker.js`)
 
 ---
 

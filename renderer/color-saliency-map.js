@@ -21,6 +21,15 @@ class ColorSaliencyMap {
     }
 
     resize(width, height) {
+        // Adaptive Resolution Scaling (Phase 2)
+        // Target a consistent max dimension (e.g., 256px) regardless of screen size.
+        // This prevents performance degradation on 4K/5K displays.
+        const TARGET_MAX_DIM = 256;
+        const maxDim = Math.max(width, height);
+
+        // Calculate scale to fit within target, but never upscale (max 1.0)
+        this.scale = maxDim > 0 ? Math.min(1.0, TARGET_MAX_DIM / maxDim) : 0.25;
+
         const newWidth = Math.floor(width * this.scale);
         const newHeight = Math.floor(height * this.scale);
 
@@ -43,52 +52,44 @@ class ColorSaliencyMap {
         const pixels = imageData.data;
         const len = this.width * this.height;
 
+        // Loop Fusion (Phase 2):
+        // Eliminated intermediate Float32Arrays for I, RG, BY.
+        // We now compute features and combine them in a single pass.
+
         const saliency = new Float32Array(len);
-
-        // Feature Maps
-        const I = new Float32Array(len); // Intensity
-        const RG = new Float32Array(len); // Red-Green
-        const BY = new Float32Array(len); // Blue-Yellow
-
         let maxVal = 0;
 
-        // Feature weight constants (pre-calculated for performance)
+        // Feature weight constants
         const W_I = 0.3;   // Intensity weight
         const W_RG = 0.35; // Red-Green opponency weight
         const W_BY = 0.35; // Blue-Yellow opponency weight
 
-        // 1. Extract Features
+        // PASS 1: Extract & Combine
         for (let i = 0; i < len; i++) {
             const r = pixels[i * 4] / 255.0;
             const g = pixels[i * 4 + 1] / 255.0;
             const b = pixels[i * 4 + 2] / 255.0;
 
-            // Intensity (True Perceptual Luminance - ITU-R BT.709)
-            // Human vision is most sensitive to Green (72%), then Red (21%), then Blue (7%)
+            // Intensity (ITU-R BT.709)
             const intensity = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-            I[i] = intensity;
 
             // Color Opponency
-            // R-G: |R - G|
-            // B-Y: |B - (R+G)/2|
-            RG[i] = Math.abs(r - g);
-            BY[i] = Math.abs(b - (r + g) / 2.0);
-        }
+            const rg = Math.abs(r - g);
+            const by = Math.abs(b - (r + g) / 2.0);
 
-        // 2. Combine Features (Linear Combination)
-        // Weights: Intensity=30%, Red-Green=35%, Blue-Yellow=35%
-        for (let i = 0; i < len; i++) {
-            const val = W_I * I[i] + W_RG * RG[i] + W_BY * BY[i];
+            // Weighted Sum
+            const val = W_I * intensity + W_RG * rg + W_BY * by;
+
             saliency[i] = val;
             if (val > maxVal) maxVal = val;
         }
 
-        // 3. Normalize & Write Output
+        // PASS 2: Normalize & Write Output
         if (maxVal < 0.001) maxVal = 1.0; // Prevent div by zero
 
         // Debug Log (Throttled)
         if (Math.random() < 0.01) {
-            console.log(`[ColorSaliencyMap] MaxVal: ${maxVal.toFixed(4)}`);
+            console.log(`[ColorSaliencyMap] MaxVal: ${maxVal.toFixed(4)}, Scale: ${this.scale.toFixed(3)}`);
         }
 
         for (let i = 0; i < len; i++) {

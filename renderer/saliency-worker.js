@@ -7,12 +7,17 @@ let canvas;
 let ctx;
 let width = 0;
 let height = 0;
-const scale = 0.25; // 25% resolution
+
 
 self.onmessage = function (e) {
     const { imageBitmap, id } = e.data;
 
     if (!imageBitmap) return;
+
+    // Adaptive Resolution Scaling (Phase 2)
+    const TARGET_MAX_DIM = 256;
+    const maxDim = Math.max(imageBitmap.width, imageBitmap.height);
+    const scale = maxDim > 0 ? Math.min(1.0, TARGET_MAX_DIM / maxDim) : 0.25;
 
     // Calculate target dimensions
     const newWidth = Math.floor(imageBitmap.width * scale);
@@ -36,13 +41,8 @@ self.onmessage = function (e) {
     const pixels = imageData.data;
     const len = width * height;
 
+    // Loop Fusion (Phase 2)
     const saliency = new Float32Array(len);
-
-    // Feature Maps
-    const I = new Float32Array(len); // Intensity
-    const RG = new Float32Array(len); // Red-Green
-    const BY = new Float32Array(len); // Blue-Yellow
-
     let maxVal = 0;
 
     // Feature weight constants
@@ -50,29 +50,27 @@ self.onmessage = function (e) {
     const W_RG = 0.35;
     const W_BY = 0.35;
 
-    // 1. Extract Features
+    // PASS 1: Extract & Combine
     for (let i = 0; i < len; i++) {
         const r = pixels[i * 4] / 255.0;
         const g = pixels[i * 4 + 1] / 255.0;
         const b = pixels[i * 4 + 2] / 255.0;
 
-        // Intensity (ITU-R BT.709)
+        // Intensity
         const intensity = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        I[i] = intensity;
 
         // Color Opponency
-        RG[i] = Math.abs(r - g);
-        BY[i] = Math.abs(b - (r + g) / 2.0);
-    }
+        const rg = Math.abs(r - g);
+        const by = Math.abs(b - (r + g) / 2.0);
 
-    // 2. Combine Features
-    for (let i = 0; i < len; i++) {
-        const val = W_I * I[i] + W_RG * RG[i] + W_BY * BY[i];
+        // Weighted Sum
+        const val = W_I * intensity + W_RG * rg + W_BY * by;
+
         saliency[i] = val;
         if (val > maxVal) maxVal = val;
     }
 
-    // 3. Normalize & Write Output
+    // PASS 2: Normalize & Write Output
     if (maxVal < 0.001) maxVal = 1.0;
 
     for (let i = 0; i < len; i++) {

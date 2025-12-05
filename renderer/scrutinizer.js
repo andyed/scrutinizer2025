@@ -47,10 +47,21 @@
                     // preventing the "fight" between raw worker updates and smoothed frames.
 
                     if (!this.saliencyTargetCanvas) {
-                        // Should be init in handleResize, but safety first
                         this.saliencyTargetCanvas = document.createElement('canvas');
+                    }
+
+                    // RESIZE if dimensions changed (Adaptive Scaling support)
+                    if (this.saliencyTargetCanvas.width !== imageData.width ||
+                        this.saliencyTargetCanvas.height !== imageData.height) {
                         this.saliencyTargetCanvas.width = imageData.width;
                         this.saliencyTargetCanvas.height = imageData.height;
+
+                        // Also resize the buffer canvas
+                        if (!this.saliencyCurrentCanvas) {
+                            this.saliencyCurrentCanvas = document.createElement('canvas');
+                        }
+                        this.saliencyCurrentCanvas.width = imageData.width;
+                        this.saliencyCurrentCanvas.height = imageData.height;
                     }
 
                     // Update Target Canvas
@@ -170,10 +181,14 @@
                     this.maskCtx.fillRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
                     this.maskDirty = true;
 
-                    // Resize saliency map (1/4 resolution is enough for heatmap)
-                    if (this.saliencyMap) {
-                        this.saliencyMap.resize(bufferWidth, bufferHeight);
-                    }
+                    // Resize saliency map
+                    // ADAPTIVE SCALING (Phase 2): Target 256px max dim
+                    const TARGET_MAX_DIM = 256;
+                    const maxDim = Math.max(bufferWidth, bufferHeight);
+                    const saliencyScale = maxDim > 0 ? Math.min(1.0, TARGET_MAX_DIM / maxDim) : 0.25;
+
+                    this.saliencyMap?.resize(bufferWidth, bufferHeight);
+
                     // Create offscreen canvas for saliency generation if not exists
                     if (!this.saliencyTargetCanvas) {
                         this.saliencyTargetCanvas = document.createElement('canvas');
@@ -182,14 +197,12 @@
                         this.saliencyCurrentCanvas = document.createElement('canvas');
                     }
 
-                    const sWidth = Math.ceil(bufferWidth * maskScale);
-                    const sHeight = Math.ceil(bufferHeight * maskScale);
+                    const sWidth = Math.floor(bufferWidth * saliencyScale);
+                    const sHeight = Math.floor(bufferHeight * saliencyScale);
 
                     this.saliencyTargetCanvas.width = sWidth;
                     this.saliencyTargetCanvas.height = sHeight;
 
-                    // Resize current canvas but keep content if possible? 
-                    // No, resize usually clears. That's fine for resize events.
                     this.saliencyCurrentCanvas.width = sWidth;
                     this.saliencyCurrentCanvas.height = sHeight;
                 }
@@ -701,9 +714,6 @@
                 );
             }
 
-            // Generate Saliency Map from grouped blocks
-            this.generateSaliencyMap(groupedBlocks, dpr, yOffset);
-
             // Upload to GPU
             if (this.renderer) {
                 this.renderer.uploadStructureMap(this.structureMap.getCanvas());
@@ -797,78 +807,6 @@
             merged.push(current);
 
             return [...otherBlocks, ...merged];
-        }
-
-        generateSaliencyMap(blocks, dpr, yOffset) {
-            if (!this.saliencyTargetCanvas || !this.renderer) return;
-
-            const ctx = this.saliencyTargetCanvas.getContext('2d', { alpha: false });
-            const width = this.saliencyTargetCanvas.width;
-            const height = this.saliencyTargetCanvas.height;
-
-            // Scale factor from viewport to saliency map (0.25)
-            const scale = width / (this.canvas.width || 1);
-
-            // 1. Clear to base saliency (Low attention)
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, width, height);
-
-            // 2. Draw blocks with "Feature Integration" weights
-            // Images/Headers = High Saliency (Pop-out)
-            // Text = Low Saliency (Texture)
-
-            // Use source-over to prevent "intensity explosion" from overlapping blocks
-            // This stabilizes the saliency map against small layout shifts/grouping changes
-            ctx.globalCompositeOperation = 'source-over';
-
-            // Blur context for "Proximity Grouping" (Gestalt)
-            // Simulates the low-frequency nature of peripheral vision
-            ctx.filter = 'blur(8px)';
-
-            for (const block of blocks) {
-                let saliency = 0.0;
-
-                // --- FEATURE WEIGHTS ---
-                // Types from preload.js:
-                // 1.0 = Text
-                // 0.5 = Media
-                // 0.0 = UI
-
-                if (block.type === 0.5) { // Media (Images, Video)
-                    saliency = 1.0; // High pop-out
-                } else if (block.type === 1.0) { // Text
-                    // Check for Headers based on line height
-                    if (block.lineHeight > 24) {
-                        // Header/Large Text
-                        const normalizedSize = Math.min(block.lineHeight / 60.0, 1.0);
-                        saliency = 0.4 + (normalizedSize * 0.6);
-                    } else {
-                        // Body Text
-                        saliency = 0.15; // Low baseline
-                    }
-                } else { // UI (0.0) or others
-                    saliency = 0.3; // Medium saliency for interactive elements
-                }
-
-                // Draw "activation blob"
-                const x = block.x * dpr * scale;
-                const y = (block.y + yOffset) * dpr * scale;
-                const w = block.w * dpr * scale;
-                const h = block.h * dpr * scale;
-
-                // Color: Red channel = Saliency Strength
-                const intensity = Math.floor(saliency * 255);
-                ctx.fillStyle = `rgb(${intensity}, 0, 0)`;
-                ctx.fillRect(x, y, w, h);
-            }
-
-            ctx.filter = 'none'; // Reset filter
-
-            // Activate the smoothing loop for 60 frames (~1 second)
-            // This ensures we blend to the new target, then stop uploading to save GPU.
-            this.saliencyUpdateCountdown = 60;
-            // NOTE: We do NOT upload here anymore.
-            // The render loop (processFrame) will blend Target -> Current and upload Current.
         }
     }
 

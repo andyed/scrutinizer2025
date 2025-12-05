@@ -87,6 +87,22 @@ This loop captures the browser content to use as the source texture for the WebG
     *   `WebGLRenderer.uploadTexture` uploads the bitmap to the GPU (`u_texture`).
     *   **Color Correction**: Electron captures are BGRA. The Fragment Shader's `sampleSource` helper handles the BGRA->RGBA swizzle centrally to ensure correct colors.
 
+### D. Saliency Pipeline (Pixel-Based)
+This pipeline generates the "Saliency Map" used to guide the user's attention (heatmaps) and modulate visual effects. It runs off the main thread to ensure 60fps rendering.
+
+1.  **Input**: The `Scrutinizer` receives a new high-res frame from `processFrame`.
+2.  **Dispatch**: The frame bitmap is cloned and posted to `saliency-worker.js`.
+3.  **Process (Web Worker)**:
+    - **Adaptive Scaling**: Use a target max dimension of 256px (e.g., 256x144) for consistent O(1) performance regardless of screen size.
+    - **Feature Extraction**: Compute Intensity (I), Red-Green (RG), and Blue-Yellow (BY) features per pixel.
+    - **Combination**: Fuse features into a single saliency scalar using pre-calculated weights (I=0.3, RG=0.35, BY=0.35).
+    - **Normalization**: Normalize and apply contrast curve.
+4.  **Send**: The worker transfers the processed `ImageData` back to the main thread.
+5.  **Upload**:
+    - `Scrutinizer` receives the data and draws it to `saliencyTargetCanvas`.
+    - **Smoothing**: The render loop blends `saliencyCurrentCanvas` towards `target` over ~60 frames to remove flicker.
+    - `WebGLRenderer` uploads existing smoothened canvas to the GPU (`u_saliencyMap`).
+
 ---
 
 ## 3. Key Data Structures

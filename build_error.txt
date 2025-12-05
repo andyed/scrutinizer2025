@@ -1,0 +1,30 @@
+
+> scrutinizer-electron@1.1.4 build
+> node scripts/build-signed.js
+
+[dotenv@17.2.3] injecting env (3) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+Starting signed build...
+APPLE_ID present: true
+APPLE_ID_PASSWORD present: true
+APPLE_TEAM_ID present: true
+Mapped APPLE_ID_PASSWORD to APPLE_APP_SPECIFIC_PASSWORD
+(node:24849) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+  • electron-builder  version=26.0.12 os=25.1.0
+  • loaded configuration  file=package.json ("build" field)
+[dotenv@17.2.3] injecting env (0) from .env -- tip: 🔑 add access controls to secrets: https://dotenvx.com/ops
+  • executing @electron/rebuild  electronVersion=30.5.1 arch=arm64 buildFromSource=false appDir=./
+  • installing native dependencies  arch=arm64
+  • completed installing native dependencies
+  • packaging       platform=darwin arch=arm64 electron=30.5.1 appOutDir=dist/mac-arm64
+(node:24850) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+  • signing         file=dist/mac-arm64/Scrutinizer.app platform=darwin type=distribution identityName=Developer ID Application: Andy Edmonds (CQ3R588P3U) identityHash=7E6963EE5BFD9C38097EA62A25657A77A1926A61 provisioningProfile=none
+  • cancelled by SIGINT
+  ⨯ Failed to notarize via notarytool.  Failed with unexpected result: 
+
+  failedTask=build stackTrace=Error: Failed to notarize via notarytool.  Failed with unexpected result: 
+                                                                                 at /Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/node_modules/app-builder-lib/node_modules/@electron/notarize/src/notarytool.ts:115:13
+    at Generator.next (<anonymous>)
+    at fulfilled (/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/node_modules/app-builder-lib/node_modules/@electron/notarize/lib/notarytool.js:28:58)
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
