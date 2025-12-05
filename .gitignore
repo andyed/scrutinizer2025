@@ -24,3 +24,4 @@ out/
 tests/screenshots/
 tests/golden/*Z.png
 build/certs/
+build_error.txt
