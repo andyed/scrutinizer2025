@@ -648,8 +648,8 @@
         }
 
         setVisualMemoryLimit(limit) {
-            this.visualMemoryLimit = limit;
-            console.log('[Scrutinizer] Visual Memory Limit set to:', limit);
+            this.visualMemoryLimit = Number(limit);
+            console.log('[Scrutinizer] Visual Memory Limit set to:', this.visualMemoryLimit, `(Type: ${typeof this.visualMemoryLimit})`);
 
             // Always reset memory when changing modes to prevent "ghosts"
             // e.g. switching from Infinite to Limited should clear the infinite mask
