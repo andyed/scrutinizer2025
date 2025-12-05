@@ -71,12 +71,14 @@ This simulation visualizes the split-second mechanics of a glance—how your bra
 
 ## Installation
 
-### Unsigned Binaries (Experimental Builds)
-> **Security Note:** These are unsigned developer previews. Your OS will warn you. Only install if you trust this repository.
+### 📥 Download (v1.2.0)
 
-**Download:**
-* **macOS (Apple Silicon):** [Scrutinizer-1.1.4-arm64-mac.zip](https://github.com/andyed/scrutinizer2025/releases/download/v1.1.4/Scrutinizer-1.1.4-arm64-mac.zip)
-* **Windows:** [Scrutinizer-Setup-1.1.4.exe](https://github.com/andyed/scrutinizer2025/releases/download/v1.1.4/Scrutinizer-Setup-1.1.4.exe)
+> **Note:** Scrutinizer for macOS is now **Signed & Notarized**! No more security warnings.
+
+*   🍎 **macOS (Apple Silicon):** [**Download Scrutinizer-1.2.0.dmg**](https://github.com/andyed/scrutinizer2025/releases/download/v1.2.0/Scrutinizer-1.2.0-arm64.dmg)
+*   🪟 **Windows:** TBD (See [Releases Page](https://github.com/andyed/scrutinizer2025/releases))
+
+[**View All Releases & Changelogs**](https://github.com/andyed/scrutinizer2025/releases)
 
 <details>
 <summary><strong>Troubleshooting macOS Warnings</strong></summary>
@@ -100,8 +102,11 @@ This simulation visualizes the split-second mechanics of a glance—how your bra
 # Install dependencies
 npm install
 
-# Run the application
+# Run the application (Development Mode)
 npm start
+
+# Build for Release (Signed DMG)
+npm run build
 ```
 
 ---
