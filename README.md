@@ -5,6 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 
 ➡️ Live site: **[scrutinizer.app](https://scrutinizer.app)**
+🍎 macOS Installer: **[Download v1.2.0](https://github.com/andyed/scrutinizer2025/releases/download/v1.2.0/Scrutinizer-1.2.0-arm64.dmg)**
 
 **A design constraint model for studying foveal vs. peripheral vision on the web.**
 
@@ -76,7 +77,7 @@ This simulation visualizes the split-second mechanics of a glance—how your bra
 > **Note:** Scrutinizer for macOS is now **Signed & Notarized**! No more security warnings.
 
 *   🍎 **macOS (Apple Silicon):** [**Download Scrutinizer-1.2.0.dmg**](https://github.com/andyed/scrutinizer2025/releases/download/v1.2.0/Scrutinizer-1.2.0-arm64.dmg)
-*   🪟 **Windows:** TBD (See [Releases Page](https://github.com/andyed/scrutinizer2025/releases))
+*   🪟 **Windows:** Manual build required (Coming soon though, see [Releases Page](https://github.com/andyed/scrutinizer2025/releases))
 
 [**View All Releases & Changelogs**](https://github.com/andyed/scrutinizer2025/releases)
 
