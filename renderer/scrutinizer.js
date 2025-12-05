@@ -387,7 +387,8 @@
 
             // Update Visual Memory Mask
             // Only if enabled and visual memory is active
-            const useMask = this.enabled && (this.visualMemoryLimit !== 0);
+            // Use loose equality (!=) to handle '0' string vs 0 number (robustness)
+            const useMask = this.enabled && (this.visualMemoryLimit != 0);
 
             if (useMask) {
                 // 1. Fixation Detection
@@ -397,7 +398,7 @@
 
                 // 1. Update Fixation State for "Visual Memory"
                 // Only run if Visual Memory is enabled (limit != 0)
-                if (this.visualMemoryLimit !== 0) {
+                if (this.visualMemoryLimit != 0) {
                     // Velocity-based fixation detection
                     // If moving slow enough, we are fixating
                     if (this.currentVelocity < 0.1) { // Threshold 0.1 px/ms = 100px/s (Adjust as needed)
@@ -489,25 +490,7 @@
                     this.maskCtx.fill();
                 }
 
-                // Also draw CURRENT fovea
-                const maskX = this.mouseX * maskScaleX;
-                const maskY = this.mouseY * maskScaleY;
-                const maskRadius = effectiveRadius * maskScaleX;
-
-                const gradient = this.maskCtx.createRadialGradient(maskX, maskY, 0, maskX, maskY, maskRadius);
-                gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
-                gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.5)');
-                gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
-
-                this.maskCtx.fillStyle = gradient;
-                this.maskCtx.beginPath();
-                this.maskCtx.arc(maskX, maskY, maskRadius, 0, Math.PI * 2);
-                this.maskCtx.fill();
-
-                // Debug: Log mask drawing occasionally
-                if (Math.random() < 0.01) {
-                    console.log(`[Scrutinizer] Drawing mask at (${maskX.toFixed(1)}, ${maskY.toFixed(1)}), Radius: ${maskRadius.toFixed(1)}`);
-                }
+                // Removed redundant Current Fovea drawing. Shader handles live fovea.
 
                 // Upload mask to GPU
                 this.renderer.uploadMask(this.maskCanvas);
