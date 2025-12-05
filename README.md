@@ -81,7 +81,9 @@ This simulation visualizes the split-second mechanics of a glance—how your bra
 [**View All Releases & Changelogs**](https://github.com/andyed/scrutinizer2025/releases)
 
 <details>
-<summary><strong>Troubleshooting macOS Warnings</strong></summary>
+<summary><strong>Troubleshooting macOS Warnings (Manual/Unsigned Builds Only)</strong></summary>
+
+> **Note:** The official release v1.2.0+ is signed and notarized. You should not see these warnings unless you are building from source or using an older version.
 
 1.  Right-click `Scrutinizer.app` → **Open**.
 2.  Click **Open** when warned about the unidentified developer.
