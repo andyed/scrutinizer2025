@@ -1,5 +1,23 @@
 # Scientific Literature Review & Implementation Details
 
+## Overview
+
+This document bridges the gap between Scrutinizer's technical implementation and the biological and cognitive science that inspires it. Scrutinizer is not merely an aesthetic filter; it is a biologically plausible simulation of the human foveated visual system, designed to reveal how peripheral vision influences attention, reading, and information foraging.
+
+## Table of Contents
+
+1.  [Implementation Notes: The Biological Model](#implementation-notes-the-biological-model)
+    *   [Rod-Weighted Luminance](#1-rod-weighted-luminance-scotopic-vision)
+    *   [Box Sampling](#2-box-sampling-retinal-ganglion-density)
+    *   [Domain Warping](#3-domain-warping-positional-uncertainty)
+    *   [Radial Chromatic Aberration](#4-radial-chromatic-aberration-the-lens-split)
+2.  [Scientific Validation & Research Context](#scientific-validation--research-context)
+    *   [Validation: Gaze-Contingent Research Protocols](#validation-gaze-contingent-research-protocols)
+    *   [Ensemble Perception & Saccade Planning](#ensemble-perception--saccade-planning)
+    *   [Vision Science & Cognitive Psychology](#vision-science--cognitive-psychology)
+    *   [Feature Detection in V1](#feature-detection-in-primary-visual-cortex-v1)
+    *   [Top-Down Influences in the LGN](#top-down-influences-in-the-lateral-geniculate-nucleus-lgn)
+
 ## Implementation Notes: The Biological Model
 
 The simulation is powered by a custom **WebGL Fragment Shader** that processes the browser viewport in real-time (60fps). The pipeline implements four distinct biological constraints to model the limitations of the human visual system.
@@ -12,11 +30,17 @@ In the periphery, cone cells (color) are scarce, and rod cells (luminance) domin
 - **Algorithm**: We calculate a "Rod Tint" vector based on the pixel's luminance.
 - **Effect**: As eccentricity increases, colors desaturate towards a cyan-grey. Red objects lose contrast and vanish, while blue/green objects appear brighter ("Purkinje shift").
 
+> **Key Insight**: This simulates the "night vision" quality of peripheral sight.
+> ↳ **See**: [Vision Science & Cognitive Psychology](#vision-science--cognitive-psychology) (Purkinje Shift)
+
 ### 2. Box Sampling (Retinal Ganglion Density)
 The density of Retinal Ganglion Cells (RGCs) drops exponentially from the fovea. This results in a loss of sampling resolution.
 
 - **Algorithm**: We use a variable-size pixelation filter. The "block size" scales with distance from the fovea.
 - **Effect**: Fine details in the periphery are averaged into larger blocks, destroying high-frequency information (like text) while preserving low-frequency structures (layout).
+
+> **Key Insight**: This models the "hardware limit" of the retina.
+> ↳ **See**: [Ensemble Perception](#ensemble-perception--saccade-planning) (Whitney: Compression)
 
 ### 3. Domain Warping (Positional Uncertainty)
 Peripheral vision suffers from "crowding"—the inability to isolate features. The brain receives a statistical summary of the texture rather than precise coordinates.
@@ -25,6 +49,9 @@ Peripheral vision suffers from "crowding"—the inability to isolate features. T
 - **Effect**:
     - **Fine Noise**: Jitters small details (text looks like "ants").
     - **Coarse Noise**: Warps large shapes (layout feels unstable).
+
+> **Key Insight**: The brain sees the *texture* of text but cannot resolve individual letters.
+> ↳ **See**: [Mongrel Theory](#vision-science--cognitive-psychology) (Rosenholtz: Texture Statistics)
 
 ### 4. Radial Chromatic Aberration (The "Lens Split")
 The Magno-cellular pathway (motion/luminance) processes information faster than the Parvo-cellular pathway (color), leading to temporal and spatial asynchrony.
@@ -35,15 +62,18 @@ The Magno-cellular pathway (motion/luminance) processes information faster than 
     - **Green Channel**: Anchored.
 - **Effect**: High-contrast edges in the periphery develop color fringes (Red/Cyan), creating a "vibrating" or "3D" effect that simulates the difficulty of locking focus on peripheral objects.
 
-
+> **Key Insight**: Visualizes the disconnect between "Where" (Magno) and "What" (Parvo) streams.
+> ↳ **See**: [Feature Detection in V1](#feature-detection-in-primary-visual-cortex-v1) (Hubel & Wiesel)
 
 **For detailed theoretical discussion**, see [`docs/beta_gemini3_discussion.md`](docs/beta_gemini3_discussion.md)
 
 ---
 
-## Related Work & Theoretical Foundation
+## Scientific Validation & Research Context
 
-### Use of Foveal Simulation for UX Design
+### Validation: Gaze-Contingent Research Protocols
+
+> **Context**: The studies below utilize "Gaze-Contingent Displays" (GCDs) as a **research protocol**. While they typically use simple Gaussian blur (unlike Scrutinizer's biologically plausible simulation), they validate the fundamental methodology: restricting peripheral information forces users to reveal their cognitive focus via overt attention (mouse/eye movements).
 
 
 - **Lagun, D. & Agichtein, E. (2011)**: ["ViewSer: A Tool for Large-Scale Studies of Web Search Result Examination"](http://www.mathcs.emory.edu/~dlagun/pubs/sigir636-lagun.pdf). *CHI 2011*.

@@ -13,7 +13,9 @@ Scrutinizer uses a custom WebGL renderer (`webgl-renderer.js`) to apply fragment
 3.  **`menu-template.js`**: Defines the critical application menu, including simulation settings.
 4.  **`docs/architecture-module-pattern.md`**: **CRITICAL** - Explains the hybrid CommonJS/Window module pattern used to prevent `ReferenceError`s. Read this before refactoring any class files.
 
-### 4. Input Normalization Layer
+### 4. Visual Memory & Input Layers
+Scrutinizer now supports a **Visual Memory** system. This uses a secondary texture (`u_maskTexture`) to represent areas the user has "fixated" on, which bypass distortion.
+
 **Lesson Learned (The "Blue Tint" Incident):**
 Platform-specific quirks (like Electron's `desktopCapturer` returning BGRA textures instead of RGBA) should **never** leak into the core scientific model.
 
@@ -62,7 +64,7 @@ The shader uses a modular architecture inspired by the human visual system to or
     *   **Function**: `processV1`
     *   **Logic**: Determines *how* the image is warped. It uses the signal from the LGN to apply displacement.
     *   **Types**:
-        *   **Noise**: Fluid, continuous distortion (e.g., Trippy mode).
+        *   **Noise**: Fluid, continuous distortion (e.g., Double Vision mode).
         *   **Shatter**: Blocky, discontinuous displacement (e.g., default peripheral blur).
         *   **None**: No geometric change (e.g., Blueprint mode).
 
@@ -72,19 +74,29 @@ The shader uses a modular architecture inspired by the human visual system to or
     *   **Logic**: Determines *what* the final pixel looks like. It applies color grading, overlays, and pixel-level effects.
     *   **Examples**: High-Key ghosting, Neon colors, Wireframe overlays.
 
+### Philosophy: Aesthetic Modes as Test Cases
+In Scrutinizer, an "Aesthetic Mode" is not just a visual filter—it is a **functional test case** for the modularity of the pipeline. We encourage keeping "Work In Progress" (WIP) or experimental modes in the codebase because they often reveal missing architectural features.
+
+*   **Double Vision (Mode 5)** is a test for **Stream Integration**. By bypassing LGN gating (`lgn_use_structure_mask = false`), it proves the pipeline can handle raw, ungated input without breaking.
+*   **Blueprint (Mode 3)** is a test for **Edge Detection**. It forces V1 to use pixelated UVs (`Type 3`) and tests if V4 can run a Sobel filter on that distorted coordinate space.
+*   **Cyberpunk (Mode 4)** is a test for **Variable Quantization**. It pushes the V1 block size logic to extreme limits (1200px) to verify that the coordinate system doesn't collapse at high scales.
+
+**Guideline:** If you need to "hack" the shader to achieve a specific look, **do it**. If the hack persists, it likely means the V1 or V4 stage needs a new official capability (like a new `distortion_type` or `uniform`). Use the mode to drive the architecture, not the other way around.
+
 ### Adding a New Aesthetic Mode
 
 To add a new mode, you no longer write a monolithic `if/else` block. Instead, you define a **Configuration** for the pipeline.
 
 1.  **Register the Mode**: Add a new ID in `menu-template.js` (e.g., `6.0`).
-2.  **Configure the Pipeline**: In `webgl-renderer.js` (inside `main`), add a configuration block:
+2.  **Configure the Pipeline**: In `webgl-renderer.js` (inside `updateConfigFromMode`), add a configuration block:
 
-```glsl
-} else if (u_aesthetic_mode > 5.5) { // Mode 6: My New Mode
-    config.lgn_use_structure_mask = true;  // Protect text?
-    config.v1_distortion_type = 0;         // 0=Noise, 1=Shatter, 2=None
-    config.v1_strength_mult = 2.0;         // Double distortion?
-    config.v4_style_id = 6;                // Custom Style ID
+```javascript
+// Inside updateConfigFromMode(modeId)
+} else if (modeId > 5.5) { // Mode 6: My New Mode
+    this.config.lgn_use_structure_mask = true;  // Protect text?
+    this.config.v1_distortion_type = 0;         // 0=Noise, 1=Shatter, 2=None
+    this.config.v1_strength_mult = 2.0;         // Double distortion?
+    this.config.v4_style_id = 6;                // Custom Style ID
 }
 ```
 
@@ -119,7 +131,7 @@ The following table details the rendering characteristics of each built-in mode 
 | **4: Cyberpunk** | **LGN** | Standard |
 | | **V1** | **Massive Pixelate**: Up to 1200px blocks (Type 3). |
 | | **V4** | **Neon**: Progressive Contrast (1.0->2.5) + Halftone Texture. |
-| **5: Trippy** | **LGN** | **Bypassed**: No Gating (Stream Integration). |
+| **5: Double Vision** | **LGN** | **Bypassed**: No Gating (Stream Integration). |
 | | **V1** | **Flowing Wave**: High-amplitude Sine Wave (Custom). |
 | | **V4** | **Vibrant**: Saturation Boost + Subtle Fractal Noise. |
 
@@ -321,6 +333,20 @@ If you see `TypeError: Cannot read properties of undefined (reading 'on')`, it m
 unset ELECTRON_RUN_AS_NODE
 ```
 
+### Checking Notarization Status
+
+If you did not use the `--wait` flag during submission, you can check the status using the submission ID you received after the initial upload.
+
+To check the status, use:
+```bash
+xcrun notarytool info "YOUR_SUBMISSION_ID" --apple-id "YOUR_APPLE_ID" --password "YOUR_APP_PASSWORD"
+```
+
+To view detailed logs, especially for rejections, use:
+```bash
+xcrun notarytool log "YOUR_SUBMISSION_ID" --keychain-profile "YourNotaryProfile"
+```
+
 ---
 
 ## Testing
@@ -352,10 +378,6 @@ SCREENSHOT_MODE=update SAVE_SCREENSHOTS=true npm test
 - **Date Mode**: Saves as `testname_TIMESTAMP.png`. These are ignored by git.
 - **Update Mode**: Saves as `testname.png`. These should be committed as reference images.
 
-### Integration Tests
-To run full app integration tests (e.g., loading external sites):
-
-```bash
 ### Integration Tests
 To run full app integration tests (e.g., loading external sites):
 

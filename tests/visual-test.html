@@ -665,10 +665,23 @@
                 visualMemoryLimit: 2, // Need 2 to hold center + current pos
                 debugBoundary: 0,
                 mongrelMode: 1, // Shatter mode (high geometric noise)
-                aestheticMode: 0
+                aestheticMode: 0,
+                // Critical thresholds for memory activation
+                fixationVelocityThreshold: 50.0, // High threshold for test stability
+                dwellTimeThreshold: 100,         // Short dwell for test speed
+                foveaBypassMargin: 0.8,
+                velocityDecayMove: 0.1,
+                velocityDecayStop: 0.2,
+                saccadicSuppressionThreshold: 100.0 // Disable suppression
             };
 
             const intScrutinizer = new window.Scrutinizer(integrityConfig);
+
+            // MANUALLY FIX MASK SIZE FOR TEST (IPC 'get-window-size' won't reply in this env)
+            // This ensures the mask texture has the correct aspect ratio (matching the 800x600 canvas)
+            intScrutinizer.maskCanvas.width = Math.ceil(width * 0.25);
+            intScrutinizer.maskCanvas.height = Math.ceil(height * 0.25);
+
             intScrutinizer.enable();
 
             // Mock Time

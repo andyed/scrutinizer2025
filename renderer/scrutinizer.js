@@ -6,7 +6,17 @@
 
     class Scrutinizer {
         constructor(config) {
-            this.config = config;
+            // Apply defaults for missing config values
+            this.config = {
+                fixationVelocityThreshold: 20.0,
+                dwellTimeThreshold: 150,
+                foveaBypassMargin: 0.8,
+                velocityDecayMove: 0.01,
+                velocityDecayStop: 0.02,
+                maskSmoothness: 0.1,
+                saccadicSuppressionThreshold: 4.0,
+                ...config
+            };
 
             // Canvas setup
             this.canvas = document.getElementById('overlay-canvas');

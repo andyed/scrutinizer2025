@@ -378,7 +378,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     click: () => sendToOverlays('menu:set-aesthetic-mode', 4)
                                 },
                                 {
-                                    label: 'Trippy (Psychedelic)',
+                                    label: 'Double Vision',
                                     type: 'radio',
                                     click: () => sendToOverlays('menu:set-aesthetic-mode', 5)
                                 }

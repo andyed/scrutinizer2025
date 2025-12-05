@@ -178,7 +178,7 @@ struct ModeConfig {
     bool lgn_use_saliency_gate;  // Should high saliency be protected?
     int  v1_distortion_type;     // 0=Noise (Curves), 1=Shatter (Mongrel), 2=None
     float v1_strength_mult;      // Multiplier for distortion
-    int  v4_style_id;            // 0=HighKey, 1=Lab, 2=Frosted, 3=Blueprint, 4=Cyberpunk, 5=Trippy
+    int  v4_style_id;            // 0=HighKey, 1=Lab, 2=Frosted, 3=Blueprint, 4=Cyberpunk, 5=Double Vision
     float lgn_ramp_end_mult;     // Multiplier for fovea_radius to determine ramp end
     bool v1_animate;             // Should distortion move over time?
 };
@@ -263,7 +263,7 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     
     signal.distortionStrength = strength;
     
-    // === TRIPPY MODE (Flowing Wave) ===
+    // === DOUBLE VISION MODE (Flowing Wave) ===
     if (config.v4_style_id == 5) {
         // Flowing Wave: Faster, stronger, more fluid than "Slow Wave"
         float waveSpeed = 0.5; 
@@ -272,7 +272,7 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         float waveX = sin(uv.y * waveFreq + u_time * waveSpeed);
         float waveY = cos(uv.x * waveFreq + u_time * waveSpeed * 0.7);
         
-        // Higher amplitude for "Trippy" feel
+        // Higher amplitude for "Double Vision" feel
         vec2 waveOffset = vec2(waveX, waveY) * 0.015 * strength * u_intensity;
         
         signal.displacement = waveOffset;
@@ -640,8 +640,8 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             
             // Apply bypassTransition to ensure smooth start
             return mix(col, finalColor, cleanFactor * bypassTransition);
-    } else if (config.v4_style_id == 5) { // Trippy (Fractal/Ooze)
-        // CLEAN TRIPPY: Just the flowing wave + saturation boost
+    } else if (config.v4_style_id == 5) { // Double Vision (Fractal/Ooze)
+        // CLEAN DOUBLE VISION: Just the flowing wave + saturation boost
         // Removed the "Oil Slick" (Red/Green) pattern as requested.
         
         // 1. Saturation Boost
@@ -700,7 +700,7 @@ void main() {
     config.lgn_ramp_end_mult = u_lgn_ramp_end_mult;
     config.v1_animate = u_v1_animate > 0.5;
     
-    // === TRIPPY MODE OVERRIDE ===
+    // === DOUBLE VISION MODE OVERRIDE ===
     // "Psychologically plausible as LGN is the stream separator"
     // In a psychedelic state, the LGN's gating function is compromised, leading to
     // a flood of unfiltered information (stream integration).

@@ -482,21 +482,23 @@ The "Feature Extractor" stage determines *how* the image is warped.
 -   **Inputs**: `suppressionFactor` (from LGN), `ModeConfig`.
 -   **Operation**: Calculates `distortedUV` and `displacement`.
 -   **Modes**:
-    -   **Noise**: Fluid, continuous distortion (e.g., Trippy).
+    -   **Noise**: Fluid, continuous distortion (e.g., Double Vision).
     -   **Shatter**: Blocky, discontinuous displacement (e.g., Default).
     -   **None**: No distortion (e.g., Blueprint, Cyberpunk).
 
 ### Stage 3: V4 (Aesthetics & Style)
-The "Interpreter" stage determines *what* the final pixel looks like.
+The "Interpreter" stage determines *what* the final pixel looks like. This stage demonstrates how the core foveated pipeline can be customized to achieve different research or artistic goals.
+
 -   **Inputs**: `distortedUV`, `ModeConfig`.
--   **Operation**: Applies color grading and pixel effects.
--   **Styles**:
-    -   **High-Key**: Desaturated, ghosting (Default).
-    -   **Lab**: Scotopic, dark blue-grey.
-    -   **Frosted**: Low contrast, milky.
-    -   **Blueprint**: Wireframe, scanlines.
-    -   **Cyberpunk**: Neon, pixelated blocks.
-    -   **Trippy**: Psychedelic, rainbow cycling.
+*   **Operation**: Applies color grading and pixel effects.
+*   **Customization Examples (Architectural Stress Tests)**:
+    *These modes not only demonstrate visual possibilities but also serve as stress-tests for the pipeline's flexibility.*
+    -   **High-Key (Default)**: Simulates standard peripheral degradation with desaturation and ghosting.
+    -   **Lab (Scotopic)**: A "night vision" model (dark blue-grey) simulating rod-dominated vision in low light.
+    -   **Frosted**: A low-contrast, milky aesthetic useful for simulating cataracts or foggy conditions.
+    -   **Blueprint**: A "wireframe" mode that visualizes the underlying Gestalt structure (rhythm/mass) detected by the engine.
+    -   **Cyberpunk**: An exaggerated "glitch" aesthetic using neon colors and blocky artifacts.
+    -   **Double Vision**: A fluid, wave-based distortion that simulates temporary visual impairments or disorienting states.
 
 ### Saccadic Suppression
 To prevent distracting "shimmering" during rapid eye movements, the renderer tracks mouse velocity. When velocity exceeds a threshold (>4000px/s), the V4 stage washes out the periphery, mimicking the brain's natural suppression of visual input during saccades.
