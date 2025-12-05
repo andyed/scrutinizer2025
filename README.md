@@ -5,6 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 
 ➡️ Live site: **[scrutinizer.app](https://scrutinizer.app)**
+
 🍎 macOS Installer: **[Download v1.2.0](https://github.com/andyed/scrutinizer2025/releases/download/v1.2.0/Scrutinizer-1.2.0-arm64.dmg)**
 
 **A design constraint model for studying foveal vs. peripheral vision on the web.**
