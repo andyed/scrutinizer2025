@@ -520,7 +520,9 @@
 
                 // Draw Target over Current with low opacity to smooth changes
                 // 0.1 = Slow smooth, 0.3 = Fast smooth
-                ctx.globalAlpha = 0.15;
+                // 0.8 = Fast update (Phase 2 fix for "ghosting" lag)
+                // Since we removed the legacy conflict, we can update much faster.
+                ctx.globalAlpha = 0.8;
                 ctx.drawImage(this.saliencyTargetCanvas, 0, 0);
                 ctx.globalAlpha = 1.0;
 
