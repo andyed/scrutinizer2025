@@ -70,5 +70,13 @@ See `docs/webcontentsview-migration.md` for full migration plan.
 ### Visual Artifacts
 - **Scroll Lag**: Rapid scrolling may cause a momentary desynchronization between the overlay canvas (visuals) and the underlying webview (interaction targets).
 - **Cursor State**: The mouse cursor may not always correctly reflect the hover state (e.g., changing to a hand pointer) due to the overlay window intercepting events.
-- **Native Select Dropdown Tracking**: Native HTML `<select>` dropdowns (e.g., Amazon's department menu) may show peripheral distortion when open. This occurs because the OS renders these controls outside the browser's context and blocks mouse event reporting. The polling fallback system attempts to compensate using screen coordinates, but coordinate space misalignment causes inaccurate foveal positioning.
-- **Peripheral Movie Artifacts**: When viewing full-motion video (e.g., movies) in the periphery, the "Slow Wave" distortion can create a "breathing" or "pulsing" artifact (approx. 1-2s cycle) that may be distracting. We are investigating saliency-based stabilization to mitigate this.
+
+---
+
+## 4. Resolved Issues (v1.2+)
+
+### Fixed in v1.2
+- **Native Select Dropdown Tracking**: Resolved misalignment issues with native HTML `<select>` dropdowns. The polling fallback system now correctly accounts for window offsets and zoom levels, ensuring the foveal bubble tracks the mouse accurately even when the OS intercepts events.
+- **Peripheral Movie Artifacts**: ADDRESSED via **Pixel Saliency Map**. The new high-performance saliency system (running in a background Web Worker) now detects high-saliency content (like moving faces in video) and modulates the peripheral distortion to prevent distracting "breathing" artifacts.
+- **Saliency Map Oscillation**: Fixed a conflict where the legacy structure-based saliency generation was fighting with the new pixel-based system. The application now uses the Saliency Worker exclusively.
+
