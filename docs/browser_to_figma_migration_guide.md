@@ -38,8 +38,9 @@ In the Figma plugin `ScrutinizerEngine.ts`:
 - Images normally come as raw bytes or blobs from Figma.
 - **Aspect Ratio Correction**: The shader acts as the "object-fit: contain".
 - You must calculate `canvasAspect` vs `imageAspect` and adjust UVs accordingly.
-- **Clipping**: Be careful with strict clipping (blacking out UVs < 0 or > 1).
-  - *Recommendation*: Use `uv = clamp(uv, 0.0, 1.0)` or specialized "black bars" logic. Strict clipping can make the canvas appear broken if there's a slight precision error.
+- **Clipping Artifacts**:
+  - *Recommendation*: Use **STRICT** clipping (`if (uv < 0 || uv > 1) discard/black`).
+  - *Warning*: Using `clamp()` or "relaxed" clipping can cause edge pixels to "smear" across the empty space (streaking artifacts), which looks like a graphical glitch. If you see streaks, check your clamping.
   - *Gotcha*: If the aspect ratio logic is inverted (`width/height` vs `height/width`), you will get "stretched" or "squashed" images (e.g., vertical oval fovea).
 
 ## 3. Shader Porting (`peripheral.frag`)
@@ -72,6 +73,28 @@ The `ScrutinizerEngine.ts` contains an **inlined** version of `peripheral.frag`.
 - **Figma**: Vite + `esbuild.config.js`.
 - **Command**: `npm run build`
 - Always verify the build after porting shader code, as syntax errors in the inlined string won't be caught by TypeScript (they typically only show up as runtime WebGL errors, so check the console!).
+
+## 6. Critical Pitfalls & Solutions (Lessons Learned)
+
+### The "Black Screen" / INVALID_OPERATION Error
+- **Symptom**: The plugin loads, controls appear, but the canvas is black. Console shows `WebGL: INVALID_OPERATION: texImage2D: no texture bound to target`.
+- **Cause**: The main texture (`this.texture`) was never initialized with `gl.createTexture()`.
+- **Fix**: Ensure `this.texture = gl.createTexture()` is called in `init()`.
+
+### Initial Load Race Condition
+- **Symptom**: When opening the plugin with an image already selected, it says "Select an image" (loading fails). Selecting *another* image works fine.
+- **Cause**: The plugin backend (`code.ts`) sends the `update-image` message *before* the UI (`App.tsx`) has mounted and set up its listeners. The message is lost in the void.
+- **Fix**: Implement a **Handshake Protocol**.
+  1. `App.tsx`: On mount -> `parent.postMessage({ pluginMessage: { type: 'UI_READY' } }, '*')`
+  2. `code.ts`: Listen for `UI_READY` -> Call `handleSelection()` to send the initial image.
+
+### Window Resizing
+- **Context**: Figma plugins do not have native window chrome resizing enabled by default in the same way standard windows do.
+- **Solution**: You must implement a custom "Corner Resizer" in the UI.
+  - Listen for drag events on a custom handle.
+  - Send `{ type: 'RESIZE_UI', width, height }` to `code.ts`.
+  - `code.ts` calls `figma.ui.resize(w, h)`.
+- **Note**: Ensure your UI is responsive (e.g., scrollable toolbar) to handle small sizes gracefully.
 
 ## Checklist for Updates
 - [ ] Port shader logic functions.
