@@ -28,18 +28,27 @@
 
         scrutinizer = new Scrutinizer(CONFIG);
 
-        // Track mouse for foveal center (HUD forwards all events so we get them here too)
-        document.addEventListener('mousemove', (e) => {
-            if (scrutinizer) {
-                scrutinizer.handleMouseMove(e);
-            }
-        });
+        // REMOVED local mouse listener to prevent conflict with IPC stream
+        // document.addEventListener('mousemove', (e) => {
+        //     if (scrutinizer) {
+        //         scrutinizer.handleMouseMove(e);
+        //     }
+        // });
 
         // Also listen for mouse position from content view
-        ipcRenderer.on('browser:mousemove', (event, x, y, zoom = 1.0) => {
+        ipcRenderer.on('browser:mousemove', (event, screenX, screenY, zoom = 1.0) => {
             // Update foveal center when mouse moves in browser below
             if (scrutinizer) {
-                const syntheticEvent = { clientX: x, clientY: y, zoom: zoom };
+                // Convert Screen Coordinates -> Local HUD Coordinates
+                // This bypasses any zoom/DPI scaling confusion in the source webview
+                const localX = screenX - window.screenX;
+                const localY = screenY - window.screenY; // HUD is frameless, so this is content area
+
+                if (Math.random() < 0.05) { // 5% sample rate
+                    log(`[Overlay] Mouse Sync: Screen(${screenX}, ${screenY}) - Win(${window.screenX}, ${window.screenY}) = Local(${localX}, ${localY}). HUD: ${window.innerWidth}x${window.innerHeight}, DPR=${window.devicePixelRatio}`);
+                }
+
+                const syntheticEvent = { clientX: localX, clientY: localY, zoom: zoom };
                 scrutinizer.handleMouseMove(syntheticEvent);
             }
         });

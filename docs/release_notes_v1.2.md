@@ -56,6 +56,5 @@ We've established a robust visual regression testing pipeline to prevent "AI Hub
 *   **High-Key Mode**: Fixed black level crushing in the High-Key Ghosting mode.
 
 ## 🔮 Upcoming Roadmap
-*   **Signed App Downloads**: We have successfully obtained Apple Developer Certification! The macOS build is now signed and notarized, ensuring a smooth installation experience without security warnings.
 *   **Windows Support**: Active development is underway to resolve build and launch issues on Windows.
 *   **Marketing Site**: Launching the public landing page at [scrutinizer.app](https://scrutinizer.app) to showcase the tool, link documentation, and host future product updates.

@@ -811,12 +811,20 @@ function createScrutinizerWindow(startUrl) {
                 const cursorPos = screen.getCursorScreenPoint();
                 const contentBounds = win.getContentBounds();
 
-                const x = cursorPos.x - contentBounds.x;
-                // Fix: Subtract toolbar height (40) because contentBounds starts at window top (below titlebar),
-                // but our content view (and HUD) starts 40px lower.
-                const y = cursorPos.y - contentBounds.y - 40;
+                const x = cursorPos.x;
+                const y = cursorPos.y;
 
-                if (x >= 0 && x < contentBounds.width && y >= 0 && y < contentBounds.height) {
+                // FIX: Coordinate System Unification
+                // preload.js sends Screen Coordinates.
+                // overlay.js expects Screen Coordinates (and subtracts window.screenX itself).
+                // Formerly, this fallback calculated Local Coordinates. Mixing them caused massive jumps.
+                // We now send raw Screen Coordinates to match the primary pipeline.
+
+                // Bounds check still needs local coords
+                const localX = cursorPos.x - contentBounds.x;
+                const localY = cursorPos.y - contentBounds.y - 40;
+
+                if (localX >= 0 && localX < contentBounds.width && localY >= 0 && localY < contentBounds.height) {
                     // Send zoom=1.0 since coords are already window-relative
                     if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
                         win.scrutinizerHud.webContents.send('browser:mousemove', x, y, 1.0);

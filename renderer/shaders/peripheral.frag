@@ -828,29 +828,92 @@ void main() {
     
     // Debug Boundary
     if (u_debug_boundary > 0.5) {
-            // ... (Keep existing boundary logic) ...
-            // For brevity in this replacement, I'll assume the boundary logic is standard
-            // and just needs to be preserved or re-added if I cut it.
-            // I will re-add the boundary logic here to be safe.
-            
         vec2 diff = uv_corrected - mouse_corrected;
         float angle = atan(diff.y, diff.x);
         
-        if (u_debug_boundary > 0.5) { // Mode 1
-            float tickLength = 0.007;
-            float distFromFovea = abs(dist - fovea_radius);
-            float fw = fwidth(distFromFovea);
-            float tickRadial = 1.0 - smoothstep(tickLength - fw, tickLength + fw, distFromFovea);
-            float tickAlpha = tickRadial * smoothstep(0.95, 0.98, cos(angle * 12.0));
-            if (tickAlpha > 0.0) color.rgb = mix(color.rgb, vec3(0.0, 1.0, 1.0), tickAlpha * 0.7);
+        // --- MODE 1: BASIC FOVEAL OVERLAY ---
+        if (u_debug_boundary > 0.5) { 
+            float fw = fwidth(dist);
+            
+            // 1. Light Continuous Oval Stroke
+            float borderDist = abs(dist - fovea_radius);
+            float borderAlpha = 1.0 - smoothstep(0.0, fw * 2.0, borderDist);
+            if (borderAlpha > 0.0) {
+                color.rgb = mix(color.rgb, vec3(0.0, 1.0, 1.0), borderAlpha * 0.4);
+            }
+
+            // 2. Outward Ticks
+            float tickLength = 0.015; // Longer ticks
+            // Only draw outside fovea
+            if (dist > fovea_radius && dist < fovea_radius + tickLength) {
+                float tickRadial = 1.0; 
+                // Fade out at tip
+                tickRadial *= (1.0 - smoothstep(fovea_radius + tickLength * 0.5, fovea_radius + tickLength, dist));
+                
+                // Angular gaps
+                float tickWidth = smoothstep(0.97, 0.98, cos(angle * 12.0)); // 12 ticks
+                
+                float tickAlpha = tickRadial * tickWidth;
+                if (tickAlpha > 0.0) {
+                    color.rgb = mix(color.rgb, vec3(0.0, 1.0, 1.0), tickAlpha * 0.9);
+                }
+            }
         }
-        if (u_debug_boundary > 1.5) { // Mode 2: Parafovea Boundary
-            // CRITICAL: Match actual parafoveal radius (1.35x, not 2.5x)
-            float visualParafoveaRadius = parafovea_radius; // Use the real value
+
+        // --- MODE 2: PARAFOVEAL BOUNDARY ---
+        if (u_debug_boundary > 1.5) { 
+            float visualParafoveaRadius = parafovea_radius; 
             float parafoveaDist = abs(dist - visualParafoveaRadius);
             float fw = fwidth(parafoveaDist);
-            float ringAlpha = (1.0 - smoothstep(0.0, fw * 2.0, parafoveaDist)) * smoothstep(0.0, 0.1, sin(angle * 40.0));
-            if (ringAlpha > 0.0) color.rgb = mix(color.rgb, vec3(1.0, 0.5, 0.0), ringAlpha * 0.7);
+            
+            // "More Ink": Thicker line and smaller gaps
+            // Thicker: fw * 3.0
+            float ringPresence = 1.0 - smoothstep(0.0, fw * 3.0, parafoveaDist);
+            
+            // Dashed pattern: sin(angle * 60) > -0.2 (Less gap)
+            float dashPattern = smoothstep(-0.2, 0.1, sin(angle * 60.0));
+            
+            float ringAlpha = ringPresence * dashPattern;
+            
+            if (ringAlpha > 0.0) {
+                color.rgb = mix(color.rgb, vec3(1.0, 0.5, 0.0), ringAlpha * 0.85);
+            }
+        }
+
+        // --- MODE 3: SCIENTIFIC RADIAL GRID (HI-TECH) ---
+        if (u_debug_boundary > 2.5) {
+             // Grid starts at parafovea
+             if (dist > parafovea_radius) {
+                // A. Exponential Rings
+                // dist = r0 * k^n  =>  n = log(dist/r0) / log(k)
+                float r0 = parafovea_radius;
+                float expansionFactor = 1.4; // How fast rings grow
+                
+                float n = log(dist / r0) / log(expansionFactor);
+                float n_idx = round(n);
+                float dist_to_ring = abs(n - n_idx);
+                
+                // Ring thickness
+                float ringWidth = 0.02; // In "log space"
+                float ringAlpha = 1.0 - smoothstep(0.0, ringWidth, dist_to_ring);
+                
+                // B. Radial Spokes
+                // 16 spokes
+                float spokeWidth = smoothstep(0.995, 0.998, cos(angle * 16.0));
+                
+                // Combine Grid
+                float gridAlpha = max(ringAlpha, spokeWidth);
+                
+                // Distance Fade (optional, keep it clean for now)
+                // Make it look "Hi-Tech" -> Low Alpha, Cyan/Blue
+                vec3 gridColor = vec3(0.0, 0.8, 1.0); // Cyan-ish
+                
+                if (gridAlpha > 0.0) {
+                    // Subtle additive overlay
+                    color.rgb = mix(color.rgb, gridColor, gridAlpha * 0.15);
+                    color.rgb += gridColor * gridAlpha * 0.1; // Additive bloom
+                }
+             }
         }
     }
     

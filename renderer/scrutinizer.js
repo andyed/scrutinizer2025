@@ -3,6 +3,13 @@
     const Logger = require('./logger');
     const WebGLRenderer = require('./webgl-renderer');
     const StructureMap = require('./structure-map');
+    // Architecture: Explicit require for dependencies
+    let SVGOverlay;
+    try {
+        SVGOverlay = require('./svg-overlay');
+    } catch (e) {
+        console.warn('[Scrutinizer] Could not require svg-overlay:', e);
+    }
 
     class Scrutinizer {
         constructor(config) {
@@ -13,7 +20,7 @@
                 foveaBypassMargin: 0.8,
                 velocityDecayMove: 0.01,
                 velocityDecayStop: 0.02,
-                maskSmoothness: 0.1,
+                maskSmoothness: 0.4, // Increased from 0.1 for tighter mouse tracking
                 saccadicSuppressionThreshold: 4.0,
                 ...config
             };
@@ -108,10 +115,23 @@
             this.handleStructureUpdate = this.handleStructureUpdate.bind(this);
 
             this.setupEventListeners();
+
+            // Initialize SVG Overlay
+            console.log('[Scrutinizer] Attempting to init SVGOverlay...');
+            // Check local require first, then global window
+            const OverlayClass = SVGOverlay || (typeof window !== 'undefined' ? window.SVGOverlay : null);
+
+            if (OverlayClass) {
+                this.svgOverlay = new OverlayClass('debug-overlay');
+                console.log('[Scrutinizer] SVGOverlay initialized:', this.svgOverlay);
+            } else {
+                console.error('[Scrutinizer] SVGOverlay class NOT found (require failed and global missing)!');
+            }
         }
 
         setupEventListeners() {
-            window.addEventListener('mousemove', this.handleMouseMove);
+            // REMOVED local mouse listener to prevent conflict with IPC stream
+            // window.addEventListener('mousemove', this.handleMouseMove);
             window.addEventListener('resize', this.handleResize);
 
             // Listen for structure updates
@@ -219,6 +239,10 @@
             const scaleX = this.canvas.width / rect.width;
             const scaleY = this.canvas.height / rect.height;
 
+            // Store scale factors for reverse-projection in render()
+            this.scaleX = scaleX;
+            this.scaleY = scaleY;
+
             if (event.zoom) {
                 this.currentZoom = event.zoom;
             }
@@ -226,10 +250,15 @@
             let clientX = event.clientX;
             let clientY = event.clientY;
 
-            if (event.zoom) {
-                clientX *= event.zoom;
-                clientY *= event.zoom;
-            }
+            // FIX: Do NOT scale mouse coordinates by zoom. 
+            // In Electron/Chrome, clientX/Y from the preload event (even with zoom)
+            // appear to align with the viewport overlay 1:1, or the scaling 
+            // logic here was double-applying it. User reported offset to bottom-right 
+            // which implies we were scaling up (zoom > 1) when we shouldn't.
+            // if (event.zoom) {
+            //     clientX *= event.zoom;
+            //     clientY *= event.zoom;
+            // }
 
             this.targetMouseX = (clientX - rect.left) * scaleX;
             this.targetMouseY = (clientY - rect.top) * scaleY;
@@ -540,6 +569,27 @@
             // Remembered areas stay clear, forgotten areas get lighter blur instead of heavy distortion
             const effectiveIntensity = useMask ? this.config.intensity * 0.6 : this.config.intensity;
 
+            // Update SVG Overlay
+            if (this.svgOverlay) {
+                // FIX: SVG Overlay works in Logical pixels (CSS), while WebGL works in Physical pixels (DPR scaled).
+                // We must scale down the physical coordinates back to logical for the DOM overlay.
+                // We use the exact scale factor calculated in handleMouseMove to be robust against resolution mismatches.
+                const scaleX = this.scaleX || this.dpr || window.devicePixelRatio || 1;
+                const scaleY = this.scaleY || scaleX;
+
+                // Approximate shader logic for parafovea (usually 2.5x fovea)
+                const parafoveaRadius = effectiveRadius * 2.5;
+
+                this.svgOverlay.update(
+                    this.mouseX / scaleX,
+                    this.mouseY / scaleY,
+                    effectiveRadius / scaleX, // Radius is mostly X-based in shader logic
+                    aspectRatio,
+                    this.config.debugBoundary,
+                    parafoveaRadius / scaleX
+                );
+            }
+
             this.renderer.render(
                 this.canvas.width,
                 this.canvas.height,
@@ -549,7 +599,7 @@
                 aspectRatio,
                 effectiveIntensity, // Use reduced intensity when memory is active
                 this.config.caStrength,
-                this.config.debugBoundary,
+                0.0, // Force disable shader debug (we use SVG now)
                 this.config.debugStructure, // New arg
                 useMask ? 1.0 : 0.0,
                 this.config.mongrelMode,

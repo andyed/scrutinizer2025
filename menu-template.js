@@ -466,6 +466,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             type: 'radio',
                             checked: false,
                             click: () => sendToOverlays('menu:set-debug-boundary', 2)
+                        },
+                        {
+                            label: 'Radial Grid (Hi-Tech)',
+                            type: 'radio',
+                            checked: false,
+                            click: () => sendToOverlays('menu:set-debug-boundary', 3)
                         }
                     ]
                 }

@@ -19,7 +19,9 @@ class DomAdapter {
         const blocks = [];
         const zoom = webFrame.getZoomFactor();
 
-        // 1. Text Nodes (unchanged - these are the most important)
+        // 1. Text Nodes
+        const styleCache = new Map();
+
         const walker = document.createTreeWalker(
             root,
             NodeFilter.SHOW_TEXT,
@@ -38,33 +40,61 @@ class DomAdapter {
             const rects = range.getClientRects();
 
             if (rects.length > 0) {
+                // Optimization: Check visibility of first rect before computing style
+                // If the first rect is completely off-screen, it's likely the others are too or don't matter enough to block
+                const firstRect = rects[0];
+                if (firstRect.bottom < 0 || firstRect.top > window.innerHeight || firstRect.right < 0 || firstRect.left > window.innerWidth) {
+                    // Check if *any* rect is visible before skipping
+                    let anyVisible = false;
+                    for (let i = 0; i < rects.length; i++) {
+                        const r = rects[i];
+                        if (!(r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth)) {
+                            anyVisible = true;
+                            break;
+                        }
+                    }
+                    if (!anyVisible) continue;
+                }
+
                 const parent = node.parentElement;
                 if (!parent) continue;
 
-                const style = window.getComputedStyle(parent);
+                let styleData = styleCache.get(parent);
 
-                // Parse Line Height
-                let lineHeight = parseFloat(style.lineHeight);
-                if (isNaN(lineHeight)) {
-                    const fontSize = parseFloat(style.fontSize);
-                    lineHeight = isNaN(fontSize) ? 16 : fontSize * 1.2;
+                if (!styleData) {
+                    const style = window.getComputedStyle(parent);
+
+                    // Parse Line Height
+                    let lineHeight = parseFloat(style.lineHeight);
+                    if (isNaN(lineHeight)) {
+                        const fontSize = parseFloat(style.fontSize);
+                        lineHeight = isNaN(fontSize) ? 16 : fontSize * 1.2;
+                    }
+
+                    // Calculate Density (Mass)
+                    const weight = parseFloat(style.fontWeight) || 400;
+                    const density = Math.min(1.0, Math.max(0.2, weight / 900));
+
+                    styleData = { density, lineHeight };
+                    styleCache.set(parent, styleData);
                 }
-
-                // Calculate Density (Mass)
-                const weight = parseFloat(style.fontWeight) || 400;
-                const density = Math.min(1.0, Math.max(0.2, weight / 900));
 
                 // Add blocks for each line rect
                 for (let i = 0; i < rects.length; i++) {
                     const rect = rects[i];
+                    // Skip if off-screen (optimization)
+                    if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+                        continue;
+                    }
+
                     blocks.push({
                         x: rect.left * zoom,
                         y: rect.top * zoom,
                         w: rect.width * zoom,
                         h: rect.height * zoom,
                         type: 1.0, // Text
-                        density: density,
-                        lineHeight: lineHeight * zoom
+                        density: styleData.density,
+                        lineHeight: styleData.lineHeight * zoom
                     });
                 }
             }
@@ -222,9 +252,10 @@ window.addEventListener('DOMContentLoaded', () => {
                 mouseMoveCount++;
                 // Log every 60th event to verify flow
                 if (mouseMoveCount % 60 === 0) {
-                    ipcRenderer.send('log:renderer', `[Preload] Mouse at (${e.clientX}, ${e.clientY}), zoom=${webFrame.getZoomFactor()}`);
+                    ipcRenderer.send('log:renderer', `[Preload] Mouse: Screen(${e.screenX}, ${e.screenY}), Client(${e.clientX}, ${e.clientY}), Zoom=${webFrame.getZoomFactor()}, DPR=${window.devicePixelRatio}`);
                 }
-                ipcRenderer.send('browser:mousemove', e.clientX, e.clientY, webFrame.getZoomFactor());
+                // PIPELINE CHANGE: Send Screen Coordinates to avoid Zoom scaling issues
+                ipcRenderer.send('browser:mousemove', e.screenX, e.screenY, webFrame.getZoomFactor());
                 ticking = false;
             });
             ticking = true;

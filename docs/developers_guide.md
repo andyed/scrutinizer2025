@@ -12,6 +12,7 @@ Scrutinizer uses a custom WebGL renderer (`webgl-renderer.js`) to apply fragment
 2.  **`scrutinizer.js`**: The high-level controller that manages the renderer, mouse tracking, and configuration.
 3.  **`menu-template.js`**: Defines the critical application menu, including simulation settings.
 4.  **`docs/architecture-module-pattern.md`**: **CRITICAL** - Explains the hybrid CommonJS/Window module pattern used to prevent `ReferenceError`s. Read this before refactoring any class files.
+5.  **`docs/coordinate_systems.md`**: **CRITICAL** - Explains the complex mapping between Screen, Window, WebGL, and SVG coordinate spaces. Read this if overlays are drifting or jumping.
 
 ### 4. Visual Memory & Input Layers
 Scrutinizer now supports a **Visual Memory** system. This uses a secondary texture (`u_maskTexture`) to represent areas the user has "fixated" on, which bypass distortion.
@@ -483,4 +484,34 @@ npm install
 npm run build:win
 ```
 *   **Output**: `dist/Scrutinizer Setup 1.2.0.exe` (NSIS Installer) + `dist/Scrutinizer-1.2.0-win.zip`.
-*   **Certificates**: Windows signing configuration is in `package.json` (`cscLink`), but typically requires a manual setup for the first run if keys are missing.
+
+---
+
+## Custom Overlays
+
+Scrutinizer supports a custom SVG overlay system for drawing debug information, fixation points, or aesthetic elements like "reticles" or "grids" over the simulation.
+
+### Architecture
+*   **Renderer**: `svg-overlay.js` manages a decoupled SVG layer (separate from the canvas).
+*   **Update Loop**: `scrutinizer.js` calls `overlay.update(x, y, radius...)` every frame.
+*   **Coordinate System**: The SVG works in **Logical Pixels** (CSS), while the WebGL renderer works in **Physical Pixels**. You **MUST** divide physical coordinates by `scaleX` (or `dpr`) before passing them to the overlay. See `docs/coordinate_systems.md`.
+
+### Adding a New Overlay
+1.  **Modify `svg-overlay.js`**: Add a new group in `init()`.
+    ```javascript
+    this.elements.myOverlay = {
+        group: this.createGroup('my-overlay-group'),
+        // ... cached elements
+    };
+    ```
+2.  **Update Logic**: Add rendering logic to `update()`.
+    ```javascript
+    if (this.config.showMyOverlay) {
+        this.elements.myOverlay.group.style.removeProperty('display');
+        // Update positions...
+    }
+    ```
+3.  **Aesthetics**: Use `shape-rendering="geometricPrecision"` for crisp lines.
+
+### Future Roadmap
+We plan to support "Per-Mode Overlays" (e.g., a Cyberpunk hud for Mode 4, a Wireframe grid for Mode 3). See `ROADMAP.md`.

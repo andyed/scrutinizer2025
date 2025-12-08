@@ -230,6 +230,7 @@ Add user-facing controls for progressive blur tuning:
 - Worker can rebuild pyramid with new multipliers
 - Menu or panel UI for adjustment (possibly View → Simulation Fidelity submenu)
 - Useful for researchers comparing different acuity models or designers stress-testing layouts
+- [ ] **Custom SVG Overlays**: Allow aesthetic modes to define their own SVG overlays (e.g., Cyberpunk reticle, Wireframe grid) instead of the global debug overlay.
 
 
 

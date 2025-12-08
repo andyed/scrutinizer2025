@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>SVG Overlay Verification</title>
+    <style>
+        body {
+            background: #333;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        #debug-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 101;
+        }
+    </style>
+</head>
+
+<body>
+    <svg id="debug-overlay"></svg>
+
+    <!-- Load the class -->
+    <script src="../renderer/svg-overlay.js"></script>
+
+    <script>
+        console.log('Starting Verification...');
+
+        try {
+            const overlay = new SVGOverlay('debug-overlay');
+            console.log('SVGOverlay instantiated.');
+
+            // Simulate render loop updates
+            const x = window.innerWidth / 2;
+            const y = window.innerHeight / 2;
+            const r = 100;
+            const asp = 1.33;
+
+            // Test Mode 3 (Grid)
+            console.log('Testing Mode 3 (Grid)...');
+            overlay.update(x, y, r, asp, 3.0, r * 2.5);
+
+            // Check DOM
+            const svg = document.getElementById('debug-overlay');
+            const gridGroup = document.getElementById('grid-group');
+
+            if (!gridGroup) {
+                console.error('FAIL: grid-group not found in DOM');
+            } else {
+                const display = gridGroup.style.display;
+                if (display === 'none') {
+                    console.error('FAIL: grid-group is hidden (display: none)');
+                } else {
+                    console.log(`PASS: grid-group is visible. Display: "${display}" (should be empty/unset)`);
+                }
+
+                const rings = document.getElementById('grid-rings').children;
+                const spokes = document.getElementById('grid-spokes').children;
+                console.log(`Rings count: ${rings.length}`);
+                console.log(`Spokes count: ${spokes.length}`);
+
+                if (rings.length > 0 && spokes.length > 0) {
+                    console.log('PASS: SVG elements created successfully.');
+                    document.body.style.background = '#003300';
+
+                    // Report to test runner if available
+                    if (typeof require !== 'undefined') {
+                        const { ipcRenderer } = require('electron');
+                        ipcRenderer.send('test-result', { success: true, message: 'SVG elements created and visible' });
+                    }
+                } else {
+                    console.error('FAIL: No rings or spokes created.');
+                    document.body.style.background = '#330000';
+                    if (typeof require !== 'undefined') {
+                        const { ipcRenderer } = require('electron');
+                        ipcRenderer.send('test-result', { success: false, message: 'No rings or spokes created' });
+                    }
+                }
+            }
+
+        } catch (e) {
+            console.error('CRASH:', e);
+            document.body.style.background = '#330000';
+            if (typeof require !== 'undefined') {
+                const { ipcRenderer } = require('electron');
+                ipcRenderer.send('test-result', { success: false, message: 'Crash: ' + e.message });
+            }
+        }
+    </script>
+</body>
+
+</html>

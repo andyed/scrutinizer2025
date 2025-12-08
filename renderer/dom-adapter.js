@@ -25,15 +25,14 @@ class DomAdapter {
         // So getBoundingClientRect is exactly what we want.
 
         // 1. Text Nodes
+        const styleCache = new Map();
+
         const walker = document.createTreeWalker(
             root,
             NodeFilter.SHOW_TEXT,
             {
                 acceptNode: (node) => {
                     if (!node.textContent.trim()) return NodeFilter.FILTER_REJECT;
-                    // Optimization: Check if node is roughly in viewport?
-                    // For now, scan everything to be safe, or maybe just what's visible.
-                    // Scanning everything is safer for correctness but slower.
                     return NodeFilter.FILTER_ACCEPT;
                 }
             }
@@ -46,31 +45,47 @@ class DomAdapter {
             const rects = range.getClientRects();
 
             if (rects.length > 0) {
+                // Optimization: Check visibility of first rect before computing style
+                // If the first rect is completely off-screen, it's likely the others are too or don't matter enough to block
+                const firstRect = rects[0];
+                if (firstRect.bottom < 0 || firstRect.top > window.innerHeight || firstRect.right < 0 || firstRect.left > window.innerWidth) {
+                    // Check if *any* rect is visible before skipping
+                    let anyVisible = false;
+                    for (let i = 0; i < rects.length; i++) {
+                        const r = rects[i];
+                        if (!(r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth)) {
+                            anyVisible = true;
+                            break;
+                        }
+                    }
+                    if (!anyVisible) continue;
+                }
+
                 const parent = node.parentElement;
                 if (!parent) continue;
 
-                const style = window.getComputedStyle(parent);
+                let styleData = styleCache.get(parent);
 
-                // Parse Line Height
-                let lineHeight = parseFloat(style.lineHeight);
-                if (isNaN(lineHeight)) {
-                    // Normal line height is roughly 1.2 * fontSize
-                    const fontSize = parseFloat(style.fontSize);
-                    lineHeight = isNaN(fontSize) ? 16 : fontSize * 1.2;
+                if (!styleData) {
+                    const style = window.getComputedStyle(parent);
+
+                    // Parse Line Height
+                    let lineHeight = parseFloat(style.lineHeight);
+                    if (isNaN(lineHeight)) {
+                        const fontSize = parseFloat(style.fontSize);
+                        lineHeight = isNaN(fontSize) ? 16 : fontSize * 1.2;
+                    }
+
+                    // Calculate Density (Mass)
+                    const weight = parseFloat(style.fontWeight) || 400;
+                    const density = Math.min(1.0, Math.max(0.2, weight / 900));
+
+                    styleData = { density, lineHeight };
+                    styleCache.set(parent, styleData);
                 }
 
-                // Calculate Density (Mass)
-                // Font weight: 100-900. Map to 0.2 - 1.0
-                const weight = parseFloat(style.fontWeight) || 400;
-                const density = Math.min(1.0, Math.max(0.2, weight / 900));
-
-                // Calculate Saliency
-                // Base: 0.2 (Body text)
-                // Boost by size: >20px -> +0.3, >30px -> +0.5
-                // Boost by weight: >600 -> +0.2
-                // TODO: Saliency temporarily disabled (alpha < 1.0 breaks structure map)
-                // See: https://github.com/andyed/scrutinizer2025/issues/XXX
-                let saliency = 1.0; // TEMP: Always 1.0 until we move to packed R channel
+                // Calculate Saliency (TEMP: Always 1.0)
+                let saliency = 1.0;
 
                 // Add blocks for each line rect
                 for (let i = 0; i < rects.length; i++) {
@@ -86,8 +101,8 @@ class DomAdapter {
                         w: rect.width,
                         h: rect.height,
                         type: 1.0, // Text
-                        density: density,
-                        lineHeight: lineHeight,
+                        density: styleData.density,
+                        lineHeight: styleData.lineHeight,
                         saliency: saliency
                     });
                 }

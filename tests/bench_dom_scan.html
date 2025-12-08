@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>DomAdapter Benchmark</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+        }
+
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 5px;
+        }
+
+        .item {
+            margin: 2px;
+            padding: 2px;
+            border: 1px solid #ccc;
+            font-size: 12px;
+        }
+
+        #results {
+            margin-top: 20px;
+            font-weight: bold;
+            white-space: pre;
+            background: #eee;
+            padding: 10px;
+        }
+
+        .hidden-offscreen {
+            position: absolute;
+            top: 10000px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>DomAdapter Scan Benchmark</h1>
+    <button onclick="runBenchmark()">Run Benchmark</button>
+    <div id="results">Waiting to run...</div>
+    <div id="container"></div>
+
+    <script src="../renderer/dom-adapter.js"></script>
+    <script>
+        // Generate massive DOM
+        const container = document.getElementById('container');
+        const COUNT = 5000;
+        console.log(`Generating ${COUNT} items...`);
+        let html = '';
+        for (let i = 0; i < COUNT; i++) {
+            // Mix of visible and off-screen items
+            const isOffscreen = i > 1000;
+            const className = isOffscreen ? 'item hidden-offscreen' : 'item';
+            html += `<span class="${className}">Item ${i}</span> `;
+            if (i % 20 === 0) html += '<br>';
+        }
+        container.innerHTML = html;
+
+        function runBenchmark() {
+            const results = document.getElementById('results');
+            results.textContent = "Running...";
+
+            setTimeout(() => {
+                const adapter = new DomAdapter();
+
+                // Warm up
+                adapter.scan(document.body);
+
+                // Measure
+                const t0 = performance.now();
+                const iterations = 10;
+                for (let i = 0; i < iterations; i++) {
+                    adapter.scan(document.body);
+                }
+                const t1 = performance.now();
+
+                const avg = (t1 - t0) / iterations;
+                results.textContent = `Average scan time over ${iterations} runs: ${avg.toFixed(2)}ms\nTotal items: ${COUNT}`;
+                console.log(`Average: ${avg.toFixed(2)}ms`);
+            }, 100);
+        }
+    </script>
+</body>
+
+</html>

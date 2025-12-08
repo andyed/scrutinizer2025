@@ -28,8 +28,8 @@ Additionally, there's a long history (keyword: "restricted focus viewer")of usin
 - [Usage & Controls](#usage--controls)
 - [Under the Hood: WebGL Implementation](#under-the-hood-webgl-implementation)
 - [Theoretical Foundation](#theoretical-foundation)
-- [Limitations & Roadmap](#limitations--roadmap)
-- [License & Contributors](#license--contributors)
+- [Limitations](#limitations)
+- [License](#license)
 
 ---
 
@@ -157,14 +157,10 @@ Access all features via **Simulation** menu:
 
 Scrutinizer uses a custom WebGL pipeline to simulate biological constraints like rod-weighted luminance, retinal ganglion density, and domain warping.
 
-For implementation details, see [Implementation Notes: The Biological Model](docs/foveated-vision-model.md). 
+For implementation details, see [Implementation Notes: The Biological Model](docs/foveated-vision-model.md) and the comprehensive [Developer's Guide](docs/developers_guide.md).
 
-This allows the visual simulation to be applied efficiently to even video content and in general a smooth experience, with only a minor additional latency associated with initial shader compilation and some defenses against showing partially loaded untransformed content.
-
-### Recent Updates (v1.1.5)
-- **Renderer Stability**: Fixed critical WebGL initialization crashes by isolating renderer scripts in IIFEs.
-- **Visuals Restored**: Resolved shader uniform mismatches to ensure Mongrel Mode and Rod Vision work correctly.
-- **Configuration**: Added `renderer/config.js` for fine-tuning, including `enableLogger` for debugging.
+> [!TIP]
+> **Extensibility:** The system is designed to be extensible! The shaders allow you to alter different layers to create custom visual effects. See the Developer's Guide for details on adding your own modes.
 ---
 
 ## Theoretical Foundation
