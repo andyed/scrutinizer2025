@@ -28,7 +28,7 @@ In the Figma plugin `ScrutinizerEngine.ts`:
   gl.uniform2f(this.mouseLocation, mouseX, height - mouseY);
   ```
 
-## 2. Image Loading & aspect Ratio
+## 2. Image Loading & Aspect Ratio
 
 ### Browser
 - Images are loaded via `<img>` tags or captured via `desktopCapturer`.
@@ -42,6 +42,69 @@ In the Figma plugin `ScrutinizerEngine.ts`:
   - *Recommendation*: Use **STRICT** clipping (`if (uv < 0 || uv > 1) discard/black`).
   - *Warning*: Using `clamp()` or "relaxed" clipping can cause edge pixels to "smear" across the empty space (streaking artifacts), which looks like a graphical glitch. If you see streaks, check your clamping.
   - *Gotcha*: If the aspect ratio logic is inverted (`width/height` vs `height/width`), you will get "stretched" or "squashed" images (e.g., vertical oval fovea).
+
+### 2.1 Fovea Radius Normalization (Browser vs Figma)
+
+- **Browser canonical behavior** (`peripheral.frag`):
+  - Foveal geometry is computed in **canvas space**, not in image-fit UV space.
+  - Distance is measured on a canvas-space coordinate system that is stretched by the canvas aspect, then corrected by a fovea aspect ratio:
+    ```glsl
+    float aspect = u_resolution.x / u_resolution.y;
+
+    vec2 canvas_uv = v_texCoord;                    // 0..1 in X/Y on the canvas
+    vec2 uv_corrected = vec2(canvas_uv.x * aspect,  // X scaled by aspect
+                              canvas_uv.y);
+
+    vec2 mouse_uv = u_mouse / u_resolution;         // mouse in 0..1 canvas space
+    vec2 mouse_corrected = vec2(mouse_uv.x * aspect,
+                                mouse_uv.y);
+
+    vec2 delta = uv_corrected - mouse_corrected;
+    delta.x /= u_fovea_aspect_ratio;                // final tweak for foveal shape
+    float dist = length(delta);
+
+    float radius_norm = u_foveaRadius / u_resolution.y; // normalized by height
+    float fovea_radius    = radius_norm;
+    float parafovea_radius = radius_norm * 2.5;
+    ```
+  - **Key point**: the *distance* is in the same (aspect-stretched) units for both `dist` and `fovea_radius`, so the fovea shape is consistent on screen.
+
+- **Figma plugin behavior (ScrutinizerEngine.ts)**:
+  - Uses the **same canvas-space geometry** for fovea distance and radius as the browser shader (the snippet above is effectively mirrored in the inlined shader).
+  - Separately, the plugin applies an **image-fit transform** only for *sampling* the source texture/structure map:
+    ```glsl
+    float canvasAspect = u_resolution.x / u_resolution.y;
+    float imageAspect  = u_imageAspect;
+    vec2  scale        = vec2(1.0);
+
+    if (canvasAspect > imageAspect) scale.x = canvasAspect / imageAspect;
+    else                            scale.y = imageAspect / canvasAspect;
+
+    // uv used for sampling source/structure maps (object-fit: contain)
+    vec2 uv = (v_texCoord - 0.5) * scale + 0.5;
+    ```
+  - **Important**: fovea geometry (distances, radii, LGN/V1 gating) is driven by **canvas UVs** (`v_texCoord`), while image content is sampled with **fit UVs** (`uv`). The two pipelines are intentionally decoupled.
+
+- **Why this still matters in Figma**:
+  - If you accidentally:
+    - Compute `dist` in the **fit UV** space (after scale/letterbox), or
+    - Normalize `u_foveaRadius` differently from how `dist` is measured,
+    - you will re-introduce elliptical/warped fovea shapes, especially on tall/narrow plugin windows.
+
+- **Mental model**:
+  - Fovea = **circle on the plugin canvas**.
+  - Image/structure maps are **pasted into that canvas** via an object-fit style transform.
+  - Always ask: “Am I measuring distance in the same coordinate system (and units) as the radius I compare it to?”
+
+- **When porting shader changes**:
+  - Treat the browser `peripheral.frag` `main()` as the **source of truth**.
+  - In Figma, keep the following invariants:
+    - Fovea distances use **canvas UVs** (`v_texCoord`) corrected by canvas aspect and `u_fovea_aspect_ratio`.
+    - Radius uses `u_foveaRadius / u_resolution.y`, just like the browser.
+    - Image sampling uses the aspect-fit `uv` derived from `v_texCoord`.
+  - If you see a vertically stretched fovea or watermark in Figma but not in the browser:
+    - Check that the distance + radius math is still bit-for-bit aligned with the browser,
+    - and that you didn’t start mixing fit-UV space into the fovea distance calculation.
 
 ## 3. Shader Porting (`peripheral.frag`)
 
