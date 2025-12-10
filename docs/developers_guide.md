@@ -515,3 +515,7 @@ Scrutinizer supports a custom SVG overlay system for drawing debug information, 
 
 ### Future Roadmap
 We plan to support "Per-Mode Overlays" (e.g., a Cyberpunk hud for Mode 4, a Wireframe grid for Mode 3). See `ROADMAP.md`.
+
+
+### Related Projects
+- https://github.com/VARID-XR

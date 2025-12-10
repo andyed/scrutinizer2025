@@ -121,6 +121,7 @@ npm run build
 1. **Navigate**: Use the **Toolbar** at the top to enter URLs, search, or navigate back/forward.
 2. **Toggle simulation**: Click the **Eye Icon** in the toolbar, press `Cmd+Shift+F`, or use **Simulation → Foveal → Toggle Foveal Mode**.
 3. **Quick adjust**: Use Left/Right arrow keys to change foveal radius.
+    > **Tip:** Not sure what size to use? Use our [Foveal Calibrator](https://scrutinizer.app/foveal-calibration.html) to measure your actual foveal spread.
 
 ### Toolbar
 The new browser toolbar provides:
@@ -170,6 +171,7 @@ This project is grounded in research from vision science and cognitive psycholog
 Research into exactly how the periphery is perceived has progressed in recent years, with the development of the "Mongrel Theory" of vision. As of 2025, AI researchers are actively trying to develop a more accurate model of how the periphery is perceived so that they can better simulate it in their own tools [ref](https://news.mit.edu/2024/researchers-enhance-peripheral-vision-ai-models-0308)
 
 - **[Scientific Literature Review](docs/scientific_literature_review.md)**: Deep dive into the science behind the simulation.
+- **[Foveal Calibration Logic](foveal-calibration-logic.md)**: Detailed psychophysics of the calibration tool.
 - **[YouTube Playlists](https://www.youtube.com/@scrutinizer-app/playlists)**: Watch our curated videos on vision science and UX.
 
 ---
