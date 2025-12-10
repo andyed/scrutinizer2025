@@ -4,7 +4,7 @@
 [![WebGL](https://img.shields.io/badge/WebGL-2.0-990000?style=flat-square&logo=webgl&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 
-➡️ Live site: **[scrutinizer.app](https://scrutinizer.app)**
+➡️ Live site: **[scrutinizer.app](https://andyed.github.io/scrutinizer-www/)**
 
 🍎 macOS Installer: **[Download v1.2.0](https://github.com/andyed/scrutinizer2025/releases/download/v1.2/Scrutinizer-1.2.0-arm64.dmg)**
 
@@ -121,7 +121,7 @@ npm run build
 1. **Navigate**: Use the **Toolbar** at the top to enter URLs, search, or navigate back/forward.
 2. **Toggle simulation**: Click the **Eye Icon** in the toolbar, press `Cmd+Shift+F`, or use **Simulation → Foveal → Toggle Foveal Mode**.
 3. **Quick adjust**: Use Left/Right arrow keys to change foveal radius.
-    > **Tip:** Not sure what size to use? Use our [Foveal Calibrator](https://scrutinizer.app/foveal-calibration.html) to measure your actual foveal spread.
+    > **Tip:** Not sure what size to use? Use our [Foveal Calibrator](https://andyed.github.io/scrutinizer-www/foveal-calibration.html) to measure your actual foveal spread.
 
 ### Toolbar
 The new browser toolbar provides:
