@@ -176,7 +176,127 @@ warpOffset *= crowdingFactor;
 
 ---
 
-## Priority 3: Distribution & Release
+## Priority 1: Performance & Simulation Accuracy
+
+### 🚀 High-Priority Optimizations (v1.4)
+
+#### 1. Capture Fidelity: 1:1 Scale Rendering
+**Priority**: HIGH  
+**Effort**: MEDIUM  
+**Impact**: HIGH (accuracy)  
+**Performance Cost**: +10-15% memory, negligible CPU
+
+**Goal**: Eliminate scaling artifacts and improve text clarity
+
+**Current Issue:**
+- Electron captures may have DPI/zoom scaling
+- Potential resampling artifacts
+- No explicit 1:1 guarantee for native resolution
+
+**Proposed Implementation:**
+```javascript
+// Capture at native resolution (no scaling)
+const nativeImage = await contents.capturePage({ 
+    x: 0, y: 0, 
+    width: actualWidth, 
+    height: actualHeight 
+});
+
+// Use createImageBitmap for zero-copy transfer
+const bitmap = await createImageBitmap(nativeImage);
+```
+
+**Benefits:**
+- Sharper text rendering (especially small fonts)
+- Better iconography clarity
+- More accurate peripheral simulation
+- Eliminates resampling artifacts
+
+**Files to Modify:**
+- `renderer/scrutinizer.js:298-348` (processFrame)
+- `main.js` (capture logic)
+
+**Testing:**
+- Visual comparison of text clarity
+- Memory usage profiling
+- Frame time measurement
+
+---
+
+#### 2. Eliminate ImageData Allocations in Hot Path
+**Priority**: HIGH  
+**Effort**: LOW  
+**Impact**: MEDIUM (performance)  
+**Performance Gain**: 5-10% frame time reduction
+
+**Goal**: Reduce GC pressure and memory allocations
+
+**Current Issue:**
+```javascript
+// scrutinizer.js:312 - Creates new allocation EVERY FRAME (60fps)
+const imageData = new ImageData(new Uint8ClampedArray(buffer), width, height);
+```
+
+**Proposed Implementation:**
+```javascript
+// Pre-allocate reusable buffer in constructor
+this.imageDataBuffer = new Uint8ClampedArray(width * height * 4);
+this.imageData = new ImageData(this.imageDataBuffer, width, height);
+
+// In processFrame: Fast typed array copy
+this.imageDataBuffer.set(buffer);
+this.renderer.uploadTexture(this.imageData);
+```
+
+**Benefits:**
+- Eliminates 60 allocations/sec
+- Reduces GC pressure
+- Faster memory reuse
+
+**Files to Modify:**
+- `renderer/scrutinizer.js:298-348`
+
+**Testing:**
+- Frame time profiling
+- Memory allocation tracking
+- GC pause measurement
+
+---
+
+### 🔧 Medium-Priority Optimizations (v1.5)
+
+#### 3. Shader Optimization
+**Priority**: MEDIUM  
+**Effort**: MEDIUM  
+**Impact**: LOW-MEDIUM (performance)  
+**Performance Gain**: 5-10% GPU time
+
+**Current State:**
+- 1041 lines in `peripheral.frag`
+- Multiple texture lookups per pixel (4-5 reads)
+- Complex Oklab conversions with matrix math
+
+**Optimization Opportunities:**
+
+**3a. Reduce Texture Lookups**
+- Pack saliency + density + rhythm into single texture
+- Reduces memory bandwidth by 25-30%
+
+**3b. Simplify Oklab Conversions**
+- Pre-compute for common cases
+- Use lookup tables for gamma correction
+- 10-15% faster color conversions
+
+**3c. Branch Reduction**
+- Replace `if/else` chains with `mix()` and `step()`
+- Better GPU parallelism
+
+**Files to Modify:**
+- `renderer/shaders/peripheral.frag`
+
+---
+
+## Priority 2: Saliency Map - Design Tool + Core Simulation Enhancement
 
 ### 🟡 Important for 1.0
 
