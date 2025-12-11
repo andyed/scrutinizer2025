@@ -103,6 +103,15 @@ See `docs/webcontentsview-migration.md` for full migration plan.
 - **Issue**: Removing Alpine.js introduced fragility in state management. Initial CSS classes must be manually applied via `setUIState` before the first render frame, or the UI remains hidden (default state).
 - **Status**: Fixed in v1.2.0 by ensuring initialization order in `foveal-calibration.js`.
 
+
 ### Deployment & Testing
 - **Issue**: Testing "Remote URL" flows in Electron creates a slow feedback loop. Caching issues or deployment lags can mask local fixes.
 - **Status**: "Calibrate Fovea" menu item temporarily disabled in Electron to prevent user frustration until performance parity is achieved.
+
+## 5. Known Issues (v1.3)
+
+### Calibration Display Scaling
+- **Issue**: On certain window sizes and aspect ratios (particularly on desktop), the calibration screen visuals may not perfectly fill the entire viewport, leaving small gaps or borders at the edges.
+- **Cause**: The calibration tool uses a smart resolution capping system to maintain performance (target ~2MP logic resolution). While the canvas is stretched via CSS to fill the screen (`width: 100%; height: 100%`), slight aspect ratio mismatches between the logical resolution and the physical viewport can occur.
+- **Impact**: Aesthetic only. The calibration functionality and accuracy are unaffected.
+- **Workaround**: Resizing the window slightly or using browser zoom often resolves the gaps.
