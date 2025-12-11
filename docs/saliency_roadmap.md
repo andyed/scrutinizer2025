@@ -94,36 +94,42 @@ const scale = Math.min(1.0, 256 / maxDim);
 
 ---
 
-## Long-Term / Research Goals
+## Long-Term / Research Goals---
 
-### 6. Implement Center-Surround Mechanism
-**Priority**: HIGH (for accuracy) | **Effort**: HIGH | **Impact**: VERY HIGH
+### 6. ✅ Implement Center-Surround Mechanism
+**Priority**: HIGH (for accuracy) | **Effort**: HIGH | **Impact**: VERY HIGH  
+**Status**: ✅ COMPLETE (2025-12-11)
 
-**Current**: Direct feature combination (no spatial context)
-
-**Improved**: Multi-scale difference-of-Gaussians (DoG)
-```
+**Implementation**: Multi-scale Difference-of-Gaussians (DoG)
+```javascript
 For each feature map (I, RG, BY):
-  1. Create coarse version (blur with σ=3)
-  2. Compute |Fine - Coarse|
-  3. Combine across features
+  1. Fine scale: Gaussian blur with σ=1.0
+  2. Coarse scale: Gaussian blur with σ=3.0
+  3. Center-surround: |Fine - Coarse|
+  4. Combine: 0.3*cs_I + 0.35*cs_RG + 0.35*cs_BY
 ```
 
-**Rationale**: This is the **most significant algorithmic gap**. Center-surround is fundamental to biological saliency and prevents uniform regions from being rated as salient. Required for detecting:
-- Edges and boundaries
-- Isolated objects
-- Local contrast (not global)
+**Benefits Achieved:**
+- Isolated objects "pop out" (high saliency)
+- Uniform regions suppressed (low saliency)
+- Edges and boundaries enhanced
+- Biologically accurate attention mechanism
+
+**Performance:**
+- Separable Gaussian blur (O(2n) vs O(n²))
+- Reusable buffers to minimize allocations
+- Target: <5ms @ 256×256
 
 **References**:
 - Itti, Koch, & Niebur (1998) - "A Model of Saliency-Based Visual Attention for Rapid Scene Analysis"
 - Walther & Koch (2006) - "Modeling attention to salient proto-objects"
 
 **Implementation Notes**:
-- Use separable Gaussian blur for performance
-- Consider 3-5 spatial scales (fine → coarse)
-- Normalize across scales before combination
+- Uses separable Gaussian blur for performance
+- 2-scale pyramid (fine + coarse)
+- Edge clamping for boundary handling
 
-**Files**: New method `computeCenterSurround()` in `color-saliency-map.js`
+**Files**: `renderer/saliency-worker.js` (94 → 235 lines)
 
 ---
 
@@ -182,10 +188,12 @@ Current weights (`W_I = 0.3`, `W_RG = 0.35`, `W_BY = 0.35`) are heuristic. Consi
 
 ## Implementation Order
 
-1. ✅ **Phase 1** (This session): True luminance, expose data, pre-calc weights
-2. ✅ **Phase 2** (This session): Merge loops, adaptive scaling
-3. **Phase 3** (Research): Center-surround mechanism
-4. ✅ **Phase 4** (Optimization): Web Workers (Implemented in `renderer/saliency-worker.js`)
+1. ✅ **Phase 1** (Completed): True luminance, expose data, pre-calc weights
+2. ✅ **Phase 2** (Completed): Merge loops, adaptive scaling
+3. ✅ **Phase 3** (Completed 2025-12-11): Center-surround mechanism (DoG)
+4. ✅ **Phase 4** (Completed): Web Workers (Implemented in `renderer/saliency-worker.js`)
+
+**All phases complete!** Saliency system is now production-ready with biologically accurate center-surround detection.
 
 ---
 
