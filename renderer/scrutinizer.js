@@ -38,6 +38,11 @@
                 // alert('WebGL is required for this version of Scrutinizer.'); // Suppressed to avoid spam
             }
 
+            // Performance Optimization: Pre-allocate ImageData buffer to eliminate allocations in hot path
+            // This buffer will be reused every frame (60fps) instead of creating new allocations
+            this.imageDataBuffer = null;
+            this.imageData = null;
+            this.lastBufferSize = 0;
             // Structure Map (Content Density Texture)
             const StructureMap = require('./structure-map.js');
             this.structureMap = new StructureMap();
@@ -308,10 +313,22 @@
                 return;
             }
 
-            // Create ImageData from buffer
-            const imageData = new ImageData(new Uint8ClampedArray(buffer), width, height);
+            // Performance Optimization: Reuse pre-allocated ImageData buffer
+            // Eliminates 60 allocations/sec (one per frame at 60fps)
+            const bufferSize = width * height * 4;
+            if (!this.imageDataBuffer || this.lastBufferSize !== bufferSize) {
+                // Allocate new buffer only if size changed (e.g., window resize)
+                this.imageDataBuffer = new Uint8ClampedArray(bufferSize);
+                this.imageData = new ImageData(this.imageDataBuffer, width, height);
+                this.lastBufferSize = bufferSize;
+                Logger.log(`[Scrutinizer] Allocated ImageData buffer: ${width}x${height}`);
+            }
+
+            // Fast typed array copy (much faster than new allocation)
+            this.imageDataBuffer.set(buffer);
+
             // Upload texture
-            this.renderer.uploadTexture(imageData);
+            this.renderer.uploadTexture(this.imageData);
 
             // Compute saliency from SOURCE browser capture (before rendering effects)
             // Compute saliency from SOURCE browser capture (before rendering effects)
