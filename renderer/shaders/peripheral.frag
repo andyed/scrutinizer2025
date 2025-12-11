@@ -295,11 +295,15 @@ LGN_Signal processLGN(vec2 uv, ModeConfig config, float dist, float fovea_radius
     LGN_Signal signal;
     
     // 1. Read Maps
-    vec4 structure = texture(u_structureMap, uv);
+    // Note: Structure and saliency maps are lower resolution than main texture
+    // Add half-pixel offset to properly center samples and avoid seams
+    vec2 mapUV = uv + (0.5 / u_resolution);
+    
+    vec4 structure = texture(u_structureMap, mapUV);
     signal.density = structure.g;
     signal.rhythm = structure.r;
     signal.type = structure.b;
-    signal.saliency = texture(u_saliencyMap, uv).r;
+    signal.saliency = texture(u_saliencyMap, mapUV).r;
     
     // 2. Calculate Base Suppression (Foveal Protection)
     // Ramp from fovea_radius to fovea_radius * ramp_mult
