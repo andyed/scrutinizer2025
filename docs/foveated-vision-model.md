@@ -291,21 +291,39 @@ To simulate the brain's pre-attentive grouping of visual elements, the renderer 
 -   **Quantization**: Block coordinates are snapped to a grid (1px for text, 10px for UI) to prevent sub-pixel jitter from causing "flicker" in the periphery during micro-layout shifts.
 
 ### 2. Saliency Map Generation
-**File**: `renderer/scrutinizer.js`
+**File**: `renderer/saliency-worker.js`
 
-The Saliency Map is a heatmap generated from the grouped structure blocks, encoding "visual attractiveness" into the Red channel.
+The Saliency Map is generated using a **center-surround mechanism** (Difference-of-Gaussians) for biologically accurate attention detection.
 
-**Feature Integration Weights**:
--   **Images / Video** (Type 0.5): **1.0 (Max)**. High contrast, complex features pop out.
--   **Headers** (Type 1.0, Large): **0.4 - 1.0**. Dynamic based on size.
--   **UI Elements** (Type 0.0): **0.3**. Buttons and inputs have medium priority.
--   **Body Text** (Type 1.0, Small): **0.15**. Low priority texture.
+**Algorithm** (Itti-Koch-Niebur Model):
+1. **Feature Extraction**: Compute Intensity (I), Red-Green (RG), Blue-Yellow (BY) opponent channels
+2. **Multi-Scale Gaussian Pyramid**: 
+   - Fine scale: σ=1.0 (captures details)
+   - Coarse scale: σ=3.0 (captures context)
+3. **Center-Surround**: For each feature, compute `|Fine - Coarse|`
+4. **Feature Combination**: `saliency = 0.3*cs_I + 0.35*cs_RG + 0.35*cs_BY`
+
+**Key Properties**:
+- **Isolated objects "pop out"**: High center-surround response
+- **Uniform regions suppressed**: Low center-surround response (prevents blank pages from being salient)
+- **Edges enhanced**: Strong response at boundaries
+- **Biologically accurate**: Matches V1 cortical processing
+
+**Performance**:
+- Separable Gaussian blur: O(2n) complexity
+- Adaptive resolution scaling (target 256px max dimension)
+- Runs in Web Worker (off main thread)
+- Target: <5ms @ 256×256
 
 **Temporal Smoothing**:
 To prevent "flicker" and "dropouts" during rapid content updates (e.g., video playback), the saliency map uses a **double-buffered** approach with temporal blending.
 -   **Target Buffer**: Renders the new state immediately.
 -   **Current Buffer**: Blends towards the Target by ~15% per frame.
 -   **Result**: Attention shifts feel organic and fluid, rather than snapping instantly.
+
+**References**:
+- Itti, Koch, & Niebur (1998) - "A Model of Saliency-Based Visual Attention for Rapid Scene Analysis"
+- Walther & Koch (2006) - "Modeling attention to salient proto-objects"
 
 ### 3. Texture Pipeline
 -   **GL_TEXTURE3**: Saliency texture (Red channel = intensity).
