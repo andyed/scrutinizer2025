@@ -534,8 +534,8 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         float blurRate = 2.0;
         blurRadius = blurScale * (exp(eccentricity * blurRate) - 1.0);
         
-        // Cap maximum blur to prevent excessive softness
-        blurRadius = min(blurRadius, 20.0);
+        // Cap maximum blur to prevent excessive softness and ghosting
+        blurRadius = min(blurRadius, 12.0); // Reduced from 20.0
     }
     
     // Use sampleBlurred instead of raw sampleSource
