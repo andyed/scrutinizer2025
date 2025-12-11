@@ -261,8 +261,19 @@ ipcMain.on('hud:capture:request', async (event) => {
 
     if (win && win.scrutinizerView && win.scrutinizerHud) {
         try {
+            // Performance Optimization: 1:1 Capture Fidelity
+            // Explicitly specify capture bounds to ensure 1:1 pixel mapping
+            // This eliminates scaling artifacts and improves text clarity
+            const bounds = win.scrutinizerView.getBounds();
+            const captureRect = {
+                x: 0,
+                y: 0,
+                width: bounds.width,
+                height: bounds.height
+            };
+
             // Race capturePage against a timeout
-            const capturePromise = win.scrutinizerView.webContents.capturePage();
+            const capturePromise = win.scrutinizerView.webContents.capturePage(captureRect);
             const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Capture timed out')), 1000));
 
             let image;
@@ -270,7 +281,7 @@ ipcMain.on('hud:capture:request', async (event) => {
                 image = await Promise.race([capturePromise, timeoutPromise]);
             } catch (e) {
                 // console.warn('[Main] View capture failed/timed out, falling back to window capture:', e.message);
-                image = await win.capturePage();
+                image = await win.capturePage(captureRect);
             }
 
             const buffer = image.toBitmap();
@@ -302,7 +313,16 @@ ipcMain.on('capture:request', async (event) => {
 
     if (win && win.scrutinizerView && win.scrutinizerHud) {
         try {
-            const image = await win.scrutinizerView.webContents.capturePage();
+            // Performance Optimization: 1:1 Capture Fidelity (legacy handler)
+            const bounds = win.scrutinizerView.getBounds();
+            const captureRect = {
+                x: 0,
+                y: 0,
+                width: bounds.width,
+                height: bounds.height
+            };
+
+            const image = await win.scrutinizerView.webContents.capturePage(captureRect);
             const buffer = image.toBitmap();
             const size = image.getSize();
 
