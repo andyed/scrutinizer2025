@@ -111,15 +111,25 @@ function computeCenterSurround(feature, width, height) {
     const len = width * height;
     const result = new Float32Array(len);
 
+    // Copy feature to avoid modifying original
+    const featureCopy = new Float32Array(feature);
+
     // Fine scale (σ=1.0)
-    const fine = gaussianBlur(feature, width, height, 1.0);
+    const fine = gaussianBlur(featureCopy, width, height, 1.0);
+
+    // CRITICAL: Copy fine result before computing coarse
+    // (gaussianBlur reuses temp buffers)
+    const fineCopy = new Float32Array(fine);
+
+    // Reset feature for coarse blur
+    const featureCopy2 = new Float32Array(feature);
 
     // Coarse scale (σ=3.0)
-    const coarse = gaussianBlur(feature, width, height, 3.0);
+    const coarse = gaussianBlur(featureCopy2, width, height, 3.0);
 
     // Difference-of-Gaussians
     for (let i = 0; i < len; i++) {
-        result[i] = Math.abs(fine[i] - coarse[i]);
+        result[i] = Math.abs(fineCopy[i] - coarse[i]);
     }
 
     return result;
