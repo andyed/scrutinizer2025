@@ -398,10 +398,9 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         float waveSpeed = 0.1; // Was 0.5
         float waveFreq = 2.0;  // Was 4.0
         
-        // CRITICAL FIX: Use aspect-corrected UV for wave calculation
-        // Using uncorrected UV causes horizontal offset/ghosting
-        float waveX = sin(uv_corrected.y * waveFreq + u_time * waveSpeed);
-        float waveY = cos(uv_corrected.x * waveFreq + u_time * waveSpeed * 0.8);
+        // Create a slow rolling wave
+        float waveX = sin(uv.y * waveFreq + u_time * waveSpeed);
+        float waveY = cos(uv.x * waveFreq + u_time * waveSpeed * 0.8);
         
         // Amplitude scales with strength (eccentricity)
         // Parafovea: Tiny warp
@@ -415,7 +414,7 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
             waveDampener = 1.0 - (lgn.saliency * 0.9);
         }
         
-        vec2 waveOffset = vec2(waveX, waveY) * 0.005 * strength * u_intensity * waveDampener;
+        vec2 waveOffset = vec2(waveX, waveY) * 0.001 * strength * u_intensity * waveDampener; // Reduced from 0.005
         
         signal.displacement = waveOffset;
         signal.distortedUV = uv + signal.displacement;
@@ -426,9 +425,7 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         // Calculate warp strength specifically for noise (different falloff than shatter usually)
         // But we use the LGN passed strength for consistency now.
         
-        // CRITICAL FIX: Use uncorrected UV for noise sampling to match texture sampling space
-        // The aspect correction was causing vertical offset in periphery
-        vec2 uv_noise = vec2(uv.x / u_fovea_aspect_ratio, uv.y);
+        vec2 uv_noise = vec2(uv_corrected.x / u_fovea_aspect_ratio, uv_corrected.y);
         
         // Add time offset if animated
         vec2 timeOffset = vec2(0.0);
@@ -535,8 +532,8 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         float blurRate = 2.0;
         blurRadius = blurScale * (exp(eccentricity * blurRate) - 1.0);
         
-        // Cap maximum blur to prevent excessive softness and ghosting
-        blurRadius = min(blurRadius, 12.0); // Reduced from 20.0
+        // Cap maximum blur to prevent excessive softness
+        blurRadius = min(blurRadius, 20.0);
     }
     
     // Use sampleBlurred instead of raw sampleSource
