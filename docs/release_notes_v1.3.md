@@ -70,9 +70,17 @@ Significant improvements to rendering performance and capture fidelity.
 - Lower GC pressure for smoother frame times
 - 5-10% frame time improvement
 
-**Bug Fixes:**
-- Fixed saliency worker data corruption causing invisible text in search boxes
-- Separate ImageData copy for async saliency processing
+**Critical Bug Fixes:**
+- **Mouse Position Offset (v1.2 regression)** - Fixed ~40px vertical offset in cursor hover detection
+  - Root cause: `getSize()` included window title bar, but captured content excluded it
+  - Solution: Changed to `getContentSize()` for accurate canvas sizing
+  - Impact: Mouse cursor now aligns perfectly with hover states
+- **Peripheral Vertical Offset** - Fixed visible vertical displacement in Shatter mode (default)
+  - Root cause: Wave amplitude was 5x too large (0.005 vs 0.001)
+  - Solution: Reduced Shatter wave amplitude to match Noise mode
+  - Impact: Eliminates ghosting/doubling artifacts on text in periphery
+- **Saliency worker data corruption** - Fixed invisible text in search boxes
+  - Separate ImageData copy for async saliency processing
 
 ---
 
