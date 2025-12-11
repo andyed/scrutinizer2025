@@ -389,13 +389,140 @@ Create:
 ---
 
 
-## Priority 6: Future Enhancements 
+## Priority 6: Future Enhancements
+
+### Fixation Recording & Visualization
+**Priority**: Medium  
+**Effort**: High  
+**Impact**: High (UX research, education, documentation)
+
+**Goal**: Record sequences of eye fixations and generate visual artifacts showing attention flow and how the scene appeared at each fixation.
+
+**Use Cases:**
+- UX research: Show designers where users actually look
+- Accessibility testing: Demonstrate peripheral vision effects on navigation
+- Education: Teach about saccadic eye movements
+- Documentation: Create "attention flow" diagrams for design reviews
+
+#### Core Features
+
+**Recording Mechanism:**
+- Manual recording mode with keyboard shortcut (e.g., Cmd+R)
+- Visual indicator when recording (red dot)
+- Captures fixation sequence with timestamps and dwell times
+- Configurable: record last N fixations or time-based duration
+
+**Multi-Zone Capture Strategy:**
+Biologically-accurate gradient capture instead of binary fovea/periphery:
+
+```
+Zone 1: Fovea (0-2°, ~180px radius)
+  - Full resolution, no blur
+  - Always captured per fixation
+  
+Zone 2: Parafovea (2-5°, ~180-450px)
+  - 75% resolution, light blur
+  - Captured if fixation moved >2°
+  
+Zone 3: Near Periphery (5-10°, ~450-720px)
+  - 50% resolution, moderate blur  
+  - Captured if fixation moved >5°
+  
+Zone 4: Mid Periphery (10-20°, ~720-1440px)
+  - 25% resolution, heavy blur
+  - Captured if fixation moved >10°
+  
+Zone 5: Far Periphery (>20°)
+  - Static base layer (captured once)
+  - Never updates during recording
+```
+
+**Optimization:** Reuse peripheral zones when fixations are close together, dramatically reducing storage requirements.
+
+#### Output Formats
+
+**Interactive HTML Export** (Phase 1):
+- Self-contained HTML file with embedded data
+- Scrubber to step through fixation sequence
+- Toggle zones/layers on/off
+- Show/hide saccade path visualization
+- No external dependencies
+
+**Animated Export** (Phase 2):
+- GIF or WebM showing temporal sequence
+- Smooth transitions between fixations
+- Configurable playback speed
+- Shareable on social media
+
+**Layered Image Export** (Phase 3):
+- PSD/XCF with separate layers per zone
+- Vector layer for saccade path (numbered markers)
+- Editable for design presentations
+- Professional output for reports
+
+#### Visualization Features
+
+**Path Representation:**
+- Numbered circles at fixation points (1, 2, 3...)
+- Curved arrows showing saccade direction
+- Dwell time encoded as circle size or color intensity
+- Optional heatmap overlay showing cumulative attention
+
+**Alternative Display Modes for Near-Foveal Content:**
+- Highlight mode: Show parafoveal region with color overlay
+- Comparison mode: Side-by-side foveal vs peripheral view
+- Acuity gradient: Visualize the smooth falloff of visual acuity
+- Zone boundaries: Toggle visibility of eccentricity zones
+
+#### File Format
+
+**`.scrutinizer` Archive:**
+```
+recording.scrutinizer/
+├── metadata.json          # Fixation sequence, timestamps, settings
+├── base.png              # Far peripheral base layer (static)
+└── fixations/
+    ├── 001/
+    │   ├── fovea.png     # Zone 1
+    │   ├── parafovea.png # Zone 2 (if captured)
+    │   └── near.png      # Zone 3 (if captured)
+    ├── 002/
+    └── ...
+```
+
+Compressed as single `.scrutinizer` ZIP file.
+
+#### Storage Estimates
+
+**Example:** 1920×1080 page, 10 fixations
+- Naive (10 full captures): ~80 MB
+- Fovea-only: ~13 MB
+- Multi-zone (optimal): ~25 MB
+- **With zone reuse:** ~15-20 MB (close fixations)
+
+#### Technical Implementation
+
+**Dependencies:**
+- Existing capture pipeline (1:1 fidelity)
+- Visual memory mask system (can reuse for compositing)
+- Structure map (for intelligent zone selection)
+
+**Action Items:**
+- [ ] Design recording UI (start/stop, indicator)
+- [ ] Implement multi-zone capture system
+- [ ] Create `.scrutinizer` file format spec
+- [ ] Build HTML export with scrubber
+- [ ] Add saccade path visualization
+- [ ] Implement zone reuse optimization
+- [ ] Create animated export (GIF/WebM)
+- [ ] Add layered image export (PSD)
+
+---
 
 #### Preferences UI
 - Persistent settings panel
 - Default blur/radius values
 - Capture quality settings
-- Keyboard shortcut customization
 
 #### Auto-Update
 - Integrate `electron-updater`
