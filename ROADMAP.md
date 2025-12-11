@@ -1,4 +1,89 @@
-# Scrutinizer 1.0 Roadmap
+# Scrutinizer Roadmap
+
+## ✅ Completed Features (v1.0-v1.3)
+
+### v1.3: Perceptual Accuracy Update
+
+#### Oklab Color Space Integration ✅
+**Completed:** 2025-12-10
+
+- [x] Created `oklab-utils.js` with RGB ↔ Oklab conversion functions
+- [x] Updated `image-processor.js` to use Oklab for desaturation
+- [x] Added GLSL Oklab functions to `peripheral.frag` shader
+- [x] Converted High-Key and Lab modes to use Oklab
+- [x] Eigengrau tinting in Oklab space
+- [x] Ported Oklab to Figma plugin
+
+**Benefits:**
+- Perceptually uniform desaturation (no hue shifts)
+- Cyan preservation in periphery (rod-sensitive wavelengths)
+- More natural cold blue-gray appearance
+
+**Reference:** Ottosson, B. (2020). "A perceptual color space for image processing"
+
+#### Smooth Parafovea-Periphery Transitions ✅
+**Completed:** 2025-12-10
+
+- [x] Replaced piecewise blur with continuous exponential curve
+- [x] Smooth contrast preservation gradient using `smoothstep`
+- [x] Eliminated visual "kink" at parafovea boundary
+
+**Formula:** `blur = 3.0 * exp(distFromPara * 2.0)` (capped at 20px)
+
+#### WebGL 2.0 Upgrade ✅
+**Completed:** 2025-12 (prior to Oklab work)
+
+- [x] Updated shaders to `#version 300 es`
+- [x] Migrated syntax: `attribute` → `in`, `varying` → `out/in`, `texture2D` → `texture`
+- [x] WebGL 2 context creation in renderer
+- [x] Native `fwidth` support for crisp debug boundaries
+
+**Benefits:**
+- Better performance and shader capabilities
+- Resolution-independent vector graphics
+- Modern rendering pipeline
+
+#### Foveal Calibration Improvements ✅
+**Completed:** 2025-12-10
+
+- [x] Mobile support (fixed blank screen and control alignment)
+- [x] Tap functionality as alternative to Spacebar
+- [x] Menu integration (Simulation → Calibrate Foveal Size)
+- [x] Widened ISI randomization (2000-5000ms) to prevent anticipation
+- [x] Added professional branding (logo, footer)
+- [x] Simplified instructions with instructional diagram
+- [x] Hidden navbar during active calibration
+
+### v1.0-v1.2: Core Features
+
+#### Progressive Blur ✅
+- [x] Multi-resolution pyramid (3 levels)
+- [x] Gradual acuity falloff with radial gradient zones
+- [x] Web Worker offloading for non-blocking UI
+- [x] Gentler blur multipliers preserving Magnocellular info
+
+#### Neural Processing Model ✅
+- [x] Parafoveal crowding with spatial jitter
+- [x] Block-based downsampling in periphery
+- [x] Progressive desaturation
+- [x] Improved shader pipeline (v1.3)
+
+#### Saliency Modulation ✅
+**Completed:** 2025-12-02
+
+- [x] Temporal smoothing (double-buffered, 15% blend/frame)
+- [x] Gestalt grouping (structure block quantization)
+- [x] V1 jitter/warp modulation (up to 25% reduction near salient areas)
+- [x] V4 rod vision modulation (up to 15% reduction)
+
+#### Configuration Consolidation ✅
+- [x] Extracted fixation detection constants to `config.js`
+- [x] Removed magic numbers from shader code
+
+#### Navigation Polish ✅
+- [x] "Go" menu with Home/Back/Forward entries
+
+---
 
 ## Overview
 
@@ -163,14 +248,6 @@ Create:
   - Pass Mask pixel data to `blur-worker.js`.
   - Pixel Shader: `FinalPixel = mix(MongrelPixel, CleanPixel, MaskValue)`.
 
-#### Variations & Settings
-- **"Fog of War" (Permanent Cache)**: 
-  - *Setting*: Memory Limit = Infinite.
-  - *Mechanic*: "Gamified" scanning. Paint clarity that persists. 
-  - *Metric*: "Comprehension Score" (% of page loaded).
-- **"Change Blindness" Trap (The VJ Prank)**:
-  - *Mechanic*: Change text in the "preserved" (peripheral) zones while the user is looking away.
-  - *Reveal*: Show a replay of the "Confidence Path" proving they didn't notice the change.
 
 ---
 
@@ -282,20 +359,6 @@ Improve how we sample the page for foveal/peripheral processing:
 - Move WebGL context to a Web Worker using `OffscreenCanvas`.
 - **Goal**: Decouple rendering from main thread to prevent UI jank.
 - **Ambiguity**: High complexity refactor. Current performance is GPU-bound, so CPU offloading might yield diminishing returns for the effort required.
-
-#### Upgrade to GLSL ES 3.0 / WebGL 2.0
-**Priority**: Medium
-**Effort**: Low
-
-- **Goal**: Modernize rendering pipeline to use WebGL 2.0 features.
-- **Benefits**:
-  - Native `fwidth` support for crisp, resolution-independent vector graphics (debug boundaries).
-  - Better performance and more advanced shader capabilities.
-  - High compatibility across modern browsers.
-- **Action Items**:
-  - Update shader version string to `#version 300 es`.
-  - Update shader syntax (attribute -> in, varying -> out/in, texture2D -> texture).
-  - Verify context creation ensures `webgl2`.
 
 ---
 
