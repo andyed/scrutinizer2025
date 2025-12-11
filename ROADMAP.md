@@ -296,7 +296,199 @@ this.renderer.uploadTexture(this.imageData);
 
 ---
 
-## Priority 2: Saliency Map - Design Tool + Core Simulation Enhancement
+## Priority 2: Simulation Fidelity Improvements
+
+### 🎯 Foundational: Calibrated Visual Angles
+**Priority**: HIGH  
+**Effort**: LOW  
+**Impact**: HIGH (scientific accuracy)
+
+**Goal**: Convert pixel-based measurements to true degree-based visual angles using calibration data.
+
+**Current State:**
+- Foveal radius in pixels (arbitrary, varies by monitor/distance)
+- No biological accuracy guarantee
+- Zone boundaries are pixel-based approximations
+
+**Proposed:**
+Leverage existing foveal calibration to derive pixels-per-degree ratio:
+
+```javascript
+// From calibration
+const calibratedFovealRadiusPx = 92; // User's measured fovea
+const fovealAngleDegrees = 2.0;      // Biological constant
+
+// Derive conversion factor
+const pixelsPerDegree = calibratedFovealRadiusPx / fovealAngleDegrees;
+
+// Use biological constants for zones
+const parafoveaRadius = degreesToPixels(5);   // True 5° boundary
+const nearPeripheryRadius = degreesToPixels(10); // True 10°
+const midPeripheryRadius = degreesToPixels(20);  // True 20°
+```
+
+**Benefits:**
+- Scientifically accurate simulation
+- Automatic adaptation to monitor size/DPI/distance
+- No manual configuration needed
+- Validates calibration quality
+
+**Implementation:**
+- [x] Foveal calibration tool exists
+- [ ] Store pixels-per-degree in calibration data
+- [ ] Update renderer to use degree-based zones
+- [ ] Add validation (20-80 px/degree range check)
+- [ ] Optional: Multi-monitor calibration support
+
+**Files to Modify:**
+- `renderer/scrutinizer.js` - Use calibrated visual angles
+- `scrutinizer-www/src/js/foveal-calibration.js` - Save px/degree ratio
+- `settings-manager.js` - Store calibration data
+
+---
+
+### 🔍 High-Impact: Center-Surround Saliency
+**Priority**: HIGH  
+**Effort**: MEDIUM  
+**Impact**: VERY HIGH (realism)
+
+**Goal**: Replace distance-only blur with clutter-sensitive distortion using center-surround mechanism.
+
+**Current State:**
+- Blur based purely on eccentricity (distance from fovea)
+- Uniform regions get same treatment as cluttered regions
+- Missing biological "pop-out" effect
+
+**Proposed:**
+Implement Difference-of-Gaussians (DoG) for true saliency:
+
+```glsl
+// Multi-scale center-surround
+for each feature map (I, RG, BY):
+    fine = blur(feature, sigma=1)
+    coarse = blur(feature, sigma=3)
+    centerSurround = abs(fine - coarse)
+    
+// Modulate distortion by inverse saliency
+clutterStrength = 1.0 - saliency
+warpStrength *= clutterStrength
+jitterAmount *= clutterStrength
+```
+
+**Benefits:**
+- Isolated objects "pop out" (less distortion)
+- Dense clutter becomes harder to parse (more distortion)
+- Matches biological attention mechanisms
+- Enables design tool (saliency overlay mode)
+
+**Implementation:**
+- [ ] Implement DoG in saliency worker
+- [ ] Multi-scale pyramid (3-5 scales)
+- [ ] Integrate with existing saliency modulation
+- [ ] Add saliency overlay debug mode
+- [ ] Validate against eye-tracking data
+
+**Dependencies:**
+- Existing saliency worker ✅
+- Temporal smoothing ✅
+- Need: Multi-scale DoG implementation
+
+**Files to Modify:**
+- `renderer/saliency-worker.js` - Add DoG
+- `renderer/shaders/peripheral.frag` - Clutter modulation
+- `renderer/color-saliency-map.js` - Multi-scale processing
+
+---
+
+### 🎨 Advanced: Mongrel Texture Synthesis
+**Priority**: MEDIUM  
+**Effort**: VERY HIGH  
+**Impact**: VERY HIGH (ultimate realism)
+
+**Goal**: Replace blur with true feature scrambling to simulate peripheral crowding.
+
+**Current Approach:**
+- Blur + jitter = smooth gradients, recognizable shapes
+- Doesn't capture "crowding" (unbound features)
+
+**Mongrel Approach:**
+- Feature scrambling: See curve of 'd', cross of 't' in wrong positions
+- Summary statistics: Preserve average color, orientation, spatial frequency
+- Unbound features: Detect edges but can't bind to objects
+
+**Techniques (in order of complexity):**
+
+**Phase 1: Simple Feature Scrambling**
+```glsl
+// Random pixel sampling within blocks
+vec4 mongrel = vec4(0.0);
+for (int i = 0; i < N; i++) {
+    vec2 randomOffset = hash(blockId + i) * blockSize;
+    mongrel += texture(u_texture, uv + randomOffset);
+}
+mongrel /= float(N);
+```
+- Effort: LOW
+- Impact: MEDIUM
+- Performance: GOOD
+
+**Phase 2: Portilla-Simoncelli Texture Synthesis**
+- Match summary statistics (mean, variance, correlations)
+- Preserve spatial frequency content
+- Effort: HIGH
+- Impact: VERY HIGH
+- Performance: EXPENSIVE (may need pre-computation)
+
+**Phase 3: Neural Texture Synthesis**
+- Gram matrix matching (style transfer lite)
+- GPU-accelerated
+- Effort: VERY HIGH
+- Impact: VERY HIGH
+- Performance: MEDIUM (with optimization)
+
+**Recommendation:**
+- Start with Phase 1 (simple scrambling) to validate concept
+- Optimize shader performance first (free up GPU budget)
+- Phase 2/3 only if Phase 1 proves valuable
+
+**Implementation:**
+- [ ] Prototype simple feature scrambling
+- [ ] Measure performance impact
+- [ ] User testing: Does it improve realism?
+- [ ] If successful: Research Portilla-Simoncelli
+- [ ] Optimize for real-time performance
+
+**Files to Modify:**
+- `renderer/shaders/peripheral.frag` - Add mongrel mode
+- New: `renderer/shaders/texture-synthesis.glsl`
+- `renderer/scrutinizer.js` - Mode switching
+
+---
+
+### 🔧 Supporting: Smooth Zone Transitions
+**Priority**: LOW  
+**Effort**: LOW  
+**Impact**: MEDIUM (polish)
+
+**Goal**: Eliminate "popping" artifacts when fovea crosses zone boundaries.
+
+**Current State:**
+- Mostly fixed with v1.3 smooth transitions
+- Some residual hard jumps during rapid movement
+
+**Proposed:**
+- Temporal smoothing of zone transitions
+- Velocity-gated transitions (smooth when stationary)
+- Per-pixel transition history
+
+**Implementation:**
+- [ ] Add temporal smoothing buffer
+- [ ] Velocity-based transition rate
+- [ ] Test with rapid saccades
+
+---
+
+## Priority 3: Saliency Map - Design Tool + Core Simulation Enhancement
 
 ### 🟡 Important for 1.0
 
