@@ -267,6 +267,9 @@
 
             this.targetMouseX = (clientX - rect.left) * scaleX;
             this.targetMouseY = (clientY - rect.top) * scaleY;
+
+            // DEBUG: Log coordinate calculations
+            console.log(`[Mouse Debug] rect: (${rect.left}, ${rect.top}), client: (${clientX}, ${clientY}), scale: (${scaleX}, ${scaleY}), target: (${this.targetMouseX}, ${this.targetMouseY})`);
         }
 
         handleZoomChanged(zoom) {

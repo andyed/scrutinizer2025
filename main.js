@@ -232,7 +232,7 @@ ipcMain.on('hud:request:window-bounds', (event) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
     if (win) {
-        const [width, height] = win.getSize();
+        const [width, height] = win.getContentSize(); // Use getContentSize to exclude title bar
         event.reply('window-size', { width, height });
     }
 });
@@ -242,7 +242,7 @@ ipcMain.on('get-window-size', (event) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
     if (win) {
-        const [width, height] = win.getSize();
+        const [width, height] = win.getContentSize(); // Use getContentSize to exclude title bar
         event.reply('window-size', { width, height });
     }
 });
