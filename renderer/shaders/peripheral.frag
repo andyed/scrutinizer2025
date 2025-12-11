@@ -600,7 +600,9 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         // Recalculate periphery_start (radius_norm * 1.2)
         float periphery_start = fovea_radius * 1.2;
         
-        float caFactor = smoothstep(periphery_start, periphery_start + 0.25, distDithered);
+        // CRITICAL FIX: Use clean dist for CA, not dithered
+        // Dithered distance was causing CA to appear in random vertical lines
+        float caFactor = smoothstep(periphery_start, periphery_start + 0.25, dist);
         
         // Apply Strength Modulation to CA
         caFactor *= strengthMult;
