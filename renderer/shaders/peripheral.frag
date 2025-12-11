@@ -398,9 +398,10 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         float waveSpeed = 0.1; // Was 0.5
         float waveFreq = 2.0;  // Was 4.0
         
-        // Create a slow rolling wave
-        float waveX = sin(uv.y * waveFreq + u_time * waveSpeed);
-        float waveY = cos(uv.x * waveFreq + u_time * waveSpeed * 0.8);
+        // CRITICAL FIX: Use aspect-corrected UV for wave calculation
+        // Using uncorrected UV causes horizontal offset/ghosting
+        float waveX = sin(uv_corrected.y * waveFreq + u_time * waveSpeed);
+        float waveY = cos(uv_corrected.x * waveFreq + u_time * waveSpeed * 0.8);
         
         // Amplitude scales with strength (eccentricity)
         // Parafovea: Tiny warp
