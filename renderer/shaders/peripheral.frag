@@ -425,7 +425,9 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         // Calculate warp strength specifically for noise (different falloff than shatter usually)
         // But we use the LGN passed strength for consistency now.
         
-        vec2 uv_noise = vec2(uv_corrected.x / u_fovea_aspect_ratio, uv_corrected.y);
+        // CRITICAL FIX: Use uncorrected UV for noise sampling to match texture sampling space
+        // The aspect correction was causing vertical offset in periphery
+        vec2 uv_noise = vec2(uv.x / u_fovea_aspect_ratio, uv.y);
         
         // Add time offset if animated
         vec2 timeOffset = vec2(0.0);
