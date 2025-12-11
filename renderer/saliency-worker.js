@@ -181,7 +181,27 @@ self.onmessage = function (e) {
     const cs_RG = computeCenterSurround(RG, width, height);
     const cs_BY = computeCenterSurround(BY, width, height);
 
-    // PASS 3: Combine with weights
+    // PASS 3: Normalize each feature map independently (Itti-Koch-Niebur)
+    // This prevents one feature from dominating
+    function normalizeFeature(feature) {
+        let max = 0;
+        for (let i = 0; i < feature.length; i++) {
+            if (feature[i] > max) max = feature[i];
+        }
+        if (max < 0.001) max = 1.0;
+
+        const normalized = new Float32Array(feature.length);
+        for (let i = 0; i < feature.length; i++) {
+            normalized[i] = feature[i] / max;
+        }
+        return normalized;
+    }
+
+    const norm_I = normalizeFeature(cs_I);
+    const norm_RG = normalizeFeature(cs_RG);
+    const norm_BY = normalizeFeature(cs_BY);
+
+    // PASS 4: Combine normalized features with weights
     const W_I = 0.3;
     const W_RG = 0.35;
     const W_BY = 0.35;
@@ -190,23 +210,36 @@ self.onmessage = function (e) {
     let maxVal = 0;
 
     for (let i = 0; i < len; i++) {
-        const val = W_I * cs_I[i] + W_RG * cs_RG[i] + W_BY * cs_BY[i];
+        const val = W_I * norm_I[i] + W_RG * norm_RG[i] + W_BY * norm_BY[i];
         saliency[i] = val;
         if (val > maxVal) maxVal = val;
     }
 
     // PASS 4: Normalize & Write Output
-    if (maxVal < 0.001) maxVal = 1.0;
+    if (maxVal < 0.001) {
+        console.warn('[Saliency] maxVal too low:', maxVal, '- using fallback');
+        maxVal = 1.0;
+    }
 
     for (let i = 0; i < len; i++) {
         let val = saliency[i] / maxVal;
-        val = Math.pow(val, 0.8); // Boost contrast
+
+        // Boost contrast for visualization
+        val = Math.pow(val, 0.8);
+
+        // Clamp to [0, 1]
+        val = Math.max(0, Math.min(1, val));
 
         const byteVal = Math.floor(val * 255);
         pixels[i * 4] = byteVal;
         pixels[i * 4 + 1] = byteVal;
         pixels[i * 4 + 2] = byteVal;
         pixels[i * 4 + 3] = 255;
+    }
+
+    // Debug: Log stats occasionally
+    if (Math.random() < 0.01) {
+        console.log('[Saliency] maxVal:', maxVal.toFixed(4), 'len:', len);
     }
 
     // Send back the processed ImageData
