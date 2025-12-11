@@ -331,7 +331,6 @@
             this.renderer.uploadTexture(this.imageData);
 
             // Compute saliency from SOURCE browser capture (before rendering effects)
-            // Compute saliency from SOURCE browser capture (before rendering effects)
             if (width > 0 && height > 0) {
                 // Throttle Saliency: Only compute every N frames (e.g., 15 frames ~ 250ms at 60fps)
                 // This is an expensive CPU operation (pixel analysis) so we shouldn't run it every frame.
@@ -339,8 +338,17 @@
                 this.saliencyFrameCounter++;
 
                 if (this.saliencyFrameCounter % 15 === 0) {
+                    // IMPORTANT: Create a COPY of imageData for the worker
+                    // Since we're now reusing this.imageData buffer, we need a separate copy
+                    // for the async saliency computation to avoid data corruption
+                    const saliencyImageData = new ImageData(
+                        new Uint8ClampedArray(this.imageDataBuffer),
+                        width,
+                        height
+                    );
+
                     // Create ImageBitmap for efficient transfer to worker
-                    createImageBitmap(imageData).then(bitmap => {
+                    createImageBitmap(saliencyImageData).then(bitmap => {
                         this.saliencyWorker.postMessage({
                             imageBitmap: bitmap,
                             id: this.saliencyFrameCounter
