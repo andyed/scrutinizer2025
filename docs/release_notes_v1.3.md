@@ -75,10 +75,6 @@ Significant improvements to rendering performance and capture fidelity.
   - Root cause: `getSize()` included window title bar, but captured content excluded it
   - Solution: Changed to `getContentSize()` for accurate canvas sizing
   - Impact: Mouse cursor now aligns perfectly with hover states
-- **Peripheral Vertical Offset** - Fixed visible vertical displacement in Shatter mode (default)
-  - Root cause: Wave amplitude was 5x too large (0.005 vs 0.001)
-  - Solution: Reduced Shatter wave amplitude to match Noise mode
-  - Impact: Eliminates ghosting/doubling artifacts on text in periphery
 - **Saliency worker data corruption** - Fixed invisible text in search boxes
   - Separate ImageData copy for async saliency processing
 
