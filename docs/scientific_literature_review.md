@@ -124,6 +124,13 @@ The Magno-cellular pathway (motion/luminance) processes information faster than 
 * **Jeff Johnson:** [*Designing with the Mind in Mind* (Elsevier)](https://www.sciencedirect.com/book/9780124079144/designing-with-the-mind-in-mind)
 * **Susan Weinschenk:** [*100 Things Every Designer Needs to Know About People*](https://theteamw.com/books/100-things-every-designer-needs-to-know-about-people/)
 
+### Community Discussion
+
+* **Reddit /r/askscience (2014):** ["The fovea is so small compared to the size of the visual field, so why does the world not appear to be of terribly low fidelity?"](https://www.reddit.com/r/askscience/comments/1wzp3g/the_fovea_is_so_small_compared_to_the_size_of_the/)
+    * **The Question**: A fundamental inquiry about why we perceive the world as uniformly sharp despite the fovea covering only ~2° of visual angle.
+    * **Community Answers**: Discusses saccadic eye movements, visual memory, and the brain's reconstruction of a coherent visual scene from sparse high-resolution samples.
+    * **Relevance to Scrutinizer**: Validates the core motivation—most people are unaware of how limited their peripheral vision actually is until it's explicitly demonstrated.
+
 ### Feature Detection in Primary Visual Cortex (V1)
 
 The primary visual cortex (V1) is the first cortical area to receive visual information from the lateral geniculate nucleus (LGN) and serves as the foundation for feature extraction in the visual system.
