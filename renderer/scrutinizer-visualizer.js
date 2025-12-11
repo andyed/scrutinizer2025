@@ -222,33 +222,31 @@ class ScrutinizerVisualizer {
                 float distFromRightEdge = u_resolution.x - (uv.x * u_resolution.x);
                 bool isScrollbar = distFromRightEdge < scrollbarWidth;
                 
-                // === 7. ROD VISION ===
+                // === 7. ROD VISION (Simplified) ===
+                // NOTE: This is a simplified implementation for the standalone visualizer.
+                // The main Scrutinizer app uses Oklab color space for perceptually uniform desaturation.
+                // See peripheral.frag for the full Oklab implementation.
                 if (rodStrength > 0.0 && !isScrollbar) {
                     float eccentricity = max(0.0, dist - fovea_radius);
-                    // Exponential saturation falloff (Steeper curve as requested)
-                    // saturation = 1.0 - sqrt(dist)
+                    
+                    // Simple RGB desaturation (sqrt falloff)
                     float saturation = 1.0 - pow(dist, 0.5);
                     saturation = clamp(saturation, 0.0, 1.0);
-                    
-                    // Modulate by intensity
                     saturation = mix(1.0, saturation, u_intensity);
                     
                     float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
                     
-                    // Contrast boost (Magnocellular pathway style), scaled by intensity.
+                    // Contrast boost (Magnocellular pathway)
                     float contrast = 1.0 + (0.3 * u_intensity);
                     float boostedGray = (gray - 0.5) * contrast + 0.5;
                     boostedGray = clamp(boostedGray, 0.0, 1.0);
                     
-                    // Add grain (neural noise / visual snow) to break smooth gradients.
-                    float grain = rand(uv_corrected * 10.0) - 0.5; // -0.5 to 0.5
-                    // Scale grain by intensity
+                    // Add grain (neural noise / visual snow)
+                    float grain = rand(uv_corrected * 10.0) - 0.5;
                     boostedGray += grain * 0.15 * u_intensity; 
                     boostedGray = clamp(boostedGray, 0.0, 1.0);
                     
-                    // Rod tint: Eigengrau / Cold Dark Blue
-                    // Was: vec3(0.6, 0.9, 1.0) (Cyan)
-                    // New: vec3(0.5, 0.6, 0.8) (Cold Blue)
+                    // Eigengrau tint (cold dark blue) - simplified RGB version
                     vec3 rodTint = vec3(boostedGray * 0.5, boostedGray * 0.6, boostedGray * 0.8);
                     vec3 neutralGray = vec3(boostedGray);
                     
