@@ -3,33 +3,42 @@
  * Handles desaturation and blur operations on canvas ImageData
  */
 
+const OklabUtils = require('./oklab-utils');
+
 class ImageProcessor {
     constructor(config) {
         this.config = config;
     }
 
     /**
-     * Desaturate image data using ColorMatrix luminance weights
-     * Based on the original ActionScript ColorMatrix implementation
+     * Desaturate image data using Oklab color space
+     * Oklab provides perceptually uniform desaturation, avoiding muddy artifacts
      * @param {ImageData} imageData - Canvas ImageData to process
      * @returns {ImageData} Desaturated image data
      */
     desaturate(imageData) {
         const data = imageData.data;
-        const { LUM_R, LUM_G, LUM_B, desaturationAmount } = this.config;
+        const { desaturationAmount } = this.config;
 
         for (let i = 0; i < data.length; i += 4) {
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
 
-            // Calculate luminance using ColorMatrix weights
-            const gray = r * LUM_R + g * LUM_G + b * LUM_B;
+            // Convert to Oklab
+            const lab = OklabUtils.rgbToOklab(r, g, b);
 
-            // Blend between original and grayscale based on desaturation amount
-            data[i] = r + (gray - r) * desaturationAmount;
-            data[i + 1] = g + (gray - g) * desaturationAmount;
-            data[i + 2] = b + (gray - b) * desaturationAmount;
+            // Desaturate by reducing chrominance (a, b) toward zero
+            // Preserves lightness (L) for perceptually uniform result
+            lab.a *= (1 - desaturationAmount);
+            lab.b *= (1 - desaturationAmount);
+
+            // Convert back to RGB
+            const rgb = OklabUtils.oklabToRgb(lab.L, lab.a, lab.b);
+
+            data[i] = rgb.r;
+            data[i + 1] = rgb.g;
+            data[i + 2] = rgb.b;
             // Force alpha to 255 (fully opaque) to prevent see-through to webview
             data[i + 3] = 255;
         }
@@ -38,7 +47,7 @@ class ImageProcessor {
     }
 
     /**
-     * Rod-sensitive desaturation for peripheral vision
+     * Rod-sensitive desaturation for peripheral vision using Oklab
      * Implements biological reality:
      * - Rods peak at 505nm (cyan/aqua) - boost this range
      * - Helmholtz-Kohlrausch effect - saturated colors appear brighter
@@ -48,41 +57,45 @@ class ImageProcessor {
      */
     desaturateRodSensitive(imageData) {
         const data = imageData.data;
-        const { LUM_R, LUM_G, LUM_B } = this.config;
 
         for (let i = 0; i < data.length; i += 4) {
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
 
-            // Calculate luminance
-            const gray = r * LUM_R + g * LUM_G + b * LUM_B;
+            // Convert to Oklab
+            const lab = OklabUtils.rgbToOklab(r, g, b);
 
-            // Detect cyan/aqua (high blue + high green, low red)
+            // Detect cyan/aqua in Oklab space
+            // Cyan has positive b (blue-yellow), negative a (green-red)
             // Peak rod sensitivity at 505nm (cyan/teal range)
-            const isCyan = (b > 100 && g > 100 && r < 150);
-            const cyanStrength = isCyan ? Math.min((b + g) / 400, 1.0) : 0;
+            const isCyan = (lab.b > 0.05 && lab.a < 0);
+            const cyanStrength = isCyan ? Math.min(lab.b * 5, 1.0) : 0;
+
+            // Calculate saturation (chroma) in Oklab
+            const chroma = Math.sqrt(lab.a * lab.a + lab.b * lab.b);
 
             // Helmholtz-Kohlrausch effect: saturated colors appear brighter
-            const saturation = Math.max(
-                Math.abs(r - gray),
-                Math.abs(g - gray),
-                Math.abs(b - gray)
-            ) / 255;
-            const hkBoost = saturation * 0.3; // Perceived brightness boost
+            const hkBoost = chroma * 0.15; // Perceived brightness boost
 
             // Rod sensitivity boost for cyan (505nm peak)
-            const rodBoost = cyanStrength * 0.4;
+            const rodBoost = cyanStrength * 0.2;
 
-            // Total brightness boost
-            const brightnessBoost = 1.0 + hkBoost + rodBoost;
+            // Apply brightness boost to L channel
+            lab.L = Math.min(1.0, lab.L * (1.0 + hkBoost + rodBoost));
 
-            // Desaturate but preserve cyan luminance and boost it
-            const desatAmount = isCyan ? 0.7 : 1.0; // Less desaturation for cyan
+            // Desaturate by reducing chrominance
+            // Less desaturation for cyan to preserve rod peak sensitivity
+            const desatAmount = isCyan ? 0.7 : 1.0;
+            lab.a *= (1 - desatAmount);
+            lab.b *= (1 - desatAmount);
 
-            data[i] = Math.min(255, (r + (gray - r) * desatAmount) * brightnessBoost);
-            data[i + 1] = Math.min(255, (g + (gray - g) * desatAmount) * brightnessBoost);
-            data[i + 2] = Math.min(255, (b + (gray - b) * desatAmount) * brightnessBoost);
+            // Convert back to RGB
+            const rgb = OklabUtils.oklabToRgb(lab.L, lab.a, lab.b);
+
+            data[i] = rgb.r;
+            data[i + 1] = rgb.g;
+            data[i + 2] = rgb.b;
             data[i + 3] = 255;
         }
 
@@ -231,7 +244,7 @@ class ImageProcessor {
 
                 const invT = 1 - t;
 
-                out[idx]     = sharp[idx]     * invT + blur[idx]     * t;
+                out[idx] = sharp[idx] * invT + blur[idx] * t;
                 out[idx + 1] = sharp[idx + 1] * invT + blur[idx + 1] * t;
                 out[idx + 2] = sharp[idx + 2] * invT + blur[idx + 2] * t;
                 out[idx + 3] = 255;

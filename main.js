@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, ipcMain, WebContentsView, globalShortcut } = r
 const path = require('path');
 const { buildMenuTemplate, RADIUS_OPTIONS } = require('./menu-template');
 const settingsManager = require('./settings-manager');
+const { CALIBRATION_URL } = require('./renderer/config');
 
 // Track current settings for menu state and new windows
 let currentRadius;
@@ -651,7 +652,7 @@ function createScrutinizerWindow(startUrl) {
         }
     });
 
-    // Also listen for did-stop-loading (covers stop button and some SPAs)
+    // Also listen for did-stop-loading
     contentView.webContents.on('did-stop-loading', () => {
         console.log('[Main] ContentView did-stop-loading');
         if (toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
@@ -1116,6 +1117,12 @@ app.whenReady().then(() => {
         runTestMode();
     } else {
         createWindow();
+
+        // Auto-open calibration if --calibrate flag is passed
+        if (process.argv.includes('--calibrate')) {
+            console.log('[Main] --calibrate flag detected, opening calibration window...');
+            setTimeout(() => startWebCalibration(), 1000); // Delay to ensure main window is ready
+        }
     }
 
     // Register global shortcut for Open URL
@@ -1174,4 +1181,115 @@ app.on('activate', function () {
 // Handle "New Window" menu action
 app.on('create-new-window', () => {
     createScrutinizerWindow();
+});
+
+// === Calibration Window Logic ===
+// Web-based calibration: Navigate to working web version with distortion disabled
+
+
+
+function startWebCalibration() {
+    console.log('[Main] Starting Web-Based Calibration');
+
+    // Find the main window with scrutinizerView
+    const windows = BrowserWindow.getAllWindows();
+    const mainWin = windows.find(w => w.scrutinizerView);
+
+    if (!mainWin) {
+        console.error('[Main] No window with scrutinizerView found');
+        return;
+    }
+
+    // Disable visual distortion during calibration using existing mechanism
+    currentEnabled = false;
+    settingsManager.set('enabled', currentEnabled);
+
+    // Notify HUD and toolbar of disabled state
+    if (mainWin.scrutinizerHud && !mainWin.scrutinizerHud.isDestroyed()) {
+        mainWin.scrutinizerHud.webContents.send('settings:enabled-changed', currentEnabled);
+    }
+    if (mainWin.toolbarView && !mainWin.toolbarView.webContents.isDestroyed()) {
+        mainWin.toolbarView.webContents.send('toolbar:fovea-state', currentEnabled);
+    }
+    console.log('[Main] Disabled foveal simulation for calibration');
+
+    // Navigate to calibration URL
+    // Navigate to calibration URL
+    mainWin.scrutinizerView.webContents.loadURL(CALIBRATION_URL);
+    console.log('[Main] Navigated to calibration URL:', CALIBRATION_URL);
+
+    // Listen for postMessage from the calibration page
+    mainWin.scrutinizerView.webContents.on('console-message', (event, level, message) => {
+        // Check if this is our calibration message
+        if (message.includes('scrutinizer-calibration-complete')) {
+            const match = message.match(/radius['":\s]+(\d+)/);
+            if (match) {
+                const radius = parseInt(match[1], 10);
+                handleCalibrationComplete(mainWin, radius);
+            }
+        }
+    });
+
+    // Also inject a script to forward postMessage to console.log for capture
+    mainWin.scrutinizerView.webContents.on('did-finish-load', () => {
+        mainWin.scrutinizerView.webContents.executeJavaScript(`
+            window.addEventListener('message', function(e) {
+                if (e.data && e.data.type === 'scrutinizer-calibration-complete') {
+                    console.log('scrutinizer-calibration-complete radius:' + e.data.radius);
+                }
+            });
+        `);
+    });
+}
+
+function handleCalibrationComplete(win, radius) {
+    console.log('[Main] Calibration Complete from web:', radius, 'px');
+
+    // Save the radius
+    currentRadius = radius;
+    settingsManager.set('radius', radius);
+
+    // Re-enable distortion with new radius using existing mechanism
+    currentEnabled = true;
+    settingsManager.set('enabled', currentEnabled);
+
+    // Notify all windows of new state
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach(w => {
+        if (w.scrutinizerHud && !w.scrutinizerHud.isDestroyed()) {
+            w.scrutinizerHud.webContents.send('settings:radius-changed', radius);
+            w.scrutinizerHud.webContents.send('settings:enabled-changed', currentEnabled);
+        }
+        if (w.toolbarView && !w.toolbarView.webContents.isDestroyed()) {
+            w.toolbarView.webContents.send('toolbar:fovea-state', currentEnabled);
+        }
+    });
+    console.log('[Main] Re-enabled foveal simulation with new radius:', radius);
+}
+
+// Event from Menu
+app.on('open-calibration-window', () => {
+    startWebCalibration();
+});
+
+// Event from Calibration Page
+ipcMain.on('calibration-complete', (event, radius) => {
+    console.log(`[Main] Calibration Complete: ${radius}px`);
+    currentRadius = radius;
+    settingsManager.set('radius', radius);
+
+    // Notify all windows
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach(win => {
+        if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+            win.scrutinizerHud.webContents.send('settings:radius-changed', radius);
+        }
+    });
+
+    // Update Menu
+    rebuildMenu();
+
+    // Close the calibration window (event.sender)
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) win.close();
 });

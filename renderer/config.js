@@ -47,5 +47,11 @@ const CONFIG = {
 };
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = CONFIG;
+    const CALIBRATION_URL = 'https://andyed.github.io/scrutinizer-www/foveal-calibration.html';
+
+    module.exports = {
+        DEFAULT_SETTINGS: CONFIG,
+        CALIBRATION_URL,
+        // ... possibly other exports
+    };
 }

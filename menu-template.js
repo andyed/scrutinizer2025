@@ -245,7 +245,14 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     type: 'radio',
                                     checked: isClosest(RADIUS_OPTIONS[5], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[5])
-                                }
+                                },
+                                { type: 'separator' },
+                                /*
+                                {
+                                    label: 'Calibrate Fovea...',
+                                    click: () => app.emit('open-calibration-window')
+                                },
+                                */
                             ]
                         },
                         {

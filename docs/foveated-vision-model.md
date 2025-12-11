@@ -224,10 +224,38 @@ This combination ensures:
 - Just outside the fovea, characters wobble enough to be hard to parse but not fully pixelated.
 - Further out, both local letter structure and global word envelopes are heavily disrupted.
 
-### Second Pass Softening (v1.2)
-To improve perceptual comfort and reduce motion sickness, the "Second Pass" update introduced:
-1.  **Variable Gaussian Blur**: Replaces blocky pixelation with a smooth blur that increases exponentially with eccentricity (0px -> 3px -> 15px+).
-2.  **Slow Wave Distortion**: Replaces high-frequency "glitch" jitter with a slow (0.1Hz), smooth sine-wave warp. This maintains the "underwater" feel without the rapid, distracting shaking.
+### Second Pass Softening (v1.2) and Smooth Transitions (v1.3)
+
+**v1.2:** To improve perceptual comfort and reduce motion sickness, the "Second Pass" update introduced:
+1. **Variable Gaussian Blur**: Replaces blocky pixelation with a smooth blur that increases exponentially with eccentricity (0px → 3px → 15px+).
+2. **Slow Wave Distortion**: Replaces high-frequency "glitch" jitter with a slow (0.1Hz), smooth sine-wave warp. This maintains the "underwater" feel without the rapid, distracting shaking.
+
+**v1.3:** Smoothed the parafovea-periphery transition to eliminate abrupt visual "kinks":
+
+**Previous implementation (v1.2):**
+- Parafovea: Linear blur ramp (0px → 3px)
+- Periphery: Steep exponential (`3px + distFromPara * 40.0`)
+- **Problem:** Hard slope change at boundary created visible discontinuity
+
+**New implementation (v1.3):**
+```glsl
+// Continuous exponential blur curve
+float eccentricity = dist - fovea_radius;
+blurRadius = 8.0 * (exp(eccentricity * 2.0) - 1.0);
+blurRadius = min(blurRadius, 20.0); // Cap maximum
+```
+
+**Benefits:**
+- No hard boundary at parafovea edge
+- Smooth acceleration from parafovea to periphery
+- Natural visual transition
+
+**Contrast preservation** also uses smooth gradient:
+```glsl
+// Gradual falloff instead of hard switch
+float contrastPreservation = mix(0.6, 0.3, 
+    smoothstep(0.0, parafovea_radius - fovea_radius, eccentricity));
+```
 
 ---
 
@@ -406,19 +434,115 @@ This creates colored fringes in the periphery, supporting illegibility without n
 
 ---
 
-## 7. Rod vision: desaturation, contrast, grain, tint
+## 7. Rod vision: Oklab color space desaturation
 
-Beyond the fovea, the shader gradually:
+**New in v1.3:** Peripheral vision color processing has been upgraded from RGB to **Oklab**, a perceptually uniform color space designed for image processing.
 
-- Reduces saturation using an **exponential falloff** (`1.0 - sqrt(dist)`), making the far periphery effectively monochrome.
-- Increases contrast.
-- Adds high‑frequency grain.
-- Applies a **"Eigengrau" (Brain Grey)** tint (cold dark blue) in darker regions.
+### Why Oklab?
 
-This is blended based on both `rodStrength` and the local luminance, yielding a peripheral appearance that is:
+RGB color space is not perceptually uniform - equal numeric changes in RGB values do not correspond to equal perceived color differences. When desaturating colors in RGB space, this can produce "muddy" artifacts, especially for saturated colors like reds and blues.
 
-- Cold, colorless, and grainy.
-- Shifted towards a dark blue-grey, mimicking the lack of color data in the rod-dominated periphery.
+**Oklab** (Ottosson, 2020) is a perceptual color space where:
+- **L** (Lightness): Separates luminance from chrominance (0-1 range)
+- **a** (Green-Red): Opponent color dimension
+- **b** (Blue-Yellow): Opponent color dimension
+
+This separation directly maps to the biological visual system:
+- **Magnocellular pathway** (M-cells): Processes luminance (L channel)
+- **Parvocellular pathway** (P-cells): Processes chrominance (a, b channels)
+
+### Implementation
+
+#### JavaScript (CPU-side)
+**File:** `renderer/oklab-utils.js`, `renderer/image-processor.js`
+
+The blur worker uses Oklab for desaturating the multi-resolution pyramid:
+
+```javascript
+// Convert RGB → Oklab
+const lab = rgbToOklab(r, g, b);
+
+// Desaturate by reducing chrominance toward zero
+lab.a *= (1 - desaturationAmount);
+lab.b *= (1 - desaturationAmount);
+
+// Preserve lightness (L) for perceptual uniformity
+// Convert back Oklab → RGB
+const rgb = oklabToRgb(lab.L, lab.a, lab.b);
+```
+
+**Rod-sensitive desaturation** preserves cyan (505nm peak rod sensitivity):
+```javascript
+// Detect cyan in Oklab space (positive b, negative a)
+const isCyan = (lab.b > 0.05 && lab.a < 0);
+
+// Less desaturation for cyan
+const desatAmount = isCyan ? 0.7 : 1.0;
+lab.a *= (1 - desatAmount);
+lab.b *= (1 - desatAmount);
+```
+
+#### GLSL (GPU-side)
+**File:** `renderer/shaders/peripheral.frag`
+
+The shader includes Oklab conversion functions for real-time processing:
+
+```glsl
+// Convert sRGB to Oklab
+vec3 rgbToOklab(vec3 srgb);
+
+// Convert Oklab to sRGB
+vec3 oklabToRgb(vec3 lab);
+```
+
+**High-Key mode** (v4_style_id == 0):
+```glsl
+// Convert to Oklab
+vec3 lab = rgbToOklab(col);
+
+// Desaturate by reducing chrominance
+lab.y *= (1.0 - desaturationFactor); // a component
+lab.z *= (1.0 - desaturationFactor); // b component
+
+// Convert back to RGB
+vec3 desaturatedColor = oklabToRgb(lab);
+```
+
+**Eigengrau tinting** in Oklab space:
+```glsl
+// Eigengrau (dark blue-gray) in Oklab
+vec3 eigengrauLab = vec3(0.1, 0.0, -0.05); // Low L, blue shift
+vec3 whiteLab = vec3(1.0, 0.0, 0.0);
+
+// Map lightness: dark → eigengrau, bright → white
+vec3 rodColorLab = mix(eigengrauLab, whiteLab, L_contrasted);
+```
+
+### Benefits
+
+1. **Perceptually uniform desaturation** - No muddy artifacts
+2. **Biologically accurate** - Matches Magno/Parvo pathway separation
+3. **Natural grayscale** - Preserves perceived brightness
+4. **Better rod vision** - Accurate cyan sensitivity (505nm peak)
+
+### Gamma Correction
+
+Oklab requires linear RGB input. The implementation properly handles sRGB gamma correction:
+- **sRGB → Linear:** Inverse gamma (2.4 with linear segment)
+- **Linear → sRGB:** Forward gamma for display
+
+### Performance
+
+Oklab conversion requires:
+- 2 matrix multiplications (3×3)
+- 3 cube roots (forward) + 3 cubes (reverse)
+- Gamma correction (power functions)
+
+GLSL has hardware-accelerated `pow()` and matrix operations, making the overhead negligible on modern GPUs.
+
+### Scientific Reference
+
+Ottosson, B. (2020). "A perceptual color space for image processing." https://bottosson.github.io/posts/oklab/
 
 ---
 

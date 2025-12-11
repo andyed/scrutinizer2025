@@ -485,6 +485,31 @@ npm run build:win
 ```
 *   **Output**: `dist/Scrutinizer Setup 1.2.0.exe` (NSIS Installer) + `dist/Scrutinizer-1.2.0-win.zip`.
 
+
+---
+
+## Analytics (PostHog)
+
+Scrutinizer uses PostHog for privacy-preserving usage analytics. Data capture is strictly opt-in via user settings.
+
+### Events
+
+#### `calibration_complete`
+Triggered when a user successfully completes the Foveal Calibration process.
+
+**Payload:**
+- `radius`: (Number) The final calibrated foveal radius in pixels.
+- `mode`: (String) "auto" or "manual".
+- `trials`: (Number) Total reactions in the session.
+- `reversals`: (Number) Count of reversals (hits to misses or vice versa).
+- `window_width`: (Number) Inner width of the browser window.
+- `window_height`: (Number) Inner height of the browser window.
+- `screen_width`: (Number) Full screen width.
+- `screen_height`: (Number) Full screen height.
+- `device_pixel_ratio`: (Number) The DPR of the display.
+
+**Note**: Screen and Window dimensions are captured to help correlate performance issues (e.g., Retina lag) with specific hardware configurations.
+
 ---
 
 ## Custom Overlays

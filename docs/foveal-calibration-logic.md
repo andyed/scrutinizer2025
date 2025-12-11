@@ -54,3 +54,27 @@ The tool generates a session history graph displaying:
 - **X-Axis**: Trial Number
 - **Y-Axis**: Radius (px)
 - **Data Points**: Color-coded Hits/Misses with vertical error bars representing Reaction Time magnitude.
+
+---
+
+## 6. Robustness Mitigations (v1.3)
+
+### Pop-Out Prevention
+**Risk**: Cessation of motion might act as a "pop-out" cue if crosses stop in an aligned grid, creating a sudden regular pattern detectable even in periphery.
+
+**Mitigation**:
+- **Randomized Rotation Phases**: Each cross has a unique initial phase: `phase = seededRandom(seed + 100) * Math.PI * 2` (line 177)
+- **Golden Ratio Distribution**: Crosses are positioned using Golden Ratio spiral (`offsetX/Y = (layer * goldenRatio) % 1 * spacing`), ensuring non-grid, low-discrepancy distribution
+- **Multi-Layer Depth**: 15 overlapping layers with different offsets prevent any single "freeze frame" from creating a regular pattern
+
+**Result**: When motion stops, crosses freeze at random angles in a quasi-random spatial distribution, eliminating grid-based pop-out cues.
+
+### Anticipation Prevention
+**Risk**: Users might learn the timing and anticipate motion events, reducing $d'$ signal validity.
+
+**Mitigation**:
+- **Wide ISI Randomization**: Inter-Stimulus Interval randomized over 2000-5000ms range (3000ms variance)
+- **Variable Reaction Window**: 1.5s window creates time pressure, preventing "wait and guess" strategies
+- **Latency-Weighted Scoring**: RT <500ms triggers "Too Fast" penalty, discouraging anticipatory responses
+
+**Result**: Unpredictable event timing forces genuine perceptual detection rather than learned timing patterns.

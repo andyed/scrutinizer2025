@@ -126,6 +126,99 @@ float sobel(vec2 uv) {
     return sqrt(gx*gx + gy*gy);
 }
 
+// === OKLAB COLOR SPACE CONVERSION ===
+// Based on Björn Ottosson's Oklab specification
+// https://bottosson.github.io/posts/oklab/
+
+// Convert sRGB component to linear RGB
+float srgbToLinear(float c) {
+    if (c <= 0.04045) {
+        return c / 12.92;
+    } else {
+        return pow((c + 0.055) / 1.055, 2.4);
+    }
+}
+
+// Convert linear RGB component to sRGB
+float linearToSrgb(float c) {
+    if (c <= 0.0031308) {
+        return c * 12.92;
+    } else {
+        return 1.055 * pow(c, 1.0 / 2.4) - 0.055;
+    }
+}
+
+// Convert sRGB vec3 to linear RGB
+vec3 srgbToLinearVec(vec3 srgb) {
+    return vec3(
+        srgbToLinear(srgb.r),
+        srgbToLinear(srgb.g),
+        srgbToLinear(srgb.b)
+    );
+}
+
+// Convert linear RGB vec3 to sRGB
+vec3 linearToSrgbVec(vec3 linear) {
+    return vec3(
+        linearToSrgb(linear.r),
+        linearToSrgb(linear.g),
+        linearToSrgb(linear.b)
+    );
+}
+
+// Convert linear sRGB to Oklab
+vec3 linearSrgbToOklab(vec3 rgb) {
+    // Convert linear sRGB to LMS cone response (M1 matrix)
+    float l = 0.4122214708 * rgb.r + 0.5363325363 * rgb.g + 0.0514459929 * rgb.b;
+    float m = 0.2119034982 * rgb.r + 0.6806995451 * rgb.g + 0.1073969566 * rgb.b;
+    float s = 0.0883024619 * rgb.r + 0.2817188376 * rgb.g + 0.6299787005 * rgb.b;
+
+    // Apply non-linearity (cube root)
+    float l_ = pow(l, 1.0 / 3.0);
+    float m_ = pow(m, 1.0 / 3.0);
+    float s_ = pow(s, 1.0 / 3.0);
+
+    // Convert to Lab coordinates (M2 matrix)
+    return vec3(
+        0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+        1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+        0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
+    );
+}
+
+// Convert Oklab to linear sRGB
+vec3 oklabToLinearSrgb(vec3 lab) {
+    // Convert Lab to LMS (inverse M2)
+    float l_ = lab.x + 0.3963377774 * lab.y + 0.2158037573 * lab.z;
+    float m_ = lab.x - 0.1055613458 * lab.y - 0.0638541728 * lab.z;
+    float s_ = lab.x - 0.0894841775 * lab.y - 1.2914855480 * lab.z;
+
+    // Apply inverse non-linearity (cube)
+    float l = l_ * l_ * l_;
+    float m = m_ * m_ * m_;
+    float s = s_ * s_ * s_;
+
+    // Convert LMS to linear sRGB (inverse M1)
+    return vec3(
+        +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
+    );
+}
+
+// Convert sRGB (0-1) to Oklab
+vec3 rgbToOklab(vec3 srgb) {
+    vec3 linear = srgbToLinearVec(srgb);
+    return linearSrgbToOklab(linear);
+}
+
+// Convert Oklab to sRGB (0-1), clamped
+vec3 oklabToRgb(vec3 lab) {
+    vec3 linear = oklabToLinearSrgb(lab);
+    vec3 srgb = linearToSrgbVec(linear);
+    return clamp(srgb, 0.0, 1.0);
+}
+
 // === STATIC MONGREL SAMPLER ===
 vec2 hash22(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973));
@@ -423,19 +516,22 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
 vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float parafovea_radius, float saccadeFactor) {
     // === VARIABLE BLUR (Gaussian Roll-off) ===
     // Calculate blur radius based on eccentricity
+    // Use smooth exponential curve to avoid abrupt transitions
     float blurRadius = 0.0;
     
     if (dist > fovea_radius) {
-        if (dist <= parafovea_radius) {
-            // Parafovea (2-5°): 1px to 3px
-            float t = (dist - fovea_radius) / (parafovea_radius - fovea_radius);
-            blurRadius = mix(0.0, 3.0, t);
-        } else {
-            // Periphery (>5°): 3px to 15px+
-            // Exponential increase
-            float distFromPara = dist - parafovea_radius;
-            blurRadius = 3.0 + distFromPara * 40.0; // Rapid increase
-        }
+        // Smooth exponential blur from fovea to far periphery
+        // No hard boundary at parafovea - continuous curve
+        float eccentricity = dist - fovea_radius;
+        
+        // Exponential curve: blur = a * (e^(b*x) - 1)
+        // Tuned to give ~3px at parafovea boundary, then accelerate
+        float blurScale = 8.0;
+        float blurRate = 2.0;
+        blurRadius = blurScale * (exp(eccentricity * blurRate) - 1.0);
+        
+        // Cap maximum blur to prevent excessive softness
+        blurRadius = min(blurRadius, 20.0);
     }
     
     // Use sampleBlurred instead of raw sampleSource
@@ -453,8 +549,10 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     // Prevent division by zero
         float lumaRatio = cleanLuma / max(distortedLuma, 0.01);
         
-        // Apply contrast boost (60% preservation in parafovea, less in far periphery)
-        float contrastPreservation = dist < parafovea_radius ? 0.6 : 0.3;
+        // Smooth contrast preservation falloff (no hard boundary)
+        // Gradually reduce from 0.6 to 0.3 across parafovea-periphery transition
+        float eccentricity = dist - fovea_radius;
+        float contrastPreservation = mix(0.6, 0.3, smoothstep(0.0, parafovea_radius - fovea_radius, eccentricity));
         col *= mix(1.0, lumaRatio, contrastPreservation);
     }
     
@@ -516,29 +614,33 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             col.b = sampleSource(v1.distortedUV - caOffset).b;
         }
 
-        // === ROD VISION AESTHETIC ===
-        // 1. Base Luma (Monochrome)
-        float luma = dot(col, vec3(0.299, 0.587, 0.114));
+        // === ROD VISION AESTHETIC (OKLAB) ===
+        // Convert to Oklab for perceptually uniform desaturation
+        vec3 lab = rgbToOklab(col);
         
-        // 2. Contrast Boost
-        // Rods have high contrast sensitivity.
-        // Simple S-curve or linear boost.
+        // 1. Contrast Boost on Lightness
+        // Rods have high contrast sensitivity
         float contrast = 1.2;
-        float lumaContrast = (luma - 0.5) * contrast + 0.5;
-        lumaContrast = clamp(lumaContrast, 0.0, 1.0);
+        float L_contrasted = (lab.x - 0.5) * contrast + 0.5;
+        L_contrasted = clamp(L_contrasted, 0.0, 1.0);
         
-        // 3. Eigengrau Tint (Cold Dark Blue)
-        // "Darker regions shifted towards dark blue-grey"
-        // We map black (0.0) to Eigengrau, and white (1.0) to White.
-        vec3 eigengrau = vec3(0.02, 0.02, 0.1); // Deep cold blue
-        vec3 rodColor = mix(eigengrau, vec3(1.0), lumaContrast);
+        // 2. Eigengrau Tint in Oklab Space
+        // Eigengrau (dark blue-gray) in Oklab: L ≈ 0.1, a ≈ 0, b ≈ -0.05 (blue shift)
+        vec3 eigengrauLab = vec3(0.1, 0.0, -0.05);
+        vec3 whiteLab = vec3(1.0, 0.0, 0.0);
         
-        // 4. Grain
-        // High-frequency noise
+        // Map lightness: dark → eigengrau, bright → white
+        vec3 rodColorLab = mix(eigengrauLab, whiteLab, L_contrasted);
+        
+        // Convert rod color back to RGB for grain
+        vec3 rodColor = oklabToRgb(rodColorLab);
+        
+        // 3. Grain (applied in RGB space)
         float grainStrength = 0.08;
         rodColor += noiseVal * grainStrength;
+        rodColor = clamp(rodColor, 0.0, 1.0);
         
-        // === DECOUPLED DESATURATION ===
+        // === DECOUPLED DESATURATION (OKLAB) ===
         // Calculate desaturation strength purely based on distance, IGNORING LGN gating.
         // This ensures "Rod Vision" applies to everything in the periphery (including Reddit logo).
         float rampEnd = fovea_radius * config.lgn_ramp_end_mult;
@@ -557,17 +659,36 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             desaturationFactor *= rodMod;
         }
         
-        // Apply effect based on Bypass Transition AND the new independent factor
-        // We combine them: bypassTransition handles the smooth start from 0.25
-        // desaturationFactor handles the ramp over the periphery.
+        // Desaturate in Oklab space by reducing chrominance
+        vec3 desaturatedLab = lab;
+        desaturatedLab.y *= (1.0 - desaturationFactor * bypassTransition); // a component
+        desaturatedLab.z *= (1.0 - desaturationFactor * bypassTransition); // b component
         
-        vec3 finalColor = mix(col, rodColor, desaturationFactor * bypassTransition);
+        // Convert desaturated color back to RGB
+        vec3 desaturatedColor = oklabToRgb(desaturatedLab);
+        
+        // Mix between desaturated color and rod color (eigengrau-tinted)
+        // Higher desaturation factor → more rod color influence
+        vec3 finalColor = mix(desaturatedColor, rodColor, desaturationFactor * bypassTransition * 0.3);
         return finalColor;
         
-    } else if (config.v4_style_id == 1) { // Lab
-        float luma = dot(col, vec3(0.0, 0.6, 0.4)); 
-        vec3 rodColor = mix(vec3(0.02, 0.05, 0.1), vec3(0.6, 0.7, 0.8), luma) * 0.96;
+    } else if (config.v4_style_id == 1) { // Oklab (formerly "Lab")
+        // Use actual Oklab color space for desaturation
+        vec3 lab = rgbToOklab(col);
+        
+        // Create rod-like color in Oklab space
+        // Dark blue-gray tint with preserved lightness
+        vec3 rodColorLab = vec3(
+            lab.x * 0.96, // Slightly reduce lightness
+            0.0,          // No green-red
+            -0.05         // Slight blue shift
+        );
+        
+        // Convert to RGB and add grain
+        vec3 rodColor = oklabToRgb(rodColorLab);
         rodColor += (rand(uv) - 0.5) * 0.1;
+        
+        // Saccade suppression (darken during rapid eye movement)
         rodColor = mix(rodColor, vec3(0.01), saccadeFactor * 0.9);
         
         // Saliency Modulation (Phase 3): Conservative rod vision relief

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Foveal Scope Calibration - Scrutinizer</title>
+    <meta name="description" content="Calibrate your foveal vision size using our specialized optical tool.">
+    <link href="./calibration.css" rel="stylesheet">
+
+    <!-- PostHog Analytics -->
+    <script>
+        !function (t, e) { var o, n, p, r; e.__SV || (window.posthog && window.posthog.__loaded) || (window.posthog = e, e._i = [], e.init = function (i, s, a) { function g(t, e) { var o = e.split("."); 2 == o.length && (t = t[o[0]], e = o[1]), t[e] = function () { t.push([e].concat(Array.prototype.slice.call(arguments, 0))) } } (p = t.createElement("script")).type = "text/javascript", p.crossOrigin = "anonymous", p.async = !0, p.src = s.api_host.replace(".i.posthog.com", "-assets.i.posthog.com") + "/static/array.js", (r = t.getElementsByTagName("script")[0]).parentNode.insertBefore(p, r); var u = e; for (void 0 !== a ? u = e[a] = [] : a = "posthog", u.people = u.people || [], u.toString = function (t) { var e = "posthog"; return "posthog" !== a && (e += "." + a), t || (e += " (stub)"), e }, u.people.toString = function () { return u.toString(1) + ".people (stub)" }, o = "init capture identify".split(" "), n = 0; n < o.length; n++)g(u, o[n]); e._i.push([i, s, a]) }, e.__SV = 1) }(document, window.posthog || []);
+        posthog.init('phc_cUZalkUiHgfuv7k5hPzhuLhYQkjUWOQBl82pdDgHAmZ', {
+            api_host: 'https://us.i.posthog.com',
+            person_profiles: 'identified_only'
+        });
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Hide results by default, show splash */
+        .state-results {
+            display: none;
+        }
+
+        .state-splash {
+            display: block;
+        }
+
+        .state-running {
+            display: none;
+        }
+
+        /* When running */
+        body.running .state-running {
+            display: block;
+        }
+
+        body.running .state-splash {
+            display: none;
+        }
+
+        body.running .state-results {
+            display: none;
+        }
+
+        body.running #overlay {
+            display: none;
+        }
+
+        /* When results */
+        body.results .state-results {
+            display: block;
+        }
+
+        body.results .state-splash {
+            display: none;
+        }
+
+        body.results .state-running {
+            display: none;
+        }
+
+        body.results #overlay {
+            display: flex;
+        }
+
+        /* Auto-mode only elements */
+        .auto-only {
+            display: none;
+        }
+
+        body.mode-auto .auto-only {
+            display: block;
+        }
+
+        /* Logic-bound styles from source */
+        #crosshair {
+            pointer-events: none;
+        }
+
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        #crosshair::before {
+            width: 2px;
+            height: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        #crosshair::after {
+            width: 16px;
+            height: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .crosshair-idle {
+            opacity: 0.3;
+            transition: all 0.5s ease;
+        }
+
+        .crosshair-active {
+            opacity: 1;
+            filter: drop-shadow(0 0 4px #818cf8);
+            transition: all 0.2s ease;
+        }
+
+        .crosshair-active::before,
+        .crosshair-active::after {
+            background: #818cf8 !important;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-slate-900 text-white antialiased selection:bg-indigo-500 selection:text-white flex flex-col min-h-screen overflow-hidden">
+
+    <!-- Navigation -->
+    <nav id="navbar" class="fixed w-full z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="index.html" class="flex-shrink-0">
+                        <span
+                            class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">Scrutinizer</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content / Visualizer Layer -->
+    <main class="fixed inset-0 z-0">
+        <canvas id="calibration-canvas" class="block w-full h-full"></canvas>
+
+        <!-- HUD Elements -->
+        <div id="circle"
+            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-2 border-white/50 rounded-full pointer-events-none z-10 transition-all duration-75">
+        </div>
+        <!-- Fixation Crosshair -->
+        <div id="crosshair"
+            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-cyan-400 transition-all duration-300 z-20 pointer-events-none drop-shadow-[0_0_8px_rgba(34,211,238,0.8)] filter">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="none"
+                xmlns="http://www.w3.org/2000/svg" class="transform -rotate-12 translate-x-1 translate-y-1">
+                <path d="M5.5 3.5L11.5 19.5L14.5 13.5L20.5 12.5L5.5 3.5Z" stroke="white" stroke-width="2"
+                    stroke-linejoin="round" />
+            </svg>
+        </div>
+        <div id="feedback"
+            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl font-bold opacity-0 pointer-events-none z-30">
+        </div>
+
+        <!-- Contextual Info (Top) - shown when running -->
+        <div id="contextInfo"
+            class="state-running absolute top-20 left-1/2 -translate-x-1/2 bg-slate-900/80 backdrop-blur text-xs sm:text-sm text-slate-300 px-4 py-2 rounded-lg border border-slate-700 pointer-events-none">
+            👁️ Stare at center. Shrink circle until you <em class="text-white font-medium">can't</em> detect when
+            motion resumes in periphery.
+        </div>
+
+        <!-- Controls (Bottom) - shown when running -->
+        <div id="controls"
+            class="state-running absolute left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-4"
+            style="bottom: max(2rem, env(safe-area-inset-bottom) + 1rem);">
+
+            <!-- Mobile Step Controls -->
+            <div class="flex gap-4 sm:hidden">
+                <button id="decrease"
+                    class="w-12 h-12 rounded-full bg-slate-800 border-2 border-slate-600 text-2xl font-bold active:scale-95 transition-transform">−</button>
+                <button id="increase"
+                    class="w-12 h-12 rounded-full bg-slate-800 border-2 border-slate-600 text-2xl font-bold active:scale-95 transition-transform">+</button>
+            </div>
+
+            <!-- Main Control Bar -->
+            <div
+                class="bg-slate-900/90 backdrop-blur border border-slate-700 rounded-xl px-6 py-3 flex items-center gap-6 shadow-xl">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-indigo-400 font-mono"><span id="radiusVal">120</span>px</div>
+                    <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Foveal Radius</div>
+
+                    <!-- Confidence Meter (Auto Only) -->
+                    <div class="auto-only mt-2 w-32 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div id="confidenceBar"
+                            class="h-full bg-gradient-to-r from-indigo-600 to-cyan-400 w-0 transition-all duration-500">
+                        </div>
+                    </div>
+                    <div class="auto-only flex justify-between text-[9px] text-slate-500 mt-1">
+                        <span>Confidence</span>
+                        <span id="confidenceVal">0%</span>
+                    </div>
+                </div>
+                <button id="doneBtn"
+                    class="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-lg transition-colors shadow-lg shadow-indigo-500/20">
+                    Done
+                </button>
+            </div>
+        </div>
+
+        <!-- Settings Toggle (Top Right) - shown when running -->
+        <div id="settingsContainer" class="state-running absolute top-4 right-4 z-20">
+            <button id="settingsBtn"
+                class="p-2 bg-slate-800/80 rounded-full text-slate-400 hover:text-white transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            </button>
+            <div id="settingsPanel"
+                class="hidden absolute top-12 right-0 bg-slate-900/95 border border-slate-700 p-4 rounded-xl shadow-xl w-48">
+                <div class="space-y-4">
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-xs text-slate-400">
+                            <label>Cross Size</label>
+                            <span id="crossVal">5</span>
+                        </div>
+                        <input type="range" id="crossSize" min="2" max="12" step="0.5" value="5"
+                            class="w-full accent-indigo-500">
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-xs text-slate-400">
+                            <label>Density</label>
+                            <span id="densityVal">28</span>
+                        </div>
+                        <input type="range" id="density" min="15" max="50" step="1" value="28"
+                            class="w-full accent-indigo-500">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Unified Overlay (Intro / Done) -->
+    <div id="overlay" class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/90 backdrop-blur-md">
+        <div class="flex min-h-full items-center justify-center p-4">
+
+            <div
+                class="max-w-2xl w-full bg-slate-900 border border-slate-700 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
+                <!-- Noise bg -->
+                <div class="absolute inset-0 bg-noise opacity-10 pointer-events-none"></div>
+
+                <div class="relative z-10">
+                    <!-- Header -->
+                    <h1 class="text-3xl font-bold text-white mb-6">
+                        <span id="headerSplash" class="state-splash">Foveal Scope Calibration</span>
+                        <span id="headerResults" class="state-results text-indigo-400">Calibration Complete</span>
+                    </h1>
+
+                    <!-- Dynamic Content -->
+                    <div class="prose prose-invert text-slate-300 mb-8 leading-relaxed">
+
+                        <!-- Done State: Result -->
+                        <div id="resultsPanel"
+                            class="state-results bg-slate-800/50 border border-slate-700 rounded-xl p-6 mb-6">
+                            <div class="grid grid-cols-2 gap-8 mb-6">
+                                <div class="text-center border-r border-slate-700">
+                                    <div class="text-xs text-slate-400 uppercase tracking-widest font-semibold mb-1">
+                                        Final
+                                        Radius</div>
+                                    <div class="text-5xl font-bold text-white"><span id="finalRadiusVal">0</span><span
+                                            class="text-2xl text-indigo-400 ml-1">px</span></div>
+                                </div>
+                                <div class="text-center auto-only">
+                                    <div class="text-xs text-slate-400 uppercase tracking-widest font-semibold mb-1">
+                                        Confidence</div>
+                                    <div class="text-5xl font-bold text-green-400"><span id="finalConfidence">0%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Performance Chart -->
+                            <div class="w-full h-48 bg-slate-900 rounded-lg border border-slate-700 mb-4 p-2 relative">
+                                <canvas id="results-canvas" class="w-full h-full block"></canvas>
+                                <div class="absolute top-2 left-2 text-[10px] text-slate-500">Staircase History</div>
+                            </div>
+
+                            <p class="text-sm text-slate-400 text-center">
+                                The graph shows your foveal threshold narrowing over time.
+                            </p>
+                        </div>
+
+                        <!-- Intro / Instructions -->
+                        <div id="instructionsPanel"
+                            class="state-splash bg-slate-800/50 rounded-xl p-6 mb-6 border border-slate-700">
+                            <h3 class="text-white font-bold text-lg mb-3 flex items-center gap-2">
+                                <svg class="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Instructions
+                            </h3>
+                            <ul class="list-disc list-inside text-slate-300 space-y-2 text-sm md:text-base">
+                                <li><strong class="text-white">Focus on the center</strong> crosshair.</li>
+                                <li>Use <strong class="text-white">Arrow Keys</strong> to roughly size the circle.</li>
+                                <li>When the <strong class="text-white">crosshair glows blue</strong>, lock your eyes on
+                                    it.
+                                </li>
+                                <li>Press <strong class="text-white">Spacebar</strong> immediately if you see motion
+                                    resume.
+                                </li>
+                                <li>The system will <strong class="text-white">automatically find</strong> your
+                                    threshold.
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- Intro / Science Text -->
+                        <p class="mb-4">
+                            This technique works by generating a field of tiny rotating crosses at a scale tuned to be
+                            just
+                            resolvable by your fovea.
+                        </p>
+                        <p class="mb-4">
+                            The crosses are small enough (~0.13 units) and numerous enough (15 layered fields) that your
+                            <strong>peripheral vision can't resolve them individually</strong>—they blur into grayish
+                            noise.
+                        </p>
+                        <blockquote
+                            class="border-l-4 border-indigo-500 pl-4 italic text-slate-400 my-4 bg-slate-800/50 py-2 pr-2 rounded-r">
+                            "Wherever your fovea lands, suddenly the structure pops into sharp, colorful detail."
+                        </blockquote>
+                        <p class="state-splash">
+                            The pattern exists uniformly everywhere, but your <strong>retina does the blurring</strong>.
+                        </p>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex flex-wrap justify-center gap-4">
+                        <!-- Splash buttons -->
+                        <button id="btnStartAuto"
+                            class="state-splash px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-lg shadow-indigo-500/30 transition-all hover:scale-105">
+                            Start Auto-Calibration
+                        </button>
+                        <button id="btnStartManual"
+                            class="state-splash px-8 py-4 border border-slate-700 text-slate-300 hover:bg-slate-800 font-bold rounded-lg transition-all">
+                            Manual Mode
+                        </button>
+
+                        <!-- Results buttons -->
+                        <button id="btnRestartAuto"
+                            class="state-results px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-lg shadow-indigo-500/30 transition-all hover:scale-105">
+                            Restart Auto
+                        </button>
+                        <button id="btnRestartManual"
+                            class="state-results px-8 py-4 border border-slate-700 text-slate-300 hover:bg-slate-800 font-bold rounded-lg transition-all">
+                            Manual Mode
+                        </button>
+                        <a href="index.html" id="btnBackHome"
+                            class="state-results px-8 py-4 border border-slate-700 text-slate-300 hover:bg-slate-800 font-bold rounded-lg transition-all">
+                            Back to Home
+                        </a>
+                    </div>
+
+                    <!-- Opt-in checkbox for sharing calibration data -->
+                    <div id="shareDataContainer" class="state-splash mt-6 flex items-center justify-center gap-2">
+                        <input type="checkbox" id="shareData" checked class="w-4 h-4 accent-indigo-500 rounded">
+                        <label for="shareData" class="text-sm text-slate-400">
+                            Share my calibration data to help improve Scrutinizer
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="./foveal-calibration.js"></script>
+</body>
+
+</html>

@@ -80,3 +80,29 @@ See `docs/webcontentsview-migration.md` for full migration plan.
 - **Peripheral Movie Artifacts**: ADDRESSED via **Pixel Saliency Map**. The new high-performance saliency system (running in a background Web Worker) now detects high-saliency content (like moving faces in video) and modulates the peripheral distortion to prevent distracting "breathing" artifacts.
 - **Saliency Map Oscillation**: Fixed a conflict where the legacy structure-based saliency generation was fighting with the new pixel-based system. The application now uses the Saliency Worker exclusively.
 
+
+---
+
+## Calibration Challenges (v1.2)
+
+### Electron High-DPI Performance
+- **Issue**: The calibration canvas, which uses intensive `ctx.fillRect` operations (850k+ per frame), causes the Electron Renderer process to freeze or lag significantly on Retina displays (DPR 2.0+), leading to a "static" UI.
+- **Comparison**: The same code runs smoothly in Chrome/Safari on the same hardware. Electron's older Chromium version or specific compositing flags may be the bottleneck.
+- **Mitigation**:
+    - [x] Fix freeze issues (Resolution Cap 1280x800)
+    - [x] Fix crash on launch (Syntax Error)
+    - [ ] Verify calibration flow (User Testing) - **PAUSED (See Known Issues)**
+    - [ ] Confirm PostHog data capture - **Ready for Validation**
+- [x] Verify Implementation <!-- id: 3 -->
+    - [x] Check visual correctness.
+    - [x] Verify functionality (Browser flow active).
+- [x] Refine Content <!-- id: 7 -->
+- **Status**: Improved but still laggy in Electron compared to browser.
+
+### UI State Initialization
+- **Issue**: Removing Alpine.js introduced fragility in state management. Initial CSS classes must be manually applied via `setUIState` before the first render frame, or the UI remains hidden (default state).
+- **Status**: Fixed in v1.2.0 by ensuring initialization order in `foveal-calibration.js`.
+
+### Deployment & Testing
+- **Issue**: Testing "Remote URL" flows in Electron creates a slow feedback loop. Caching issues or deployment lags can mask local fixes.
+- **Status**: "Calibrate Fovea" menu item temporarily disabled in Electron to prevent user frustration until performance parity is achieved.
