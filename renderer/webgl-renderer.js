@@ -15,7 +15,7 @@
         class WebGLRenderer {
             constructor(canvas) {
                 this.canvas = canvas;
-                
+
                 // Initialize WebGL 2 Context
                 const gl = canvas.getContext('webgl2', {
                     alpha: true,
@@ -201,9 +201,9 @@
                 gl.bindTexture(gl.TEXTURE_2D, this.structureMapTexture);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-                // NEAREST filter is important for structure map to keep sharp edges for wireframe mode
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                // LINEAR filter for smooth interpolation (prevents vertical line artifacts)
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
                 // Initialize to WHITE (Full Density) so effects are visible by default before first scan
                 const dummyStructure = new Uint8Array([255, 255, 255, 255]);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, dummyStructure);
