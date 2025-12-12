@@ -76,14 +76,25 @@ button:disabled {
     background-color: var(--input-bg);
     border: 1px solid transparent;
     border-radius: 4px;
-    color: var(--text-color);
+    /* Reduced contrast default state */
+    color: #999;
+    opacity: 0.7;
     padding: 6px 10px;
     font-size: 13px;
     outline: none;
-    transition: background-color 0.2s, border-color 0.2s;
+    transition: all 0.2s ease;
+}
+
+#url-input:hover {
+    opacity: 0.9;
+    color: #ccc;
+    background-color: var(--hover-bg);
 }
 
 #url-input:focus {
+    /* distinct active state */
+    opacity: 1.0;
+    color: var(--text-color);
     background-color: var(--input-focus-bg);
     border-color: var(--accent-color);
 }

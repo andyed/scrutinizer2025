@@ -522,6 +522,16 @@ Scrutinizer supports a custom SVG overlay system for drawing debug information, 
 *   **Coordinate System**: The SVG works in **Logical Pixels** (CSS), while the WebGL renderer works in **Physical Pixels**. You **MUST** divide physical coordinates by `scaleX` (or `dpr`) before passing them to the overlay. See `docs/coordinate_systems.md`.
 
 ### Adding a New Overlay
+
+#### 1. Architecture: Static Implementation, Dynamic Transform
+**CRITICAL PERFORMANCE RULE**: Do NOT update the `cx`, `cy`, or `x,y` attributes of individual elements every frame. This kills performance.
+
+**The Correct Pattern**:
+1.  **Create a Container Group**: Create a `<g>` that holds your entire overlay.
+2.  **Translate the Group**: On `update()`, simply set `transform="translate(x, y)"` on the container.
+3.  **Local Coordinates**: Draw your shapes relative to `(0,0)` inside the group.
+
+#### 2. Implementation Steps
 1.  **Modify `svg-overlay.js`**: Add a new group in `init()`.
     ```javascript
     this.elements.myOverlay = {
@@ -529,14 +539,18 @@ Scrutinizer supports a custom SVG overlay system for drawing debug information, 
         // ... cached elements
     };
     ```
-2.  **Update Logic**: Add rendering logic to `update()`.
+2.  **Build Logic**: If your overlay is complex (like a grid), build it **once** in a `buildMyOverlay()` method. Do not rebuild DOM nodes every frame.
+3.  **Update Logic**:
     ```javascript
-    if (this.config.showMyOverlay) {
-        this.elements.myOverlay.group.style.removeProperty('display');
-        // Update positions...
+    update(x, y, ...) {
+        if (this.config.showMyOverlay) {
+            this.elements.myOverlay.group.style.removeProperty('display');
+            // PERFORMANCE: Move the whole group
+            this.elements.myOverlay.group.setAttribute('transform', `translate(${x}, ${y})`);
+        }
     }
     ```
-3.  **Aesthetics**: Use `shape-rendering="geometricPrecision"` for crisp lines.
+4.  **Filters**: Avoid applying filters (like Drop Shadows) to moving groups. Rasterizing filters on moving elements is extremely expensive. Apply filters to static elements only.
 
 ### Future Roadmap
 We plan to support "Per-Mode Overlays" (e.g., a Cyberpunk hud for Mode 4, a Wireframe grid for Mode 3). See `ROADMAP.md`.

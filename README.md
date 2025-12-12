@@ -135,7 +135,7 @@ The new browser toolbar provides:
 ### Menu Structure
 Access all features via **Simulation** menu:
 - **Foveal**: Toggle, Radius (6 sizes), Shape (4 ratios)
-- **Peripheral**: Intensity (5 levels), Mongrel Mode, Chromatic Aberration
+- **Peripheral**: Intensity (5 levels), Effect Type, Chromatic Aberration
 - **Behavior**: Aesthetic Mode (5 styles), Visual Memory (4 modes)
 - **Content Analysis**: Enable/Show Structure Map, Enable/Show Saliency Map
 
@@ -182,7 +182,7 @@ Research into exactly how the periphery is perceived has progressed in recent ye
 > Scrutinizer is intentionally **approximate** and should be used as a **design constraint model**, not a precise physiological instrument.
 
 - It models **retinal input constraints**, not the brain's transsaccadic integration.
-- **Current implementation** uses Box Sampling with Noise, not full "Mongrel Theory" texture synthesis.
+- **Current implementation** uses Box Sampling with Noise ("Mongrel Approximation"), not full "Mongrel Theory" texture synthesis. We aspire to full Mongrel textures, but they are currently too computationally expensive for real-time 60fps rendering in the browser.
 - It assumes a fixed relationship between screen pixels and **visual angle**.
 
 ---

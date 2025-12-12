@@ -625,7 +625,8 @@ The "Feature Extractor" stage determines *how* the image is warped.
 -   **Operation**: Calculates `distortedUV` and `displacement`.
 -   **Modes**:
     -   **Noise**: Fluid, continuous distortion (e.g., Double Vision).
-    -   **Shatter**: Blocky, discontinuous displacement (e.g., Default).
+    -   **Mongrel Approximation** (formerly "Shatter"): Blocky, discontinuous displacement (e.g., Default).
+        > **Note:** This is a statistical approximation of the "Mongrel" texture theory. We aspire to full texture synthesis, but it is currently too expensive for real-time performance.
     -   **None**: No distortion (e.g., Blueprint, Cyberpunk).
 
 ### Stage 3: V4 (Aesthetics & Style)

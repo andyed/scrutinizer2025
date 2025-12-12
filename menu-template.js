@@ -327,10 +327,10 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             ]
                         },
                         {
-                            label: 'Mongrel Mode',
+                            label: 'Effect Type',
                             submenu: [
                                 {
-                                    label: 'Shatter (Static)',
+                                    label: 'Mongrel Approximation',
                                     type: 'radio',
                                     checked: true,
                                     click: () => sendToOverlays('menu:set-mongrel-mode', 1)
@@ -454,7 +454,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
 
                 { type: 'separator' },
                 {
-                    label: 'Debug: Show Boundary',
+                    label: 'Visual Overlay',
                     submenu: [
                         {
                             label: 'Off',
@@ -463,7 +463,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             click: () => sendToOverlays('menu:set-debug-boundary', 0)
                         },
                         {
-                            label: 'Fovea Only (Reticle)',
+                            label: 'Fovea Only',
                             type: 'radio',
                             checked: false,
                             click: () => sendToOverlays('menu:set-debug-boundary', 1)
@@ -475,7 +475,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             click: () => sendToOverlays('menu:set-debug-boundary', 2)
                         },
                         {
-                            label: 'Radial Grid (Hi-Tech)',
+                            label: 'Fovea + Parafovea + Periphery',
                             type: 'radio',
                             checked: false,
                             click: () => sendToOverlays('menu:set-debug-boundary', 3)
