@@ -295,8 +295,11 @@ To simulate the brain's pre-attentive grouping of visual elements, the renderer 
 
 The Saliency Map is generated using a **center-surround mechanism** (Difference-of-Gaussians) for biologically accurate attention detection.
 
-**Algorithm** (Itti-Koch-Niebur Model):
-1. **Feature Extraction**: Compute Intensity (I), Red-Green (RG), Blue-Yellow (BY) opponent channels
+**Algorithm** (Itti-Koch-Niebur Model - Oklab Adapted):
+1. **Feature Extraction**: Convert to Oklab space:
+   - **Intensity (I)**: Oklab `L` Channel (Lightness).
+   - **Red-Green (RG)**: Oklab `a` Channel Magnitude (`|a|`).
+   - **Blue-Yellow (BY)**: Oklab `b` Channel Magnitude (`|b|`).
 2. **Multi-Scale Gaussian Pyramid**: 
    - Fine scale: σ=1.0 (captures details)
    - Coarse scale: σ=3.0 (captures context)

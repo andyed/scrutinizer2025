@@ -39,6 +39,36 @@ function generateGaussianKernel(sigma) {
 }
 
 /**
+* Convert sRGB component to linear RGB
+*/
+function srgbToLinear(c) {
+    if (c <= 0.04045) {
+        return c / 12.92;
+    } else {
+        return Math.pow((c + 0.055) / 1.055, 2.4);
+    }
+}
+
+/**
+* Convert linear sRGB to Oklab
+*/
+function linearSrgbToOklab(r, g, b) {
+    const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+    const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+    const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+
+    const l_ = Math.cbrt(l);
+    const m_ = Math.cbrt(m);
+    const s_ = Math.cbrt(s);
+
+    return {
+        L: 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+        a: 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+        b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
+    };
+}
+
+/**
  * Horizontal blur pass (separable)
  */
 function blurHorizontal(src, dst, width, height, kernel) {
@@ -168,22 +198,24 @@ self.onmessage = function (e) {
     const len = width * height;
 
     // Feature maps
-    const I = new Float32Array(len);   // Intensity
-    const RG = new Float32Array(len);  // Red-Green opponency
-    const BY = new Float32Array(len);  // Blue-Yellow opponency
+    const I = new Float32Array(len);   // Intensity (Oklab L)
+    const RG = new Float32Array(len);  // Red-Green (Oklab |a|)
+    const BY = new Float32Array(len);  // Blue-Yellow (Oklab |b|)
 
-    // PASS 1: Extract features
+    // PASS 1: Extract features using Oklab
     for (let i = 0; i < len; i++) {
-        const r = pixels[i * 4] / 255.0;
-        const g = pixels[i * 4 + 1] / 255.0;
-        const b = pixels[i * 4 + 2] / 255.0;
+        // Normalize 0-255 to 0-1 and Linearize
+        const rLin = srgbToLinear(pixels[i * 4] / 255.0);
+        const gLin = srgbToLinear(pixels[i * 4 + 1] / 255.0);
+        const bLin = srgbToLinear(pixels[i * 4 + 2] / 255.0);
 
-        // Intensity (ITU-R BT.709)
-        I[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        // Convert to Oklab
+        const lab = linearSrgbToOklab(rLin, gLin, bLin);
 
-        // Color Opponency
-        RG[i] = Math.abs(r - g);
-        BY[i] = Math.abs(b - (r + g) / 2.0);
+        // Feature Mapping
+        I[i] = lab.L;              // Lightness matches Intensity
+        RG[i] = Math.abs(lab.a);   // Magnitude of Red-Green opponent
+        BY[i] = Math.abs(lab.b);   // Magnitude of Blue-Yellow opponent
     }
 
     // PASS 2: Compute center-surround for each feature
@@ -212,6 +244,8 @@ self.onmessage = function (e) {
     const norm_BY = normalizeFeature(cs_BY);
 
     // PASS 4: Combine normalized features with weights
+    // Oklab provides cleaner perceptual separation, so equal weights often work well,
+    // but we'll stick to established saliency weights.
     const W_I = 0.3;
     const W_RG = 0.35;
     const W_BY = 0.35;

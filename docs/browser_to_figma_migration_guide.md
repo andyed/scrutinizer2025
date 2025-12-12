@@ -153,11 +153,18 @@ The `ScrutinizerEngine.ts` contains an **inlined** version of `peripheral.frag`.
 
 ### Window Resizing
 - **Context**: Figma plugins do not have native window chrome resizing enabled by default in the same way standard windows do.
+- **Consistent UI**: The Figma plugin now matches the `scrutinizer-www` aesthetic.
 - **Solution**: You must implement a custom "Corner Resizer" in the UI.
   - Listen for drag events on a custom handle.
   - Send `{ type: 'RESIZE_UI', width, height }` to `code.ts`.
   - `code.ts` calls `figma.ui.resize(w, h)`.
 - **Note**: Ensure your UI is responsive (e.g., scrollable toolbar) to handle small sizes gracefully.
+
+## Work Log
+
+For a detailed history of changes and updates, please refer to the release notes:
+- [Release Notes v1.3](../docs/release_notes_v1.3.md)
+- [Release Notes v1.4](../docs/release_notes_v1.4.md)
 
 ## Checklist for Updates
 - [ ] Port shader logic functions.
