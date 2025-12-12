@@ -10,6 +10,11 @@ The debug boundary system has been overhauled and renamed to **Visual Overlay**.
 - **Linear Spacing**: The radial grid now uses evenly spaced rings to match linear acuity reduction, replacing the previous exponential spacing.
 - **Variable Stroke Width**: Grid lines now become thinner as they move further from the fovea, adding depth and reducing visual clutter in the far periphery.
 
+### 🚫 Inhibition of Return
+A new Visual Memory mode that mimics the brain's tendency to de-prioritize recently visited locations.
+- **New Mode**: Available under `Visual Memory > Inhibition of Return (10 fixations)`.
+- **Function**: Recently fixated areas become **suppressed** (more distorted) rather than cleared, simulating a drop in saliency. This forces the user to seek new information rather than re-fixating on old content.
+
 ### ⚡️ 10x Performance Boost for Overlays
 We addressed significant lag in the Radial Grid overlay.
 - **Group Translation**: The grid is now treated as a single rigid object, transforming the entire group instead of 50+ individual elements per frame.
