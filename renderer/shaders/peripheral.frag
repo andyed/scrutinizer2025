@@ -327,6 +327,22 @@ LGN_Signal processLGN(vec2 uv, ModeConfig config, float dist, float fovea_radius
         signal.suppressionFactor *= mix(1.0, 0.3, signal.saliency);
     }
     
+    // 5. Inhibition of Return (Gating Suppression)
+    // If u_useMask == 2.0, we are in Inhibition Mode.
+    // Visited areas (high mask value) should be SUPPRESSED (hidden from LGN).
+    // This removes their structural/salient protection, making them subject to full distortion.
+    if (u_useMask > 1.5) {
+        float rawMask = texture(u_maskTexture, uv).r;
+        float inhibition = smoothstep(0.0, 0.5, rawMask);
+        
+        // Suppress signals based on inhibition level
+        signal.saliency *= (1.0 - inhibition);
+        signal.density *= (1.0 - inhibition);
+        signal.rhythm *= (1.0 - inhibition);
+        // We do NOT suppress suppressionFactor itself yet, because that is pure foveal distance.
+        // But by killing saliency/density, we ensure "Structure Masking" and "Saliency Gating" fail.
+    }
+
     return signal;
 }
 
@@ -356,8 +372,10 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     // VISUAL MEMORY MODULATION
     // If this area is remembered (memoryStrength > 0), we must reduce distortion
     // to ensure the underlying geometry aligns with the clear overlay.
-    // memoryStrength 1.0 -> strength 0.0
-    strength *= (1.0 - memoryStrength);
+    // ONLY APPLY IN STANDARD MODE (1.0). In Inhibition mode (2.0), we want distortion!
+    if (u_useMask < 1.5) {
+        strength *= (1.0 - memoryStrength);
+    }
     
     signal.distortionStrength = strength;
     
@@ -912,13 +930,16 @@ void main() {
         // Visual Memory Mask (Post-Process Overlay)
         // We still overlay the clear image to ensure pixel-perfect clarity,
         // but now the underlying distortion (v1) should align with it.
-        if (memoryStrength > 0.9) {
+        // ONLY IN STANDARD MODE (u_useMask < 1.5)
+        if (u_useMask < 1.5 && u_useMask > 0.5) {
+            if (memoryStrength > 0.9) {
             // Use sampleSource for guaranteed correct color
             vec4 clearColor = sampleSource(uv);
             color.rgb = clearColor.rgb;
         } else if (memoryStrength > 0.0) {
             vec4 clearColor = sampleSource(uv);
             color.rgb = mix(color.rgb, clearColor.rgb, memoryStrength);
+        }
         }
     }
     

@@ -663,6 +663,18 @@ To simulate the brain's ability to "hold" visual information, Scrutinizer implem
 -   **Capacity**: The buffer size is configurable (`visualMemoryLimit`). When full, the oldest memory fades out.
 -   **Rendering**:
     -   The buffer is rendered to a **Visual Memory Mask** (`u_maskTexture`).
-    -   This mask is used in the fragment shader to mix between the processed peripheral view and the clear source image.
+    -   This mask is used in the fragment shader to modulate distortion signals.
     -   **Blend Mode**: `Screen` blending is used to accumulate memories, ensuring that overlapping memories remain visible and don't darken each other.
+
+### Modes
+
+#### 1. Standard Persistence (Foveal Protection)
+*   **Default Behavior**: Remembered areas are rendered *clearly*, creating a "clean" overlay on top of the distorted periphery.
+*   **Biological Mechanism**: Mimics short-term memory (iconic memory) where the brain retains high-fidelity details of recently visited locations to stitch together a coherent scene.
+*   **Implementation**: `u_useMask = 1.0`. The mask reduces distortion strength: `strength *= (1.0 - memoryStrength)`.
+
+#### 2. Inhibition of Return (Saliency Suppression)
+*   **Behavior**: Recently visited areas are rendered with *increased* distortion or lower saliency.
+*   **Biological Mechanism**: Mimics the "Inhibition of Return" phenomenon, where the attention system discourages re-orienting to a recently visited location to facilitate efficient foraging/search.
+*   **Implementation**: `u_useMask = 2.0`. The mask suppresses LGN signals (Saliency, Density) but *not* V1 distortion. This effectively "masks out" the visited area from the Saliency/Structure maps, causing it to lose any protection it might have had (e.g., text protection), forcing it to be processed by the raw peripheral distortion.
 

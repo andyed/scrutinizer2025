@@ -414,6 +414,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     label: 'Infinite',
                                     type: 'radio',
                                     click: () => sendToOverlays('menu:set-visual-memory', -1)
+                                },
+                                { type: 'separator' },
+                                {
+                                    label: 'Inhibition of Return (10 fixations)',
+                                    type: 'radio',
+                                    click: () => sendToOverlays('menu:set-visual-memory', 20)
                                 }
                             ]
                         }

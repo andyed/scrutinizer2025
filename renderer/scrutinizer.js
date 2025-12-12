@@ -88,14 +88,16 @@
             this.lastFrameBitmap = null;
 
             // Visual Memory
-            this.visualMemoryLimit = config.visualMemoryLimit !== undefined ? Number(config.visualMemoryLimit) : 0; // 0 = Off, -1 = Infinite, >0 = Count
-            console.log(`[Scrutinizer] Initial Visual Memory Limit: ${this.visualMemoryLimit} (Type: ${typeof this.visualMemoryLimit})`);
             this.visualMemoryBuffer = []; // Array of {x, y, radius, timestamp}
             this.fixationStartTime = 0;
             this.isFixating = false;
             this.maskCanvas = document.createElement('canvas');
             this.maskCtx = this.maskCanvas.getContext('2d', { alpha: true }); // Enable alpha for proper blending
             this.maskDirty = true;
+
+            // Set limit AFTER buffers are ready
+            const initLimit = config.visualMemoryLimit !== undefined ? config.visualMemoryLimit : 0;
+            this.setVisualMemoryLimit(initLimit);
 
             // Velocity tracking for fixation detection
             this.lastMouseX = 0;
@@ -629,7 +631,7 @@
                 this.config.caStrength,
                 0.0, // Force disable shader debug (we use SVG now)
                 this.config.debugStructure, // New arg
-                useMask ? 1.0 : 0.0,
+                useMask ? (this.inhibitionMode ? 2.0 : 1.0) : 0.0,
                 this.config.mongrelMode,
                 this.aestheticMode,
                 this.currentVelocity,
@@ -710,12 +712,24 @@
         }
 
         setVisualMemoryLimit(limit) {
-            this.visualMemoryLimit = Number(limit);
-            console.log('[Scrutinizer] Visual Memory Limit set to:', this.visualMemoryLimit, `(Type: ${typeof this.visualMemoryLimit})`);
+            const rawLimit = Number(limit);
+            ipcRenderer.send('log:renderer', `[Scrutinizer] setVisualMemoryLimit called with: ${limit} -> ${rawLimit}`);
+            console.log('[Scrutinizer] Visual Memory Limit set to:', rawLimit);
+
+            if (rawLimit === 20) {
+                this.visualMemoryLimit = 10;
+                this.inhibitionMode = true;
+                ipcRenderer.send('log:renderer', '[Scrutinizer] Mode: Inhibition of Return');
+                console.log('[Scrutinizer] Mode: Inhibition of Return');
+            } else {
+                this.visualMemoryLimit = rawLimit;
+                this.inhibitionMode = false;
+            }
 
             // Always reset memory when changing modes to prevent "ghosts"
             // e.g. switching from Infinite to Limited should clear the infinite mask
             this.resetVisualMemory();
+            ipcRenderer.send('log:renderer', `[Scrutinizer] Visual Memory Reset. Current Buffer Size: ${this.visualMemoryBuffer.length}`);
         }
 
         resetVisualMemory() {
