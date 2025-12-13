@@ -123,18 +123,21 @@ Effect strength
 
 ---
 
-## 4. Domain warping (positional uncertainty)
+## 4. Domain Warping & Mipmap Pooling (Crowding)
 
-The shader models the growth of receptive field size with eccentricity using **domain warping**:
+The shader models the growth of receptive field size with eccentricity using **domain warping** and **pooling**:
 
 1. A coarse multi‑octave noise field (`warpVector`) is sampled in an aspect‑corrected space.
 2. The amplitude of this warp is increased in the periphery but kept small and vertically “crushed” in the parafovea to preserve rough baselines and vertical strokes.
 3. This warp is multiplied by `warpStrength` and the global intensity.
 
+**Crowding Simulation (Mipmap Bias Pooling)**:
+In v1.3+, we introduced **Mipmap Bias Pooling**. Instead of simply distorting pixel coordinates (which preserves high-frequency detail in the wrong place), the shader now increases the Texture LOD (Level of Detail) bias based on eccentricity. This forces the GPU to sample a lower-resolution 'summary statistic' of the texture. When combined with domain warping, this physically simulates **interactional crowding**: features from adjacent letters merge into a 'mongrel' texture, preserving the word shape while destroying legibility.
+
 Intuition:
 
 - In the parafovea, text looks like it is seen through shimmering heat haze.
-- In the far periphery, letters collide and smear, but the image does not completely melt.
+- In the far periphery, letters collide and smear (mongrelize), but the image does not completely melt.
 
 ---
 
@@ -384,8 +387,8 @@ if (u_enable_saliency_modulation > 0.5) {
 
 ### 5. Validation Results
 
-**Observed Behavior** (confirmed via A/B comparison):
--   **Social media icons** (Twitter, etc.): Visibly clearer than surrounding text
+**Observed Behavior** :
+-   **Social media icons** (Twitter, etc.): Visibly clearer than surrounding text (verified pop-out effect)
 -   **Logos** (Bitrix24): Resist warping/jitter compared to background
 -   **UI elements**: Retain structural integrity for saccade guidance
 -   **Body text**: Full peripheral degradation applied normally
@@ -459,9 +462,9 @@ To mitigate "breathing" artifacts on full-motion video, the Saliency Map is used
 ## Technical Details
 
 ### Performance
-- **Saliency computation**: ~2-5ms at 1920×1080 (25% resolution)
-- **GPU texture**: +1 texture unit (3 of 32 used)
-- **Memory overhead**: ~1MB at 1080p (RGBA8 texture)
+- **Saliency Computation**: Separable Gaussian Blur (O(2n) complexity).
+- **Latency**: <5ms @ 256x256 resolution (running in Web Worker).
+- **Memory**: Double-buffered architecture prevents read/write hazards.
 
 ### Edge Cases
 - **Blank pages**: Uniform low saliency (full degradation)
@@ -623,6 +626,8 @@ The current implementation hard‑codes the key ratios:
 
 - `parafovea_radius / fovea_radius = 2.5` (biological macula: 0-5°)
 - `periphery_start / fovea_radius = 2.5` (same as parafovea boundary)
+
+> **Note**: "Calibrated Visual Angles" (Pixels Per Degree) is now implemented via the Foveal Calibration tool, allowing the simulation to adapt to physical monitor size rather than just arbitrary pixel radii.
 
 In future versions, these can be exposed as user‑tunable parameters by mapping UI sliders to:
 
