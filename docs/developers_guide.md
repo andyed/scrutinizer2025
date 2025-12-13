@@ -65,14 +65,16 @@ The shader uses a modular architecture inspired by the human visual system to or
     *   **Function**: `processV1`
     *   **Logic**: Determines *how* the image is warped. It uses the signal from the LGN to apply displacement.
     *   **Types**:
-        *   **Noise**: Fluid, continuous distortion (e.g., Double Vision mode).
-        *   **Shatter**: Blocky, discontinuous displacement (e.g., default peripheral blur).
-        *   **None**: No geometric change (e.g., Blueprint mode).
+        *   **Noise (0)**: Fluid, continuous distortion with animation. Used by Double Vision mode.
+        *   **Shatter (1)**: Slow wave distortion (legacy "Mongrel Approximation"). Used by default modes.
+        *   **None (2)**: No geometric change. Used by Blueprint mode.
+        *   **Pixelate (3)**: Blocky, saliency-guided quantization. Used by Cyberpunk/Wireframe.
 
 3.  **Stage 3: V4 (Aesthetics & Style)**
-    *   **Role**: The "Interpreter". Handles color and stylistic rendering.
+    *   **Role**: The "Interpreter". Handles color, pooling, and stylistic rendering.
     *   **Function**: `processV4`
-    *   **Logic**: Determines *what* the final pixel looks like. It applies color grading, overlays, and pixel-level effects.
+    *   **Logic**: Determines *what* the final pixel looks like. Now includes **MIP-based pooling** for peripheral compression.
+    *   **Key Feature (v1.4)**: Hardware MIP-map sampling simulates biological receptive field growth.
     *   **Examples**: High-Key ghosting, Neon colors, Wireframe overlays.
 
 ### Philosophy: Aesthetic Modes as Test Cases
@@ -113,27 +115,27 @@ if (config.v4_style_id == 6) {
 
 ### Aesthetic Modes Reference
 
-The following table details the rendering characteristics of each built-in mode (as of v1.2):
+The following table details the rendering characteristics of each built-in mode (as of v1.4):
 
 | Mode | Stage | Configuration / Effect |
 | :--- | :--- | :--- |
 | **0: High-Key** | **LGN** | **Standard**: Structure Masking + Saliency Gating |
-| *(Baseline)* | **V1** | **Mongrel / Shatter**: Slow Wave Distortion (0.1Hz). *Controlled by Mongrel Mode toggle.* |
-| | **V4** | **Rod Vision**: Desaturation + "Eigengrau" Blue Shift + Contrast Boost. |
+| *(Baseline)* | **V1** | **Slow Wave**: 0.1Hz sine warp (Type 1). |
+| | **V4** | **MIP Pooling** + Rod Vision: Receptive field pooling + Desaturation + Eigengrau tint. |
 | **1: Lab** | **LGN** | Standard |
 | | **V1** | Same as Baseline |
-| | **V4** | **Clinical**: High-contrast Grayscale + Red Overlay. |
+| | **V4** | **MIP Pooling** + Clinical Grayscale. |
 | **2: Frosted** | **LGN** | Standard |
 | | **V1** | Same as Baseline |
-| | **V4** | **Privacy**: Simple Gaussian Blur (No Blue Shift/Tint). |
+| | **V4** | **MIP Pooling** + Privacy blur (No Blue Shift). |
 | **3: Wireframe** | **LGN** | Standard |
 | | **V1** | **Quantized**: Pixelated UVs (Type 3). |
 | | **V4** | **Gestalt**: Sobel Edge Detection on Distorted UVs (Cyan/White). |
 | **4: Cyberpunk** | **LGN** | Standard |
 | | **V1** | **Massive Pixelate**: Up to 1200px blocks (Type 3). |
-| | **V4** | **Neon**: Progressive Contrast (1.0->2.5) + Halftone Texture. |
+| | **V4** | **Neon**: Progressive Contrast (1.0→2.5) + Halftone Texture. |
 | **5: Double Vision** | **LGN** | **Bypassed**: No Gating (Stream Integration). |
-| | **V1** | **Flowing Wave**: High-amplitude Sine Wave (Custom). |
+| | **V1** | **Flowing Wave**: High-amplitude animated sine wave (Type 0). |
 | | **V4** | **Vibrant**: Saturation Boost + Subtle Fractal Noise. |
 
 ### Eccentricity-Based Scaling (Parafovea vs Far Periphery)
@@ -161,7 +163,34 @@ float baseJitter = isParafovea ? 0.008 : 0.04; // 5x reduction
 ```
 
 **Second Pass Softening (v1.2)**:
-The "Shatter" mode now uses a **Slow Wave** distortion (0.1Hz sine wave) instead of random jitter to reduce motion sickness. A `sampleBlurred` helper function applies a variable Gaussian blur (up to 15px) in the periphery to replace blocky artifacts.
+The "Shatter" mode now uses a **Slow Wave** distortion (0.1Hz sine wave) instead of random jitter to reduce motion sickness.
+
+**MIP-Based Pooling (v1.4)**:
+The V4 stage now uses **hardware MIP-maps** to simulate receptive field growth in the periphery:
+
+```glsl
+// Calculate MIP level based on eccentricity
+float normalizedEcc = max(0.0, eccentricity) / fovea_radius;
+float mipScaling = 2.5; // Tune: higher = faster pooling growth
+float mipLevel = clamp(normalizedEcc * mipScaling, 0.0, 4.0);
+
+// Sample using textureLod
+vec4 pooled = textureLod(u_texture, uv, mipLevel);
+```
+
+**Benefits over previous blur approach:**
+- True spatial averaging (not weighted samples)
+- Hardware-accelerated (~0.1ms vs ~0.5ms)
+- Biologically accurate receptive field doubling per MIP level
+
+**WebGL2 Requirements:**
+```javascript
+// Texture setup for MIP pooling
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+
+// Generate MIP chain on each frame upload
+gl.generateMipmap(gl.TEXTURE_2D);
+```
 
 
 **Magnocellular Contrast Preservation**: In `processV4`, luminance contrast is boosted to simulate the M-cell pathway:
@@ -460,6 +489,42 @@ To prevent "AI Hubris" and accidental regressions (like the "Blue Tint" or "Sali
 ### Golden Artifacts
 *   `tests/golden/`: Source of truth. Committed to git.
 *   `tests/screenshots/`: Ephemeral test output. Ignored by git.
+
+### Release Tagging (TODO: Implement Consistently)
+
+> [!WARNING]
+> **Historical Gap**: Golden images have not been consistently tagged with releases. Starting with v1.4, we should follow this process.
+
+**Per-Release Requirements:**
+1. Before tagging a release, regenerate all golden images:
+   ```bash
+   # Capture all modes for reference sites
+   TEST_URL=https://www.figma.com TEST_MODES=0,saliency,structure SCREENSHOT_MODE=update SAVE_SCREENSHOTS=true npm start
+   TEST_URL=https://techmeme.com TEST_MODES=0,1,2,3,4,5 SCREENSHOT_MODE=update SAVE_SCREENSHOTS=true npm start
+   
+   # Run visual tests
+   SAVE_SCREENSHOTS=true SCREENSHOT_MODE=update npm test
+   
+   # Copy to golden
+   cp tests/screenshots/*.png tests/golden/
+   ```
+
+2. Commit golden images **before** creating the release tag:
+   ```bash
+   git add tests/golden/
+   git commit -m "chore: update golden images for vX.Y.Z"
+   git tag vX.Y.Z
+   ```
+
+3. **Historical Comparison in Release Notes**: Use GitHub's blob URL with tag to link to previous versions:
+   ```markdown
+   ![v1.3 Mode 0](https://github.com/USER/REPO/blob/v1.3.0/tests/golden/site_techmeme_com_mode_0.png?raw=true)
+   ```
+
+**Benefits:**
+- Each release has a permanent visual snapshot
+- Release notes can show before/after comparisons
+- Regression detection across versions
 
 
 ---

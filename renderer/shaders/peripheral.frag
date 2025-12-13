@@ -41,8 +41,9 @@ out vec4 fragColor;
 // Centralizes sampling of the source capture to ensure consistent color handling.
 // Electron captures are BGRA, but WebGL treats them as RGBA.
 // We MUST swap R and B here to get the correct color.
+// Uses textureLod(0) for consistency with MIP-based pooling (avoids subtle filtering differences).
 vec4 sampleSource(vec2 uv) {
-    vec4 col = texture(u_texture, uv);
+    vec4 col = textureLod(u_texture, uv, 0.0);
     float temp = col.r;
     col.r = col.b;
     col.b = temp;
@@ -78,6 +79,45 @@ vec4 sampleBlurred(vec2 uv, float radius) {
     totalWeight += 0.6;
     
     return sum / totalWeight;
+}
+
+// === HELPER: MIP-BASED POOLING (Mongrel Tier 1) ===
+// Uses hardware MIP-maps to approximate biological receptive field pooling.
+// As eccentricity increases, we sample from lower-resolution MIP levels,
+// simulating the larger pooling regions in peripheral vision.
+// 
+// Unlike blur, MIP pooling:
+// - Genuinely averages larger areas (not just weighted samples)
+// - Is essentially free (hardware-accelerated)
+// - Provides consistent "pooling region" sizes at each eccentricity
+//
+// mipLevel: 0 = full resolution (fovea), ~4 = 16x16 pooling (far periphery)
+vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
+    // Calculate MIP level based on eccentricity
+    // Eccentricity is normalized distance from fovea edge
+    // At fovea edge (eccentricity=0): mipLevel=0 (full res)
+    // At far periphery (eccentricity~0.5): mipLevel=4 (16x16 pooling)
+    
+    float normalizedEcc = max(0.0, eccentricity) / fovea_radius;
+    
+    // Biological: receptive field size doubles every ~2° of eccentricity
+    // We map this to MIP levels: each level doubles pooling region
+    // Scaling factor adjusts how quickly we reach max pooling
+    float mipScaling = 2.5; // Tune: higher = faster pooling growth
+    float maxMipLevel = 4.0; // Cap at 16x16 pooling (level 4)
+    
+    float mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
+    
+    // Sample using textureLod with computed MIP level
+    // Note: textureLod performs trilinear filtering between MIP levels
+    vec4 col = textureLod(u_texture, uv, mipLevel);
+    
+    // Apply BGRA -> RGBA swap (same as sampleSource)
+    float temp = col.r;
+    col.r = col.b;
+    col.b = temp;
+    
+    return col;
 }
 
 // === NOISE HELPERS ===
@@ -534,46 +574,46 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
 
 // --- STAGE 3: V4 (Aesthetics) ---
 vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float parafovea_radius, float saccadeFactor) {
-    // === VARIABLE BLUR (Gaussian Roll-off) ===
-    // Calculate blur radius based on eccentricity
-    // Use smooth exponential curve to avoid abrupt transitions
-    float blurRadius = 0.0;
+    // === MIP-BASED POOLING (Mongrel Tier 1) ===
+    // Uses hardware MIP-maps to approximate biological receptive field growth.
+    // Replaces the previous 5-tap blur with true pooling.
     
-    if (dist > fovea_radius) {
-        // Smooth exponential blur from fovea to far periphery
-        // No hard boundary at parafovea - continuous curve
-        float eccentricity = dist - fovea_radius;
-        
-        // Exponential curve: blur = a * (e^(b*x) - 1)
-        // Tuned to give ~3px at parafovea boundary, then accelerate
-        float blurScale = 8.0;
-        float blurRate = 2.0;
-        blurRadius = blurScale * (exp(eccentricity * blurRate) - 1.0);
-        
-        // Cap maximum blur to prevent excessive softness
-        blurRadius = min(blurRadius, 20.0);
-    }
+    float eccentricity = max(0.0, dist - fovea_radius);
     
-    // Use sampleBlurred instead of raw sampleSource
-    vec3 col = sampleBlurred(v1.distortedUV, blurRadius).rgb;
+    // Always sample at MIP level 0 for fovea (guaranteed sharp)
+    vec3 foveaCol = sampleSource(v1.distortedUV).rgb;
+    
+    // For periphery, use MIP pooling
+    // Intensity modulates the pooling strength (lower intensity = less aggressive pooling)
+    vec3 pooledCol = sampleMIPPooled(v1.distortedUV, eccentricity * u_intensity, fovea_radius).rgb;
+    
+    // Smooth blend from fovea to periphery to eliminate visible boundary
+    // Blend zone: from fovea_radius to fovea_radius * 1.1 (10% transition band)
+    // Intensity also modulates the blend factor to reduce pooling at low settings
+    float baseBlend = smoothstep(0.0, fovea_radius * 0.1, eccentricity);
+    float blendFactor = baseBlend * u_intensity;
+    vec3 col = mix(foveaCol, pooledCol, blendFactor);
     
     // === MAGNOCELLULAR PATHWAY: Luminance Contrast Preservation ===
     // M-cells are highly sensitive to luminance (brightness) but blind to color/detail.
     // Even when the image is heavily distorted, the M-pathway preserves contrast.
     // This ensures a blue link on white background stays clearly distinct.
-    if (dist > fovea_radius) {
+    // Note: Uses smooth ramp instead of hard boundary to avoid visible ring artifacts.
+    if (eccentricity > 0.001) {
         vec3 cleanSample = sampleSource(uv).rgb; // Original, undistorted
         float cleanLuma = dot(cleanSample, vec3(0.299, 0.587, 0.114));
         float distortedLuma = dot(col, vec3(0.299, 0.587, 0.114));
         
-    // Prevent division by zero
+        // Prevent division by zero
         float lumaRatio = cleanLuma / max(distortedLuma, 0.01);
         
-        // Smooth contrast preservation falloff (no hard boundary)
-        // Gradually reduce from 0.6 to 0.3 across parafovea-periphery transition
-        float eccentricity = dist - fovea_radius;
+        // Smooth contrast preservation: ramp in over same blend zone as MIP pooling
+        // This ensures no additional visible boundary
+        float contrastRamp = smoothstep(0.0, fovea_radius * 0.1, eccentricity);
+        
+        // Gradually reduce preservation strength with distance
         float contrastPreservation = mix(0.6, 0.3, smoothstep(0.0, parafovea_radius - fovea_radius, eccentricity));
-        col *= mix(1.0, lumaRatio, contrastPreservation);
+        col *= mix(1.0, lumaRatio, contrastPreservation * contrastRamp);
     }
     
     // === ARCHITECTURAL GUARANTEE: FOVEA PROTECTION ===

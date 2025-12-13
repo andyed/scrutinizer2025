@@ -182,7 +182,7 @@ Research into exactly how the periphery is perceived has progressed in recent ye
 > Scrutinizer is intentionally **approximate** and should be used as a **design constraint model**, not a precise physiological instrument.
 
 - It models **retinal input constraints**, not the brain's transsaccadic integration.
-- **Current implementation** uses Box Sampling with Noise ("Mongrel Approximation"), not full "Mongrel Theory" texture synthesis. We aspire to full Mongrel textures, but they are currently too computationally expensive for real-time 60fps rendering in the browser.
+- **Current implementation** uses MIP-based pooling ("Mongrel Approximation Tier 1"), which approximates receptive field growth using hardware MIP-maps. This is more biologically accurate than simple blur but does not yet implement full "Mongrel Theory" texture synthesis with statistical replacement.
 - It assumes a fixed relationship between screen pixels and **visual angle**.
 
 ---

@@ -257,6 +257,37 @@ float contrastPreservation = mix(0.6, 0.3,
     smoothstep(0.0, parafovea_radius - fovea_radius, eccentricity));
 ```
 
+### MIP-Based Pooling (v1.4)
+
+**v1.4:** Replaced the 5-tap Gaussian blur approximation with **hardware MIP-based pooling**, which more accurately models how the peripheral visual system compresses information into "pooling regions."
+
+**Key Insight (Rosenholtz et al.):** The peripheral visual system doesn't just blur the image—it computes summary statistics over pooling regions that grow with eccentricity. Each MIP level doubles the pooling region size, naturally modeling receptive field growth.
+
+**Implementation:**
+```glsl
+// Calculate MIP level based on eccentricity
+float normalizedEcc = max(0.0, eccentricity) / fovea_radius;
+float mipScaling = 2.5; // Tune: higher = faster pooling growth
+float maxMipLevel = 4.0; // Cap at 16x16 pooling (level 4)
+float mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
+
+// Sample using textureLod with computed MIP level
+vec4 col = textureLod(u_texture, uv, mipLevel);
+```
+
+**Smooth Transition:** To eliminate visible boundaries at the fovea edge, a smooth blend zone is applied:
+```glsl
+vec3 foveaCol = sampleSource(v1.distortedUV).rgb;
+vec3 pooledCol = sampleMIPPooled(v1.distortedUV, eccentricity, fovea_radius).rgb;
+float blendFactor = smoothstep(0.0, fovea_radius * 0.1, eccentricity);
+vec3 col = mix(foveaCol, pooledCol, blendFactor);
+```
+
+**Benefits:**
+- **Biologically accurate**: Models receptive field pooling, not just blur
+- **Performance**: Hardware-accelerated MIP sampling is essentially free
+- **Consistent**: Same `textureLod()` function used throughout pipeline
+
 ---
 
 # Saliency Map & Fidelity Bias
