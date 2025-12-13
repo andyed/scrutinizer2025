@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reference: Techmeme (Dense Text)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #fdfdfd;
+            color: #111;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.4;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            gap: 20px;
+        }
+
+        .column {
+            flex: 1;
+        }
+
+        h3 {
+            font-size: 14px;
+            margin: 15px 0 5px;
+            color: #000;
+        }
+
+        a {
+            color: #0000AA;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .source {
+            color: #555;
+            font-size: 11px;
+            font-weight: normal;
+        }
+
+        .snippet {
+            font-size: 12px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .cluster {
+            margin-bottom: 20px;
+            border-left: 3px solid #eee;
+            padding-left: 10px;
+        }
+
+        .related {
+            font-size: 11px;
+            color: #666;
+            margin-left: 10px;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="column">
+            <!-- Simulated Techmeme Content -->
+            <div id="content"></div>
+        </div>
+        <div class="column" style="flex: 0.4; font-size: 12px; background: #eef; padding: 10px;">
+            <h4>River</h4>
+            <div id="river"></div>
+        </div>
+    </div>
+    <script>
+        const words = "OpenAI Google Apple regulation antitrust privacy quantum computing neural network transformer inference latency throughput silicon TSMC nvidia gpu shortage merger acquisition ipo series-b funding valuation unicorn decacorn layoffs hiring freeze remote work return to office hybrid policy".split(" ");
+
+        function genTitle() {
+            let t = [];
+            for (let i = 0; i < 8; i++) t.push(words[Math.floor(Math.random() * words.length)]);
+            return t.join(" ");
+        }
+
+        const content = document.getElementById('content');
+        for (let i = 0; i < 20; i++) {
+            const div = document.createElement('div');
+            div.className = 'cluster';
+            div.innerHTML = `
+                <h3><a href="#">${genTitle()}</a> <span class="source">The Verge</span></h3>
+                <div class="snippet">The latest report indicates that ${genTitle()} is forcing a rethink in ${genTitle()} strategy. Analysts suggest...</div>
+                <a href="#" class="related">TechCrunch: ${genTitle()}</a>
+                <a href="#" class="related">Reuters: ${genTitle()}</a>
+            `;
+            content.appendChild(div);
+        }
+
+        const river = document.getElementById('river');
+        for (let i = 0; i < 30; i++) {
+            const div = document.createElement('div');
+            div.style.marginBottom = "8px";
+            div.innerHTML = `<a href="#">${genTitle().substring(0, 30)}...</a> <span class="source" style="font-size:9px">2m</span>`;
+            river.appendChild(div);
+        }
+    </script>
+</body>
+
+</html>

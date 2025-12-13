@@ -20,8 +20,8 @@ const version = versionArg
     ? versionArg.split('=')[1]
     : require('../package.json').version;
 
-const REFERENCE_PAGES = ['dashboard', 'article', 'ecommerce'];
-const MODES = [0]; // Default mode only, add more as needed
+const REFERENCE_PAGES = ['dashboard', 'article', 'ecommerce', 'techmeme', 'figma', 'grid'];
+const FIXATIONS = ['center', 'top_left', 'sidebar']; // Fixation points
 const OUTPUT_DIR = path.join(__dirname, '..', 'tests', 'golden-captures', `v${version}`);
 
 console.log(`\n🎯 Golden Capture Script`);
@@ -37,7 +37,7 @@ if (!fs.existsSync(OUTPUT_DIR)) {
 console.log(`\n📋 Instructions:`);
 console.log(`   1. For each page below, capture a screenshot manually`);
 console.log(`   2. Save to: ${OUTPUT_DIR}/`);
-console.log(`   3. Use naming: {page}_mode{N}.png\n`);
+console.log(`   3. Use naming: {page}_{fixation}.png\n`);
 
 REFERENCE_PAGES.forEach(page => {
     const pagePath = path.resolve(__dirname, '..', 'tests', 'reference-pages', `${page}.html`);
@@ -46,8 +46,8 @@ REFERENCE_PAGES.forEach(page => {
     console.log(`\n📄 ${page.toUpperCase()}`);
     console.log(`   URL: ${fileUrl}`);
     console.log(`   Expected files:`);
-    MODES.forEach(mode => {
-        const filename = `${page}_mode${mode}.png`;
+    FIXATIONS.forEach(fixation => {
+        const filename = `${page}_${fixation}.png`;
         const fullPath = path.join(OUTPUT_DIR, filename);
         const exists = fs.existsSync(fullPath);
         console.log(`   ${exists ? '✅' : '⬜'} ${filename}`);
@@ -63,12 +63,12 @@ REFERENCE_PAGES.forEach(page => {
 
 console.log(`\n💡 Tips:`);
 console.log(`   - Enable foveal mode: Cmd+Shift+F`);
-console.log(`   - Set aesthetic mode: Simulation > Behavior > Aesthetic Mode`);
+console.log(`   - Move mouse to fixation point (Center, Top-Left, Sidebar)`);
 console.log(`   - Screenshot: Cmd+Shift+4 (macOS)\n`);
 
 // Check completion
 const completed = REFERENCE_PAGES.every(page =>
-    MODES.every(mode => fs.existsSync(path.join(OUTPUT_DIR, `${page}_mode${mode}.png`)))
+    FIXATIONS.every(fixation => fs.existsSync(path.join(OUTPUT_DIR, `${page}_${fixation}.png`)))
 );
 
 if (completed) {

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reference: Figma (UI Density)</title>
+    <style>
+        body {
+            margin: 0;
+            background: #2c2c2c;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .toolbar {
+            height: 40px;
+            background: #1e1e1e;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            border-bottom: 1px solid #000;
+            justify-content: space-between;
+        }
+
+        .tool {
+            width: 30px;
+            height: 30px;
+            background: #444;
+            margin-right: 5px;
+            border-radius: 4px;
+        }
+
+        .tool.active {
+            background: #0d99ff;
+        }
+
+        .workspace {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .sidebar-left {
+            width: 240px;
+            background: #1e1e1e;
+            border-right: 1px solid #000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-right {
+            width: 260px;
+            background: #1e1e1e;
+            border-left: 1px solid #000;
+            padding: 10px;
+            font-size: 11px;
+        }
+
+        .canvas {
+            flex: 1;
+            background: #e5e5e5;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .layer-item {
+            padding: 8px 16px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            color: #eee;
+        }
+
+        .layer-item:hover {
+            background: #333;
+        }
+
+        .layer-icon {
+            width: 12px;
+            height: 12px;
+            background: #666;
+            margin-right: 8px;
+            border-radius: 2px;
+        }
+
+        .inspector-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .input {
+            background: #333;
+            border: 1px solid #555;
+            width: 45%;
+            height: 24px;
+            border-radius: 2px;
+        }
+
+        .label {
+            color: #aaa;
+            margin-bottom: 4px;
+        }
+
+        .artboard {
+            position: absolute;
+            top: 100px;
+            left: 100px;
+            width: 400px;
+            height: 600px;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding: 20px;
+        }
+
+        .ui-el {
+            background: #eee;
+            height: 40px;
+            border-radius: 6px;
+        }
+
+        .ui-card {
+            grid-column: span 2;
+            height: 120px;
+            background: #f9f9f9;
+            border: 1px solid #eee;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="toolbar">
+        <div style="display:flex">
+            <div class="tool active"></div>
+            <div class="tool"></div>
+            <div class="tool"></div>
+            <div class="tool"></div>
+        </div>
+        <div style="font-size: 12px;">Untitled Design</div>
+        <div style="display:flex">
+            <div class="tool" style="background:green"></div>
+        </div>
+    </div>
+    <div class="workspace">
+        <div class="sidebar-left">
+            <div style="padding:10px; font-size:11px; font-weight:bold; color:#888;">LAYERS</div>
+            <div id="layers"></div>
+        </div>
+        <div class="canvas">
+            <div class="artboard">
+                <div class="ui-card"></div>
+                <div class="ui-el"></div>
+                <div class="ui-el"></div>
+                <div class="ui-el"></div>
+                <div class="ui-el"></div>
+                <div class="ui-card" style="height: 200px"></div>
+            </div>
+        </div>
+        <div class="sidebar-right">
+            <div class="label">Design</div>
+            <div class="inspector-row">
+                <div class="input"></div>
+                <div class="input"></div>
+            </div>
+            <div class="inspector-row">
+                <div class="input" style="width:100%"></div>
+            </div>
+            <div style="height: 1px; background: #333; margin: 10px 0;"></div>
+            <div class="label">Fill</div>
+            <div class="inspector-row">
+                <div style="width: 20px; height: 20px; background: #ccc; border: 1px solid white;"></div>
+                <div style="font-size:11px; align-self:center;">#CCCCCC</div>
+                <div style="font-size:11px; align-self:center;">100%</div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const layers = document.getElementById('layers');
+        ['Header', 'Hero Section', 'Card Grid', 'Footer', 'Navigation', 'Logo', 'Background'].forEach(name => {
+            const div = document.createElement('div');
+            div.className = 'layer-item';
+            div.innerHTML = `<div class="layer-icon"></div>${name}`;
+            layers.appendChild(div);
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reference: Grid (B/W)</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: white;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(20, 1fr);
+            grid-template-rows: repeat(20, 1fr);
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .cell {
+            border: 1px solid #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: monospace;
+            font-size: 10px;
+            color: #999;
+        }
+
+        .cell:nth-child(even) {
+            background: #f0f0f0;
+        }
+
+        .cell:nth-child(4n) {
+            background: #333;
+            color: white;
+        }
+
+        /* High contrast points */
+
+        /* Central fixation cross */
+        .fixation {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            transform: translate(-50%, -50%);
+            background: red;
+            border-radius: 50%;
+            z-index: 100;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="fixation"></div>
+    <div class="grid-container" id="grid">
+        <!-- JS will populate -->
+    </div>
+    <script>
+        const grid = document.getElementById('grid');
+        for (let i = 0; i < 400; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.textContent = i;
+            grid.appendChild(cell);
+        }
+    </script>
+</body>
+
+</html>
