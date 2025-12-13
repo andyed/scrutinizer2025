@@ -11,7 +11,8 @@
     "release": "electron-builder --mac --publish always",
     "build:win": "electron-builder --win",
     "release:win": "electron-builder --win --publish always",
-    "test": "cross-env TEST_MODE=true node scripts/run-electron.js ."
+    "test": "cross-env TEST_MODE=true node scripts/run-electron.js .",
+    "capture-golden": "node scripts/capture-golden.js"
   },
   "keywords": [
     "electron",
