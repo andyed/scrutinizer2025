@@ -1244,6 +1244,54 @@ app.on('create-new-window', () => {
     createScrutinizerWindow();
 });
 
+// Handle "Check for Updates" menu action
+app.on('check-for-updates', () => {
+    const { dialog } = require('electron');
+
+    // Show checking dialog
+    console.log('[Main] Manual update check triggered');
+
+    autoUpdater.once('update-available', (info) => {
+        dialog.showMessageBox({
+            type: 'info',
+            title: 'Update Available',
+            message: `Scrutinizer ${info.version} is available!`,
+            detail: 'Would you like to download it now?',
+            buttons: ['Download', 'Later'],
+            defaultId: 0,
+            cancelId: 1
+        }).then(result => {
+            if (result.response === 0) {
+                require('electron').shell.openExternal('https://github.com/andyed/scrutinizer2025/releases/latest');
+            }
+        });
+    });
+
+    autoUpdater.once('update-not-available', () => {
+        dialog.showMessageBox({
+            type: 'info',
+            title: 'No Updates Available',
+            message: 'You\'re running the latest version!',
+            detail: `Current version: ${app.getVersion()}`,
+            buttons: ['OK']
+        });
+    });
+
+    autoUpdater.once('error', (err) => {
+        dialog.showMessageBox({
+            type: 'warning',
+            title: 'Update Check Failed',
+            message: 'Could not check for updates.',
+            detail: err.message || 'Please check your internet connection.',
+            buttons: ['OK']
+        });
+    });
+
+    autoUpdater.checkForUpdates().catch(err => {
+        console.log('[Main] Update check error:', err.message);
+    });
+});
+
 // === Calibration Window Logic ===
 // Web-based calibration: Navigate to working web version with distortion disabled
 

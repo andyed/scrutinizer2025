@@ -507,6 +507,13 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
             role: 'help',
             submenu: [
                 {
+                    label: 'Check for Updates...',
+                    click: () => {
+                        app.emit('check-for-updates');
+                    }
+                },
+                { type: 'separator' },
+                {
                     label: 'Learn More',
                     click: async () => {
                         await shell.openExternal('https://github.com/andyed/scrutinizer2025');
