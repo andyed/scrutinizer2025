@@ -263,6 +263,82 @@ this.renderer.uploadTexture(this.imageData);
 
 ---
 
+### 🎯 v1.5 Planned Features
+
+#### 1. Static Reference Pages for Visual Regression Testing
+**Priority**: HIGH  
+**Effort**: LOW  
+**Impact**: HIGH (reliability, documentation)
+
+**Goal**: Create stable, version-controlled HTML test pages for golden image comparisons.
+
+**Problem Solved:**
+- Live sites change, making historical comparisons unreliable
+- Test harness uses different config than real app
+- No consistent reference for design/scientific demonstrations
+
+**Proposed:**
+Create 2-3 static HTML pages in the repo featuring common web patterns:
+
+```
+tests/reference-pages/
+├── dashboard.html     # Toolbar, sidebar, cards, tables, icons
+├── article.html       # Headings, paragraphs, images, blockquotes
+├── ecommerce.html     # Product grid, buttons, CTAs, thumbnails
+```
+
+**Benefits:**
+- Version-controlled, never changes unexpectedly
+- Showcases Scrutinizer for design audience
+- Supports scientific reproducibility
+- Can include edge cases (low contrast, small text, dense layouts)
+
+**Files to Create:**
+- `tests/reference-pages/*.html` (Bootstrap or Tailwind-based)
+- `tests/golden-captures/v1.5.0/*.png` (captured from reference pages)
+
+---
+
+#### 2. "Check for Updates" Menu Item with Opt-Out
+**Priority**: MEDIUM  
+**Effort**: LOW  
+**Impact**: MEDIUM (UX polish)
+
+**Goal**: Give users control over update notifications.
+
+**Proposed:**
+- Add `Help > Check for Updates` menu item
+- Add `Preferences > Auto-check for updates` toggle (default: ON)
+- Store setting via `settingsManager`
+
+**Implementation:**
+```javascript
+// Help menu
+{ label: 'Check for Updates', click: () => autoUpdater.checkForUpdates() }
+
+// Settings
+settingsManager.get('autoCheckUpdates', true) // default enabled
+```
+
+---
+
+#### 3. Fix Test Harness to Match App Defaults
+**Priority**: LOW  
+**Effort**: LOW  
+**Impact**: MEDIUM (developer experience)
+
+**Goal**: Ensure test screenshots match real app behavior.
+
+**Current Issue:**
+- Test passes `mongrelMode=0` instead of `1`
+- Missing default values for several parameters
+
+**Proposed:**
+- Update `tests/visual-test.html` to use same defaults as `scrutinizer.js`
+- Document expected test output in `developers_guide.md`
+
+---
+
 ### 🔧 Medium-Priority Optimizations (v1.5)
 
 #### 3. Shader Optimization
