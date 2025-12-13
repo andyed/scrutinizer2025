@@ -81,6 +81,10 @@ vec4 sampleBlurred(vec2 uv, float radius) {
     return sum / totalWeight;
 }
 
+float rand(vec2 co){
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
 // === NOISE HELPERS (moved before sampleMIPPooled for Tier 1.5 warp) ===
 vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
 float snoise(vec2 v){
@@ -166,7 +170,15 @@ vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius, float dens
     float structureMod = 1.0 + density * 2.0;
     vec2 warp = vec2(n1, n2) * integrationRadius * 1.0 * structureMod;
     
-    vec2 warpedUV = uv + warp;
+    // === JITTER (The "Scramble") ===
+    // "Blur AND Scramble" - Needs high frequency noise to break Bouma shape
+    // Tuned: Random white noise (hash) added on top of smooth warp
+    float h1 = rand(uv * 123.0 + vec2(0.0));
+    float h2 = rand(uv * 456.0 + vec2(1.0));
+    vec2 jitter = (vec2(h1, h2) - 0.5) * integrationRadius * 0.5 * structureMod;
+    
+    // Combine Smooth Warp + Scramble
+    vec2 warpedUV = uv + warp + jitter;
     
     // Sample using textureLod with computed MIP level FROM THE WARPED LOCATION
     // This is the core of Tier 1.5: blurry summary from jittered location
@@ -299,9 +311,7 @@ vec2 hash22(vec2 p) {
     return fract((p3.xx + p3.yz) * p3.zy);
 }
 
-float rand(vec2 co){
-    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
-}
+
 
 vec4 sampleMongrel(sampler2D tex, vec2 uv, float strength, float intensity, float rhythm) {
     if (strength <= 0.01) return sampleSource(uv);
