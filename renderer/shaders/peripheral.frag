@@ -128,9 +128,8 @@ float snoise(vec2 v){
 // Together, they create a simulation where users can "see" text but can't "read" it.
 // 
 // The warp magnitude scales with MIP level because larger pooling regions
-// have correspondingly larger positional uncertainty in biological vision.
-
-vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
+// have correspondingly larger positional uncertainty// 1.5 - Coupled Warp + MIP Pooling
+vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius, float density) {
     // Calculate MIP level based on eccentricity
     // Eccentricity is normalized distance from fovea edge
     // At fovea edge (eccentricity=0): mipLevel=0 (full res)
@@ -163,10 +162,10 @@ vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
     float n2 = snoise(uv * 50.0 + vec2(100.0));
     
     // Warp scales with integration field size (KEY INSIGHT)
-    // Smaller multiplier = subtler effect, larger = more aggressive
-    vec2 warp = vec2(n1, n2) * integrationRadius * 0.5;
+    // Structure Map Boost: Increase warp by 50% for high-density text to break Bouma shape
+    float structureMod = 1.0 + density * 0.5;
+    vec2 warp = vec2(n1, n2) * integrationRadius * 0.75 * structureMod;
     
-    // Apply warp to UV before sampling
     vec2 warpedUV = uv + warp;
     
     // Sample using textureLod with computed MIP level FROM THE WARPED LOCATION
@@ -536,8 +535,8 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         float saliencyWarpMod = 1.0;
         if (u_enable_saliency_modulation > 0.5 && isFarPeriphery) {
             float s = lgn.saliency;
-            // 25% max warp reduction at maximum saliency
-            saliencyWarpMod = mix(1.0, 0.75, s);
+            // 15% max warp reduction at maximum saliency (Weaker protection for text)
+            saliencyWarpMod = mix(1.0, 0.85, s);
         }
         
         vec2 warpVector = vec2(n1, n2) * warpAmp * strength * u_intensity * saliencyWarpMod;
@@ -619,7 +618,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     
     // For periphery, use MIP pooling
     // Intensity modulates the pooling strength (lower intensity = less aggressive pooling)
-    vec3 pooledCol = sampleMIPPooled(v1.distortedUV, eccentricity * u_intensity, fovea_radius).rgb;
+    vec3 pooledCol = sampleMIPPooled(v1.distortedUV, eccentricity * u_intensity, fovea_radius, lgn.density).rgb;
     
     // Smooth blend from fovea to periphery to eliminate visible boundary
     // Blend zone: from fovea_radius to fovea_radius * 1.1 (10% transition band)
