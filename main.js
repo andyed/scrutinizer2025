@@ -3,6 +3,12 @@ const path = require('path');
 const { buildMenuTemplate, RADIUS_OPTIONS } = require('./menu-template');
 const settingsManager = require('./settings-manager');
 const { CALIBRATION_URL } = require('./renderer/config');
+const { autoUpdater } = require('electron-updater');
+
+// Configure auto-updater
+autoUpdater.autoDownload = false; // Don't auto-download, just notify
+autoUpdater.logger = require('electron-log');
+autoUpdater.logger.transports.file.level = 'info';
 
 // Track current settings for menu state and new windows
 let currentRadius;
@@ -1142,6 +1148,41 @@ app.whenReady().then(() => {
         if (process.argv.includes('--calibrate')) {
             console.log('[Main] --calibrate flag detected, opening calibration window...');
             setTimeout(() => startWebCalibration(), 1000); // Delay to ensure main window is ready
+        }
+
+        // Check for updates (production only)
+        if (!process.env.NODE_ENV || process.env.NODE_ENV === 'production') {
+            console.log('[Main] Checking for updates...');
+
+            autoUpdater.on('update-available', (info) => {
+                console.log('[Main] Update available:', info.version);
+                const { dialog } = require('electron');
+                dialog.showMessageBox({
+                    type: 'info',
+                    title: 'Update Available',
+                    message: `Scrutinizer ${info.version} is available!`,
+                    detail: 'A new version is ready to download. Would you like to download it now?',
+                    buttons: ['Download', 'Later'],
+                    defaultId: 0,
+                    cancelId: 1
+                }).then(result => {
+                    if (result.response === 0) {
+                        require('electron').shell.openExternal('https://github.com/andyed/scrutinizer2025/releases/latest');
+                    }
+                });
+            });
+
+            autoUpdater.on('update-not-available', () => {
+                console.log('[Main] App is up to date');
+            });
+
+            autoUpdater.on('error', (err) => {
+                console.error('[Main] Auto-update error:', err);
+            });
+
+            autoUpdater.checkForUpdates().catch(err => {
+                console.log('[Main] Update check failed (expected in dev):', err.message);
+            });
         }
     }
 
