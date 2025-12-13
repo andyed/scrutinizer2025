@@ -701,13 +701,41 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         
         // Apply CA if factor > 0
         if (caFactor > 0.01) {
-            // Use ungated factor for CA strength too, or just the calculated caFactor
-            // Let's use caFactor directly as it's distance based.
-            float offset = 0.005 * caFactor; 
-            vec2 caOffset = vec2(offset, 0.0); 
+            // === UNBOUND COLOR (Tier 1.6) ===
+            // Refined Chromatic Aberration:
+            // 1. Radial Direction: Push color outward from fovea (not just horizontal)
+            // 2. Unbound Blur: Blur color channels more than luma (simulate Parvo resolution drop)
             
-            col.r = sampleSource(v1.distortedUV + caOffset).r;
-            col.b = sampleSource(v1.distortedUV - caOffset).b;
+            float aspect = u_resolution.x / u_resolution.y;
+            vec2 mouseUV = u_mouse / u_resolution;
+            
+            // Calculate screen-space radial direction
+            // (Correct for aspect ratio to ensure circular push)
+            vec2 delta = (v1.distortedUV - mouseUV) * vec2(aspect, 1.0);
+            vec2 dir = normalize(delta);
+            
+            // Calculate UV-space offset using the radial direction
+            // Scale by 1/aspect to convert back to UV space magnitude
+            float baseOffset = 0.005 * caFactor;
+            vec2 caOffset = dir * vec2(1.0/aspect, 1.0) * baseOffset;
+            
+            // Calculate MIP Bias for "Unbound" look
+            // Base MIP level comes from eccentricity (same logic as sampleMIPPooled)
+            float normalizedEcc = max(0.0, dist) / fovea_radius; 
+            float mipBase = clamp(normalizedEcc * 2.5, 0.0, 4.0);
+            
+            // ADD BIAS: Blur color ghosts significantly more (+2.0 levels = 4x blurrier)
+            // This creates "watercolor bleed" instead of sharp double images
+            float chromaBias = 2.0;
+            float totalMip = mipBase + chromaBias;
+            
+            // Sample Channels with Offset & extra blur
+            // Note: Electron captures are BGRA, so we read .b for Red and .r for Blue
+            float redVal = textureLod(u_texture, v1.distortedUV + caOffset, totalMip).b;
+            float blueVal = textureLod(u_texture, v1.distortedUV - caOffset, totalMip).r;
+            
+            col.r = redVal;
+            col.b = blueVal;
         }
 
         // === ROD VISION AESTHETIC (OKLAB) ===

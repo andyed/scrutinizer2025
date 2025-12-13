@@ -182,6 +182,17 @@ float finalMipLevel = mipLevel * saliencyMod;
 
 ---
 
+### Tier 1.6: Unbound Color (Low Cost) ✅ IMPLEMENTED (v1.4.1)
+
+**Goal**: Simulate the "Magno/Parvo Split" where color (Parvo) resolution drops faster than luminance (Magno) resolution in the periphery.
+
+**Implementation**:
+- **Radial Offset**: Chromatic aberration pushes radially outward from the fovea (screen-space direction).
+- **Unbound Blur**: Chromatic channels are sampled at a higher MIP level (+2.0) than the luminance channel.
+- **Effect**: "Ghost" images appear as soft, watercolor-like bleeds, reducing the "sharp double image" artifact.
+
+---
+
 ### Tier 2: Contrast-Preserving Pooling (Medium Cost)
 
 **Goal**: Maintain local contrast variance while pooling, preventing the "washed out" look of standard MIP blur.
