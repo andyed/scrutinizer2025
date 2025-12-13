@@ -81,10 +81,6 @@ vec4 sampleBlurred(vec2 uv, float radius) {
     return sum / totalWeight;
 }
 
-float rand(vec2 co){
-    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
-}
-
 // === NOISE HELPERS (moved before sampleMIPPooled for Tier 1.5 warp) ===
 vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
 float snoise(vec2 v){
@@ -132,8 +128,9 @@ float snoise(vec2 v){
 // Together, they create a simulation where users can "see" text but can't "read" it.
 // 
 // The warp magnitude scales with MIP level because larger pooling regions
-// have correspondingly larger positional uncertainty// 1.5 - Coupled Warp + MIP Pooling
-vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius, float density) {
+// have correspondingly larger positional uncertainty in biological vision.
+
+vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
     // Calculate MIP level based on eccentricity
     // Eccentricity is normalized distance from fovea edge
     // At fovea edge (eccentricity=0): mipLevel=0 (full res)
@@ -144,7 +141,7 @@ vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius, float dens
     // Biological: receptive field size doubles every ~2° of eccentricity
     // We map this to MIP levels: each level doubles pooling region
     // Scaling factor adjusts how quickly we reach max pooling
-    float mipScaling = 4.0; // Tuned: Increased from 2.5 to 4.0 (Aggressive pooling growth)
+    float mipScaling = 2.5; // Tune: higher = faster pooling growth
     float maxMipLevel = 4.0; // Cap at 16x16 pooling (level 4)
     
     float mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
@@ -166,19 +163,11 @@ vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius, float dens
     float n2 = snoise(uv * 50.0 + vec2(100.0));
     
     // Warp scales with integration field size (KEY INSIGHT)
-    // Structure Map Boost: Increase warp by 200% for high-density text to break Bouma shape
-    float structureMod = 1.0 + density * 2.0;
-    vec2 warp = vec2(n1, n2) * integrationRadius * 1.0 * structureMod;
+    // Smaller multiplier = subtler effect, larger = more aggressive
+    vec2 warp = vec2(n1, n2) * integrationRadius * 0.5;
     
-    // === JITTER (The "Scramble") ===
-    // "Blur AND Scramble" - Needs high frequency noise to break Bouma shape
-    // Tuned: Random white noise (hash) added on top of smooth warp
-    float h1 = rand(uv * 123.0 + vec2(0.0));
-    float h2 = rand(uv * 456.0 + vec2(1.0));
-    vec2 jitter = (vec2(h1, h2) - 0.5) * integrationRadius * 0.5 * structureMod;
-    
-    // Combine Smooth Warp + Scramble
-    vec2 warpedUV = uv + warp + jitter;
+    // Apply warp to UV before sampling
+    vec2 warpedUV = uv + warp;
     
     // Sample using textureLod with computed MIP level FROM THE WARPED LOCATION
     // This is the core of Tier 1.5: blurry summary from jittered location
@@ -311,7 +300,9 @@ vec2 hash22(vec2 p) {
     return fract((p3.xx + p3.yz) * p3.zy);
 }
 
-
+float rand(vec2 co){
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
 
 vec4 sampleMongrel(sampler2D tex, vec2 uv, float strength, float intensity, float rhythm) {
     if (strength <= 0.01) return sampleSource(uv);
@@ -545,8 +536,8 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         float saliencyWarpMod = 1.0;
         if (u_enable_saliency_modulation > 0.5 && isFarPeriphery) {
             float s = lgn.saliency;
-            // 15% max warp reduction at maximum saliency (Weaker protection for text)
-            saliencyWarpMod = mix(1.0, 0.85, s);
+            // 25% max warp reduction at maximum saliency
+            saliencyWarpMod = mix(1.0, 0.75, s);
         }
         
         vec2 warpVector = vec2(n1, n2) * warpAmp * strength * u_intensity * saliencyWarpMod;
@@ -628,7 +619,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     
     // For periphery, use MIP pooling
     // Intensity modulates the pooling strength (lower intensity = less aggressive pooling)
-    vec3 pooledCol = sampleMIPPooled(v1.distortedUV, eccentricity * u_intensity, fovea_radius, lgn.density).rgb;
+    vec3 pooledCol = sampleMIPPooled(v1.distortedUV, eccentricity * u_intensity, fovea_radius).rgb;
     
     // Smooth blend from fovea to periphery to eliminate visible boundary
     // Blend zone: from fovea_radius to fovea_radius * 1.1 (10% transition band)
