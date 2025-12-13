@@ -73,6 +73,7 @@ The following comparisons show the improvement in peripheral rendering:
 ### 💅 UI Polish
 - **Less Distracting URL Bar**: The toolbar URL input is now dimmer and semi-transparent by default, reducing visual competition with the canvas. It automatically brightens on hover or focus.
 - **Menu Terminology**: "Mongrel Mode" has been renamed to "**Effect Type**" to better reflect its function. "Shatter" is now "**Mongrel Approximation**".
+- **Visual Fidelity (v1.4.1)**: Implemented "Coupled Warp + MIP Pooling" (Tier 1.5), physically simulating peripheral crowding by scaling position jitter with the integration field size.
 
 ## Developer Notes
 - **Custom Overlays Guide**: Added a new section to `docs/developers_guide.md` explaining how to implement high-performance custom overlays using the new Group Translation pattern.
