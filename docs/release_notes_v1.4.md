@@ -51,17 +51,9 @@ vec4 pooled = textureLod(u_texture, uv, mipLevel);
 - *[Rosenholtz et al. — Mongrel Theory](scientific_literature_review.md#vision-science--cognitive-psychology) — Scientific foundation*
 - *[Mongrel Textures Spec](specs/mongrel_textures.md) — Tiered implementation strategy*
 
-**Visual Evolution: v1.2 → v1.3 → v1.4**
+**Visual Evolution: v1.3 → v1.4**
 
-The following comparisons show the evolution of peripheral rendering across three releases:
-
-#### Checkerboard Grid Test (Mode 0)
-This synthetic test pattern clearly shows how each version handles peripheral pooling:
-
-| v1.2: Blocky Pixelation | v1.3: Gaussian Blur | v1.4: MIP Pooling |
-|:---:|:---:|:---:|
-| Discrete block sampling | 5-tap blur, washed colors | Hardware MIP-maps, vibrant |
-| ![v1.2](assets/visual-history/v1.2_test9_mode0.png) | ![v1.3](assets/visual-history/v1.3_test9_mode0.png) | ![v1.4](assets/visual-history/v1.4_test9_mode0.png) |
+The following comparisons show the improvement in peripheral rendering:
 
 #### Real-World Content (Techmeme.com)
 
