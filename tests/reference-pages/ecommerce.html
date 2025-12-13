@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop - Scrutinizer Reference Page</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .product-card:hover {
+            transform: translateY(-4px);
+            transition: transform 0.2s;
+        }
+
+        .product-card {
+            transition: transform 0.2s;
+        }
+
+        .product-img {
+            height: 200px;
+            object-fit: cover;
+        }
+
+        .price-old {
+            text-decoration: line-through;
+            color: #999;
+        }
+
+        .rating-star {
+            color: #ffc107;
+        }
+
+        .filter-section {
+            border-right: 1px solid #dee2e6;
+        }
+
+        .badge-sale {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Top Bar -->
+    <div class="bg-dark text-light py-2 small">
+        <div class="container d-flex justify-content-between">
+            <div>Free shipping on orders over $50</div>
+            <div>
+                <a href="#" class="text-light me-3">Track Order</a>
+                <a href="#" class="text-light me-3">Help</a>
+                <a href="#" class="text-light">USD</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Nav -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+        <div class="container">
+            <a class="navbar-brand fw-bold fs-4" href="#">TechShop</a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Categories</a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#">Audio</a></li>
+                            <li><a class="dropdown-item" href="#">Wearables</a></li>
+                            <li><a class="dropdown-item" href="#">Accessories</a></li>
+                            <li><a class="dropdown-item" href="#">Gaming</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item"><a class="nav-link" href="#">New Arrivals</a></li>
+                    <li class="nav-item"><a class="nav-link text-danger" href="#">Sale</a></li>
+                </ul>
+                <div class="d-flex align-items-center">
+                    <div class="input-group me-3" style="width: 250px;">
+                        <input type="text" class="form-control form-control-sm" placeholder="Search products...">
+                        <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-search"></i></button>
+                    </div>
+                    <a href="#" class="btn btn-outline-secondary btn-sm me-2"><i class="bi bi-person"></i></a>
+                    <a href="#" class="btn btn-outline-secondary btn-sm me-2"><i class="bi bi-heart"></i></a>
+                    <a href="#" class="btn btn-primary btn-sm position-relative">
+                        <i class="bi bi-cart3"></i>
+                        <span
+                            class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">3</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-4">
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="#">Home</a></li>
+                <li class="breadcrumb-item"><a href="#">Electronics</a></li>
+                <li class="breadcrumb-item active">Audio</li>
+            </ol>
+        </nav>
+
+        <div class="row">
+            <!-- Filters Sidebar -->
+            <div class="col-lg-3 filter-section">
+                <h5 class="mb-3">Filters</h5>
+
+                <div class="mb-4">
+                    <h6>Category</h6>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" checked><label
+                            class="form-check-label">Headphones (24)</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox"><label
+                            class="form-check-label">Earbuds (18)</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox"><label
+                            class="form-check-label">Speakers (12)</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox"><label
+                            class="form-check-label">Microphones (8)</label></div>
+                </div>
+
+                <div class="mb-4">
+                    <h6>Price Range</h6>
+                    <input type="range" class="form-range" min="0" max="500" value="300">
+                    <div class="d-flex justify-content-between small">
+                        <span>$0</span>
+                        <span>$300</span>
+                        <span>$500</span>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <h6>Brand</h6>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" checked><label
+                            class="form-check-label">Sony</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" checked><label
+                            class="form-check-label">Bose</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox"><label
+                            class="form-check-label">Apple</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox"><label
+                            class="form-check-label">JBL</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox"><label
+                            class="form-check-label">Sennheiser</label></div>
+                </div>
+
+                <div class="mb-4">
+                    <h6>Rating</h6>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="rating" checked>
+                        <label class="form-check-label"><span class="rating-star">★★★★★</span> & up</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="rating">
+                        <label class="form-check-label"><span class="rating-star">★★★★</span>☆ & up</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="rating">
+                        <label class="form-check-label"><span class="rating-star">★★★</span>☆☆ & up</label>
+                    </div>
+                </div>
+
+                <button class="btn btn-outline-secondary w-100">Clear All Filters</button>
+            </div>
+
+            <!-- Product Grid -->
+            <div class="col-lg-9">
+                <!-- Sort Bar -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>Showing <strong>1-12</strong> of <strong>64</strong> products</div>
+                    <div class="d-flex align-items-center">
+                        <label class="me-2">Sort by:</label>
+                        <select class="form-select form-select-sm" style="width: 150px;">
+                            <option>Featured</option>
+                            <option>Price: Low to High</option>
+                            <option>Price: High to Low</option>
+                            <option>Newest</option>
+                            <option>Best Rating</option>
+                        </select>
+                        <button class="btn btn-outline-secondary btn-sm ms-2"><i
+                                class="bi bi-grid-3x3-gap"></i></button>
+                        <button class="btn btn-outline-secondary btn-sm ms-1"><i class="bi bi-list"></i></button>
+                    </div>
+                </div>
+
+                <!-- Products -->
+                <div class="row g-4">
+                    <!-- Product 1 -->
+                    <div class="col-md-4">
+                        <div class="card product-card h-100 shadow-sm">
+                            <div class="position-relative">
+                                <img src="images/hero_product.png" class="card-img-top product-img"
+                                    alt="Wireless Headphones">
+                                <span class="badge bg-danger badge-sale">-20%</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="small text-muted">Sony</div>
+                                <h6 class="card-title">WH-1000XM5 Wireless Headphones</h6>
+                                <div class="mb-2">
+                                    <span class="rating-star">★★★★★</span>
+                                    <span class="small text-muted">(324)</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="fw-bold text-primary">$279.99</span>
+                                        <span class="price-old small ms-1">$349.99</span>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary"><i
+                                            class="bi bi-cart-plus"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Product 2 -->
+                    <div class="col-md-4">
+                        <div class="card product-card h-100 shadow-sm">
+                            <img src="images/product_smartwatch.png" class="card-img-top product-img" alt="Smart Watch">
+                            <div class="card-body">
+                                <div class="small text-muted">Apple</div>
+                                <h6 class="card-title">Watch Series 9 GPS 45mm</h6>
+                                <div class="mb-2">
+                                    <span class="rating-star">★★★★★</span>
+                                    <span class="small text-muted">(892)</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold text-primary">$429.00</span>
+                                    <button class="btn btn-sm btn-outline-primary"><i
+                                            class="bi bi-cart-plus"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Product 3 -->
+                    <div class="col-md-4">
+                        <div class="card product-card h-100 shadow-sm">
+                            <img src="images/product_keyboard.png" class="card-img-top product-img"
+                                alt="Mechanical Keyboard">
+                            <div class="card-body">
+                                <div class="small text-muted">Keychron</div>
+                                <h6 class="card-title">Q1 Pro Mechanical Keyboard</h6>
+                                <div class="mb-2">
+                                    <span class="rating-star">★★★★</span>☆
+                                    <span class="small text-muted">(156)</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold text-primary">$199.00</span>
+                                    <button class="btn btn-sm btn-outline-primary"><i
+                                            class="bi bi-cart-plus"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Product 4-6 (Placeholders using same images) -->
+                    <div class="col-md-4">
+                        <div class="card product-card h-100 shadow-sm">
+                            <div class="position-relative">
+                                <img src="images/hero_product.png" class="card-img-top product-img" alt="Earbuds">
+                                <span class="badge bg-success badge-sale">New</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="small text-muted">Bose</div>
+                                <h6 class="card-title">QuietComfort Earbuds II</h6>
+                                <div class="mb-2">
+                                    <span class="rating-star">★★★★★</span>
+                                    <span class="small text-muted">(445)</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold text-primary">$299.00</span>
+                                    <button class="btn btn-sm btn-outline-primary"><i
+                                            class="bi bi-cart-plus"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card product-card h-100 shadow-sm">
+                            <img src="images/product_smartwatch.png" class="card-img-top product-img"
+                                alt="Fitness Tracker">
+                            <div class="card-body">
+                                <div class="small text-muted">Fitbit</div>
+                                <h6 class="card-title">Charge 6 Fitness Tracker</h6>
+                                <div class="mb-2">
+                                    <span class="rating-star">★★★★</span>☆
+                                    <span class="small text-muted">(234)</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold text-primary">$159.95</span>
+                                    <button class="btn btn-sm btn-outline-primary"><i
+                                            class="bi bi-cart-plus"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card product-card h-100 shadow-sm">
+                            <div class="position-relative">
+                                <img src="images/product_keyboard.png" class="card-img-top product-img"
+                                    alt="Gaming Mouse">
+                                <span class="badge bg-warning text-dark badge-sale">Bestseller</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="small text-muted">Logitech</div>
+                                <h6 class="card-title">G Pro X Superlight</h6>
+                                <div class="mb-2">
+                                    <span class="rating-star">★★★★★</span>
+                                    <span class="small text-muted">(1.2k)</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold text-primary">$159.00</span>
+                                    <button class="btn btn-sm btn-outline-primary"><i
+                                            class="bi bi-cart-plus"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                <nav class="mt-5">
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
+                        <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                        <li class="page-item"><a class="page-link" href="#">2</a></li>
+                        <li class="page-item"><a class="page-link" href="#">3</a></li>
+                        <li class="page-item"><a class="page-link" href="#">4</a></li>
+                        <li class="page-item"><a class="page-link" href="#">5</a></li>
+                        <li class="page-item"><a class="page-link" href="#">Next</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light py-5 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-3">
+                    <h5>TechShop</h5>
+                    <p class="text-muted small">Your one-stop shop for premium tech gear.</p>
+                    <div class="d-flex gap-2">
+                        <a href="#" class="btn btn-outline-light btn-sm"><i class="bi bi-facebook"></i></a>
+                        <a href="#" class="btn btn-outline-light btn-sm"><i class="bi bi-twitter"></i></a>
+                        <a href="#" class="btn btn-outline-light btn-sm"><i class="bi bi-instagram"></i></a>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <h6>Shop</h6>
+                    <ul class="list-unstyled text-muted small">
+                        <li><a href="#" class="text-muted">New Arrivals</a></li>
+                        <li><a href="#" class="text-muted">Best Sellers</a></li>
+                        <li><a href="#" class="text-muted">Sale</a></li>
+                        <li><a href="#" class="text-muted">Gift Cards</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-3">
+                    <h6>Support</h6>
+                    <ul class="list-unstyled text-muted small">
+                        <li><a href="#" class="text-muted">Contact Us</a></li>
+                        <li><a href="#" class="text-muted">Shipping Info</a></li>
+                        <li><a href="#" class="text-muted">Returns</a></li>
+                        <li><a href="#" class="text-muted">FAQ</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-3">
+                    <h6>Newsletter</h6>
+                    <p class="text-muted small">Get 10% off your first order!</p>
+                    <div class="input-group input-group-sm">
+                        <input type="email" class="form-control" placeholder="Email">
+                        <button class="btn btn-primary">Subscribe</button>
+                    </div>
+                </div>
+            </div>
+            <hr class="my-4">
+            <div class="d-flex justify-content-between align-items-center small text-muted">
+                <div>© 2025 TechShop. All rights reserved.</div>
+                <div>
+                    <a href="#" class="text-muted me-3">Privacy</a>
+                    <a href="#" class="text-muted me-3">Terms</a>
+                    <a href="#" class="text-muted">Cookies</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
