@@ -81,7 +81,46 @@ vec4 sampleBlurred(vec2 uv, float radius) {
     return sum / totalWeight;
 }
 
-// === NOISE HELPERS (moved before sampleMIPPooled for Tier 1.5 warp) ===
+// === HELPER: MIP-BASED POOLING (Mongrel Tier 1) ===
+// Uses hardware MIP-maps to approximate biological receptive field pooling.
+// As eccentricity increases, we sample from lower-resolution MIP levels,
+// simulating the larger pooling regions in peripheral vision.
+// 
+// Unlike blur, MIP pooling:
+// - Genuinely averages larger areas (not just weighted samples)
+// - Is essentially free (hardware-accelerated)
+// - Provides consistent "pooling region" sizes at each eccentricity
+//
+// mipLevel: 0 = full resolution (fovea), ~4 = 16x16 pooling (far periphery)
+vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
+    // Calculate MIP level based on eccentricity
+    // Eccentricity is normalized distance from fovea edge
+    // At fovea edge (eccentricity=0): mipLevel=0 (full res)
+    // At far periphery (eccentricity~0.5): mipLevel=4 (16x16 pooling)
+    
+    float normalizedEcc = max(0.0, eccentricity) / fovea_radius;
+    
+    // Biological: receptive field size doubles every ~2° of eccentricity
+    // We map this to MIP levels: each level doubles pooling region
+    // Scaling factor adjusts how quickly we reach max pooling
+    float mipScaling = 2.5; // Tune: higher = faster pooling growth
+    float maxMipLevel = 4.0; // Cap at 16x16 pooling (level 4)
+    
+    float mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
+    
+    // Sample using textureLod with computed MIP level
+    // Note: textureLod performs trilinear filtering between MIP levels
+    vec4 col = textureLod(u_texture, uv, mipLevel);
+    
+    // Apply BGRA -> RGBA swap (same as sampleSource)
+    float temp = col.r;
+    col.r = col.b;
+    col.b = temp;
+    
+    return col;
+}
+
+// === NOISE HELPERS ===
 vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
 float snoise(vec2 v){
     const vec4 C = vec4(0.211324865405187, 0.366025403784439,
@@ -108,79 +147,6 @@ float snoise(vec2 v){
     g.yz = a0.yz * x12.xz + h.yz * x12.yw;
     return 130.0 * dot(m, g);
 }
-
-// === HELPER: MIP-BASED POOLING (Mongrel Tier 1) ===
-// Uses hardware MIP-maps to approximate biological receptive field pooling.
-// As eccentricity increases, we sample from lower-resolution MIP levels,
-// simulating the larger pooling regions in peripheral vision.
-// 
-// Unlike blur, MIP pooling:
-// - Genuinely averages larger areas (not just weighted samples)
-// - Is essentially free (hardware-accelerated)
-// - Provides consistent "pooling region" sizes at each eccentricity
-//
-// mipLevel: 0 = full resolution (fovea), ~4 = 16x16 pooling (far periphery)
-// 
-// === TIER 1.5: COUPLED WARP + POOL (v1.4.1) ===
-// Key insight: Domain warping should scale WITH the integration field size.
-// - MIP Level = Integration Field Size ("What" pathway - feature binding)
-// - Warp = Positional Uncertainty ("Where" pathway - location encoding)
-// Together, they create a simulation where users can "see" text but can't "read" it.
-// 
-// The warp magnitude scales with MIP level because larger pooling regions
-// have correspondingly larger positional uncertainty in biological vision.
-
-vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
-    // Calculate MIP level based on eccentricity
-    // Eccentricity is normalized distance from fovea edge
-    // At fovea edge (eccentricity=0): mipLevel=0 (full res)
-    // At far periphery (eccentricity~0.5): mipLevel=4 (16x16 pooling)
-    
-    float normalizedEcc = max(0.0, eccentricity) / fovea_radius;
-    
-    // Biological: receptive field size doubles every ~2° of eccentricity
-    // We map this to MIP levels: each level doubles pooling region
-    // Scaling factor adjusts how quickly we reach max pooling
-    float mipScaling = 2.5; // Tune: higher = faster pooling growth
-    float maxMipLevel = 4.0; // Cap at 16x16 pooling (level 4)
-    
-    float mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
-    
-    // === COUPLED WARP (Tier 1.5) ===
-    // Positional jitter scales with integration field size
-    // At MIP 0 (fovea): no warp
-    // At MIP 4 (far periphery): maximum warp
-    // 
-    // integrationRadius represents the spatial extent (in UV space) of the pooling region
-    // warp magnitude is proportional to this because positional uncertainty
-    // grows with receptive field size
-    
-    float integrationRadius = pow(2.0, mipLevel) / 1024.0; // UV-space size of pooling region
-    
-    // Use simplex noise for smooth, organic jitter
-    // Time-based animation creates subtle "breathing" effect
-    float n1 = snoise(uv * 50.0 + vec2(0.0));
-    float n2 = snoise(uv * 50.0 + vec2(100.0));
-    
-    // Warp scales with integration field size (KEY INSIGHT)
-    // Smaller multiplier = subtler effect, larger = more aggressive
-    vec2 warp = vec2(n1, n2) * integrationRadius * 0.5;
-    
-    // Apply warp to UV before sampling
-    vec2 warpedUV = uv + warp;
-    
-    // Sample using textureLod with computed MIP level FROM THE WARPED LOCATION
-    // This is the core of Tier 1.5: blurry summary from jittered location
-    vec4 col = textureLod(u_texture, warpedUV, mipLevel);
-    
-    // Apply BGRA -> RGBA swap (same as sampleSource)
-    float temp = col.r;
-    col.r = col.b;
-    col.b = temp;
-    
-    return col;
-}
-
 
 // === EDGE DETECTION HELPERS ===
 float sobel(vec2 uv) {
