@@ -1,12 +1,17 @@
 # Release Notes v1.4
 
-**Release Date:** December 11, 2025
+**Release Date:** December 13, 2025
 
 ## TLDR
-Simulation accuracy improved (Oklab, MIP pooling).  UX polished (better visual overlays, clearer menu language).
+Simulation accuracy improved (Oklab, MIP pooling). UX polished (better visual overlays, clearer menu language). **Auto-updates** now notify you when new versions are available.
 
 
 ## Highlights
+
+### 🔄 Auto-Updates
+Scrutinizer now checks for updates on startup and notifies you when a new version is available.
+- **Non-intrusive**: No automatic downloads — you choose when to update
+- **GitHub Releases**: Opens your browser to download the latest DMG
 
 ### 🎨 Visual Overlay Refinement
 The debug boundary system has been overhauled and renamed to **Visual Overlay**.
