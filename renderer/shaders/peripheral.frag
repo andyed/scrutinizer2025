@@ -140,7 +140,7 @@ vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius, float dens
     // Biological: receptive field size doubles every ~2° of eccentricity
     // We map this to MIP levels: each level doubles pooling region
     // Scaling factor adjusts how quickly we reach max pooling
-    float mipScaling = 2.5; // Tune: higher = faster pooling growth
+    float mipScaling = 4.0; // Tuned: Increased from 2.5 to 4.0 (Aggressive pooling growth)
     float maxMipLevel = 4.0; // Cap at 16x16 pooling (level 4)
     
     float mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
@@ -162,9 +162,9 @@ vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius, float dens
     float n2 = snoise(uv * 50.0 + vec2(100.0));
     
     // Warp scales with integration field size (KEY INSIGHT)
-    // Structure Map Boost: Increase warp by 50% for high-density text to break Bouma shape
-    float structureMod = 1.0 + density * 0.5;
-    vec2 warp = vec2(n1, n2) * integrationRadius * 0.75 * structureMod;
+    // Structure Map Boost: Increase warp by 200% for high-density text to break Bouma shape
+    float structureMod = 1.0 + density * 2.0;
+    vec2 warp = vec2(n1, n2) * integrationRadius * 1.0 * structureMod;
     
     vec2 warpedUV = uv + warp;
     
