@@ -3,7 +3,7 @@
 **Release Date:** December 11, 2025
 
 ## TLDR
-Simulation accuracy improved (Oklab, MIP pooling).  UX polished (better visual overlays, clearer menu language)
+Simulation accuracy improved (Oklab, MIP pooling).  UX polished (better visual overlays, clearer menu language).
 
 
 ## Highlights
@@ -53,50 +53,24 @@ The following comparisons show the evolution of peripheral rendering across thre
 #### Checkerboard Grid Test (Mode 0)
 This synthetic test pattern clearly shows how each version handles peripheral pooling:
 
-````carousel
-### v1.2: Blocky Pixelation
-Early implementation used discrete block sampling, creating harsh rectangular artifacts in the periphery.
-
-![v1.2 Checkerboard](assets/visual-history/v1.2_test9_mode0.png)
-<!-- slide -->
-### v1.3: Gaussian Blur
-Introduced smooth 5-tap blur to replace blocky artifacts. Better transitions but colors became washed out.
-
-![v1.3 Checkerboard](assets/visual-history/v1.3_test9_mode0.png)
-<!-- slide -->
-### v1.4: MIP Pooling
-Hardware MIP-maps provide true spatial averaging. Colors remain vibrant, pooling is biologically accurate.
-
-![v1.4 Checkerboard](assets/visual-history/v1.4_test9_mode0.png)
-````
+| v1.2: Blocky Pixelation | v1.3: Gaussian Blur | v1.4: MIP Pooling |
+|:---:|:---:|:---:|
+| Discrete block sampling | 5-tap blur, washed colors | Hardware MIP-maps, vibrant |
+| ![v1.2](assets/visual-history/v1.2_test9_mode0.png) | ![v1.3](assets/visual-history/v1.3_test9_mode0.png) | ![v1.4](assets/visual-history/v1.4_test9_mode0.png) |
 
 #### Real-World Content (Techmeme.com)
 
-````carousel
-### v1.3: Gaussian Blur
-The 5-tap blur approximation washed out colors and didn't accurately model receptive field pooling.
-
-![v1.3 Techmeme](assets/visual-history/v1.3_techmeme_mode0.png)
-<!-- slide -->
-### v1.4: MIP Pooling
-True spatial averaging with vibrant colors and pooling regions that match biological receptive field growth.
-
-![v1.4 Techmeme](assets/visual-history/v1.4_techmeme_mode0.png)
-````
+| v1.3: Gaussian Blur | v1.4: MIP Pooling |
+|:---:|:---:|
+| Washed out colors | Vibrant, biologically accurate |
+| ![v1.3](assets/visual-history/v1.3_techmeme_mode0.png) | ![v1.4](assets/visual-history/v1.4_techmeme_mode0.png) |
 
 #### Design Tool Interface (Figma.com)
 
-````carousel
-### v1.2: Blocky Pixelation
-Early blocky sampling visible in the complex UI elements of Figma's landing page.
-
-![v1.2 Figma](assets/visual-history/v1.2_figma_mode0.png)
-<!-- slide -->
-### v1.4: MIP Pooling
-Smoother pooling with vibrant colors preserved. Note the reduced file size (5.5MB vs 7.2MB) — MIP averaging produces more compressible output.
-
-![v1.4 Figma](assets/visual-history/v1.4_figma_mode0.png)
-````
+| v1.2: Blocky Pixelation | v1.4: MIP Pooling |
+|:---:|:---:|
+| Harsh rectangular artifacts | Smooth pooling, smaller file (5.5MB vs 7.2MB) |
+| ![v1.2](assets/visual-history/v1.2_figma_mode0.png) | ![v1.4](assets/visual-history/v1.4_figma_mode0.png) |
 
 
 ### 💅 UI Polish
