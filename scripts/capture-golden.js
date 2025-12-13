@@ -51,6 +51,14 @@ REFERENCE_PAGES.forEach(page => {
         const fullPath = path.join(OUTPUT_DIR, filename);
         const exists = fs.existsSync(fullPath);
         console.log(`   ${exists ? '✅' : '⬜'} ${filename}`);
+
+        // Subset for Overlay Variants (Techmeme & Figma only)
+        if (page === 'techmeme' || page === 'figma') {
+            const overlayFilename = `${page}_${fixation}_overlay.png`;
+            const overlayPath = path.join(OUTPUT_DIR, overlayFilename);
+            const overlayExists = fs.existsSync(overlayPath);
+            console.log(`   ${overlayExists ? '✅' : '⬜'} ${overlayFilename} (with debug overlay)`);
+        }
     });
 });
 
@@ -68,7 +76,13 @@ console.log(`   - Screenshot: Cmd+Shift+4 (macOS)\n`);
 
 // Check completion
 const completed = REFERENCE_PAGES.every(page =>
-    FIXATIONS.every(fixation => fs.existsSync(path.join(OUTPUT_DIR, `${page}_${fixation}.png`)))
+    FIXATIONS.every(fixation => {
+        const base = fs.existsSync(path.join(OUTPUT_DIR, `${page}_${fixation}.png`));
+        if (page === 'techmeme' || page === 'figma') {
+            return base && fs.existsSync(path.join(OUTPUT_DIR, `${page}_${fixation}_overlay.png`));
+        }
+        return base;
+    })
 );
 
 if (completed) {
