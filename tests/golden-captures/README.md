@@ -72,3 +72,31 @@ To compare releases, view images side-by-side or use an image diff tool:
 # Quick visual diff (macOS)
 open tests/golden-captures/v1.4.1/dashboard_mode0.png tests/golden-captures/v1.5.0/dashboard_mode0.png
 ```
+
+---
+
+## Future: Volunteer Experiment Infrastructure
+
+A long-term goal is enabling **online volunteer experiments** to validate simulation predictions against real user behavior.
+
+### Proposed Workflow
+
+1. **Prediction Capture**: Record what the simulation predicts users will see/miss at specific gaze points
+2. **Task Design**: Present volunteers with tasks (e.g., "Find the price") on reference pages
+3. **Data Collection**: Capture mouse trajectories, fixation sequences, task completion times
+4. **Validation**: Compare predicted attention flow against actual user behavior
+
+### Required Infrastructure (TODO)
+
+| Component | Status | Description |
+|-----------|--------|-------------|
+| **Prediction Export** | ❌ Planned | Export simulation state at each fixation as JSON |
+| **A/B Comparison Tool** | ❌ Planned | Side-by-side predicted vs actual gaze paths |
+| **Data Format Spec** | ❌ Planned | Standardized format for research data exchange |
+| **IRB-Ready Consent Flow** | ❌ Planned | Informed consent UI for research studies |
+
+### Research Applications
+
+- Validate Linguistic Pre-Attentive Layer predictions (see `docs/Linguistic Pre-Attentive Layer.md`)
+- Compare simulation accuracy across different aesthetic modes
+- Calibrate parameters (e.g., `lgn_ramp_end_mult`) against empirical data

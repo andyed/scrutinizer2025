@@ -3,6 +3,19 @@
 > [!NOTE]
 > **Version 2.0** — This revision incorporates a critical review addressing gaps in the original spec, particularly regarding legibility gating, icon recognition, and dynamic attention weighting.
 
+> [!IMPORTANT]
+> **Implementation Status: PLANNED**
+> 
+> This specification is a design document for a future feature. Current implementation status:
+> - [ ] Transformers.js integration (model loading)
+> - [ ] Goal Embedding pipeline
+> - [ ] Icon/Symbol Dictionary
+> - [ ] Legibility Gating in shader
+> - [ ] Dynamic Exploration/Exploitation controller
+> - [ ] "Scent Map" visualization overlay
+> 
+> **Dependencies**: Requires `saliency-worker.js` refactor and new shader uniforms. See [ROADMAP.md](../ROADMAP.md) for prioritization.
+
 ## **1. Executive Summary**
 
 This feature introduces **Top-Down Attentional Control** to the Scrutinizer engine. By comparing the semantic meaning of a User Goal against the text content of a rendered page, we generate a **Semantic Saliency Map**. This map biases the simulated saccades toward "high information scent" areas, modeling how users scan for specific information rather than just reacting to bright colors or contrast.

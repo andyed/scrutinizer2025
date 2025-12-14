@@ -56,6 +56,24 @@ This simulation visualizes the split-second mechanics of a glance—how your bra
 
 ---
 
+## Audience & Use Cases
+
+Scrutinizer is designed for **designers, UX researchers, and HCI/vision scientists** who need to understand how users actually perceive interfaces—not how they appear in screenshots.
+
+| Audience | Use Case |
+|----------|----------|
+| **Solo Designer** | Iterate on layouts by revealing visual hierarchy issues before handoff |
+| **Design Review** | Objectively discuss "what draws the eye" with data-driven saliency overlays |
+| **UX Research** | Conduct attention studies using mouse-contingent viewing (validated against eye-tracking) |
+| **Client Presentation** | Use storytelling modes (Cyberpunk, Wireframe) to demonstrate design rationale |
+| **Vision Researchers** | Validate peripheral vision models against the simulation |
+
+> **Open Source & Extensible**: The browser app is MIT-licensed and designed for customization. Aesthetic modes serve as test cases for the modular pipeline—see the [Developer's Guide](docs/developers_guide.md) for adding your own.
+>
+> **Commercial Plugin**: A Figma plugin is also available for design-tool integration.
+
+---
+
 ## Features
 
 * **Foveal/Peripheral Vision Simulation**: Toggle between clear central vision and degraded peripheral zones

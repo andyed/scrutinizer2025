@@ -358,6 +358,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         {
                             label: 'Aesthetic Mode',
                             submenu: [
+                                // === RESEARCH MODES (Optimized for simulation accuracy) ===
                                 {
                                     label: 'High-Key Ghosting (Default)',
                                     type: 'radio',
@@ -374,6 +375,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     type: 'radio',
                                     click: () => sendToOverlays('menu:set-aesthetic-mode', 2)
                                 },
+                                // === PRESENTATION MODES (Storytelling & demos) ===
                                 {
                                     label: 'Wireframe (Gestalt)',
                                     type: 'radio',

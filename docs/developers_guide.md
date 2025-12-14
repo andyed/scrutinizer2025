@@ -2,6 +2,9 @@
 
 This guide outlines the process for implementing and testing new peripheral vision models (visual transforms) in Scrutinizer.
 
+> [!TIP]
+> **Extensibility by Design**: Scrutinizer's pipeline is intentionally modular. Aesthetic modes are not just visual filters—they are **functional test cases** that validate the architecture. If you need to "hack" the shader to achieve a look, that hack often reveals a missing capability that should become an official feature.
+
 ## Architecture Overview
 
 Scrutinizer uses a custom WebGL renderer (`webgl-renderer.js`) to apply fragment shaders to captured browser content. The core logic resides in the fragment shader's `main` function, which determines how pixels are processed based on their distance from the fovea (mouse cursor).
