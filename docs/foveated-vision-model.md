@@ -4,25 +4,134 @@ This document explains how Scrutinizer simulates human foveal / peripheral visio
 
 ---
 
-## 1. Coordinate system and foveal radius
+## 1. The Biology: From Photoreceptors to Perception
+
+Before diving into shader parameters, it helps to understand *why* foveal and peripheral vision differ so dramatically. The answer lies in the architecture of the visual system itself—from the retina to the cortex.
+
+### 1.1 The Retina: Two Receptor Systems
+
+The human retina contains two fundamentally different photoreceptor types, each optimized for different tasks:
+
+#### Cones (The "What" System)
+- **~6 million** total, concentrated in the **fovea** (central 2° of vision)
+- **Three types** (L, M, S) enable color vision
+- **High temporal resolution** for fine detail and motion
+- **1:1 wiring** in the fovea—each cone connects to its own ganglion cell
+- **Peak density**: ~200,000 cones/mm² at the foveal center
+
+#### Rods (The "Where" System)
+- **~120 million** total, distributed across the **periphery**
+- **Single type** (no color discrimination)
+- **Peak sensitivity at 505nm** (cyan/blue-green)—blind to red light
+- **Convergent wiring**: ~100 rods share a single ganglion cell
+- **Peak density**: ~160,000 rods/mm² at ~20° eccentricity
+
+> **The Key Insight**: This distribution is not a design flaw—it's an optimization. The fovea sacrifices sensitivity for resolution (1:1 wiring). The periphery sacrifices resolution for sensitivity (100:1 convergence). You can't have both.
+
+### 1.2 The Wiring: Why Periphery is "Blurry"
+
+The critical difference isn't just receptor density—it's **how receptors connect to the brain**.
+
+```
+FOVEA (1:1 Wiring)              PERIPHERY (Convergent Wiring)
+                                
+  Cone → Bipolar → Ganglion       Rod ─┐
+  Cone → Bipolar → Ganglion       Rod ─┼→ Bipolar → Ganglion
+  Cone → Bipolar → Ganglion       Rod ─┤
+                                  Rod ─┘
+                                  
+  = 3 signals to brain            = 1 signal to brain (averaged)
+```
+
+In the periphery, **receptive fields grow with eccentricity**. A single ganglion cell might pool signals from hundreds of photoreceptors. This pooling:
+- **Destroys spatial detail** (you can't know *which* rod fired)
+- **Preserves statistical summaries** (average brightness, texture energy)
+- **Enables motion detection** (any rod in the pool triggers the cell)
+
+This is why peripheral vision sees "textures" rather than "letters"—the wiring physically prevents high-resolution readout.
+
+### 1.3 The Pathway: Retina → LGN → V1 → V4
+
+Visual information flows through a hierarchical pipeline, with each stage adding abstraction:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  RETINA                                                             │
+│  ┌─────────────┐                                                    │
+│  │ Photoreceptors (Rods/Cones)                                      │
+│  │      ↓                                                           │
+│  │ Bipolar Cells (ON/OFF channels)                                  │
+│  │      ↓                                                           │
+│  │ Ganglion Cells → Optic Nerve                                     │
+│  └─────────────┘                                                    │
+│        ↓                                                            │
+├─────────────────────────────────────────────────────────────────────┤
+│  LGN (Lateral Geniculate Nucleus) — "The Gatekeeper"                │
+│  • Receives 10-20% input from retina, 30-40% from V1 FEEDBACK       │
+│  • Implements attentional gating (what gets through to cortex)      │
+│  • Separates Magnocellular (motion/luminance) from Parvocellular    │
+│    (color/detail) streams                                           │
+│        ↓                                                            │
+├─────────────────────────────────────────────────────────────────────┤
+│  V1 (Primary Visual Cortex) — "The Feature Extractor"               │
+│  • Orientation-selective neurons (Hubel & Wiesel)                   │
+│  • Spatial frequency channels (fine vs coarse detail)               │
+│  • Retinotopic map: fovea gets MASSIVE cortical magnification       │
+│  • Crowding emerges here: adjacent features interfere               │
+│        ↓                                                            │
+├─────────────────────────────────────────────────────────────────────┤
+│  V4 (Visual Area 4) — "The Interpreter"                             │
+│  • Color constancy and surface perception                           │
+│  • Shape recognition (curves, contours)                             │
+│  • Aesthetic processing begins here                                 │
+│        ↓                                                            │
+│  Higher Areas (IT, FFA, PPA...) — Object/Face/Scene recognition     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 1.4 Cortical Magnification: The Fovea's Unfair Advantage
+
+Even though the fovea covers only **2° of visual angle** (~1% of the visual field), it commands **~50% of V1's cortical surface area**. This "cortical magnification" means:
+
+- Foveal signals get more neurons, more processing, more bandwidth
+- Peripheral signals are compressed into fewer neurons
+- The brain literally allocates more "compute" to the center
+
+> **Scrutinizer's Pipeline Mirrors This**: Our LGN → V1 → V4 shader stages are named after these biological areas. While not a rigorous simulation, the architecture reflects the same principle: gating (LGN), geometric distortion (V1), and aesthetic rendering (V4).
+
+### 1.5 What This Means for Peripheral Vision
+
+The biological architecture produces several emergent properties that Scrutinizer simulates:
+
+| Biological Phenomenon | Cause | Scrutinizer Implementation |
+|----------------------|-------|---------------------------|
+| **Resolution loss** | Receptor pooling (100:1) | MIP-based pooling (textureLod) |
+| **Color blindness** | Rod dominance (no color) | Oklab desaturation + cyan tint |
+| **Crowding** | Receptive field overlap | Domain warping + lateral smash |
+| **Motion sensitivity** | Magnocellular pathway | Preserved contrast in periphery |
+| **Positional uncertainty** | Large receptive fields | Simplex noise displacement |
+
+---
+
+## 2. Coordinate System and Foveal Radius
+
+Now that we understand *why* foveal and peripheral vision differ, we can map these biological constraints to shader parameters.
 
 The WebGL renderer receives:
 
-- `u_resolution`: canvas size in pixels.
-- `u_mouse`: foveal center in pixels (canvas coordinates).
-- `u_foveaRadius`: foveal radius in pixels.
+- `u_resolution`: canvas size in pixels
+- `u_mouse`: foveal center in pixels (canvas coordinates)
+- `u_foveaRadius`: foveal radius in pixels
 
 In the fragment shader:
 
-- Texture coordinates `uv` are corrected for aspect ratio and squashed in X to approximate an elliptical (4:3) foveal footprint.
-- A normalized distance `dist` is computed from the foveal center in this corrected space.
-- A normalized radius is defined as:
-  
-  - `radius_norm = u_foveaRadius / u_resolution.y`
+- Texture coordinates `uv` are corrected for aspect ratio and squashed in X to approximate an elliptical (4:3) foveal footprint
+- A normalized distance `dist` is computed from the foveal center in this corrected space
+- A normalized radius is defined as: `radius_norm = u_foveaRadius / u_resolution.y`
 
 This allows us to express all zones as **fractions of the configured foveal radius**, independent of actual pixel resolution.
 
-Biologically, the fovea is approximately circular. For screen-based reading and text layouts, we deliberately apply an **elliptical aspect correction** (default 4:3) so that the “usable” sharp region better matches the horizontally biased saccades you make across lines of text.
+Biologically, the fovea is approximately circular. For screen-based reading and text layouts, we deliberately apply an **elliptical aspect correction** (default 4:3) so that the "usable" sharp region better matches the horizontally biased saccades you make across lines of text.
 
 ### Biological Calibration: The 5° Macular Region
 
@@ -53,7 +162,7 @@ The **parafoveal region** (fovea + parafovea combined) corresponds to the **5° 
 
 ---
 
-## 2. Three spatial zones
+## 3. Three Spatial Zones
 
 All non‑foveal processing is defined in terms of three concentric zones, expressed as multiples of `radius_norm`.
 
@@ -80,7 +189,7 @@ The **debug boundary overlay** is drawn exactly at `dist == fovea_radius`, so th
 
 ---
 
-## 3. Strength masks (distance → effect curves)
+## 4. Strength Masks (Distance → Effect Curves)
 
 The shader defines several scalar “strength” values derived from the distance `dist`. These are smoothstep curves that go from 0 to 1 across a band of radii.
 
@@ -123,7 +232,7 @@ Effect strength
 
 ---
 
-## 4. Domain Warping & Mipmap Pooling (Crowding)
+## 5. Domain Warping & Mipmap Pooling (Crowding)
 
 The shader models the growth of receptive field size with eccentricity using **domain warping** and **pooling**:
 
@@ -141,7 +250,7 @@ Intuition:
 
 ---
 
-## 5. Universal Structure Map Pipeline (New in v2.0)
+## 6. Universal Structure Map Pipeline (New in v2.0)
 
 To unify rendering across the Open Web (DOM) and Figma (Scene Graph), Scrutinizer v2.0 introduces an **Abstract Layout Provider** architecture. Instead of relying on ad-hoc heuristics, the renderer consumes a normalized data stream of layout blocks.
 
@@ -210,7 +319,7 @@ Uses the **Green Channel (Mass)** to modulate the biological simulation.
 
 ---
 
-## 6. Coherent Crowding ("The Melter")
+## 7. Coherent Crowding ("The Melter")
 
 ### Tier 1.8 & 1.8.1: Structural Melting & Lateral Smash
 
@@ -478,7 +587,7 @@ To mitigate "breathing" artifacts on full-motion video, the Saliency Map is used
 - **UI elements**: Buttons, icons remain clear for interaction
 ---
 
-## 7. Chromatic aberration (lens split)
+## 8. Chromatic Aberration (Lens Split)
 
 Chromatic aberration is modeled by sampling the warped position three times:
 
@@ -494,7 +603,7 @@ This creates colored fringes in the periphery, supporting illegibility without n
 
 ---
 
-## 7. Rod vision: Oklab color space desaturation
+## 9. Rod Vision: Oklab Color Space Desaturation
 
 **New in v1.3:** Peripheral vision color processing has been upgraded from RGB to **Oklab**, a perceptually uniform color space designed for image processing.
 
@@ -606,7 +715,7 @@ Ottosson, B. (2020). "A perceptual color space for image processing." https://bo
 
 ---
 
-## 8. Scrollbar preservation
+## 10. Scrollbar Preservation
 
 A thin band near the right edge of the screen is excluded from peripheral processing, so operating system scrollbars and similar UI affordances remain sharp and usable.
 
@@ -616,7 +725,7 @@ This acts as a **Fitts's-law safe zone** for precise pointer targeting. The mask
 
 ---
 
-## 9. Debug boundary overlay
+## 11. Debug Boundary Overlay
 
 When enabled from the menu, the shader draws a subtle grey ring at the true foveal edge:
 
@@ -625,7 +734,7 @@ When enabled from the menu, the shader draws a subtle grey ring at the true fove
 
 ---
 
-## 10. Future tuning knobs
+## 12. Future Tuning Knobs
 
 The current implementation hard‑codes the key ratios:
 
@@ -648,7 +757,7 @@ Those sliders would effectively reshape the smoothstep curves described above, a
 
 ---
 
-## 11. Neuro-Architecture Pipeline
+## 13. Neuro-Architecture Pipeline
 
 The renderer organizes these effects into a modular pipeline inspired by the human visual system.
 
@@ -697,7 +806,7 @@ The pipeline enforces a strict "Do No Harm" policy for the fovea.
 
 ---
 
-## 12. Visual Memory (Persistence)
+## 14. Visual Memory (Persistence)
 
 To simulate the brain's ability to "hold" visual information, Scrutinizer implements a **Visual Memory** system.
 

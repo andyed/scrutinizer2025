@@ -4,74 +4,174 @@
 
 This document bridges the gap between Scrutinizer's technical implementation and the biological and cognitive science that inspires it. Scrutinizer is not merely an aesthetic filter; it is a biologically plausible simulation of the human foveated visual system, designed to reveal how peripheral vision influences attention, reading, and information foraging.
 
+The document is organized to follow the visual pathway from **photoreceptors → retina → LGN → V1 → V4 → perception**, mirroring how information actually flows through the brain.
+
 ## Table of Contents
 
-1.  [Implementation Notes: The Biological Model](#implementation-notes-the-biological-model)
-    *   [Rod-Weighted Luminance](#1-rod-weighted-luminance-scotopic-vision)
-    *   [Box Sampling](#2-box-sampling-retinal-ganglion-density)
-    *   [Domain Warping](#3-domain-warping-positional-uncertainty)
-    *   [Radial Chromatic Aberration](#4-radial-chromatic-aberration-the-lens-split)
-2.  [Scientific Validation & Research Context](#scientific-validation--research-context)
-    *   [Validation: Gaze-Contingent Research Protocols](#validation-gaze-contingent-research-protocols)
+1.  [The Visual Pathway: A Biological Foundation](#1-the-visual-pathway-a-biological-foundation)
+    *   [Stage 1: Retina (Photoreceptors & Ganglion Cells)](#stage-1-retina-photoreceptors--ganglion-cells)
+    *   [Stage 2: LGN (Gating & Parallel Streams)](#stage-2-lgn-gating--parallel-streams)
+    *   [Stage 3: V1 (Feature Extraction & Crowding)](#stage-3-v1-feature-extraction--crowding)
+    *   [Stage 4: V4 and Beyond (Color, Shape, Recognition)](#stage-4-v4-and-beyond-color-shape-recognition)
+2.  [Scrutinizer's Implementation](#2-scrutinizers-implementation)
+    *   [Rod-Weighted Luminance (Scotopic Vision)](#rod-weighted-luminance-scotopic-vision)
+    *   [Box Sampling (Retinal Ganglion Density)](#box-sampling-retinal-ganglion-density)
+    *   [Domain Warping (Positional Uncertainty)](#domain-warping-positional-uncertainty)
+    *   [Chromatic Aberration (Magno/Parvo Streams)](#chromatic-aberration-magnoparvo-streams)
+3.  [Research Validation](#3-research-validation)
+    *   [Gaze-Contingent Research Protocols](#gaze-contingent-research-protocols)
     *   [Ensemble Perception & Saccade Planning](#ensemble-perception--saccade-planning)
-    *   [Vision Science & Cognitive Psychology](#vision-science--cognitive-psychology)
-    *   [Feature Detection in V1](#feature-detection-in-primary-visual-cortex-v1)
-    *   [Top-Down Influences in the LGN](#top-down-influences-in-the-lateral-geniculate-nucleus-lgn)
+4.  [Key References by Topic](#4-key-references-by-topic)
 
-## Implementation Notes: The Biological Model
+---
 
-The simulation is powered by a custom **WebGL Fragment Shader** that processes the browser viewport in real-time (60fps). The pipeline implements four distinct biological constraints to model the limitations of the human visual system.
+## 1. The Visual Pathway: A Biological Foundation
 
-For a deeper look at the foveal / parafoveal / peripheral model and shader parameters, see [`docs/foveated-vision-model.md`](docs/foveated-vision-model.md).
+Understanding *why* foveal and peripheral vision differ requires tracing the path from light hitting the retina to conscious perception. Each stage introduces constraints that Scrutinizer models.
 
-### 1. Rod-Weighted Luminance (Scotopic Vision)
+### Stage 1: Retina (Photoreceptors & Ganglion Cells)
+
+The retina is not a passive sensor—it's a sophisticated neural network that preprocesses visual information before sending it to the brain.
+
+#### Photoreceptor Distribution
+
+* **Curcio, C. A., et al. (1990)**: ["Human photoreceptor topography"](https://doi.org/10.1002/cne.902920402). *Journal of Comparative Neurology*.
+    * **The Data**: Mapped the precise distribution of rods and cones across the human retina. Cones peak at ~200,000/mm² in the foveal center and drop to ~5,000/mm² at 20° eccentricity. Rods are absent from the fovea but peak at ~160,000/mm² at 20°.
+    * **Relevance**: This distribution is the fundamental reason for foveal/peripheral differences. Scrutinizer's MIP-based pooling models the increasing receptive field size that results from rod convergence.
+
+#### Ganglion Cell Wiring
+
+* **Dacey, D. M. (1993)**: ["The mosaic of midget ganglion cells in the human retina"](https://doi.org/10.1523/JNEUROSCI.13-12-05334.1993). *Journal of Neuroscience*.
+    * **The Discovery**: In the fovea, each cone connects to a single "midget" ganglion cell (1:1 wiring). In the periphery, many photoreceptors converge onto single ganglion cells (100:1 or more).
+    * **Relevance**: This convergence is why peripheral vision cannot resolve fine detail—the information is physically averaged before leaving the eye. Scrutinizer's box sampling simulates this pooling.
+
+#### Center-Surround Processing
+
+* **Kuffler, S. W. (1953)**: ["Discharge patterns and functional organization of mammalian retina"](https://doi.org/10.1152/jn.1953.16.1.37). *Journal of Neurophysiology*.
+    * **The Discovery**: Retinal ganglion cells have "center-surround" receptive fields—they respond to contrast, not absolute light levels. This is the first stage of edge detection.
+    * **Relevance**: Scrutinizer's saliency map uses center-surround (Difference-of-Gaussians) to detect edges and contrast, mimicking this retinal preprocessing.
+
+### Stage 2: LGN (Gating & Parallel Streams)
+
+The Lateral Geniculate Nucleus is traditionally viewed as a "relay station," but it's actually a critical gating mechanism where attention and expectation modulate visual signals.
+
+#### Anatomical Architecture
+
+* **Sherman, S. M., & Guillery, R. W. (2002)**: ["The role of the thalamus in the flow of information to the cortex"](https://doi.org/10.1098/rstb.2002.1161). *Philosophical Transactions of the Royal Society B*.
+    * **The Architecture**: Only ~10-20% of synaptic inputs to LGN neurons come from the retina. The majority (~30-40%) come from **feedback projections from V1**, with additional inputs from brainstem and other thalamic nuclei.
+    * **Relevance**: The LGN is not a passive relay but an active gating mechanism. Scrutinizer's LGN stage implements this gating via structure masking and saliency modulation.
+
+#### Magnocellular vs Parvocellular Streams
+
+* **Livingstone, M., & Hubel, D. (1988)**: ["Segregation of form, color, movement, and depth: anatomy, physiology, and perception"](https://doi.org/10.1126/science.3283936). *Science*.
+    * **The Insight**: Visual information splits into parallel streams at the LGN:
+        * **Magnocellular (M)**: Fast, motion-sensitive, luminance-only, large receptive fields
+        * **Parvocellular (P)**: Slower, color-sensitive, fine detail, small receptive fields
+    * **Relevance**: Scrutinizer's chromatic aberration simulates the temporal/spatial asynchrony between these streams. The M-pathway's preserved contrast in periphery is why motion detection works even when you can't identify objects.
+
+#### Attentional Modulation
+
+* **McAlonan, K., Cavanaugh, J., & Wurtz, R. H. (2008)**: ["Guarding the gateway to cortex with attention in visual thalamus"](https://doi.org/10.1038/nature07382). *Nature*.
+    * **The Discovery**: Spatial attention enhances LGN responses to stimuli at attended locations even before information reaches V1.
+    * **Relevance**: This validates Scrutinizer's saliency-based fidelity bias—the brain really does preserve more detail around salient targets.
+
+### Stage 3: V1 (Feature Extraction & Crowding)
+
+The primary visual cortex (V1) is where the brain first constructs a representation of visual features—edges, orientations, spatial frequencies.
+
+#### Orientation Selectivity
+
+* **Hubel, D. H., & Wiesel, T. N. (1962)**: ["Receptive fields, binocular interaction and functional architecture in the cat's visual cortex"](https://doi.org/10.1113/jphysiol.1962.sp006837). *The Journal of Physiology*.
+    * **The Discovery**: Nobel-prize winning work demonstrating that V1 neurons respond selectively to oriented edges and bars at specific angles.
+    * **Relevance**: This establishes the fundamental building block of visual feature detection. Scrutinizer's wireframe mode visualizes these extracted features.
+
+#### Spatial Frequency Channels
+
+* **Campbell, F. W., & Robson, J. G. (1968)**: ["Application of Fourier analysis to the visibility of gratings"](https://doi.org/10.1113/jphysiol.1968.sp008574). *The Journal of Physiology*.
+    * **The Insight**: The human visual system processes spatial patterns via multiple independent channels tuned to different spatial frequencies.
+    * **Relevance**: Scrutinizer's MIP-based pooling destroys high spatial frequencies in the periphery while preserving low frequencies, matching how peripheral V1 neurons have coarser tuning.
+
+#### Crowding: The Peripheral Bottleneck
+
+* **Pelli, D. G. (2008)**: ["Crowding: a cortical constraint on object recognition"](https://doi.org/10.1016/j.conb.2008.09.008). *Current Opinion in Neurobiology*.
+    * **The Insight**: Crowding—the inability to identify objects in clutter—is a fundamental limit of peripheral vision that occurs in V1. It's not blur; it's feature binding failure.
+    * **Relevance**: Scrutinizer's domain warping and "lateral smash" simulate crowding by displacing features into each other, creating "mongrel" textures where individual letters cannot be identified even though their features are present.
+
+* **Rosenholtz, R., et al. (2012)**: ["A summary statistic representation in peripheral vision explains visual search"](https://jov.arvojournals.org/article.aspx?articleid=2193856). *Journal of Vision*.
+    * **The Insight**: Peripheral vision represents the world as "texture statistics" (Mongrels). We don't see blurry letters; we see a "texture of letters."
+    * **Relevance**: This is the theoretical foundation for Scrutinizer's approach—we don't just blur, we preserve statistical properties (density, rhythm, contrast) while destroying identity.
+
+### Stage 4: V4 and Beyond (Color, Shape, Recognition)
+
+Higher visual areas process increasingly abstract features—color constancy, shape, and eventually object recognition.
+
+#### Color Processing
+
+* **Zeki, S. (1980)**: ["The representation of colours in the cerebral cortex"](https://doi.org/10.1038/284412a0). *Nature*.
+    * **The Discovery**: V4 contains neurons selective for color, independent of wavelength (color constancy).
+    * **Relevance**: Scrutinizer's Oklab-based desaturation in the periphery models the loss of P-pathway color information, while preserving M-pathway luminance contrast.
+
+#### The "Controlled Hallucination"
+
+* **Seth, A. K. (2014)**: ["A predictive processing theory of sensorimotor contingencies"](https://doi.org/10.1016/j.concog.2012.12.001). *Consciousness and Cognition*.
+    * **The Framework**: Perception is not passive reception but active prediction. The brain constructs a "best guess" of reality, filling in gaps with expectations.
+    * **Relevance**: This explains why we don't notice our peripheral blindness—the brain fills in the gaps. Scrutinizer reveals what the raw signal actually contains before this "autocorrect."
+
+---
+
+## 2. Scrutinizer's Implementation
+
+The simulation is powered by a custom **WebGL Fragment Shader** that processes the browser viewport in real-time (60fps). The pipeline implements four distinct biological constraints.
+
+For detailed shader parameters, see [`foveated-vision-model.md`](foveated-vision-model.md).
+
+### Rod-Weighted Luminance (Scotopic Vision)
+
 In the periphery, cone cells (color) are scarce, and rod cells (luminance) dominate. Rods have a peak sensitivity at **505nm (Cyan/Blue-Green)** and are blind to red light.
 
-- **Algorithm**: We calculate a "Rod Tint" vector based on the pixel's luminance.
+- **Algorithm**: We calculate a "Rod Tint" vector based on the pixel's luminance using Oklab color space.
 - **Effect**: As eccentricity increases, colors desaturate towards a cyan-grey. Red objects lose contrast and vanish, while blue/green objects appear brighter ("Purkinje shift").
 
-> **Key Insight**: This simulates the "night vision" quality of peripheral sight.
-> ↳ **See**: [Vision Science & Cognitive Psychology](#vision-science--cognitive-psychology) (Purkinje Shift)
+> **Biological Basis**: Curcio (1990) photoreceptor distribution; rod spectral sensitivity peaks at 505nm.
 
-### 2. Box Sampling (Retinal Ganglion Density)
+### Box Sampling (Retinal Ganglion Density)
+
 The density of Retinal Ganglion Cells (RGCs) drops exponentially from the fovea. This results in a loss of sampling resolution.
 
-- **Algorithm**: We use a variable-size pixelation filter. The "block size" scales with distance from the fovea.
+- **Algorithm**: We use MIP-based pooling where the LOD level scales with eccentricity.
 - **Effect**: Fine details in the periphery are averaged into larger blocks, destroying high-frequency information (like text) while preserving low-frequency structures (layout).
 
-> **Key Insight**: This models the "hardware limit" of the retina.
-> ↳ **See**: [Ensemble Perception](#ensemble-perception--saccade-planning) (Whitney: Compression)
+> **Biological Basis**: Dacey (1993) ganglion cell wiring; receptive field growth with eccentricity.
 
-### 3. Domain Warping (Positional Uncertainty)
+### Domain Warping (Positional Uncertainty)
+
 Peripheral vision suffers from "crowding"—the inability to isolate features. The brain receives a statistical summary of the texture rather than precise coordinates.
 
 - **Algorithm**: We apply multi-octave **Simplex Noise** to the UV coordinates of the texture lookup.
 - **Effect**:
     - **Fine Noise**: Jitters small details (text looks like "ants").
     - **Coarse Noise**: Warps large shapes (layout feels unstable).
+    - **Lateral Smash**: Horizontal bias (6x) simulates reading-direction crowding.
 
-> **Key Insight**: The brain sees the *texture* of text but cannot resolve individual letters.
-> ↳ **See**: [Mongrel Theory](#vision-science--cognitive-psychology) (Rosenholtz: Texture Statistics)
+> **Biological Basis**: Pelli (2008) crowding; Rosenholtz (2012) texture statistics.
 
-### 4. Radial Chromatic Aberration (The "Lens Split")
-The Magno-cellular pathway (motion/luminance) processes information faster than the Parvo-cellular pathway (color), leading to temporal and spatial asynchrony.
+### Chromatic Aberration (Magno/Parvo Streams)
+
+The Magnocellular pathway (motion/luminance) processes information faster than the Parvocellular pathway (color), leading to temporal and spatial asynchrony.
 
 - **Algorithm**: We split the color channels based on a radial vector from the fovea:
     - **Red Channel**: Pulled *inward* (towards fovea).
     - **Blue Channel**: Pushed *outward* (away from fovea).
     - **Green Channel**: Anchored.
-- **Effect**: High-contrast edges in the periphery develop color fringes (Red/Cyan), creating a "vibrating" or "3D" effect that simulates the difficulty of locking focus on peripheral objects.
+- **Effect**: High-contrast edges in the periphery develop color fringes, simulating the difficulty of locking focus on peripheral objects.
 
-> **Key Insight**: Visualizes the disconnect between "Where" (Magno) and "What" (Parvo) streams.
-> ↳ **See**: [Feature Detection in V1](#feature-detection-in-primary-visual-cortex-v1) (Hubel & Wiesel)
-
-**For detailed theoretical discussion**, see [`docs/beta_gemini3_discussion.md`](docs/beta_gemini3_discussion.md)
+> **Biological Basis**: Livingstone & Hubel (1988) M/P stream segregation.
 
 ---
 
-## Scientific Validation & Research Context
+## 3. Research Validation
 
-### Validation: Gaze-Contingent Research Protocols
+### Gaze-Contingent Research Protocols
 
 > **Context**: The studies below utilize "Gaze-Contingent Displays" (GCDs) as a **research protocol**. While they typically use simple Gaussian blur (unlike Scrutinizer's biologically plausible simulation), they validate the fundamental methodology: restricting peripheral information forces users to reveal their cognitive focus via overt attention (mouse/eye movements).
 
@@ -110,14 +210,52 @@ The Magno-cellular pathway (motion/luminance) processes information faster than 
     * **The Insight**: A comprehensive review of how the visual system compresses redundant information (like rows of text) into a "Gist."
     * **Relevance to Scrutinizer**: Supports the use of **Quantization** (blocking). The visual system compresses 10 lines of text into a single "Text Object." Scrutinizer visualizes this compression algorithm in real-time.
 
-### Vision Science & Cognitive Psychology
+---
 
-* **Ruth Rosenholtz (MIT):** [Mongrel Theory and peripheral summary statistics](https://dspace.mit.edu/handle/1721.1/6763)
-    * *See also:* [The Visual System as a Statistician (PDF)](https://jov.arvojournals.org/article.aspx?articleid=2193856)
-* **Anil Seth:** [The "Controlled Hallucination" model of perception (TED Talk)](https://www.ted.com/talks/anil_seth_your_brain_hallucinates_your_conscious_reality)
-* **Peter Pirolli (Xerox PARC):** [Information Foraging Theory (Pirolli & Card, 1999)](https://review.ucsc.edu/fall09/images/Pirolli_Card_1999.pdf)
-    * *Concept:* "Information Scent"
-* **Cohen et al. (2020, PNAS):** ["The Refrigerator Light" illusion / The Bandwidth of Perceptual Experience](https://www.pnas.org/doi/10.1073/pnas.1915758117)
+## 4. Key References by Topic
+
+### Retinal Architecture
+| Author | Year | Key Contribution |
+|--------|------|------------------|
+| Curcio et al. | 1990 | Photoreceptor topography mapping |
+| Dacey | 1993 | Midget ganglion cell wiring (1:1 foveal) |
+| Kuffler | 1953 | Center-surround receptive fields |
+
+### LGN & Attention
+| Author | Year | Key Contribution |
+|--------|------|------------------|
+| Sherman & Guillery | 2002 | Thalamic feedback architecture |
+| Livingstone & Hubel | 1988 | Magno/Parvo stream segregation |
+| McAlonan et al. | 2008 | Attentional modulation in LGN |
+
+### V1 & Feature Detection
+| Author | Year | Key Contribution |
+|--------|------|------------------|
+| Hubel & Wiesel | 1962 | Orientation selectivity (Nobel Prize) |
+| Campbell & Robson | 1968 | Spatial frequency channels |
+| Marcelja | 1980 | Gabor filter model of simple cells |
+| Daugman | 1985 | Optimal uncertainty in V1 encoding |
+
+### Crowding & Peripheral Vision
+| Author | Year | Key Contribution |
+|--------|------|------------------|
+| Pelli | 2008 | Crowding as cortical constraint |
+| Rosenholtz et al. | 2012 | Texture statistics / Mongrel theory |
+| Whitney & Leib | 2018 | Ensemble perception review |
+
+### Gaze-Contingent Research
+| Author | Year | Key Contribution |
+|--------|------|------------------|
+| Blackwell et al. | 2003 | Restricted Focus Viewer (seminal) |
+| Bednarik & Tukiainen | 2007 | RFV validation vs eye-tracking |
+| Lagun & Agichtein | 2011 | ViewSer for SERP attention |
+
+### Cognitive & UX Applications
+| Author | Year | Key Contribution |
+|--------|------|------------------|
+| Pirolli & Card | 1999 | Information Foraging Theory |
+| Rayner | 1998 | Eye movements in reading |
+| Seth | 2014 | Predictive processing / "Controlled Hallucination" |
 
 ### UX & Design Practice
 
@@ -127,49 +265,38 @@ The Magno-cellular pathway (motion/luminance) processes information faster than 
 ### Community Discussion
 
 * **Reddit /r/askscience (2014):** ["The fovea is so small compared to the size of the visual field, so why does the world not appear to be of terribly low fidelity?"](https://www.reddit.com/r/askscience/comments/1wzp3g/the_fovea_is_so_small_compared_to_the_size_of_the/)
-    * **The Question**: A fundamental inquiry about why we perceive the world as uniformly sharp despite the fovea covering only ~2° of visual angle.
-    * **Community Answers**: Discusses saccadic eye movements, visual memory, and the brain's reconstruction of a coherent visual scene from sparse high-resolution samples.
-    * **Relevance to Scrutinizer**: Validates the core motivation—most people are unaware of how limited their peripheral vision actually is until it's explicitly demonstrated.
+    * Validates the core motivation—most people are unaware of how limited their peripheral vision actually is until it's explicitly demonstrated.
+
+---
+
+## Appendix: Extended V1 & LGN References
 
 ### Feature Detection in Primary Visual Cortex (V1)
-
-The primary visual cortex (V1) is the first cortical area to receive visual information from the lateral geniculate nucleus (LGN) and serves as the foundation for feature extraction in the visual system.
 
 #### Orientation Selectivity
 
 * **Hubel, D. H., & Wiesel, T. N. (1962)**: [Receptive fields, binocular interaction and functional architecture in the cat's visual cortex](https://doi.org/10.1113/jphysiol.1962.sp006837). *The Journal of Physiology*.
-    * **The Discovery**: Nobel-prize winning work demonstrating that V1 neurons respond selectively to oriented edges and bars at specific angles. Some cells respond maximally to vertical edges, others to horizontal, and others to oblique orientations spanning 360°.
-    * **Relevance**: This establishes the fundamental building block of visual feature detection—the decomposition of visual scenes into oriented contours. The orientation selectivity is organized into **orientation columns** spanning the cortical surface.
+    * Nobel-prize winning work demonstrating that V1 neurons respond selectively to oriented edges and bars at specific angles.
 
 * **Hubel, D. H., & Wiesel, T. N. (1968)**: [Receptive fields and functional architecture of monkey striate cortex](https://doi.org/10.1113/jphysiol.1968.sp008455). *The Journal of Physiology*.
-    * **Extension to primates**: Confirmed that the functional architecture discovered in cats extends to primates, including the columnar organization and the distinction between simple and complex cells.
+    * Confirmed that the functional architecture discovered in cats extends to primates.
 
 #### Simple vs. Complex Cells
 
-* **Simple Cells**: Exhibit spatially segregated ON and OFF regions in their receptive fields. They respond best to oriented edges or bars at specific positions within the receptive field. The response is linear and can be predicted by summing LGN inputs.
-
-* **Complex Cells**: Respond to oriented stimuli regardless of exact position within the receptive field (position invariance). They sum responses from multiple simple cells with the same orientation preference but different spatial phases. This provides the first level of translation invariance in the visual system.
+* **Simple Cells**: Exhibit spatially segregated ON and OFF regions. Respond to oriented edges at specific positions.
+* **Complex Cells**: Position-invariant orientation selectivity. First level of translation invariance.
 
 #### Spatial Frequency Tuning
 
-* **De Valois, R. L., Albrecht, D. G., & Thorell, L. G. (1982)**: [Spatial frequency selectivity of cells in macaque visual cortex](https://doi.org/10.1016/0042-6989(82)90113-4). *Vision Research*.
-    * **The Insight**: V1 neurons act as spatial frequency filters, with different cells tuned to different scales of detail. Some respond best to fine textures (high spatial frequencies), others to coarse structures (low spatial frequencies).
-    * **Relevance to Scrutinizer**: The box sampling and blur parameters in the peripheral simulation directly relate to the loss of high-frequency tuned neurons in peripheral visual field representations. V1's spatial frequency channels form a multi-scale decomposition analogous to a Fourier or wavelet transform.
-
-* **Campbell, F. W., & Robson, J. G. (1968)**: [Application of Fourier analysis to the visibility of gratings](https://doi.org/10.1113/jphysiol.1968.sp008574). *The Journal of Physiology*.
-    * **Psychophysical evidence**: Demonstrated that the human visual system processes spatial patterns via multiple independent channels tuned to different spatial frequencies—providing behavioral evidence for the neural mechanisms later discovered in V1.
+* **De Valois, R. L., et al. (1982)**: [Spatial frequency selectivity of cells in macaque visual cortex](https://doi.org/10.1016/0042-6989(82)90113-4). *Vision Research*.
+    * V1 neurons act as spatial frequency filters tuned to different scales.
 
 #### V1 as a 2D Gabor Filter Bank
 
-* **Marcelja, S. (1980)**: [Mathematical description of the responses of simple cortical cells](https://doi.org/10.1364/JOSA.70.001297). *Journal of the Optical Society of America*.
-    * **Mathematical Model**: Showed that simple cell receptive fields can be accurately modeled as 2D Gabor functions—sinusoidal gratings modulated by Gaussian envelopes. This provides optimal localization in both spatial and frequency domains.
+* **Marcelja, S. (1980)**: [Mathematical description of the responses of simple cortical cells](https://doi.org/10.1364/JOSA.70.001297). *JOSA*.
+* **Daugman, J. G. (1985)**: [Uncertainty relation for resolution in space, spatial frequency, and orientation](https://doi.org/10.1364/JOSAA.2.001160). *JOSA A*.
 
-* **Daugman, J. G. (1985)**: [Uncertainty relation for resolution in space, spatial frequency, and orientation optimized by two-dimensional visual cortical filters](https://doi.org/10.1364/JOSAA.2.001160). *Journal of the Optical Society of America A*.
-    * **The Optimization**: Demonstrated that Gabor functions achieve the theoretical lower bound on joint uncertainty in position and frequency (as defined by the uncertainty principle), suggesting V1 implements an information-theoretically optimal encoding strategy.
-
-### Top-Down Influences in the Lateral Geniculate Nucleus (LGN)
-
-While traditionally viewed as a relay station, the LGN is now understood to be heavily modulated by feedback from cortex, implementing attentional filtering and predictive processing mechanisms.
+### Top-Down Influences in the LGN
 
 #### Anatomical Basis of Feedback
 
