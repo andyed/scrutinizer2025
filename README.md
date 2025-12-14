@@ -6,7 +6,7 @@
 
 ➡️ Live site: **[scrutinizer.app](https://andyed.github.io/scrutinizer-www/)**
 
-🍎 macOS Installer: **[Download v1.4.0](https://github.com/andyed/scrutinizer2025/releases/download/v1.4.0/Scrutinizer-1.4.0-arm64.dmg)** | [Release Notes](docs/release_notes_v1.4.md)
+🍎 macOS Installer: **[Download v1.4.1](https://github.com/andyed/scrutinizer2025/releases/download/v1.4.1/Scrutinizer-1.4.1-arm64.dmg)** | [Release Notes](docs/release_notes_v1.4.1.md)
 
 **A design constraint model for studying foveal vs. peripheral vision on the web.**
 
