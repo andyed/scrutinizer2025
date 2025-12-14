@@ -383,14 +383,26 @@ xcrun notarytool log "YOUR_SUBMISSION_ID" --keychain-profile "YourNotaryProfile"
 
 Scrutinizer includes an automated visual smoke test to ensure the renderer is functioning correctly and producing expected visual output.
 
-### Running Tests
-To run the automated tests:
+### Automated Visual Suite (Golden Images)
+For reliable regression testing, we use a dedicated suite that spawns isolated Electron instances:
 
+```bash
+npm run capture-golden
+```
+
+This generates 18+ screenshots across 6 reference pages (`techmeme`, `dashboard`, `figma`, etc.) in `tests/golden-captures/vX.X.X/`.
+
+**Artifacts**:
+-   **Generated Images**: `tests/golden-captures/v1.4.1/*.png`
+-   **Report**: `tests/golden-captures/v1.4.1/gallery.html` (Open in browser to review)
+-   **Reference**: See [Test Suite Reference](test_suite_reference.md) for details on all scenarios.
+
+### Manual Testing
+To run the standard smoke test:
 ```bash
 npm test
 ```
-
-This command launches Electron in a special test mode (`TEST_MODE=true`), which executes the test suite defined in `tests/visual-test.html`.
+This executes the `tests/visual-test.html` logic in a headless mode.
 
 ### Generating Screenshots
 To automatically generate screenshots of every test case (useful for visual regression testing or documentation):

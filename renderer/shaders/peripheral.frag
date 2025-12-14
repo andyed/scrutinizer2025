@@ -479,41 +479,33 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         signal.distortionStrength = strength;
         
     } else if (config.v1_distortion_type == 0) {
-        // === NOISE (Curves/Ooze) ===
-        // Calculate warp strength specifically for noise (different falloff than shatter usually)
-        // But we use the LGN passed strength for consistency now.
+        // === TIER 1.8.1: LATERAL SMASH (Anisotropic Crowding) ===
+        // "The Melter" v2 - Aggressive horizontal crowding.
         
-        vec2 uv_noise = vec2(uv_corrected.x / u_fovea_aspect_ratio, uv_corrected.y);
+        vec2 uv_corrected = vec2(uv.x * u_fovea_aspect_ratio, uv.y);
         
-        // Add time offset if animated
-        vec2 timeOffset = vec2(0.0);
-        if (config.v1_animate) {
-            timeOffset = vec2(sin(u_time * 0.2), cos(u_time * 0.15)) * 10.0;
-        }
+        // 1. Micro-Noise (Stroke Melting)
+        // INCREASED Frequency: 900.0 (was 800.0) to target thinner components.
+        // INCREASED Amplitude: 0.004 (was 0.002) to bridge gaps between letters.
+        // Gated by u_v1_animate to allow "Freezing" for tests/screenshots.
+        float t = u_time * u_v1_animate;
+        float micro = snoise(uv_corrected * 900.0 + vec2(t * 5.0)); 
         
-        float coarseScaleX = isFarPeriphery ? 2000.0 : 200.0;
-        float coarseScaleY = isFarPeriphery ? 1000.0 : 100.0;
-        float n1 = snoise(vec2(uv_noise.x * coarseScaleX, uv_noise.y * coarseScaleY) + timeOffset);
-        float n2 = snoise(vec2(uv_noise.x * coarseScaleX, uv_noise.y * coarseScaleY) + vec2(50.0, 50.0) - timeOffset);
+        // 2. Macro-Noise (Word Shape Wobble)
+        float macro = snoise(uv_corrected * 20.0 + vec2(t * 0.1));
         
-        vec2 warpAmp = isFarPeriphery ? vec2(0.005, 0.004) : vec2(0.001, 0.0001);
+        // 3. Combine
+        // micro * 0.004 (high amp) + macro * 0.01 (structure)
+        vec2 warp = vec2(micro * 0.004 + macro * 0.01);
         
-        // Saliency Modulation (Phase 2): Conservative, far-periphery only
-        float saliencyWarpMod = 1.0;
-        if (u_enable_saliency_modulation > 0.5 && isFarPeriphery) {
-            float s = lgn.saliency;
-            // 25% max warp reduction at maximum saliency
-            saliencyWarpMod = mix(1.0, 0.75, s);
-        }
+        // 4. Horizontal Bias (Lateral Smash)
+        // INCREASED: 6.0x (was 2.0x).
+        // This forces letters to slide into each other laterally.
+        warp.x *= 6.0;
         
-        vec2 warpVector = vec2(n1, n2) * warpAmp * strength * u_intensity * saliencyWarpMod;
+        // 5. Apply Strength
+        signal.displacement = warp * strength * u_intensity;
         
-        // Add "breathing" motion to strength if animated
-        if (config.v1_animate) {
-            warpVector *= (1.0 + 0.2 * sin(u_time * 1.5));
-        }
-        
-        signal.displacement = warpVector; // Simplified for brevity, jitter added in full impl
         signal.distortedUV = uv + signal.displacement;
         signal.distortionStrength = strength;
     } else if (config.v1_distortion_type == 3) {
@@ -585,7 +577,12 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     
     // For periphery, use MIP pooling
     // Intensity modulates the pooling strength (lower intensity = less aggressive pooling)
-    vec3 pooledCol = sampleMIPPooled(v1.distortedUV, eccentricity * u_intensity, fovea_radius).rgb;
+    // TIER 1.8: COUPLED POOLING
+    // We link the blur radius (MIP level) directly to the distortion strength.
+    // This ensures that if Saliency/LGN suppresses the warp, the blur also vanishes.
+    // Factor 2.0 ensures we hit Max MIP (Level 4) at full strength (~1.0).
+    float coupledEccentricity = v1.distortionStrength * u_intensity * fovea_radius * 2.0;
+    vec3 pooledCol = sampleMIPPooled(v1.distortedUV, coupledEccentricity, fovea_radius).rgb;
     
     // Smooth blend from fovea to periphery to eliminate visible boundary
     // Blend zone: from fovea_radius to fovea_radius * 1.1 (10% transition band)

@@ -1004,10 +1004,18 @@ function runIntegrationTest() {
     });
     const testRadius = process.env.TEST_RADIUS ? parseFloat(process.env.TEST_RADIUS) : null;
     const testIntensity = process.env.TEST_INTENSITY ? parseFloat(process.env.TEST_INTENSITY) : null;
+    const testFixationX = process.env.TEST_FIXATION_X ? parseFloat(process.env.TEST_FIXATION_X) : null;
+    const testFixationY = process.env.TEST_FIXATION_Y ? parseFloat(process.env.TEST_FIXATION_Y) : null;
+    const testSelector = process.env.TEST_SELECTOR || null;
+    const testOverlay = process.env.TEST_OVERLAY === 'true';
+    const screenshotMode = process.env.SCREENSHOT_MODE || 'date';
+    const outputFilename = process.env.TEST_OUTPUT_FILENAME || null;
 
     console.log(`[Main] Running INTEGRATION TEST`);
     console.log(`[Main] URL: ${testUrl}`);
     console.log(`[Main] Modes: ${testModes.join(', ')}`);
+    console.log(`[Main] Selector: ${testSelector || 'None'}`);
+    console.log(`[Main] Fixation: ${testFixationX}, ${testFixationY}`);
 
     if (!testUrl) {
         console.error('❌ TEST FAILED: TEST_URL env var is required');
@@ -1044,15 +1052,48 @@ function runIntegrationTest() {
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
 
+            // Determine Target Coordinates
+            let targetX, targetY;
+            const { width, height } = mainWindow.getContentBounds();
+
+            if (testSelector) {
+                console.log(`[Test] Locating element: "${testSelector}"...`);
+                try {
+                    const bounds = await mainWindow.scrutinizerView.webContents.executeJavaScript(`
+                        (() => {
+                            const el = document.querySelector('${testSelector}');
+                            if (!el) return null;
+                            const rect = el.getBoundingClientRect();
+                            return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+                        })()
+                    `);
+
+                    if (bounds) {
+                        targetX = bounds.x + (bounds.width / 2);
+                        targetY = bounds.y + (bounds.height / 2);
+                        console.log(`[Test] Element found at (${targetX}, ${targetY})`);
+                    } else {
+                        console.warn(`[Test] Warning: Selector "${testSelector}" not found. Falling back to explicit fixation or center.`);
+                    }
+                } catch (e) {
+                    console.error('[Test] Error locating element:', e);
+                }
+            }
+
+            // Fallback to explicit coords or center
+            if (targetX === undefined || targetY === undefined) {
+                targetX = testFixationX !== null ? width * testFixationX : Math.floor(width / 2);
+                targetY = testFixationY !== null ? height * testFixationY : Math.floor(height / 2);
+            }
+
+            console.log(`[Test] Target Fixation: (${targetX}, ${targetY})`);
+
             // Wait for 5 seconds for page to settle and effects to render
             setTimeout(async () => {
-                console.log('[Test] Positioning fovea in center...');
-                const { width, height } = mainWindow.getContentBounds();
-                const centerX = Math.floor(width / 2);
-                const centerY = Math.floor(height / 2);
+                console.log('[Test] Positioning fovea...');
 
-                // Simulate mouse move to center
-                mainWindow.scrutinizerHud.webContents.send('browser:mousemove', centerX, centerY, 1.0);
+                // Simulate mouse move to target
+                mainWindow.scrutinizerHud.webContents.send('browser:mousemove', targetX, targetY, 1.0);
 
                 // Apply overrides if present
                 if (testRadius !== null) {
@@ -1060,6 +1101,14 @@ function runIntegrationTest() {
                 }
                 if (testIntensity !== null) {
                     mainWindow.scrutinizerHud.webContents.send('menu:set-intensity', testIntensity);
+                }
+
+                // Toggle Overlay if requested
+                // Note: We need to implement 'menu:toggle-debug-overlay' in HUD or use existing property
+                if (testOverlay) {
+                    console.log('[Test] Enabling Overlay...');
+                    // Use mode 2 (Parafovea) to show rings
+                    mainWindow.scrutinizerHud.webContents.send('menu:set-debug-boundary', 2.0);
                 }
 
                 // Wait for fovea/params to update
@@ -1089,25 +1138,27 @@ function runIntegrationTest() {
                             // Reuse save logic
                             const fs = require('fs');
                             const p = require('path');
-                            const screenshotsDir = p.join(__dirname, 'tests', 'screenshots');
+                            const screenshotsDir = p.join(__dirname, 'tests', 'golden-captures', 'v1.4.1'); // Fixed path as per goal
                             if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir, { recursive: true });
 
-                            const screenshotMode = process.env.SCREENSHOT_MODE || 'date';
-
-                            // Extract hostname for filename
-                            let hostname = 'unknown';
-                            try {
-                                hostname = new URL(testUrl).hostname.replace(/[^a-z0-9]/gi, '_');
-                            } catch (e) { }
-
-                            const baseName = `site_${hostname}_mode_${mode}`;
                             let filename;
-
-                            if (screenshotMode === 'update') {
-                                filename = `${baseName}.png`;
+                            if (outputFilename) {
+                                filename = outputFilename; // Use precise filename if provided
                             } else {
-                                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                                filename = `${baseName}_${timestamp}.png`;
+                                // Extract hostname for filename
+                                let hostname = 'unknown';
+                                try {
+                                    hostname = new URL(testUrl).hostname.replace(/[^a-z0-9]/gi, '_');
+                                } catch (e) { }
+
+                                const baseName = `site_${hostname}_mode_${mode}`;
+
+                                if (screenshotMode === 'update') {
+                                    filename = `${baseName}.png`;
+                                } else {
+                                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                                    filename = `${baseName}_${timestamp}.png`;
+                                }
                             }
 
                             const filePath = p.join(screenshotsDir, filename);

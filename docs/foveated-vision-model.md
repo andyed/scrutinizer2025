@@ -210,22 +210,27 @@ Uses the **Green Channel (Mass)** to modulate the biological simulation.
 
 ---
 
-## 6. High‑frequency jitter (Bouma breaker)
+## 6. Coherent Crowding ("The Melter")
 
-To disrupt word‑shape (“Bouma”) recognition, the shader adds very high‑frequency jitter:
+### Tier 1.8 & 1.8.1: Structural Melting & Lateral Smash
 
-1. Fine‑scale noise is sampled on top of the warped coordinates.
-2. Jitter amplitude ramps from subtle at the inner parafovea to aggressive at the outer parafovea.
-3. In far periphery, jitter amplitudes are highest.
+Earlier versions (v1.2-1.3) used "jitter" (random positional noise) to disrupt recognition. This created a "broken TV" aesthetic that felt like digital glitches rather than biological vision loss.
 
-The final lookup position is:
+**Tier 1.8** replaces this with **Coherent Micro-Warping**, targeting the stroke width of text rather than the word shape.
 
-- `newUV = uv + warpVector + jitterVector`
+1.  **Micro-Warp (The "Melter")**:
+    *   High-frequency Simplex noise (freq ~900.0) matches the width of letter stems.
+    *   This "twists" the strokes, breaking the clean vertical lines of ascenders/descenders.
 
-This combination ensures:
+2.  **Lateral Smash (Anisotropic Crowding)** (Tier 1.8.1):
+    *   Reading is a horizontal task. To break it, we must smash letters into their neighbors.
+    *   **X-Bias**: The horizontal distortion is multiplied by **6.0x**.
+    *   **Effect**: Letters slide sideways into each other, merging into a "mongrel" blob, while the vertical structure (the list or paragraph shape) remains intact.
 
-- Just outside the fovea, characters wobble enough to be hard to parse but not fully pixelated.
-- Further out, both local letter structure and global word envelopes are heavily disrupted.
+3.  **Coupled Pooling**:
+    *   The warp strength drives the MIP level selection. Stronger warp = larger pooling region.
+    *   This ensures that as letters collide, they also blur together, physically simulating "Feature Integration Failure."
+
 
 ### Second Pass Softening (v1.2) and Smooth Transitions (v1.3)
 

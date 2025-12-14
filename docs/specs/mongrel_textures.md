@@ -124,61 +124,29 @@ gl.generateMipmap(gl.TEXTURE_2D);
 
 ---
 
-### Tier 1.5: Coupled Warp + MIP Pooling (Low-Medium Cost) ✅ IMPLEMENTED (v1.4.1)
+### Tier 1.8: Coherent Micro-Warp & Lateral Smash (The "Melter") ✅ IMPLEMENTED (v1.4.1)
 
-**Goal**: Combine positional jitter with MIP pooling to simulate both "Where" pathway failure (position uncertainty) AND "What" pathway failure (feature crowding).
+**Goal**: Replace "Shatter" jitter with coherent distortion that targets stroke width. This is the new baseline for peripheral distortion.
 
-**Insight**: With MIP pooling, domain warping is no longer just "bending light"—it's sampling a *statistical summary* from the *wrong location*. This more accurately models how peripheral crowding feels.
+**Mechanism**:
+- **Simplex Noise (High Freq)**: ~900Hz noise twists detailed strokes.
+- **Simplex Noise (Low Freq)**: ~20Hz noise wobbles word shapes.
+- **Lateral Smash**: X-axis distortion is multiplied by 6.0x to force horizontal letter collisions.
+- **Coupled Pooling**: MIP level is driven by the warp strength.
 
-| Component | Simulates | Pathway |
-|-----------|-----------|---------|
-| MIP Level | Integration Field Size | "What" pathway (feature binding) |
-| Warp | Positional Uncertainty | "Where" pathway (location encoding) |
-
-**Key Principle: Bias-Driven Crowding**
-
-The warp magnitude should scale with the MIP level (integration field size):
-
+**Shader Implementation**:
 ```glsl
-// === TIER 1.5: COUPLED WARP + POOL ===
-
-// 1. Calculate Integration Field Size (based on eccentricity)
-float integrationRadius = eccentricity * 0.1; // Neurons get bigger further out
-float mipLevel = log2(max(1.0, integrationRadius)); // Convert to LOD level
-
-// 2. Calculate Positional Jitter (Domain Warp)
-// Uncertainty scales WITH field size (key insight!)
-vec2 warp = noise(uv) * integrationRadius;
-
-// 3. The "Mongrel" Sample
-// Sample a BLURRY summary from a JITTERED location
-vec4 color = textureLod(u_texture, uv + warp, mipLevel);
+// Tier 1.8.1: Lateral Smash
+float micro = snoise(uv * 900.0) * 0.004;
+float macro = snoise(uv * 20.0) * 0.01;
+vec2 warp = vec2(micro + macro);
+warp.x *= 6.0; // Lateral Smash
+vec4 color = textureLod(u_texture, uv + warp, mipLevel_from_warp);
 ```
-
 **Why This Is Better**:
+1. **No "Snow"**: Unlike jitter, this doesn't look like static. It looks like melted glass.
+2. **Bouma Breaking**: The lateral smash destroys the word shape while keeping the specific "text-like" texture.
 
-1. **Anti-Aliasing**: Pure warping of high-freq text creates "sparkles" (temporal aliasing). Mipmapping inherently smooths this out, creating a stable "texture" of text.
-
-2. **Feature Merging**: Sampling MIP Level 3 between two letters returns the *average* of both letters—physically simulating letters merging into a "mongrel" object.
-
-3. **Perceptual Accuracy**: Users can "see" that there is text, but can't "read" it—exactly what the periphery feels like.
-
-**Saliency Integration**:
-
-Modulate MIP level based on saliency, not just eccentricity:
-
-```glsl
-// High saliency (isolated feature) → Force MIP closer to 0 (Sharp)
-// Low saliency (cluttered text) → Allow MIP to climb with eccentricity
-float saliencyMod = mix(1.0, 0.3, saliency); // High saliency = less pooling
-float finalMipLevel = mipLevel * saliencyMod;
-```
-
-**Implementation Notes**:
-- Requires existing MIP infrastructure ✅ (Tier 1 complete)
-- Can reuse domain warp from "Shatter" mode
-- Performance: ~0.3-0.5ms (additional noise + warp calculation)
-- Priority: After v1.4.x stabilization
 
 ---
 
