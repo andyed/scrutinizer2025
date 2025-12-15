@@ -673,7 +673,13 @@ Create:
 - Fallback: Disable foveal mode for incompatible sites
 - Document known incompatible sites
 
----
+### Live Reference Targets (Replacements)
+**Priority**: High
+**Effort**: Low
+
+**Issue**: Techmeme blocks bot traffic, and Figma is too complex for basic regression.
+**Goal**: Identify 2-3 new, stable, bot-friendly live URLs for "wild" testing (e.g., Wikipedia, Hacker News).
+
 
 
 ## Priority 6: Future Enhancements

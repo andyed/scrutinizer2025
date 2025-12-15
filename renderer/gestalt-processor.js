@@ -13,13 +13,13 @@ class GestaltProcessor {
     constructor() {
         this.config = {
             // DBSCAN Parameters
-            textEpsilonX: 150, // Simulation-Accurate: Wide enough for headlines (e.g. 20 chars)
-            textEpsilonY: 60,  // Standard line-height gap (2-3 lines)
+            textEpsilonX: 60,  // Reduced from 150 to prevent column merging
+            textEpsilonY: 32,  // Reduced from 60 (approx 1.5 lines) to separate list items
             uiEpsilon: 50,     // Component grouping
-            minPts: 2,        // Minimum items to form a group
+            minPts: 2,         // Minimum items to form a group
 
             // Morphological Parameters
-            padding: 20       // "Squint" factor (Simulation safe)
+            padding: 10        // Reduced from 20 to tighten bounds
         };
     }
 

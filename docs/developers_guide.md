@@ -31,8 +31,13 @@ Implement a dedicated **Input Normalization** stage at the very beginning of the
 
 This ensures that the LGN, V1, and V4 stages operate on **ideal, platform-agnostic data**. If we switch capture methods or engines later, we only update the Normalization Layer, not the visual effects.
 
+3.  **Debug Visualization Principles**:
+    *   **NO Foveation**: Debug views should *never* exhibit foveal distortion or blur. The background must be the clean, undistorted source image (`sampleSource`).
+    *   **Raw Data Only**: Debug overlays (Saliency, Structure) must visualize the **Raw Input Texture**, bypassing all LGN gating, inhibition, and visual memory logic.
+    *   **Goal**: The debug view answers "What does the scanner see?", not "What does the user perceive?".
+
 ### 5. Dual Mouse Listening Strategy
-**Problem:**
+**Problem**:
 Relying solely on DOM `mousemove` events fails when the cursor hovers over native UI elements (like `<select>` dropdowns), system menus, or when the main thread is blocked. This causes the fovea to "stick" or disappear.
 
 **Solution:**

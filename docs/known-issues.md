@@ -78,6 +78,13 @@ See `docs/webcontentsview-migration.md` for full migration plan.
 - **Scroll Lag**: Rapid scrolling may cause a momentary desynchronization between the overlay canvas (visuals) and the underlying webview (interaction targets).
 - **Cursor State**: The mouse cursor may not always correctly reflect the hover state (e.g., changing to a hand pointer) due to the overlay window intercepting events.
 
+### Debug View Fidelity
+- **Raw Input Visualization**: The debug views (`--debug-saliency`, `--debug-structure`) visualize the **Raw Input Maps** directly from the analyzer. They intentionally **do not** reflect:
+    - Foveal Distortion
+    - Visual Memory / Inhibition of Return
+    - LGN Gating
+    - **Reason**: This ensures developers see the ground-truth data entering the pipeline, rather than the processed simulation state.
+
 ---
 
 ## 4. Resolved Issues (v1.2+)
@@ -122,3 +129,18 @@ See `docs/webcontentsview-migration.md` for full migration plan.
 - **Cause**: The calibration tool uses a smart resolution capping system to maintain performance (target ~2MP logic resolution). While the canvas is stretched via CSS to fill the screen (`width: 100%; height: 100%`), slight aspect ratio mismatches between the logical resolution and the physical viewport can occur.
 - **Impact**: Aesthetic only. The calibration functionality and accuracy are unaffected.
 - **Workaround**: Resizing the window slightly or using browser zoom often resolves the gaps.
+
+## 6. Resolved Issues (v1.4.2)
+
+### Structure Map "Over-Painting"
+- **Issue**: News sites (e.g., Techmeme) appeared as giant solid red blocks in structure debug mode.
+- **Fix**: Reduced Gestalt clustering parameters (`textEpsilonX: 150->60`, `textEpsilonY: 60->32`) to correctly separate articles and list items.
+
+### Debug View "Holes"
+- **Issue**: Structure map debug view showed "holes" that moved with the mouse.
+- **Cause**: The debug view was visualizing the *processed* LGN signal (which includes Inhibition of Return) and mixing with Visual Memory (trails).
+- **Fix**: Debug shader now strictly samples the **Raw Structure Map** and disables Visual Memory, ensuring a consistent, improved verification tool.
+
+### Red Saliency Map
+- **Issue**: Saliency debug view was solid red.
+- **Fix**: Restored correct Green/Blue/Red heatmap visualization sequence.

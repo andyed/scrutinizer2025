@@ -207,8 +207,12 @@ The Magnocellular pathway (motion/luminance) processes information faster than t
 - **Bednarik, R. & Tukiainen, M. (2007)**: ["Validating the Restricted Focus Viewer: A study using eye-movement tracking"](https://www.researchgate.net/publication/6144967_Validating_the_Restricted_Focus_Viewer_A_study_using_eye-movement_tracking). Behavior Research Methods.
   - Summary: A direct validation study comparing a "mouse-contingent" blur tool (Restricted Focus Viewer) against a hardware eye-tracker. They found that while task performance remained similar, the visual strategies differed—specifically, the artificial blur caused expert users to alter their natural scanning patterns.
 
-- **Blackwell, A. F., Jansen, A. R., & Marriott, K. (2003)**: ["A tool for tracking visual attention: The Restricted Focus Viewer"](https://www.researchgate.net/publication/10779779_A_tool_for_tracking_visual_attention_The_Restricted_Focus_Viewer). Behavior Research Methods.
   - Summary: The seminal paper introducing the Restricted Focus Viewer (RFV). The authors developed a software tool that blurs the screen except for a mouse-driven window to study how people reason with diagrams. They demonstrated that for high-level cognitive tasks, mouse movements in the RFV provide a reliable proxy for visual attention.
+
+- **Kim, N. W., Bylinskii, Z., et al. (2017)**: ["BubbleView: an interface for crowdsourcing image importance maps and tracking visual attention"](https://bubbleview.namwkim.org/). *ACM Transactions on Computer-Human Interaction (TOCHI)*.
+  - See also: [GitHub Repo](https://github.com/namwkim/bubbleview)
+  - **Summary**: This study introduced "BubbleView," a methodology where users click to reveal "bubbles" (foveal windows) on blurred images. They found that these discrete clicks serve as a high-fidelity proxy for eye fixations (0.9 correlation), enabling large-scale "eye tracking" via crowdsourcing (Mechanical Turk) without hardware.
+  - **Relevance**: Directly validates Scrutinizer's premise that restricted peripheral viewing forces users to externalize their attentional strategy. It also supports the "blur-to-fovea" user interface pattern as a scientifically grounded research tool.
 
 
 
@@ -270,6 +274,7 @@ The Magnocellular pathway (motion/luminance) processes information faster than t
 | Blackwell et al. | 2003 | Restricted Focus Viewer (seminal) |
 | Bednarik & Tukiainen | 2007 | RFV validation vs eye-tracking |
 | Lagun & Agichtein | 2011 | ViewSer for SERP attention |
+| Kim et al. | 2017 | BubbleView (Crowdsourced Attention) |
 
 ### Cognitive & UX Applications
 | Author | Year | Key Contribution |

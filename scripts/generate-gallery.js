@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const CAPTURE_DIR = path.join(__dirname, '../tests/golden-captures/v1.4.1');
+const version = require('../package.json').version;
+const CAPTURE_DIR = path.join(__dirname, `../tests/golden-captures/v${version}`);
 const OUTPUT_FILE = path.join(CAPTURE_DIR, 'gallery.html');
 
 console.log(`Scanning: ${CAPTURE_DIR}`);

@@ -29,48 +29,40 @@ const FIXATION_COORDS = {
     'sidebar': { x: 0.15, y: 0.5 } // Generic sidebar left
 };
 
+// Debug variants for standard pages
+const DEBUG_VARIANTS = [
+    { id: 'standard', mode: '0', overlay: false },
+    { id: 'saliency', mode: 'saliency' },
+    { id: 'structure', mode: 'structure' }
+];
+
 const CAPTURE_TASKS = [
     // --- DASHBOARD ---
-    { page: 'dashboard', fixations: ['center', 'top_left', 'sidebar'] },
+    {
+        page: 'dashboard',
+        fixations: ['center'],
+        variants: DEBUG_VARIANTS
+    },
 
     // --- ARTICLE ---
-    { page: 'article', fixations: ['center', 'top_left', 'sidebar'] },
+    {
+        page: 'article',
+        fixations: ['center'],
+        variants: DEBUG_VARIANTS
+    },
 
     // --- ECOMMERCE ---
     {
         page: 'ecommerce',
-        fixations: ['product_image', 'add_to_cart', 'price_tag'],
+        fixations: ['product_image'],
+        variants: [{ id: 'standard', overlay: false }], // Just standard for now
         selectors: {
-            'product_image': '.product-image', // CSS Selector
-            'add_to_cart': '.add-to-cart-btn',
-            'price_tag': '.price-tag'
+            'product_image': '.product-image'
         }
     },
 
-    // --- TECHMEME (Dense Text) ---
-    // Includes overlay variants
-    {
-        page: 'techmeme',
-        fixations: ['center', 'top_left', 'sidebar'],
-        variants: [
-            { id: 'standard', overlay: false },
-            { id: 'overlay', overlay: true } // Creates _overlay.png
-        ]
-    },
-
-    // --- FIGMA (Complex UI) ---
-    // Includes overlay variants
-    {
-        page: 'figma',
-        fixations: ['center', 'top_left', 'sidebar'],
-        variants: [
-            { id: 'standard', overlay: false },
-            { id: 'overlay', overlay: true }
-        ]
-    },
-
     // --- GRID (Distortion Check) ---
-    { page: 'grid', fixations: ['center', 'top_left', 'sidebar'] }
+    { page: 'grid', fixations: ['center'] }
 ];
 
 console.log(`\n🎯 Golden Capture Script (Automated)`);
@@ -88,7 +80,7 @@ async function runCapture(task, fixation, variant = { id: 'standard', overlay: f
 
         let filename = `${task.page}_${fixation}`;
         if (variant.id !== 'standard') {
-            filename += `_${variant.id}`; // e.g., techmeme_center_overlay
+            filename += `_${variant.id}`;
         }
         filename += '.png';
 
@@ -97,17 +89,12 @@ async function runCapture(task, fixation, variant = { id: 'standard', overlay: f
 
         console.log(`📸 Capturing: ${filename}`);
         console.log(`   URL: ${fileUrl}`);
-        if (selector) {
-            console.log(`   Fixation: Selector "${selector}"`);
-        } else {
-            console.log(`   Fixation: Coords (${fixationDef.x}, ${fixationDef.y})`);
-        }
-        if (variant.overlay) console.log(`   Overlay: ENABLED`);
+        if (variant.debugFlag) console.log(`   Debug Flag: ${variant.debugFlag}`);
 
         const env = {
             ...process.env,
             TEST_URL: fileUrl,
-            TEST_MODES: '0', // Standard High-Key mode for now
+            TEST_MODES: variant.mode || '0', // Use variant mode or default to '0'
             TEST_FIXATION_X: fixationDef.x,
             TEST_FIXATION_Y: fixationDef.y,
             TEST_SELECTOR: selector || '', // Pass selector
@@ -117,7 +104,16 @@ async function runCapture(task, fixation, variant = { id: 'standard', overlay: f
             ELECTRON_RUN_AS_NODE: undefined // Ensure Electron runs as app
         };
 
-        const child = spawn('npm', ['start'], {
+        // Construct arguments for npm start
+        const args = ['start'];
+
+        // Pass CLI flags if they exist (e.g., -- --debug-saliency)
+        if (variant.debugFlag) {
+            args.push('--');
+            args.push(variant.debugFlag);
+        }
+
+        const child = spawn('npm', args, {
             cwd: path.join(__dirname, '..'),
             env: env,
             stdio: 'inherit' // Pipe output to see test logs

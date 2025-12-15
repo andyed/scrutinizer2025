@@ -634,6 +634,9 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     // We enforce a hard bypass if we are within the foveal radius.
     // Use 50% of fovea_radius as safety margin to ensure the transition
     // starts well outside the critical vision area.
+    // We enforce a hard bypass if we are within the foveal radius.
+    // Use 50% of fovea_radius as safety margin to ensure the transition
+    // starts well outside the critical vision area.
     if (dist < fovea_radius * 0.5) {
         return col;
     }
@@ -1009,8 +1012,9 @@ void main() {
         // Visual Memory Mask (Post-Process Overlay)
         // We still overlay the clear image to ensure pixel-perfect clarity,
         // but now the underlying distortion (v1) should align with it.
-        // ONLY IN STANDARD MODE (u_useMask < 1.5)
-        if (u_useMask < 1.5 && u_useMask > 0.5) {
+        // ONLY IN STANDARD MODE (u_useMask < 1.5) and NOT IN DEBUG MODE
+        // We disable visual memory during structure debug so the overlay isn't washed out by the clear image.
+        if (u_useMask < 1.5 && u_useMask > 0.5 && u_debug_structure < 0.5) {
             if (memoryStrength > 0.9) {
             // Use sampleSource for guaranteed correct color
             vec4 clearColor = sampleSource(uv);
@@ -1026,6 +1030,15 @@ void main() {
     float debugLevel = u_debug_structure;
     if (config.v4_style_id == 4) debugLevel = 0.0;
     
+    // DEBUG VIEW STANDARDIZATION:
+    // If debugging, we replace the simulated/foveated view with the CLEAN source.
+    // This ensures:
+    // 1. Uniform brightness (no foveal "holes" in the overlay).
+    // 2. Perfect alignment (Structure Map overlay matches undistorted Page).
+    if (debugLevel > 0.5) {
+        color = sampleSource(uv);
+    }
+    
     // Debug Visualization
     if (debugLevel > 2.5) {
         float mask = texture(u_maskTexture, v_texCoord).r;
@@ -1033,11 +1046,14 @@ void main() {
     } else if (debugLevel > 1.5) {
         // Heatmap for Saliency (Grayscale)
         // User Preference: Pure B&W is clearer for polarity
-        float s = lgn.saliency;
+        // Use RAW saliency to bypass LGN inhibition/gating
+        float s = texture(u_saliencyMap, v_texCoord).r;
         color.rgb = vec3(s);
     } else if (debugLevel > 0.5) {
-        if (lgn.density > 0.0) {
-            color.rgb = mix(color.rgb, vec3(1.0, 0.0, 0.0), 0.3 * lgn.density);
+        // Use RAW structure density to bypass LGN inhibition ("holes")
+        float rawDensity = texture(u_structureMap, v_texCoord).g;
+        if (rawDensity > 0.0) {
+            color.rgb = mix(color.rgb, vec3(1.0, 0.0, 0.0), 0.5 * rawDensity);
         }
     }
     

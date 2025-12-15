@@ -1143,7 +1143,9 @@ function runIntegrationTest() {
                             // Reuse save logic
                             const fs = require('fs');
                             const p = require('path');
-                            const screenshotsDir = p.join(__dirname, 'tests', 'golden-captures', 'v1.4.1'); // Fixed path as per goal
+                            // Dynamic path based on package version
+                            const packageVersion = require('./package.json').version;
+                            const screenshotsDir = p.join(__dirname, 'tests', 'golden-captures', `v${packageVersion}`);
                             if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir, { recursive: true });
 
                             let filename;

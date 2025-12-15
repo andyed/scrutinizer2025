@@ -8,11 +8,9 @@ The suite targets a set of local HTML files representing common web UI archetype
 
 | Page | Archetype | Key Features to Observe |
 |:-----|:----------|:------------------------|
-| **techmeme.html** | Dense Text Media | Multi-column, high-density text. Critical for verifying "crowding" and legibility limits. |
 | **dashboard.html** | SaaS / App UI | "Google Search" style list. Sidebar + Main content. Good for testing Lateral Smash on list items. |
-| **ecommerce.html** | Retail Grid | Image heavy, grid layout. Product cards. Verifies image preservation + text distortion. |
 | **article.html** | Reading Layout | Long-form centered text. Standard blog/news reading experience. |
-| **figma.html** | Complex App | Mimics Figma UI. Toolbars, canvas, dense panels. Verifies UI element stability (Type 3 Distortion). |
+| **ecommerce.html** | Retail Grid | Image heavy, grid layout. Product cards. Verifies image preservation + text distortion. |
 | **grid.html** | Geometric Calibration | Pure grid of circles/lines. Used for verifying geometric warp linearity and overlay alignment. |
 
 ## Test Scenarios (Fixations)
@@ -33,10 +31,13 @@ For each page, the suite captures screenshots with the fovea positioned at three
 
 ## Variants
 
-### Overlay (`_overlay.png`)
-*   **Enabled For**: `techmeme`, `figma` (specifically)
-*   **Description**: Draws the **Parafoveal Debug Rings** (Mode 2.0).
-*   **Purpose**: Visual verification of the "Fovea vs. Parafovea" boundaries against the actual content.
+### Saliency Map (`_saliency.png`)
+*   **Description**: Raw **Saliency Texture** debug view.
+*   **Purpose**: Verify the heatmap integrity (Blue→Green→Red). **Critical Regression Check**: Ensure it is not solid red.
+
+### Structure Map (`_structure.png`)
+*   **Description**: Raw **Structure Texture** debug view.
+*   **Purpose**: Verify density clustering and type packing. **Critical Regression Check**: Ensure individual blocks are visible and not "over-painted".
 
 ## Automated Capture
 
@@ -46,7 +47,7 @@ Run the following command to regenerate all golden images:
 npm run capture-golden
 ```
 
-**Artifacts Location**: `tests/golden-captures/v1.4.1/`
+**Artifacts Location**: `tests/golden-captures/v1.4.2/`
 
 ## Debug Verification (CLI Flags)
 
@@ -55,7 +56,7 @@ You can force specific debug modes using CLI arguments. This is critical for ver
 | Flag | Effect | Pass Criteria (What to look for) | Fail Criteria (Red Flags) |
 |:-----|:-------|:---------------------------------|:--------------------------|
 | `--debug-saliency` | Shows Saliency Heatmap | **Blue/Green/Red Gradient**. Text/Edges should be Red. Background should be Blue. | **Solid Red Screen** (Data corruption/overflow). **Solid Blue** (Empty map). |
-| `--debug-structure` | Shows Structure Map | **Black/Green/Blue Blocks**. Content matches page layout. Phase (blue stripes) visible on text. | **"Shredded" Noise** (Byte packing error). **Invisible** (Alpha channel issue). |
+| `--debug-structure` | Shows Structure Map | **Red Overlay**. Density determines opacity. Blocks should match page content. | **"Shredded" Noise** (Byte packing error). **Invisible** (Alpha channel issue). |
 
 ### Example Usage
 ```bash
