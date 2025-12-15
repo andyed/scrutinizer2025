@@ -1,6 +1,25 @@
 # Scrutinizer Roadmap
 
-## ✅ Completed Features (v1.0-v1.3)
+## ✅ Completed Features (v1.0-v1.4.2)
+
+### v1.4.2: Reference Pages & Biology-Forward Docs
+
+**Date:** 2025-12-14
+
+- [x] **Go → Reference Pages menu**
+  - Added `Go → Reference Pages → (Dashboard | Article | E-commerce)`
+  - Loads local fixtures from `tests/reference-pages/*.html` directly into the Scrutinizer view
+  - Makes it trivial to jump into standard test layouts used by golden captures and experiments
+
+- [x] **Foveated Vision Model: receptor-to-cortex narrative**
+  - New Section 1: "The Biology: From Photoreceptors to Perception"
+  - Traces the path Retina → LGN → V1 → V4 with wiring diagrams and cortical magnification
+  - Explicit mapping table: biological phenomena → shader implementation knobs
+
+- [x] **Scientific Literature Review: pathway-structured rewrite**
+  - Reorganized around the biological stages (Retina, LGN, V1, V4)
+  - Added quick-reference tables (retinal architecture, crowding, gaze-contingent research)
+  - Clarified that LGN/V1/V4 are architectural metaphors, not a full biophysical simulation
 
 ### v1.3: Perceptual Accuracy Update
 
@@ -814,6 +833,7 @@ Add user-facing controls for progressive blur tuning:
 - **Blur aggressiveness slider**: Adjusts pyramid level multipliers (0.3/0.7/1.3 → 0.5/1.0/2.0)
 - **Zone transition radii**: Controls r1/r2/r3 multipliers for gradient zones
 - **Presets**: "Gentle" (Magnocellular-preserving), "Standard", "Aggressive" (strict fidelity)
+- **Pupil Dynamics**: Configuration for Saccadic Suppression (Velocity threshold, Reactivity, Min/Max Blur)
 - **Real-time preview**: Live adjustment without recapture
 - **Persistent profiles**: Save custom configurations
 

@@ -101,6 +101,27 @@ The primary visual cortex (V1) is where the brain first constructs a representat
     * **The Insight**: Peripheral vision represents the world as "texture statistics" (Mongrels). We don't see blurry letters; we see a "texture of letters."
     * **Relevance**: This is the theoretical foundation for Scrutinizer's approach—we don't just blur, we preserve statistical properties (density, rhythm, contrast) while destroying identity.
 
+### 3.4. Neural Approximation of Peripheral Statistics
+
+[cite_start]While the Texture Tiling Model (TTM) successfully predicts peripheral encoding and crowding, its iterative synthesis process is computationally prohibitive for real-time applications, often requiring hours to generate a single "mongrel" image[cite: 49]. Recent work at MIT has focused on using deep learning to approximate these statistical constraints in a feed-forward manner, enabling real-time simulation.
+
+#### 3.4.1. SideEye and Foveated Generative Networks (FGN)
+
+Fridman et al. (2017) [cite_start]introduced the **Foveated Generative Network (FGN)**, a fully convolutional architecture designed to learn the non-linear mapping between a foveal input and its peripheral representation[cite: 2, 49].
+
+* [cite_start]**Architecture:** The model extends fully convolutional networks (FCN) with a spatial weight mask that propagates foveal distance constraints through the network biases[cite: 146, 148].
+* [cite_start]**Performance:** FGN achieves a **21,000-fold reduction** in processing time compared to TTM (reducing generation time from ~4 hours to ~0.7 seconds), effectively enabling real-time design iteration[cite: 24, 229].
+* [cite_start]**Validation:** While pixel-wise comparison is impossible due to the stochastic nature of mongrels, FGN was statistically validated by comparing texture feature vectors in pooling regions, achieving a mean error of less than 8% relative to TTM outputs[cite: 216, 223].
+* [cite_start]**Application:** The authors demonstrated the utility of this speedup for **A/B testing** web layouts (predicting button click-through rates based on peripheral saliency) and analyzing **logo recognizability** (e.g., assessing how brand identity degrades in the periphery)[cite: 55, 267, 301].
+
+#### 3.4.2. GAN-Based Synthesis and Perceptual Metrics
+
+[cite_start]Building on the FGN approach, Shumikhin (2020) evaluated advanced generative architectures, including Cycle-GAN and **pix2pixHD**, for synthesizing high-resolution mongrels[cite: 436, 743].
+
+* [cite_start]**pix2pixHD:** This architecture was found to produce the highest quality mongrels, successfully capturing the "jumbling" and texture pooling effects of TTM better than standard convolutional networks, particularly for text and fonts[cite: 903].
+* [cite_start]**Quantitative Metrics:** Shumikhin moved beyond qualitative assessment by utilizing **ResNet-18 feature vectors** (Image2Vec) to measure the perceptual distance between original and mongrelized images[cite: 720]. [cite_start]This allowed for the quantification of "crowding susceptibility" using **Cosine Similarity** and **Wasserstein Distance** on high-level semantic features rather than raw pixels[cite: 726, 733].
+* [cite_start]**Design Implications:** This framework was used to rank thousands of fonts by their resilience to crowding, finding that heavy fonts with high styling variation were generally less susceptible to peripheral degradation[cite: 1082].
+
 ### Stage 4: V4 and Beyond (Color, Shape, Recognition)
 
 Higher visual areas process increasingly abstract features—color constancy, shape, and eventually object recognition.
@@ -301,8 +322,11 @@ The Magnocellular pathway (motion/luminance) processes information faster than t
 #### Anatomical Basis of Feedback
 
 * **Sherman, S. M., & Guillery, R. W. (2002)**: [The role of the thalamus in the flow of information to the cortex](https://doi.org/10.1098/rstb.2002.1161). *Philosophical Transactions of the Royal Society B*.
-    * **The Architecture**: Only ~10-20% of synaptic inputs to LGN neurons come from the retina. The majority (~30-40%) come from **feedback projections from V1**, with additional inputs from brainstem and other thalamic nuclei.
-    * **Implication**: The LGN is not a passive relay but an active gating mechanism where cortical expectations can modulate which retinal signals reach awareness.
+  - **The Architecture:** Only ~5–10% of synaptic inputs to LGN neurons come from the retina (the "drivers"). The remaining ~90% are modulatory inputs that gate signal transmission:
+    - **~30% from V1 Feedback:** Contextual modulation and focus.
+    - **~30% from Local Inhibition (TRN/Interneurons):** Lateral inhibition and gain control (crucial for "structure masking").
+    - **~25% from Brainstem:** Arousal and alertness regulation (cholinergic/noradrenergic pathways).
+  - **Implication:** The LGN is not a passive relay but an active gating mechanism where cortical expectations can modulate incoming sensory data. Scrutinizer's LGN stage implements this gating via structure masking and saliency modulation.
 
 * **Sherman, S. M., & Guillery, R. W. (1998)**: [On the actions that one nerve cell can have on another: distinguishing "drivers" from "modulators"](https://doi.org/10.1073/pnas.95.12.7121). *PNAS*.
     * **Driver vs. Modulator**: Introduced the critical distinction between "driver" inputs (which define what a neuron responds to—from retina) and "modulator" inputs (which control the gain or sensitivity—from cortex). Corticothalamic feedback acts primarily as a modulator.

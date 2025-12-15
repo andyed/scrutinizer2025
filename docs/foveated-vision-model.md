@@ -796,8 +796,27 @@ The "Interpreter" stage determines *what* the final pixel looks like. This stage
     -   **Cyberpunk**: An exaggerated "glitch" aesthetic using neon colors and blocky artifacts.
     -   **Double Vision**: A fluid, wave-based distortion that simulates temporary visual impairments or disorienting states.
 
-### Saccadic Suppression
-To prevent distracting "shimmering" during rapid eye movements, the renderer tracks mouse velocity. When velocity exceeds a threshold (>4000px/s), the V4 stage washes out the periphery, mimicking the brain's natural suppression of visual input during saccades.
+### Saccadic Suppression (The "Pupil Dilation" Model)
+To naturally simulate biological response to eye movement, the renderer maps **Mouse Velocity** to a simulated **"Pupil Aperture"** (Blur Radius).
+
+This model mimics the **"Hunt vs. Gather"** cycle of the eye:
+
+1.  **The Hunt (High Velocity)**:
+    *   **Action**: Mouse moves fast (>5px/frame).
+    *   **Response**: Pupil Dilates (Max Aperture).
+    *   **Effect**: Depth of field drops. The periphery blurs out (Tunnel Vision).
+    *   **Biological Analog**: Saccadic Suppression (brain cuts off processing during motion).
+
+2.  **The Gather (Zero Velocity)**:
+    *   **Action**: Mouse stops (Fixation).
+    *   **Response**: Pupil Constricts (Min Aperture).
+    *   **Effect**: Depth of field increases. The periphery sharpens.
+    *   **Biological Analog**: Accommodation (eye locks onto target, analyzing detail).
+
+**Implementation Details**:
+*   The visualizer calculates velocity and smooths the "Current Blur" state (Reactivity: 0.1).
+*   The shader scales the **MIP Pooling Strength** based on this blur radius.
+*   **Result**: The screen "breathes"—blurring during movement and sharpening during rest—rewarding the user for paying attention.
 
 ### Architectural Guarantee: Foveal Integrity
 The pipeline enforces a strict "Do No Harm" policy for the fovea.

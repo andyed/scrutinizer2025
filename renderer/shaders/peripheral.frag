@@ -22,6 +22,7 @@ uniform float u_has_structure;
 uniform float u_enable_saliency_modulation;
 uniform float u_time; // Time in seconds for animation
 uniform float u_velocity;         // Mouse velocity in px/ms
+uniform float u_blurRadius;       // Simulated Pupil Aperture (0.0 = Sharp, 10.0 = Blurry)
 uniform float u_mongrel_mode;     // 0.0 = Noise, 1.0 = Shatter
 
 
@@ -580,8 +581,14 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     // TIER 1.8: COUPLED POOLING
     // We link the blur radius (MIP level) directly to the distortion strength.
     // This ensures that if Saliency/LGN suppresses the warp, the blur also vanishes.
-    // Factor 2.0 ensures we hit Max MIP (Level 4) at full strength (~1.0).
-    float coupledEccentricity = v1.distortionStrength * u_intensity * fovea_radius * 2.0;
+    // MODIFIED for Saccadic Suppression:
+    // Scale the effective eccentricity by u_blurRadius.
+    // u_blurRadius range: 2.0 (Gather) -> 10.0 (Hunt)
+    // Old Baseline: 2.0
+    // New Gather: 2.0 * 0.3 + 1.0 = 1.6 (Slightly sharper than baseline, rewarding focus)
+    // New Hunt:  10.0 * 0.3 + 1.0 = 4.0 (Double baseline, creating tunnel vision)
+    float blurMult = 1.0 + (u_blurRadius * 0.3);
+    float coupledEccentricity = v1.distortionStrength * u_intensity * fovea_radius * blurMult;
     vec3 pooledCol = sampleMIPPooled(v1.distortedUV, coupledEccentricity, fovea_radius).rgb;
     
     // Smooth blend from fovea to periphery to eliminate visible boundary

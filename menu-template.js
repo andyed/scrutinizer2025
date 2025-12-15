@@ -190,6 +190,45 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             win.scrutinizerView.webContents.loadURL(defaultUrl);
                         }
                     }
+                },
+                { type: 'separator' },
+                {
+                    label: 'Reference Pages',
+                    submenu: [
+                        {
+                            label: 'Dashboard',
+                            click: () => {
+                                const win = BrowserWindow.getFocusedWindow();
+                                if (win && win.scrutinizerView) {
+                                    const path = require('path');
+                                    const target = path.join(__dirname, 'tests', 'reference-pages', 'dashboard.html');
+                                    win.scrutinizerView.webContents.loadFile(target);
+                                }
+                            }
+                        },
+                        {
+                            label: 'Article',
+                            click: () => {
+                                const win = BrowserWindow.getFocusedWindow();
+                                if (win && win.scrutinizerView) {
+                                    const path = require('path');
+                                    const target = path.join(__dirname, 'tests', 'reference-pages', 'article.html');
+                                    win.scrutinizerView.webContents.loadFile(target);
+                                }
+                            }
+                        },
+                        {
+                            label: 'E-commerce',
+                            click: () => {
+                                const win = BrowserWindow.getFocusedWindow();
+                                if (win && win.scrutinizerView) {
+                                    const path = require('path');
+                                    const target = path.join(__dirname, 'tests', 'reference-pages', 'ecommerce.html');
+                                    win.scrutinizerView.webContents.loadFile(target);
+                                }
+                            }
+                        }
+                    ]
                 }
             ]
         },

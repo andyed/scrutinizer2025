@@ -35,6 +35,11 @@ class ScrutinizerVisualizer {
         this.positionBuffer = null;
         this.texCoordBuffer = null;
 
+        // Pupil Dilation State
+        this.currentBlur = 10.0; // Starts dilated
+        this.lastMousePos = { x: 0, y: 0 };
+        this.lastTime = 0;
+
         this.init();
         this.warmup(); // Pre-compile shader to avoid lag
     }
@@ -289,6 +294,10 @@ class ScrutinizerVisualizer {
         this.debugBoundaryLocation = gl.getUniformLocation(this.program, "u_debug_boundary");
         this.textureLocation = gl.getUniformLocation(this.program, "u_texture");
 
+        // Saccadic Suppression Uniforms
+        this.blurRadiusLocation = gl.getUniformLocation(this.program, "u_blurRadius");
+        this.velocityLocation = gl.getUniformLocation(this.program, "u_velocity");
+
         // Create buffers
         this.positionBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
@@ -367,6 +376,30 @@ class ScrutinizerVisualizer {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer);
         gl.vertexAttribPointer(this.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
 
+        // === SACCADIC SUPPRESSION LOGIC (Pupil Dilation) ===
+        // 1. Calculate Velocity
+        // We use simple Euclidean distance per frame for simplicity in this standalone renderer.
+        // For production, dt should be used, but this "per-frame" metric works well for 60fps.
+        const dx = mouseX - this.lastMousePos.x;
+        const dy = mouseY - this.lastMousePos.y;
+        const speed = Math.sqrt(dx * dx + dy * dy);
+
+        // 2. Determine Target State (Hunt vs. Gather)
+        // If moving fast (>5px/frame): DILATE (Blurry periphery, "The Hunt")
+        // If still: CONSTRICT (Sharp periphery, "The Gather")
+        const MAX_BLUR = 10.0;
+        const MIN_BLUR = 2.0; // Restored baseline (was 0.0, too sharp)
+        const REACTIVITY = 0.1;
+
+        // Saccade threshold: 5.0 pixels per frame is a reasonable "flick"
+        const targetBlur = (speed > 5.0) ? MAX_BLUR : MIN_BLUR;
+
+        // 3. Lerp towards target (Pupil Inertia)
+        this.currentBlur += (targetBlur - this.currentBlur) * REACTIVITY;
+
+        // Update state for next frame
+        this.lastMousePos = { x: mouseX, y: mouseY };
+
         gl.uniform2f(this.resolutionLocation, width, height);
         gl.uniform2f(this.mouseLocation, mouseX, mouseY);
         gl.uniform1f(this.foveaRadiusLocation, foveaRadius);
@@ -374,6 +407,11 @@ class ScrutinizerVisualizer {
         gl.uniform1f(this.intensityLocation, intensity);
         gl.uniform1f(this.caStrengthLocation, caStrength);
         gl.uniform1f(this.debugBoundaryLocation, debugBoundary);
+
+        // New Uniforms
+        gl.uniform1f(this.blurRadiusLocation, this.currentBlur);
+        gl.uniform1f(this.velocityLocation, speed); // Pass raw speed for now
+
         gl.uniform1i(this.textureLocation, 0);
 
         gl.drawArrays(gl.TRIANGLES, 0, 6);
