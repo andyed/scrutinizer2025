@@ -188,11 +188,12 @@ function generateStructureMasks(blocks, targetW, targetH, sourceW, sourceH) {
         const w = Math.ceil(block.w * scaleX);
         const h = Math.ceil(block.h * scaleY);
 
-        // Clip to bounds
-        const startX = Math.max(0, x);
-        const startY = Math.max(0, y);
-        const endX = Math.min(targetW, x + w);
-        const endY = Math.min(targetH, y + h);
+        // Dilate masks slightly to ensure solid coverage (Stronger Edges)
+        const dilation = 2; // Pixels in saliency map space
+        const startX = Math.max(0, x - dilation);
+        const startY = Math.max(0, y - dilation);
+        const endX = Math.min(targetW, x + w + dilation);
+        const endY = Math.min(targetH, y + h + dilation);
 
         const isText = (block.type === 1);
 

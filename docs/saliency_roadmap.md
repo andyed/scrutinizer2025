@@ -213,14 +213,16 @@ Current weights (`W_I = 0.3`, `W_RG = 0.35`, `W_BY = 0.35`) are heuristic. Consi
 -   **Excitor Mask**: Boosts UI controls regardless of contrast.
 -   **Formula**: `Final = (RawSaliency * Inhibitor) + Excitor`
 
-### 9. ⬜ Gestalt Closure ("Blob Detection")
+### 9. ✅ Gestalt Closure ("Blob Detection")
 **Priority**: HIGH | **Effort**: MEDIUM | **Impact**: HIGH
+**Status**: ✅ COMPLETE (2025-12-14)
 
 **Problem**: Visualizing individual structure blocks looks like "ingredients" rather than a coherent "recipe" (UI component).
 **Solution**: Implement **DBSCAN** or **Morphological Closing** to fuse nearby elements into organic "Gestalt Blobs" for the wireframe/closure mode.
 
-### 10. ⬜ Temporal Synchronization
+### 10. ✅ Temporal Synchronization
 **Priority**: MEDIUM | **Effort**: MEDIUM | **Impact**: HIGH (Usability)
+**Status**: ✅ COMPLETE (2025-12-14)
 
 **Problem**: Worker latency causes "scroll tearing" where the saliency map (old) misaligns with the structure map (new).
 **Solution**: Snapshot `structureData` and pass it *with* the image to the worker. The worker generates masks locally, ensuring pixel-perfect alignment for that frame.

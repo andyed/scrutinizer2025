@@ -45,7 +45,9 @@
             this.lastBufferSize = 0;
             // Structure Map (Content Density Texture)
             const StructureMap = require('./structure-map.js');
+            const GestaltProcessor = require('./gestalt-processor.js');
             this.structureMap = new StructureMap();
+            this.gestaltProcessor = new GestaltProcessor();
             this.hasStructure = false;
 
             // Saliency Map (Visual Attractiveness Texture)
@@ -357,7 +359,7 @@
                         this.saliencyWorker.postMessage({
                             imageBitmap: bitmap,
                             id: this.saliencyFrameCounter,
-                            structureData: this.lastBlocks // Sync: Pass structure snapshot for Gated Saliency
+                            structureData: this.lastGroupedBlocks || this.lastBlocks // Sync: Pass GESTALT (fused) structure for strong edges
                         }, [bitmap]);
                     });
 
@@ -782,7 +784,9 @@
 
             // Gestalt Grouping: Merge adjacent text blocks into "Paragraphs"
             // This reduces visual clutter and simulates "pre-attentive" grouping of text lines
-            const groupedBlocks = this.groupStructureBlocks(blocks);
+            // Phase 5b: Full Gestalt Closure
+            const groupedBlocks = this.gestaltProcessor.process(blocks);
+            this.lastGroupedBlocks = groupedBlocks;
 
             // Draw blocks
             const dpr = window.devicePixelRatio || 1;
