@@ -563,7 +563,9 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                 {
                     label: 'Report Issue',
                     click: async () => {
-                        await shell.openExternal('https://github.com/andyed/scrutinizer2025/issues');
+                        const version = app.getVersion();
+                        const body = encodeURIComponent(`\n\nVersion: ${version}`);
+                        await shell.openExternal(`https://github.com/andyed/scrutinizer2025/issues/new?body=${body}`);
                     }
                 }
             ]
