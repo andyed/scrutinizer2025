@@ -356,7 +356,8 @@
                     createImageBitmap(saliencyImageData).then(bitmap => {
                         this.saliencyWorker.postMessage({
                             imageBitmap: bitmap,
-                            id: this.saliencyFrameCounter
+                            id: this.saliencyFrameCounter,
+                            structureData: this.lastBlocks // Sync: Pass structure snapshot for Gated Saliency
                         }, [bitmap]);
                     });
 

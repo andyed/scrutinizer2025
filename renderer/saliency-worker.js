@@ -165,6 +165,54 @@ function computeCenterSurround(feature, width, height) {
     return result;
 }
 
+/**
+ * Generate Inhibitor and Excitor masks from Structure Blocks
+ * @param {Array} blocks - Structure blocks from main thread
+ * @param {number} targetW - Width of saliency map
+ * @param {number} targetH - Height of saliency map
+ * @param {number} sourceW - Width of original viewport
+ * @param {number} sourceH - Height of original viewport
+ */
+function generateStructureMasks(blocks, targetW, targetH, sourceW, sourceH) {
+    const len = targetW * targetH;
+    const inhibitor = new Float32Array(len);
+    const excitor = new Float32Array(len);
+
+    const scaleX = targetW / sourceW;
+    const scaleY = targetH / sourceH;
+
+    for (const block of blocks) {
+        // Map block coordinates to saliency map space
+        const x = Math.floor(block.x * scaleX);
+        const y = Math.floor(block.y * scaleY);
+        const w = Math.ceil(block.w * scaleX);
+        const h = Math.ceil(block.h * scaleY);
+
+        // Clip to bounds
+        const startX = Math.max(0, x);
+        const startY = Math.max(0, y);
+        const endX = Math.min(targetW, x + w);
+        const endY = Math.min(targetH, y + h);
+
+        const isText = (block.type === 1);
+
+        for (let row = startY; row < endY; row++) {
+            const rowOffset = row * targetW;
+            const endRowOffset = rowOffset + endX;
+            for (let idx = rowOffset + startX; idx < endRowOffset; idx++) {
+                // Inhibitor: Mark existence of ANY content
+                inhibitor[idx] = 1.0;
+
+                // Excitor: Mark interactive content (Non-Text)
+                if (!isText) {
+                    excitor[idx] = 1.0;
+                }
+            }
+        }
+    }
+    return { inhibitor, excitor };
+}
+
 self.onmessage = function (e) {
     const { imageBitmap, id } = e.data;
 
@@ -243,6 +291,24 @@ self.onmessage = function (e) {
     const norm_RG = normalizeFeature(cs_RG);
     const norm_BY = normalizeFeature(cs_BY);
 
+    // --- PHASE 5: GATED SALIENCY MASKS ---
+    let inhibitorMask = null;
+    let excitorMask = null;
+
+    if (e.data.structureData && e.data.structureData.length > 0) {
+        // Generate masks using provided structure blocks
+        // We pass the RAW image width/height to correctly map the blocks (which are in viewport pixels)
+        // to the current downscaled canvas resolution.
+        // e.data.imageBitmap.width is the SOURCE width.
+        // width/height are the TARGET (downscaled) dimensions.
+        const sourceW = e.data.imageBitmap.width;
+        const sourceH = e.data.imageBitmap.height;
+
+        const masks = generateStructureMasks(e.data.structureData, width, height, sourceW, sourceH);
+        inhibitorMask = masks.inhibitor;
+        excitorMask = masks.excitor;
+    }
+
     // PASS 4: Combine normalized features with weights
     // Oklab provides cleaner perceptual separation, so equal weights often work well,
     // but we'll stick to established saliency weights.
@@ -254,7 +320,27 @@ self.onmessage = function (e) {
     let maxVal = 0;
 
     for (let i = 0; i < len; i++) {
-        const val = W_I * norm_I[i] + W_RG * norm_RG[i] + W_BY * norm_BY[i];
+        // Raw Bottom-Up Saliency
+        let val = W_I * norm_I[i] + W_RG * norm_RG[i] + W_BY * norm_BY[i];
+
+        // --- PHASE 5: GATED SALIENCY (Cognitive Alignment) ---
+        // Top-Down Modulation using Structure Data
+        if (inhibitorMask && excitorMask) {
+            // Formula: Final = (Raw * Inhibitor) + (Excitor * Boost)
+            // Inhibitor: 0.0 for noise, 1.0 for content
+            // Excitor: 0.0 for normal, 1.0 for interactive/important
+            const inhibition = inhibitorMask[i];
+            const excitation = excitorMask[i];
+
+            // 1. Gating: Silence the noise
+            // We use a safe floor (0.1) so real objects in empty space aren't TOTALLY invisible if structure misses them
+            val *= (inhibition * 0.9 + 0.1);
+
+            // 2. Boosting: Highlight the controls
+            // Add excitation signal (boost factor 0.8 ensures buttons pop even if low contrast)
+            val += (excitation * 0.8);
+        }
+
         saliency[i] = val;
         if (val > maxVal) maxVal = val;
     }

@@ -438,27 +438,32 @@ To simulate the brain's pre-attentive grouping of visual elements, the renderer 
 -   **Text Merging**: Vertically adjacent text blocks are merged into single "paragraph" clusters.
 -   **Quantization**: Block coordinates are snapped to a grid (1px for text, 10px for UI) to prevent sub-pixel jitter from causing "flicker" in the periphery during micro-layout shifts.
 
-### 2. Saliency Map Generation
+### 2. Saliency Map Generation (Phase 5: Gated Saliency)
 **File**: `renderer/saliency-worker.js`
 
-The Saliency Map is generated using a **center-surround mechanism** (Difference-of-Gaussians) for biologically accurate attention detection.
+The Saliency Map system has been upgraded to a **Cognitive Alignment** model. It combines biophysical contrast detection with top-down semantic gating.
 
-**Algorithm** (Itti-Koch-Niebur Model - Oklab Adapted):
-1. **Feature Extraction**: Convert to Oklab space:
-   - **Intensity (I)**: Oklab `L` Channel (Lightness).
-   - **Red-Green (RG)**: Oklab `a` Channel Magnitude (`|a|`).
-   - **Blue-Yellow (BY)**: Oklab `b` Channel Magnitude (`|b|`).
-2. **Multi-Scale Gaussian Pyramid**: 
-   - Fine scale: σ=1.0 (captures details)
-   - Coarse scale: σ=3.0 (captures context)
-3. **Center-Surround**: For each feature, compute `|Fine - Coarse|`
-4. **Feature Combination**: `saliency = 0.3*cs_I + 0.35*cs_RG + 0.35*cs_BY`
+**The Formula**:
+`FinalSaliency = (RawContrast * Inhibitor) + (Excitor * Boost)`
+
+1.  **Raw Contrast (Bottom-Up)**:
+    *   Uses **Difference-of-Gaussians** on Oklab channels (Intensity, Red-Green, Blue-Yellow).
+    *   Detects edges, color contrast, and luminance shifts.
+
+2.  **Inhibitor Mask (Silence Noise)**:
+    *   Generated from the **Structure Map**.
+    *   **Logic**: If an area contains NO semantic structure (text or image), the Inhibitor is `0.1`.
+    *   **Effect**: Suppresses paper textures, compression artifacts, and distinct-but-irrelevant gradients.
+
+3.  **Excitor Mask (Boost Signal)**:
+    *   Generated from **Interactive Elements** (Buttons, Inputs, UI).
+    *   **Logic**: Adds `+0.8` to the saliency signal.
+    *   **Effect**: Ensures low-contrast controls (e.g., light gray "Cancel" buttons) remain visible in the periphery, simulating the brain's knowledge of where tools are.
 
 **Key Properties**:
-- **Isolated objects "pop out"**: High center-surround response
-- **Uniform regions suppressed**: Low center-surround response (prevents blank pages from being salient)
-- **Edges enhanced**: Strong response at boundaries
-- **Biologically accurate**: Matches V1 cortical processing
+- **Noise Suppression**: Blank pages now generate a blank saliency map (unlike v1.4 where noise created false positives).
+- **Scroll Synchronization**: Structure data is passed to the worker every frame effectively locking the heatmap to the content.
+- **Biologically Accurate**: Simulates "Predictive Coding" (the brain uses knowledge to filter retinal input).
 
 **Performance**:
 - Separable Gaussian blur: O(2n) complexity

@@ -192,13 +192,34 @@ Current weights (`W_I = 0.3`, `W_RG = 0.35`, `W_BY = 0.35`) are heuristic. Consi
 2. ✅ **Phase 2** (Completed): Merge loops, adaptive scaling
 3. ✅ **Phase 3** (Completed 2025-12-11): Center-surround mechanism (DoG)
 4. ✅ **Phase 4** (Completed): Web Workers (Implemented in `renderer/saliency-worker.js`)
+5. ⬜ **Phase 5** (Planned): Cognitive Alignment & Gated Saliency (Saliency-Structure Fusion)
 
-**All phases complete!** Saliency system is now production-ready with biologically accurate center-surround detection.
+**Status update**: Phase 1-4 complete. Phase 5 is the next major frontier.
 
 ---
 
-## References
 
-- Itti, Koch, & Niebur (1998) - IEEE PAMI
-- Bruce & Tsotsos (2009) - "Saliency, attention, and visual search: An information theoretic approach"
-- ITU-R BT.709 - HDTV color space standard
+---
+
+## Phase 5: Cognitive Alignment (Planned)
+
+### 8. ⬜ Gated Semantic Saliency (Fusion)
+**Priority**: CRITICAL | **Effort**: HIGH | **Impact**: VERY HIGH
+
+**Problem**: Current additive model (`0.7*color + 0.3*structure`) allows noise to leak through.
+**Solution**: Implement multiplicative "Gating" where structure defines the *potential* for saliency.
+-   **Inhibitor Mask**: Silences noise/background texture.
+-   **Excitor Mask**: Boosts UI controls regardless of contrast.
+-   **Formula**: `Final = (RawSaliency * Inhibitor) + Excitor`
+
+### 9. ⬜ Gestalt Closure ("Blob Detection")
+**Priority**: HIGH | **Effort**: MEDIUM | **Impact**: HIGH
+
+**Problem**: Visualizing individual structure blocks looks like "ingredients" rather than a coherent "recipe" (UI component).
+**Solution**: Implement **DBSCAN** or **Morphological Closing** to fuse nearby elements into organic "Gestalt Blobs" for the wireframe/closure mode.
+
+### 10. ⬜ Temporal Synchronization
+**Priority**: MEDIUM | **Effort**: MEDIUM | **Impact**: HIGH (Usability)
+
+**Problem**: Worker latency causes "scroll tearing" where the saliency map (old) misaligns with the structure map (new).
+**Solution**: Snapshot `structureData` and pass it *with* the image to the worker. The worker generates masks locally, ensuring pixel-perfect alignment for that frame.

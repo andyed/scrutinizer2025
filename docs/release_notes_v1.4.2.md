@@ -14,6 +14,21 @@ The interface now "breathes" based on your activity:
 *   **Renderer**: Added velocity tracking and pupil state simulation (dilation/constriction).
 *   **Shader**: Coupled the "Blur Radius" uniform to the MIP pooling logic, allowing dynamic scaling of peripheral acuity.
 
+## Phase 5: Gated Semantic Saliency (Cognitive Alignment)
+We have upgraded the Saliency System from a purely **Bottom-Up** (retinal) model to a **Top-Down** (cognitive) model.
+
+### The "Cognitive Map"
+The brain doesn't just see pixels; it sees objects. We now simulate this by using the **Structure Map** to "gate" the visual attention system:
+*   **Inhibition (Silence the Noise)**: Empty areas (paper textures, compression artifacts, faint gradients) are now actively suppressed. If the semantic engine doesn't see an object, the visual system ignores the pixels.
+*   **Excitation (Boost the Signal)**: Interactive elements (UI controls, buttons, inputs) receive a saliency boost, ensuring they remain visible ("pop") even if they have low visual contrast (e.g., "ghost" buttons).
+*   **Temporal Sync**: The saliency heat-map is now perfectly synchronized with the content during scroll, eliminating the "laggy ghost" artifacts seen in v1.4.0.
+
+### Benefit
+*   **Cleaner Periphery**: No more flickering heat-maps on blank pages.
+*   **Solid Scrolling**: The distortion field locks to the content.
+*   **Resilient UI**: Critical controls remain visible in the periphery.
+
+
 ## New Feature: Reference Pages
 A new **"Reference Pages"** submenu has been added to the **Go** menu.
 *   Instantly load standard test fixtures (Dashboard, Article, E-commerce).
