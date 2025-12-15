@@ -400,7 +400,16 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     // Far Periphery (>8°): Aggressive scatter and dissolution
     // Parafovea (3-5°): Mild positional uncertainty, preserve geometry
     // Far Periphery (>8°): Aggressive scatter and dissolution
-    float eccentricityScale = isFarPeriphery ? 1.0 : 0.15; 
+    // Eccentricity-Based Scaling: Parafovea vs Far Periphery
+    // Parafovea (3-5°): Mild positional uncertainty, preserve geometry
+    // Far Periphery (>8°): Aggressive scatter and dissolution
+    // FIX: Replaced hard jump (0.15 -> 1.0) with smooth ramp to prevent "ring" artifact
+    
+    // We ramp from 0.15 (Parafovea level) to 1.0 (Periphery level)
+    // Transition zone: Start of Far Periphery -> +30% raidus
+    float transitionWidth = parafovea_radius * 0.3;
+    float boundaryProgress = smoothstep(parafovea_radius, parafovea_radius + transitionWidth, dist);
+    float eccentricityScale = mix(0.15, 1.0, boundaryProgress); 
     
     // Cyberpunk/Wireframe Override: We want structural distortion (blocks) to start immediately
     // in the parafovea to create a strong "tech" aesthetic.
@@ -739,6 +748,26 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         return finalColor;
         
     } else if (config.v4_style_id == 1) { // Oklab (formerly "Lab")
+        // === CHROMATIC ABERRATION (Copied from Default) ===
+        float noiseVal = (rand(uv) - 0.5);
+        
+        // Saliency Dampening for CA
+        float protection = max(lgn.saliency, lgn.density);
+        float dampener = mix(1.0, 0.85, protection);
+        float strengthMult = smoothstep(0.0, 0.6, u_intensity) * dampener;
+        
+        float periphery_start = fovea_radius * 1.2;
+        float caFactor = smoothstep(periphery_start, periphery_start + 0.25, dist);
+        caFactor *= strengthMult;
+        
+        if (caFactor > 0.01) {
+            float offset = 0.005 * caFactor; 
+            vec2 caOffset = vec2(offset, 0.0); 
+            
+            col.r = sampleSource(v1.distortedUV + caOffset).r;
+            col.b = sampleSource(v1.distortedUV - caOffset).b;
+        }
+
         // Use actual Oklab color space for desaturation
         vec3 lab = rgbToOklab(col);
         
@@ -757,15 +786,21 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         // Saccade suppression (darken during rapid eye movement)
         rodColor = mix(rodColor, vec3(0.01), saccadeFactor * 0.9);
         
-        // Saliency Modulation (Phase 3): Conservative rod vision relief
-        float labEffectFactor = effectFactor;
+        // DECOUPLED DESATURATION (Like Default)
+        // Use distance-based ramp instead of geometry strength
+        float rampEnd = fovea_radius * config.lgn_ramp_end_mult;
+        float desaturationFactor = smoothstep(fovea_radius, rampEnd, dist);
+        desaturationFactor *= strengthMult;
+        
+        // Saliency Modulation
         if (u_enable_saliency_modulation > 0.5 && dist > parafovea_radius) {
             float s = lgn.saliency;
-            // 15% max reduction at maximum saliency
-            labEffectFactor *= mix(1.0, 0.85, s);
+            float rodMod = mix(1.0, 0.85, s);
+            desaturationFactor *= rodMod;
         }
         
-        return mix(col, rodColor, labEffectFactor);
+        // Mix based on desaturation factor
+        return mix(col, rodColor, desaturationFactor);
         
     } else if (config.v4_style_id == 2) { // Frosted
         // Simple blur/desaturate
@@ -996,20 +1031,10 @@ void main() {
         float mask = texture(u_maskTexture, v_texCoord).r;
         color.rgb = vec3(mask);
     } else if (debugLevel > 1.5) {
-        // Heatmap for Saliency (Blue -> Green -> Red)
-        // Restored from commit 83e13f1 (User Preference)
+        // Heatmap for Saliency (Grayscale)
+        // User Preference: Pure B&W is clearer for polarity
         float s = lgn.saliency;
-        vec3 heatmap = vec3(0.0);
-        
-        if (s < 0.5) {
-            // Blue -> Green
-            heatmap = mix(vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 0.0), s * 2.0);
-        } else {
-            // Green -> Red
-            heatmap = mix(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), (s - 0.5) * 2.0);
-        }
-
-        color.rgb = heatmap;
+        color.rgb = vec3(s);
     } else if (debugLevel > 0.5) {
         if (lgn.density > 0.0) {
             color.rgb = mix(color.rgb, vec3(1.0, 0.0, 0.0), 0.3 * lgn.density);

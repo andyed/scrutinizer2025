@@ -664,6 +664,9 @@ function createScrutinizerWindow(startUrl) {
 
     contentView.webContents.on('did-finish-load', () => {
         console.log('[Main] ContentView did-finish-load');
+        // Force structure scan to ensure saliency map updates (Critical for initial load)
+        contentView.webContents.send('browser:force-scan');
+
         if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
             hudWindow.webContents.send('hud:browser:did-finish-load');
             hudWindow.webContents.send('browser:did-finish-load'); // Legacy
@@ -726,6 +729,8 @@ function createScrutinizerWindow(startUrl) {
     // did-navigate-in-page is for hash changes and single-page app navigations
     contentView.webContents.on('did-navigate', (event, url) => {
         sendUrlUpdate(url, 'did-navigate');
+        // Force structure scan to ensure saliency map updates
+        contentView.webContents.send('browser:force-scan');
     });
 
     // Note: Removed did-navigate-in-page listener to avoid duplicate URL updates

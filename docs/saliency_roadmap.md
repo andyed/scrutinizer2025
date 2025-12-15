@@ -203,8 +203,9 @@ Current weights (`W_I = 0.3`, `W_RG = 0.35`, `W_BY = 0.35`) are heuristic. Consi
 
 ## Phase 5: Cognitive Alignment (Planned)
 
-### 8. ⬜ Gated Semantic Saliency (Fusion)
+### 8. ✅ Gated Semantic Saliency (Fusion) (Implemented v1.4.2)
 **Priority**: CRITICAL | **Effort**: HIGH | **Impact**: VERY HIGH
+**Status**: ✅ COMPLETE (2025-12-14)
 
 **Problem**: Current additive model (`0.7*color + 0.3*structure`) allows noise to leak through.
 **Solution**: Implement multiplicative "Gating" where structure defines the *potential* for saliency.

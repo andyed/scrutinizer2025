@@ -1,4 +1,11 @@
-# Known Issues - Scrutinizer v1.0
+# Known Issues
+
+## 🛑 Critical Issues
+*   **Saliency Map Persistence (Google -> YouTube)**:
+    *   **Symptoms**: Saliency map may fail to re-initialize when navigating from Google Search Results to a YouTube video.
+    *   **Status**: Partially Mitigated (Force-Scan added), but race condition persists in this specific Single-Page App (SPA) flow.
+    *   **Workaround**: Reloading the page restores the map.
+ - Scrutinizer v1.0
 
 ## Popup Windows Don't Inherit Foveal Effect
 

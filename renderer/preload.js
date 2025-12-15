@@ -267,6 +267,12 @@ window.addEventListener('DOMContentLoaded', () => {
         ipcRenderer.send('browser:zoom-changed', webFrame.getZoomFactor());
     });
 
+    // Forced Scan (e.g. from Main Process on navigation finish)
+    ipcRenderer.on('browser:force-scan', () => {
+        console.log('[Preload] Forced scan requested');
+        scanAndSend(true);
+    });
+
     // Forward keyboard events to main process for shortcuts
     // Forward keyboard events to main process for shortcuts and modifier tracking
     const forwardKeyEvent = (e, type) => {
