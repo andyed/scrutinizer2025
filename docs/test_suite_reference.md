@@ -47,3 +47,29 @@ npm run capture-golden
 ```
 
 **Artifacts Location**: `tests/golden-captures/v1.4.1/`
+
+## Debug Verification (CLI Flags)
+
+You can force specific debug modes using CLI arguments. This is critical for verifying the underlying feature maps before running a full regression suite.
+
+| Flag | Effect | Pass Criteria (What to look for) | Fail Criteria (Red Flags) |
+|:-----|:-------|:---------------------------------|:--------------------------|
+| `--debug-saliency` | Shows Saliency Heatmap | **Blue/Green/Red Gradient**. Text/Edges should be Red. Background should be Blue. | **Solid Red Screen** (Data corruption/overflow). **Solid Blue** (Empty map). |
+| `--debug-structure` | Shows Structure Map | **Black/Green/Blue Blocks**. Content matches page layout. Phase (blue stripes) visible on text. | **"Shredded" Noise** (Byte packing error). **Invisible** (Alpha channel issue). |
+
+### Example Usage
+```bash
+# Verify Saliency Map is working
+npm start -- --debug-saliency
+
+# Verify Structure Map packing
+npm start -- --debug-structure
+```
+
+## Critical Verification Checklist
+Before shipping ANY change to `structure-map.js` or `peripheral.frag`, you MUST manualy verify:
+
+1.  **Saliency Map Integrity**: Run `--debug-saliency`. If it looks like a solid color, **STOP**. You have broken the mapping.
+2.  **Blueprint Mode Clarity**: Run `--blueprint`. Images should be **solid blocks**, not "fuzz". Text should be "schematic lines".
+3.  **Red Saliency Regression**: We have hit this twice. Always check that the saliency map is NOT full-red.
+

@@ -450,6 +450,20 @@ You can also use these parameters to launch the app in a specific state without 
 TEST_URL=https://google.com TEST_RADIUS=50 npm start
 ```
 
+**Debug Flags:**
+You can force debug overlays from the command line:
+- `--debug-saliency`: Shows the Saliency Heatmap (Blue->Red)
+- `--debug-structure`: Shows the Structure Map (Red/Green Density)
+
+```bash
+# Launch with Saliency Map Debug
+npm start -- --debug-saliency
+
+# Launch with Structure Map Debug
+npm start -- --debug-structure
+```
+
+
 ### Test Suite
 
 The test suite performs the following checks:

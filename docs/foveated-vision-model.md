@@ -301,8 +301,13 @@ These blocks are painted onto an off-screen `<canvas>` (50% resolution for Struc
 | :--- | :--- | :--- |
 | **Red** | **Rhythm** | `lineHeight / 100.0`. Defines the vertical cadence of the content. |
 | **Green** | **Mass** | `density` (0.0-1.0). Defines visual weight (font weight, image brightness). |
-| **Blue** | **Semantics** | Type ID: Text (1.0), Image (0.5), UI (0.0). |
+| **Blue** | **Semantics** | **Legacy (Stable)**: Type ID: Text (1.0), Image (0.5), UI (0.0). <br> **Experimental (v1.4.2)**: Packed Type + Phase. *See warning below.* |
 | **Alpha** | **Interaction** | 1.0 = Content. Interaction is encoded in Blue (Text=1.0 vs UI=0.0). |
+
+> ⚠️ **Implementation Warning: Blue Channel Packing**
+> In v1.4.2, we attempted to pack both **Type** and **Phase** (text y-alignment) into the Blue channel using 8-bit quantization (0-10 for Type, 11-255 for Phase).
+> **Result**: This caused significant artifacts where Images (Type 0.5) were misread as Text Phase, leading to "shredded" visual noise.
+> **Lesson**: Do not overload 8-bit channels with discontinuous data types. Use a separate texture for Phase or ensure Type codes are completely distinct from Phase ranges with a large safety margin.
 
 ### Shader Consumption
 The fragment shader reads this map to drive two distinct modes:

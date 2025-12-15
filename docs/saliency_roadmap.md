@@ -203,19 +203,27 @@ Current weights (`W_I = 0.3`, `W_RG = 0.35`, `W_BY = 0.35`) are heuristic. Consi
 
 ## Phase 5: Cognitive Alignment (Planned)
 
-### 8. ✅ Gated Semantic Saliency (Fusion) (Implemented v1.4.2)
+### 8. ⚠️ Gated Semantic Saliency (Fusion) (Implemented v1.4.2 - ROLLED BACK)
 **Priority**: CRITICAL | **Effort**: HIGH | **Impact**: VERY HIGH
-**Status**: ✅ COMPLETE (2025-12-14)
+**Status**: ⚠️ REGRESSION DETECTED (2025-12-15)
 
-**Problem**: Current additive model (`0.7*color + 0.3*structure`) allows noise to leak through.
-**Solution**: Implement multiplicative "Gating" where structure defines the *potential* for saliency.
--   **Inhibitor Mask**: Silences noise/background texture.
--   **Excitor Mask**: Boosts UI controls regardless of contrast.
--   **Formula**: `Final = (RawSaliency * Inhibitor) + Excitor`
+**Implementation Attempt**:
+We attempted to implement multiplicative gating using a packed Structure Map. 
+**Formula**: `Final = (RawSaliency * Inhibitor) + Excitor`
+
+**Critical Failures (v1.4.2)**:
+1.  **Red Saliency Map**: The debug visualization (which should be heatmap B->G->R or Grayscale) turned pure solid red. This indicates a likely overflow or channel mapping error in the `u_saliencyMap` texture upload or shader reading.
+2.  **Structure Map Artifacts**: The structure map's "Blue Channel Packing" (combining Type and Phase) caused major artifacts in Blueprint mode, rendering images as shredded "mongrel" noise until a specific packing fix was applied.
+3.  **Stability**: The system proved fragile to these complex packing schemes.
+
+**Lesson Learned**:
+-   **Don't over-pack channels**: Trying to squeeze Type (0.0/0.5/1.0) and Phase (0.0-1.0) into a single 8-bit Blue channel created precision issues and "ghost" values.
+-   **Debug Visualization is Critical**: We proceeded with feature work (Blueprint fix) while the core debug tool (Saliency view) was broken (Red screen), blinding us to the underlying data corruption.
+-   **Recommendation**: Revert to v1.4.1. For next attempt, use a **separate texture** or a **16-bit float texture** for structure data rather than trying to pack complex semantic data into 8-bit RGBA.
 
 ### 9. ✅ Gestalt Closure ("Blob Detection")
 **Priority**: HIGH | **Effort**: MEDIUM | **Impact**: HIGH
-**Status**: ✅ COMPLETE (2025-12-14)
+**Status**: ✅ COMPLETE (2025-12-14) - *Retained in codebase but requires clean Structure Map*
 
 **Problem**: Visualizing individual structure blocks looks like "ingredients" rather than a coherent "recipe" (UI component).
 **Solution**: Implement **DBSCAN** or **Morphological Closing** to fuse nearby elements into organic "Gestalt Blobs" for the wireframe/closure mode.
