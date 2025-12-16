@@ -106,3 +106,28 @@ Before shipping ANY change to `structure-map.js` or `peripheral.frag`, you MUST 
 2.  **Blueprint Mode Clarity**: Run `--blueprint`. Images should be **solid blocks**, not "fuzz". Text should be "schematic lines".
 3.  **Red Saliency Regression**: We have hit this twice. Always check that the saliency map is NOT full-red.
 
+## Pixel-Level Saliency Verification
+
+Automated tests that validate saliency features at the pixel level.
+
+### Running the Test
+```bash
+node scripts/verify-saliency-pixels.js
+```
+
+### Test 1: Face Saliency Hotspot
+- Loads `face-test.html`, enables saliency debug view
+- Checks pixel at face location (1686, 777)
+- **Pass Criteria**: R value > 100 (indicates face detected as salient)
+
+### Test 2: Modulation Delta
+- Captures two images: one with `enableSaliencyModulation: false`, one with `true`
+- Compares pixel values at face location
+- **Pass Criteria**: Pixel delta > 5 (proves modulation affects rendering)
+
+### Expected Output
+```
+✅ Face Saliency Hotspot Verified (Value > 100)
+✅ Saliency Modulation Verified (Pixels changed)
+✅ ALL PIXEL VERIFICATIONS PASSED
+```
