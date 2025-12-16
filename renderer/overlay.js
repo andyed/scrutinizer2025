@@ -44,7 +44,7 @@
                 const localX = screenX - window.screenX;
                 const localY = screenY - window.screenY; // HUD is frameless, so this is content area
 
-                if (Math.random() < 0.05) { // 5% sample rate
+                if (Math.random() < 0.001) { // 0.1% sample rate (reduced from 5%)
                     log(`[Overlay] Mouse Sync: Screen(${screenX}, ${screenY}) - Win(${window.screenX}, ${window.screenY}) = Local(${localX}, ${localY}). HUD: ${window.innerWidth}x${window.innerHeight}, DPR=${window.devicePixelRatio}`);
                 }
 
@@ -215,6 +215,7 @@
         });
 
         ipcRenderer.on('menu:toggle-structure-map', (e, enabled) => {
+            log(`[Overlay] IPC received: menu:toggle-structure-map -> ${enabled}`);
             scrutinizer.toggleStructureMap(enabled);
         });
 

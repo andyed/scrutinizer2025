@@ -682,6 +682,18 @@
 
         toggleStructureMap(enabled) {
             this.showStructureMap = enabled;
+
+            // Show/hide annotation container
+            const container = document.getElementById('structure-annotations');
+            if (container) {
+                container.style.display = enabled ? 'block' : 'none';
+                if (!enabled) container.innerHTML = '';
+            }
+
+            // Force render annotations immediately
+            if (enabled && this.lastBlocks) {
+                this.renderStructureAnnotations(this.lastBlocks);
+            }
             this.updateDebugMode();
         }
 
@@ -814,6 +826,45 @@
             // Upload to GPU
             if (this.renderer) {
                 this.renderer.uploadStructureMap(this.structureMap.getCanvas());
+            }
+
+            // Render annotations if structure debug is enabled (use raw blocks, not grouped)
+            if (this.showStructureMap) {
+                this.renderStructureAnnotations(blocks);
+            }
+        }
+
+        /**
+         * Render lineHeight annotations on large text blocks as DOM elements.
+         * @param {Array} blocks - Raw structure blocks
+         */
+        renderStructureAnnotations(blocks) {
+            const container = document.getElementById('structure-annotations');
+            if (!container) return;
+
+            container.innerHTML = '';
+            let count = 0;
+            const maxAnnotations = 50;
+
+            for (const block of blocks) {
+                if (block.type < 0.9 || block.w < 60 || block.h < 16 || !block.lineHeight) continue;
+                if (count >= maxAnnotations) break;
+
+                const label = document.createElement('div');
+                label.textContent = Math.round(block.lineHeight);
+                label.style.cssText = `
+                    position: absolute;
+                    left: ${block.x + block.w - 30}px;
+                    top: ${block.y}px;
+                    font: bold 12px system-ui, sans-serif;
+                    color: white;
+                    background: rgba(0,0,0,0.7);
+                    padding: 1px 3px;
+                    border-radius: 2px;
+                    pointer-events: none;
+                `;
+                container.appendChild(label);
+                count++;
             }
         }
 

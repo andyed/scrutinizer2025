@@ -49,25 +49,12 @@ class StructureMap {
     drawBlock(x, y, w, h, type, density, lineHeight, saliency = 1.0) {
         const s = this.scale;
 
-        // Encode channels
-        // Red: Rhythm (lineHeight / 100.0)
-        // Clamp to 0-255 range. 100px line height = 255 red.
+        // Encode channels: R=Rhythm, G=Density, B=Type
         const r = Math.min(255, Math.floor((lineHeight / 100.0) * 255));
-
-        // Green: Mass (density)
         const g = Math.min(255, Math.floor(density * 255));
-
-        // Blue: Type
         const b = Math.min(255, Math.floor(type * 255));
 
-        // Alpha: Always 1.0 for now (saliency param ignored until proper implementation)
-        // TODO: Implement saliency in packed R channel or separate texture
-        const a = 255;
-
         this.ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 1.0)`;
-
-        // Draw scaled rect
-        // Use Math.floor/ceil to ensure we cover pixels without anti-aliasing gaps if possible
         this.ctx.fillRect(
             Math.floor(x * s),
             Math.floor(y * s),
