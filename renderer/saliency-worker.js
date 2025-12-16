@@ -203,13 +203,15 @@ function computeCenterSurround(feature, width, height) {
 /**
  * Generate Inhibitor and Excitor masks from Structure Blocks
  */
-function generateStructureMasks(blocks, targetW, targetH, sourceW, sourceH) {
+function generateStructureMasks(blocks, targetW, targetH, sourceW, sourceH, dpr) {
     const len = targetW * targetH;
     const inhibitor = new Float32Array(len);
     const excitor = new Float32Array(len);
 
-    const scaleX = targetW / sourceW;
-    const scaleY = targetH / sourceH;
+    // sourceW/H are Physical pixels. blocks are Logical pixels.
+    // We must scale blocks by DPR to get Physical, then by (target/source) to get Saliency Space.
+    const scaleX = (targetW / sourceW) * dpr;
+    const scaleY = (targetH / sourceH) * dpr;
 
     for (const block of blocks) {
         const x = Math.floor(block.x * scaleX);
@@ -249,7 +251,7 @@ function drawFaceBlob(faceMap, width, height, box) {
 
     // Sigma relative to face size (larger sigma = softer blob)
     // We want the blob to cover the face and fall off
-    const sigma = Math.max(box.width, box.height) * 0.5;
+    const sigma = Math.max(box.width, box.height) * 0.6; // Increased from 0.5 for broader hotspots
     const sigma2 = 2 * sigma * sigma;
 
     // Bounds to optimize loop
@@ -281,60 +283,82 @@ self.onmessage = async function (e) {
     if (!imageBitmap) return;
 
     // Adaptive Resolution Scaling
-    const TARGET_MAX_DIM = 256;
+    const SALIENCY_MAX_DIM = 256;
+    const FACE_DETECT_MAX_DIM = 640; // Higher res for small face detection
+
     const srcW = imageBitmap.width;
     const srcH = imageBitmap.height;
     const maxDim = Math.max(srcW, srcH);
-    const scale = maxDim > 0 ? Math.min(1.0, TARGET_MAX_DIM / maxDim) : 0.25;
 
-    // Calculate target dimensions
-    const newWidth = Math.floor(srcW * scale);
-    const newHeight = Math.floor(srcH * scale);
+    // Calculate scales
+    const saliencyScale = maxDim > 0 ? Math.min(1.0, SALIENCY_MAX_DIM / maxDim) : 0.25;
+    const faceScale = maxDim > 0 ? Math.min(1.0, FACE_DETECT_MAX_DIM / maxDim) : 0.5;
 
-    // Initialize or resize OffscreenCanvas
-    if (width !== newWidth || height !== newHeight) {
-        width = newWidth;
-        height = newHeight;
+    // Saliency Dimensions
+    const sWidth = Math.floor(srcW * saliencyScale);
+    const sHeight = Math.floor(srcH * saliencyScale);
+
+    // Face Dimensions
+    const fWidth = Math.floor(srcW * faceScale);
+    const fHeight = Math.floor(srcH * faceScale);
+
+    // Initialize/Resize Saliency Canvas (Main processing canvas)
+    if (width !== sWidth || height !== sHeight) {
+        width = sWidth;
+        height = sHeight;
         canvas = new OffscreenCanvas(width, height);
         ctx = canvas.getContext('2d', { willReadFrequently: true });
         ctx.imageSmoothingEnabled = false;
+
+        // Re-allocate buffers
+        const len = width * height;
+        tempBuffer1 = new Float32Array(len);
+        tempBuffer2 = new Float32Array(len);
     }
 
-    // Draw and resize
+    // Draw frame to Saliency Canvas
     ctx.drawImage(imageBitmap, 0, 0, width, height);
-    imageBitmap.close(); // Release memory immediately
 
-    // Get pixel data
-    const imageData = ctx.getImageData(0, 0, width, height);
-    const pixels = imageData.data;
     const len = width * height;
 
-    // --- FACE DETECTION ---
-    const faceMap = new Float32Array(len); // Initialize to 0
+    // Get ImageData for processing
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const pixels = imageData.data;
+
+    // --------- FACE DETECTION ---------
+    // Run on a separate, higher-res canvas if needed to detect small faces
+    let faceMap = new Float32Array(width * height); // Initialize empty
 
     if (faceModelLoaded) {
-        try {
-            // Run detection on the downscaled canvas
-            // We await here, which is fine in a worker
-            const faces = await faceapi.detectAllFaces(canvas, faceOptions);
+        // Create temp face canvas
+        const faceCanvas = new OffscreenCanvas(fWidth, fHeight);
+        const faceCtx = faceCanvas.getContext('2d');
+        faceCtx.drawImage(imageBitmap, 0, 0, fWidth, fHeight);
 
-            console.log(`[SaliencyWorker] Detected ${faces ? faces.length : 0} faces`);
+        try {
+            const faces = await faceapi.detectAllFaces(faceCanvas, faceOptions);
 
             if (faces && faces.length > 0) {
-                // Determine scale relative to input size if needed, 
-                // but detectAllFaces on 'canvas' returns coords valid for that canvas.
-                // So no re-scaling needed!
-
+                console.log(`[SaliencyWorker] Detected ${faces.length} faces`);
                 for (const face of faces) {
-                    console.log(`[SaliencyWorker] Face at ${face.box.x}, ${face.box.y}`);
-                    drawFaceBlob(faceMap, width, height, face.box);
+                    // Map box from Face Space (fWidth) to Saliency Space (width)
+                    const scaleFactor = width / fWidth;
+
+                    const scaledBox = {
+                        x: face.box.x * scaleFactor,
+                        y: face.box.y * scaleFactor,
+                        width: face.box.width * scaleFactor,
+                        height: face.box.height * scaleFactor
+                    };
+
+                    drawFaceBlob(faceMap, width, height, scaledBox);
                 }
             }
         } catch (err) {
             // Don't crash the worker if detection fails
-            console.warn('Face detection error:', err);
+            console.warn('[SaliencyWorker] Face detection error:', err);
         }
-    }
+    } // End if(faceModelLoaded)
 
     // Feature maps
     const I = new Float32Array(len);   // Intensity (Oklab L)
@@ -389,7 +413,8 @@ self.onmessage = async function (e) {
     let excitorMask = null;
 
     if (e.data.structureData && e.data.structureData.length > 0 && srcW > 0) {
-        const masks = generateStructureMasks(e.data.structureData, width, height, srcW, srcH);
+        const dpr = e.data.dpr || 1;
+        const masks = generateStructureMasks(e.data.structureData, width, height, srcW, srcH, dpr);
         inhibitorMask = masks.inhibitor;
         excitorMask = masks.excitor;
     }
@@ -398,7 +423,7 @@ self.onmessage = async function (e) {
     const W_I = 0.3;
     const W_RG = 0.35;
     const W_BY = 0.35;
-    const W_FACE = 0.5; // High weight for faces (People look at people)
+    const W_FACE = 2.0; // Boosted from 0.5 to make faces pop against complex backgrounds
 
     const saliency = new Float32Array(len);
     let maxVal = 0;
@@ -415,11 +440,12 @@ self.onmessage = async function (e) {
             const inhibition = inhibitorMask[i];
             const excitation = excitorMask[i];
 
-            // 1. Gating
+            // 1. Gating (Suppress background/whitespace)
             val *= (inhibition * 0.9 + 0.1);
 
-            // 2. Boosting
-            val += (excitation * 0.8);
+            // 2. Boosting (Slightly highlight content areas, but don't overwhelm visual features)
+            // Was 0.8, which washed out actual image details. Reduced to 0.15.
+            val += (excitation * 0.15);
         }
 
         saliency[i] = val;

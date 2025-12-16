@@ -94,6 +94,7 @@
   "dependencies": {
     "electron-log": "^5.4.3",
     "electron-updater": "^6.1.7",
-    "html2canvas": "^1.4.1"
+    "html2canvas": "^1.4.1",
+    "pngjs": "^7.0.0"
   }
 }

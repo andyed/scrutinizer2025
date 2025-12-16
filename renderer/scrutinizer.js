@@ -159,6 +159,26 @@
                 this.handleStructureUpdate(blocks);
             });
 
+            // Listen for menu commands
+            ipcRenderer.on('menu:toggle-saliency-modulation', (event, enabled) => {
+                console.log(`[Scrutinizer] IPC received: toggle-saliency-modulation -> ${enabled}`);
+                this.toggleSaliencyModulation(enabled);
+            });
+
+            ipcRenderer.on('menu:toggle-saliency-map', (event, enabled) => {
+                console.log(`[Scrutinizer] IPC received: toggle-saliency-map -> ${enabled}`);
+                this.toggleSaliencyMap(enabled);
+            });
+
+            ipcRenderer.on('menu:toggle-structure-map', (event, enabled) => {
+                console.log(`[Scrutinizer] IPC received: toggle-structure-map -> ${enabled}`);
+                this.toggleStructureMap(enabled);
+            });
+
+            ipcRenderer.on('menu:toggle-enable-structure-map', (event, enabled) => {
+                this.toggleEnableStructureMap(enabled);
+            });
+
             // Initial resize
             this.handleResize();
             const container = document.getElementById('webview-container');
@@ -221,12 +241,6 @@
                     this.maskCtx.fillStyle = 'black';
                     this.maskCtx.fillRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
                     this.maskDirty = true;
-
-                    this.saliencyTargetCanvas.width = sWidth;
-                    this.saliencyTargetCanvas.height = sHeight;
-
-                    this.saliencyCurrentCanvas.width = sWidth;
-                    this.saliencyCurrentCanvas.height = sHeight;
                 }
             });
         }
@@ -351,7 +365,8 @@
                         this.saliencyWorker.postMessage({
                             imageBitmap: bitmap,
                             id: this.saliencyFrameCounter,
-                            structureData: this.lastGroupedBlocks || this.lastBlocks // Sync: Pass GESTALT (fused) structure for strong edges
+                            structureData: this.lastGroupedBlocks || this.lastBlocks, // Sync: Pass GESTALT (fused) structure for strong edges
+                            dpr: window.devicePixelRatio || 1
                         }, [bitmap]);
                     });
 

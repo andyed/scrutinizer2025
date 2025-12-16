@@ -178,6 +178,9 @@
             if (state.intensity !== undefined) {
                 if (scrutinizer) scrutinizer.updateIntensity(state.intensity);
             }
+            if (state.enableSaliencyModulation !== undefined) {
+                if (scrutinizer) scrutinizer.toggleSaliencyModulation(state.enableSaliencyModulation);
+            }
         });
 
         // Menu IPC handlers

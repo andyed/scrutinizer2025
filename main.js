@@ -770,17 +770,23 @@ function createScrutinizerWindow(startUrl) {
             // Pass current state to new window
             // Only show welcome popup on first window (when mainWindow doesn't exist yet)
             const isFirstWindow = !mainWindow || BrowserWindow.getAllWindows().filter(w => !w.mainBrowserWindow).length === 1;
-            const state = {
-                radius: currentRadius,
-                blur: currentBlur,
-                intensity: currentIntensity,
-                enabled: currentEnabled,
-                visualMemory: currentVisualMemory,
-                showWelcome: isFirstWindow ? currentShowWelcome : false
+            // Initial State for Renderer/HUD
+            const enableSaliency = process.env.TEST_ENABLE_SALIENCY_MODULATION !== 'false';
+            const initialState = {
+                radius: currentRadius || 180,
+                blur: currentBlur || 10,
+                intensity: currentIntensity !== undefined ? currentIntensity : 1.0,
+                enabled: currentEnabled !== undefined ? currentEnabled : true,
+                visualMemory: currentVisualMemory || 20,
+                showWelcome: currentShowWelcome !== undefined ? currentShowWelcome : true,
+                enableSaliencyModulation: enableSaliency
             };
-            console.log('[Main] Sending state to HUD:', JSON.stringify(state));
-            hudWindow.webContents.send('hud:settings:init-state', state);
-            hudWindow.webContents.send('settings:init-state', state); // Legacy
+            // Merge showWelcome into initialState based on isFirstWindow
+            initialState.showWelcome = isFirstWindow ? initialState.showWelcome : false;
+
+            console.log('[Main] Sending state to HUD:', JSON.stringify(initialState));
+            hudWindow.webContents.send('hud:settings:init-state', initialState);
+            hudWindow.webContents.send('settings:init-state', initialState); // Legacy
         }
     });
 
@@ -1278,7 +1284,7 @@ app.whenReady().then(() => {
             win.urlDialog = dialog;
         }
     });
-});
+}); // Closing app.whenReady().then( () => { ...
 
 app.on('window-all-closed', function () {
     if (process.platform !== 'darwin') {
