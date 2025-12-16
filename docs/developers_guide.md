@@ -56,7 +56,29 @@ We implement a **Dual Strategy** in `main.js`:
     *   **Cons**: Lower fidelity, requires manual coordinate mapping.
     *   **Critical Detail**: When calculating Y-coordinate, we MUST subtract the `TOOLBAR_HEIGHT` (40px) because the visual overlay's origin is offset from the window's content origin.
 
+### 6. HUD Display Layer Stack (v1.4.2)
+
+The HUD overlay window (`overlay.html`) uses a z-indexed layer stack for rendering. Understanding this is critical when adding new visual overlays:
+
+| Layer | Element | z-index | Purpose |
+| :--- | :--- | :---: | :--- |
+| **Base** | `#overlay-canvas` | 100 | WebGL canvas for foveation/effects |
+| **Debug SVG** | `#debug-overlay` | 101 | Vector overlays (fovea ring, radial grid) |
+| **Annotations** | `#structure-annotations` | 102 | DOM text labels (lineHeight annotations) |
+
+**Key Points:**
+- All layers are `position: fixed` and `pointer-events: none`
+- Canvas is set to `display: none` initially (enabled by Scrutinizer)
+- SVG overlay is managed by `svg-overlay.js` (Group Translation pattern)
+- Structure annotations are dynamically populated by `scrutinizer.js` when Structure Map debug is enabled
+
+**Adding a New Overlay:**
+1. Add a new container element in `overlay.html` with appropriate z-index
+2. Manage visibility in `scrutinizer.js` (show/hide on toggle)
+3. Populate content in response to data updates or user interaction
+
 ## Neuro-Architecture Pipeline
+
 
 The shader uses a modular architecture inspired by the human visual system to organize visual effects. While we use biological terms (LGN, V1, V4) as convenient labels for the pipeline stages, this is a **software architecture pattern**, not a rigorous biological simulation.
 
