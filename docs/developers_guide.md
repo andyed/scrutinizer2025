@@ -230,6 +230,36 @@ col *= mix(1.0, lumaRatio, contrastPreservation);
 *   **Tech**: Uses `OffscreenCanvas` for image resizing and `Transferable` objects (`ImageBitmap`, `ArrayBuffer`) for zero-copy data transfer.
 *   **Benefit**: The main thread is never blocked by image analysis. Saliency maps update asynchronously (~4fps) without affecting the 60fps rendering loop.
 
+#### 3. Multi-Resolution Processing (v1.4.2)
+**Problem**: Small faces require higher resolution for reliable detection, but running the full saliency pipeline at high resolution is expensive.
+
+**Solution**: The saliency worker uses **separate resolutions** for different tasks:
+
+| Task | Max Dimension | Purpose |
+|------|---------------|---------|
+| **Saliency (DoG)** | 256px | Edges, contrast, color opposition |
+| **Face Detection** | 640px | Reliable detection of small faces |
+
+```javascript
+// renderer/saliency-worker.js
+const SALIENCY_MAX_DIM = 256;      // Fast: O(n²) pixel processing
+const FACE_DETECT_MAX_DIM = 640;   // Accurate: Tiny Face Detector needs resolution
+```
+
+**Coordinate Mapping**: Face bounding boxes are detected in "Face Space" (640px) and mapped to "Saliency Space" (256px) before drawing the Gaussian blob:
+
+```javascript
+const scaleFactor = width / fWidth;  // 256 / 640
+const scaledBox = {
+    x: face.box.x * scaleFactor,
+    y: face.box.y * scaleFactor,
+    width: face.box.width * scaleFactor,
+    height: face.box.height * scaleFactor
+};
+```
+
+**Reuse Opportunity**: If other features (e.g., text detection, logo detection) need higher resolution, they can share the 640px canvas created for face detection.
+
 ## Future Roadmap: Abstraction
 
 We plan to abstract the "Peripheral Model" into a pluggable system where shaders can be loaded dynamically or defined in separate files, making it easier to experiment with deep-learning-based texture synthesis models.
