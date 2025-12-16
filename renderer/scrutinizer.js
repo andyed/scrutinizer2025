@@ -52,41 +52,52 @@
 
             // Saliency Map (Visual Attractiveness Texture)
             // Moved to Web Worker for performance
-            this.saliencyWorker = new Worker('./saliency-worker.js');
-            this.saliencyWorker.onmessage = (e) => {
-                const { imageData } = e.data;
-                if (imageData) {
-                    // Fix Oscillation: Route through smoothing canvas instead of direct upload
-                    // This ensures the render() loop's smoothing logic (Target -> Current) works,
-                    // preventing the "fight" between raw worker updates and smoothed frames.
+            this.saliencyTargetCanvas = document.createElement('canvas');
 
-                    if (!this.saliencyTargetCanvas) {
-                        this.saliencyTargetCanvas = document.createElement('canvas');
-                    }
+            if (window.Worker) {
+                // Add cache busting to ensure we load the latest worker code during development
+                this.saliencyWorker = new Worker(`./saliency-worker.js?v=${Date.now()}`);
 
-                    // RESIZE if dimensions changed (Adaptive Scaling support)
-                    if (this.saliencyTargetCanvas.width !== imageData.width ||
-                        this.saliencyTargetCanvas.height !== imageData.height) {
-                        this.saliencyTargetCanvas.width = imageData.width;
-                        this.saliencyTargetCanvas.height = imageData.height;
+                this.saliencyWorker.onerror = (error) => {
+                    console.error('[Scrutinizer] Worker Error:', error);
+                };
 
-                        // Also resize the buffer canvas
-                        if (!this.saliencyCurrentCanvas) {
-                            this.saliencyCurrentCanvas = document.createElement('canvas');
+                this.saliencyWorker.onmessage = (e) => {
+                    const { imageData } = e.data;
+                    if (imageData) {
+                        // Fix Oscillation: Route through smoothing canvas instead of direct upload
+                        // This ensures the render() loop's smoothing logic (Target -> Current) works,
+                        // preventing the "fight" between raw worker updates and smoothed frames.
+
+                        if (!this.saliencyTargetCanvas) {
+                            this.saliencyTargetCanvas = document.createElement('canvas');
                         }
-                        this.saliencyCurrentCanvas.width = imageData.width;
-                        this.saliencyCurrentCanvas.height = imageData.height;
+
+                        // RESIZE if dimensions changed (Adaptive Scaling support)
+                        if (this.saliencyTargetCanvas.width !== imageData.width ||
+                            this.saliencyTargetCanvas.height !== imageData.height) {
+                            this.saliencyTargetCanvas.width = imageData.width;
+                            this.saliencyTargetCanvas.height = imageData.height;
+
+                            // Also resize the buffer canvas
+                            if (!this.saliencyCurrentCanvas) {
+                                this.saliencyCurrentCanvas = document.createElement('canvas');
+                            }
+                            this.saliencyCurrentCanvas.width = imageData.width;
+                            this.saliencyCurrentCanvas.height = imageData.height;
+                        }
+
+                        // Update Target Canvas
+                        const ctx = this.saliencyTargetCanvas.getContext('2d');
+                        ctx.putImageData(imageData, 0, 0);
+
+                        // Trigger smoothing loop in render()
+                        // 60 frames = ~1 second of smoothing updates
+                        this.saliencyUpdateCountdown = 60;
                     }
+                };
+            }
 
-                    // Update Target Canvas
-                    const ctx = this.saliencyTargetCanvas.getContext('2d');
-                    ctx.putImageData(imageData, 0, 0);
-
-                    // Trigger smoothing loop in render()
-                    // 60 frames = ~1 second of smoothing updates
-                    this.saliencyUpdateCountdown = 60;
-                }
-            };
             this.lastFrameBitmap = null;
 
             // Visual Memory
@@ -210,25 +221,6 @@
                     this.maskCtx.fillStyle = 'black';
                     this.maskCtx.fillRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
                     this.maskDirty = true;
-
-                    // Resize saliency map
-                    // ADAPTIVE SCALING (Phase 2): Target 256px max dim
-                    const TARGET_MAX_DIM = 256;
-                    const maxDim = Math.max(bufferWidth, bufferHeight);
-                    const saliencyScale = maxDim > 0 ? Math.min(1.0, TARGET_MAX_DIM / maxDim) : 0.25;
-
-                    this.saliencyMap?.resize(bufferWidth, bufferHeight);
-
-                    // Create offscreen canvas for saliency generation if not exists
-                    if (!this.saliencyTargetCanvas) {
-                        this.saliencyTargetCanvas = document.createElement('canvas');
-                    }
-                    if (!this.saliencyCurrentCanvas) {
-                        this.saliencyCurrentCanvas = document.createElement('canvas');
-                    }
-
-                    const sWidth = Math.floor(bufferWidth * saliencyScale);
-                    const sHeight = Math.floor(bufferHeight * saliencyScale);
 
                     this.saliencyTargetCanvas.width = sWidth;
                     this.saliencyTargetCanvas.height = sHeight;

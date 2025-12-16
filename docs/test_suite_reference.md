@@ -56,7 +56,39 @@ You can force specific debug modes using CLI arguments. This is critical for ver
 | Flag | Effect | Pass Criteria (What to look for) | Fail Criteria (Red Flags) |
 |:-----|:-------|:---------------------------------|:--------------------------|
 | `--debug-saliency` | Shows Saliency Heatmap | **Blue/Green/Red Gradient**. Text/Edges should be Red. Background should be Blue. | **Solid Red Screen** (Data corruption/overflow). **Solid Blue** (Empty map). |
+| `--debug-saliency` | Shows Saliency Heatmap | **Blue/Green/Red Gradient**. Text/Edges should be Red. Background should be Blue. | **Solid Red Screen** (Data corruption/overflow). **Solid Blue** (Empty map). |
 | `--debug-structure` | Shows Structure Map | **Red Overlay**. Density determines opacity. Blocks should match page content. | **"Shredded" Noise** (Byte packing error). **Invisible** (Alpha channel issue). |
+
+## Verification Patterns
+
+We use two distinct testing patterns depending on the scope of the feature.
+
+### 1. Targeted Verification Scripts
+**When to use:** For specific, isolated features (like **Face Detection**) where a full regression suite is overkill or where custom setup (e.g., specific loading time, specific image content) is required.
+
+*   **Pattern**: Create a standalone Node.js script in `scripts/` (e.g., `scripts/verify-face-detection.js`) that launches Electron with specific flags and captures a single output.
+*   **Pros**: Fast iteration, isolated environment.
+*   **Cons**: Does not test integration with other pages.
+
+### 2. Full Regression Suite
+**When to use:** Before any release or major merge.
+
+*   **Pattern**: `npm run capture-golden`
+*   **Pros**: Tests all reference pages and fixations.
+*   **Cons**: Slow (~2-3 mins).
+
+## Face Detection Verification
+
+A targeted test exists to verify the "Face Channel" integration. This test loads a page with a known face (`text/reference-pages/face-test.html`) and captures the saliency map.
+
+### Running the Test
+```bash
+node scripts/verify-face-detection.js
+```
+
+### Pass Criteria
+*   The output image (`tests/verification/face_detection_result.png`) must show a **bright red/white hotspot** directly over the face.
+*   The hotspot should be roughly Gaussian (soft circular blob).
 
 ### Example Usage
 ```bash

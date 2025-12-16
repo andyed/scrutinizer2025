@@ -460,10 +460,13 @@ The Saliency Map system has been upgraded to a **Cognitive Alignment** model. It
     *   **Logic**: If an area contains NO semantic structure (text or image), the Inhibitor is `0.1`.
     *   **Effect**: Suppresses paper textures, compression artifacts, and distinct-but-irrelevant gradients.
 
-3.  **Excitor Mask (Boost Signal)**:
-    *   Generated from **Interactive Elements** (Buttons, Inputs, UI).
     *   **Logic**: Adds `+0.8` to the saliency signal.
     *   **Effect**: Ensures low-contrast controls (e.g., light gray "Cancel" buttons) remain visible in the periphery, simulating the brain's knowledge of where tools are.
+
+4.  **Face Channel (Social Bias)** (New in v1.4.2):
+    *   **Detection**: Uses `face-api.js` (Tiny Face Detector) in a background worker.
+    *   **Logic**: Adds `+0.5` weighting to detected face regions.
+    *   **Effect**: Simulates the fusiform face area's (FFA) impact on attention—humans are hard-wired to look at faces, even in the periphery.
 
 **Key Properties**:
 - **Noise Suppression**: Blank pages now generate a blank saliency map (unlike v1.4 where noise created false positives).

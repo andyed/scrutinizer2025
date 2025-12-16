@@ -1,7 +1,16 @@
 /**
- * Saliency Computation Worker with Center-Surround (DoG)
- * Implements Difference-of-Gaussians for biologically accurate saliency detection.
+ * Saliency Computation Worker with Center-Surround (DoG) & Face Detection
+ * Implements Difference-of-Gaussians for biologically accurate saliency detection
+ * combined with a specific "Face Channel" using face-api.js (Tiny Face Detector).
  */
+
+console.log('[SaliencyWorker] Worker starting. Location:', self.location.href);
+try {
+    importScripts('./lib/face-api.min.js');
+    console.log('[SaliencyWorker] face-api.js loaded.');
+} catch (e) {
+    console.error('[SaliencyWorker] Import failed:', e);
+}
 
 let canvas;
 let ctx;
@@ -11,6 +20,32 @@ let height = 0;
 // Reusable buffers to avoid allocations
 let tempBuffer1;
 let tempBuffer2;
+
+// Face Detection State
+let faceModelLoaded = false;
+let faceOptions;
+
+// Initialize Face API
+async function loadModels() {
+    try {
+        console.log('[SaliencyWorker] Loading Face Model...');
+        // Load model from relative path (resolving from root apparently)
+        await faceapi.nets.tinyFaceDetector.loadFromUri('./assets/models');
+
+        // Configure options for real-time speed
+        // inputSize: 224 is a good balance for our ~256px canvas
+        faceOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 });
+
+        faceModelLoaded = true;
+        console.log('[SaliencyWorker] Face model loaded successfully.');
+    } catch (e) {
+        console.error('[SaliencyWorker] Face model load failed:', e);
+    }
+}
+
+// Start loading immediately
+loadModels();
+
 
 /**
  * Generate 1D Gaussian kernel
@@ -167,11 +202,6 @@ function computeCenterSurround(feature, width, height) {
 
 /**
  * Generate Inhibitor and Excitor masks from Structure Blocks
- * @param {Array} blocks - Structure blocks from main thread
- * @param {number} targetW - Width of saliency map
- * @param {number} targetH - Height of saliency map
- * @param {number} sourceW - Width of original viewport
- * @param {number} sourceH - Height of original viewport
  */
 function generateStructureMasks(blocks, targetW, targetH, sourceW, sourceH) {
     const len = targetW * targetH;
@@ -182,14 +212,12 @@ function generateStructureMasks(blocks, targetW, targetH, sourceW, sourceH) {
     const scaleY = targetH / sourceH;
 
     for (const block of blocks) {
-        // Map block coordinates to saliency map space
         const x = Math.floor(block.x * scaleX);
         const y = Math.floor(block.y * scaleY);
         const w = Math.ceil(block.w * scaleX);
         const h = Math.ceil(block.h * scaleY);
 
-        // Dilate masks slightly to ensure solid coverage (Stronger Edges)
-        const dilation = 2; // Pixels in saliency map space
+        const dilation = 2;
         const startX = Math.max(0, x - dilation);
         const startY = Math.max(0, y - dilation);
         const endX = Math.min(targetW, x + w + dilation);
@@ -201,10 +229,7 @@ function generateStructureMasks(blocks, targetW, targetH, sourceW, sourceH) {
             const rowOffset = row * targetW;
             const endRowOffset = rowOffset + endX;
             for (let idx = rowOffset + startX; idx < endRowOffset; idx++) {
-                // Inhibitor: Mark existence of ANY content
                 inhibitor[idx] = 1.0;
-
-                // Excitor: Mark interactive content (Non-Text)
                 if (!isText) {
                     excitor[idx] = 1.0;
                 }
@@ -214,19 +239,57 @@ function generateStructureMasks(blocks, targetW, targetH, sourceW, sourceH) {
     return { inhibitor, excitor };
 }
 
-self.onmessage = function (e) {
+/**
+ * Draw a Gaussian blob for a detected face
+ */
+function drawFaceBlob(faceMap, width, height, box) {
+    // Box is { x, y, width, height } in canvas coords
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+
+    // Sigma relative to face size (larger sigma = softer blob)
+    // We want the blob to cover the face and fall off
+    const sigma = Math.max(box.width, box.height) * 0.5;
+    const sigma2 = 2 * sigma * sigma;
+
+    // Bounds to optimize loop
+    const radius = Math.ceil(sigma * 2.5);
+    const startX = Math.max(0, Math.floor(cx - radius));
+    const startY = Math.max(0, Math.floor(cy - radius));
+    const endX = Math.min(width, Math.ceil(cx + radius));
+    const endY = Math.min(height, Math.ceil(cy + radius));
+
+    for (let y = startY; y < endY; y++) {
+        for (let x = startX; x < endX; x++) {
+            const dx = x - cx;
+            const dy = y - cy;
+            const dist2 = dx * dx + dy * dy;
+
+            // Gaussian value
+            const val = Math.exp(-dist2 / sigma2);
+
+            // Additive blending into face map
+            const idx = y * width + x;
+            faceMap[idx] = Math.min(1.0, faceMap[idx] + val);
+        }
+    }
+}
+
+self.onmessage = async function (e) {
     const { imageBitmap, id } = e.data;
 
     if (!imageBitmap) return;
 
     // Adaptive Resolution Scaling
     const TARGET_MAX_DIM = 256;
-    const maxDim = Math.max(imageBitmap.width, imageBitmap.height);
+    const srcW = imageBitmap.width;
+    const srcH = imageBitmap.height;
+    const maxDim = Math.max(srcW, srcH);
     const scale = maxDim > 0 ? Math.min(1.0, TARGET_MAX_DIM / maxDim) : 0.25;
 
     // Calculate target dimensions
-    const newWidth = Math.floor(imageBitmap.width * scale);
-    const newHeight = Math.floor(imageBitmap.height * scale);
+    const newWidth = Math.floor(srcW * scale);
+    const newHeight = Math.floor(srcH * scale);
 
     // Initialize or resize OffscreenCanvas
     if (width !== newWidth || height !== newHeight) {
@@ -245,6 +308,33 @@ self.onmessage = function (e) {
     const imageData = ctx.getImageData(0, 0, width, height);
     const pixels = imageData.data;
     const len = width * height;
+
+    // --- FACE DETECTION ---
+    const faceMap = new Float32Array(len); // Initialize to 0
+
+    if (faceModelLoaded) {
+        try {
+            // Run detection on the downscaled canvas
+            // We await here, which is fine in a worker
+            const faces = await faceapi.detectAllFaces(canvas, faceOptions);
+
+            console.log(`[SaliencyWorker] Detected ${faces ? faces.length : 0} faces`);
+
+            if (faces && faces.length > 0) {
+                // Determine scale relative to input size if needed, 
+                // but detectAllFaces on 'canvas' returns coords valid for that canvas.
+                // So no re-scaling needed!
+
+                for (const face of faces) {
+                    console.log(`[SaliencyWorker] Face at ${face.box.x}, ${face.box.y}`);
+                    drawFaceBlob(faceMap, width, height, face.box);
+                }
+            }
+        } catch (err) {
+            // Don't crash the worker if detection fails
+            console.warn('Face detection error:', err);
+        }
+    }
 
     // Feature maps
     const I = new Float32Array(len);   // Intensity (Oklab L)
@@ -272,8 +362,7 @@ self.onmessage = function (e) {
     const cs_RG = computeCenterSurround(RG, width, height);
     const cs_BY = computeCenterSurround(BY, width, height);
 
-    // PASS 3: Normalize each feature map independently (Itti-Koch-Niebur)
-    // This prevents one feature from dominating
+    // PASS 3: Normalize each feature map independently
     function normalizeFeature(feature) {
         let max = 0;
         for (let i = 0; i < feature.length; i++) {
@@ -291,54 +380,45 @@ self.onmessage = function (e) {
     const norm_I = normalizeFeature(cs_I);
     const norm_RG = normalizeFeature(cs_RG);
     const norm_BY = normalizeFeature(cs_BY);
+    // Face is already 0-1 mostly from Gaussian, but better normalize just in case
+    // Actually, drawFaceBlob max is 1.0. If multiple faces overlap, it might go > 1.
+    // Let's rely on final clamp.
 
     // --- PHASE 5: GATED SALIENCY MASKS ---
     let inhibitorMask = null;
     let excitorMask = null;
 
-    if (e.data.structureData && e.data.structureData.length > 0) {
-        // Generate masks using provided structure blocks
-        // We pass the RAW image width/height to correctly map the blocks (which are in viewport pixels)
-        // to the current downscaled canvas resolution.
-        // e.data.imageBitmap.width is the SOURCE width.
-        // width/height are the TARGET (downscaled) dimensions.
-        const sourceW = e.data.imageBitmap.width;
-        const sourceH = e.data.imageBitmap.height;
-
-        const masks = generateStructureMasks(e.data.structureData, width, height, sourceW, sourceH);
+    if (e.data.structureData && e.data.structureData.length > 0 && srcW > 0) {
+        const masks = generateStructureMasks(e.data.structureData, width, height, srcW, srcH);
         inhibitorMask = masks.inhibitor;
         excitorMask = masks.excitor;
     }
 
     // PASS 4: Combine normalized features with weights
-    // Oklab provides cleaner perceptual separation, so equal weights often work well,
-    // but we'll stick to established saliency weights.
     const W_I = 0.3;
     const W_RG = 0.35;
     const W_BY = 0.35;
+    const W_FACE = 0.5; // High weight for faces (People look at people)
 
     const saliency = new Float32Array(len);
     let maxVal = 0;
 
     for (let i = 0; i < len; i++) {
         // Raw Bottom-Up Saliency
-        let val = W_I * norm_I[i] + W_RG * norm_RG[i] + W_BY * norm_BY[i];
+        // If Face > 0, it dominates or adds strongly
+        let raw = W_I * norm_I[i] + W_RG * norm_RG[i] + W_BY * norm_BY[i];
+
+        let val = raw + (faceMap[i] * W_FACE);
 
         // --- PHASE 5: GATED SALIENCY (Cognitive Alignment) ---
-        // Top-Down Modulation using Structure Data
         if (inhibitorMask && excitorMask) {
-            // Formula: Final = (Raw * Inhibitor) + (Excitor * Boost)
-            // Inhibitor: 0.0 for noise, 1.0 for content
-            // Excitor: 0.0 for normal, 1.0 for interactive/important
             const inhibition = inhibitorMask[i];
             const excitation = excitorMask[i];
 
-            // 1. Gating: Silence the noise
-            // We use a safe floor (0.1) so real objects in empty space aren't TOTALLY invisible if structure misses them
+            // 1. Gating
             val *= (inhibition * 0.9 + 0.1);
 
-            // 2. Boosting: Highlight the controls
-            // Add excitation signal (boost factor 0.8 ensures buttons pop even if low contrast)
+            // 2. Boosting
             val += (excitation * 0.8);
         }
 
@@ -346,9 +426,8 @@ self.onmessage = function (e) {
         if (val > maxVal) maxVal = val;
     }
 
-    // PASS 4: Normalize & Write Output
+    // PASS 5: Normalize & Write Output
     if (maxVal < 0.001) {
-        console.warn('[Saliency] maxVal too low:', maxVal, '- using fallback');
         maxVal = 1.0;
     }
 
@@ -366,11 +445,6 @@ self.onmessage = function (e) {
         pixels[i * 4 + 1] = byteVal;
         pixels[i * 4 + 2] = byteVal;
         pixels[i * 4 + 3] = 255;
-    }
-
-    // Debug: Log stats occasionally
-    if (Math.random() < 0.01) {
-        console.log('[Saliency] maxVal:', maxVal.toFixed(4), 'len:', len);
     }
 
     // Send back the processed ImageData
