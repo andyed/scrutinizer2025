@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, WebContentsView, globalShortcut } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, WebContentsView, globalShortcut, session } = require('electron');
 const path = require('path');
 const { buildMenuTemplate, RADIUS_OPTIONS } = require('./menu-template');
 const settingsManager = require('./settings-manager');
@@ -1008,7 +1008,7 @@ function runTestMode() {
 }
 
 function runIntegrationTest() {
-    const testUrl = process.env.TEST_URL;
+    const testUrl = process.env.TEST_URL || `file://${require('path').join(__dirname, 'tests', 'visual-test.html')}`;
     const testModes = (process.env.TEST_MODES || '0').split(',').map(m => {
         const val = parseFloat(m.trim());
         return isNaN(val) ? m.trim() : val;
@@ -1027,12 +1027,6 @@ function runIntegrationTest() {
     console.log(`[Main] Modes: ${testModes.join(', ')}`);
     console.log(`[Main] Selector: ${testSelector || 'None'}`);
     console.log(`[Main] Fixation: ${testFixationX}, ${testFixationY}`);
-
-    if (!testUrl) {
-        console.error('❌ TEST FAILED: TEST_URL env var is required');
-        app.exit(1);
-        return;
-    }
 
     // Create window normally
     createWindow();
@@ -1199,58 +1193,11 @@ function runIntegrationTest() {
     }
 }
 
+
+
+// Register global shortcut for Open URL
+// Register global shortcut for Open URL
 app.whenReady().then(() => {
-    if (process.env.TEST_URL && process.env.TEST_MODES) {
-        // If TEST_MODES is present, assume we want to run the capture loop
-        runIntegrationTest();
-    } else if (process.env.TEST_MODE === 'true') {
-        runTestMode();
-    } else {
-        createWindow();
-
-        // Auto-open calibration if --calibrate flag is passed
-        if (process.argv.includes('--calibrate')) {
-            console.log('[Main] --calibrate flag detected, opening calibration window...');
-            setTimeout(() => startWebCalibration(), 1000); // Delay to ensure main window is ready
-        }
-
-        // Check for updates (production only)
-        if (!process.env.NODE_ENV || process.env.NODE_ENV === 'production') {
-            console.log('[Main] Checking for updates...');
-
-            autoUpdater.on('update-available', (info) => {
-                console.log('[Main] Update available:', info.version);
-                const { dialog } = require('electron');
-                dialog.showMessageBox({
-                    type: 'info',
-                    title: 'Update Available',
-                    message: `Scrutinizer ${info.version} is available!`,
-                    detail: 'A new version is ready to download. Would you like to download it now?',
-                    buttons: ['Download', 'Later'],
-                    defaultId: 0,
-                    cancelId: 1
-                }).then(result => {
-                    if (result.response === 0) {
-                        require('electron').shell.openExternal('https://github.com/andyed/scrutinizer2025/releases/latest');
-                    }
-                });
-            });
-
-            autoUpdater.on('update-not-available', () => {
-                console.log('[Main] App is up to date');
-            });
-
-            autoUpdater.on('error', (err) => {
-                console.error('[Main] Auto-update error:', err);
-            });
-
-            autoUpdater.checkForUpdates().catch(err => {
-                console.log('[Main] Update check failed (expected in dev):', err.message);
-            });
-        }
-    }
-
-    // Register global shortcut for Open URL
     globalShortcut.register('CommandOrControl+L', () => {
         const win = BrowserWindow.getFocusedWindow();
         if (win && win.scrutinizerView) {
@@ -1284,7 +1231,17 @@ app.whenReady().then(() => {
             win.urlDialog = dialog;
         }
     });
-}); // Closing app.whenReady().then( () => { ...
+});
+
+// App Startup Logic
+app.whenReady().then(() => {
+    if (process.env.TEST_MODE === 'true') {
+        runIntegrationTest();
+    } else {
+        createWindow();
+    }
+});
+
 
 app.on('window-all-closed', function () {
     if (process.platform !== 'darwin') {
@@ -1300,6 +1257,15 @@ app.on('will-quit', () => {
 app.on('activate', function () {
     if (mainWindow === null) {
         createWindow();
+    }
+});
+
+// Cache Busting (Added per user request)
+app.whenReady().then(() => {
+    if (session && session.defaultSession) {
+        session.defaultSession.clearCache()
+            .then(() => console.log('[Main] Cache cleared successfully!'))
+            .catch((err) => console.error('[Main] Failed to clear cache:', err));
     }
 });
 

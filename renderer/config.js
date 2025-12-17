@@ -35,7 +35,7 @@ const CONFIG = {
     // Experimental settings
     useFoveatedBlur: true, // when true, use multi-resolution foveated blur
     chromaticAberration: true, // Enable chromatic aberration
-    mongrelMode: 1.0, // 0.0 = Noise, 1.0 = Shatter
+    mongrelMode: 0.0, // 0.0 = Noise/Fractal Crowding (Tier 2.0), 1.0 = Shatter/Slow Wave
 
     // Debug settings
     enableLogger: true, // Enable renderer logs passing through to main process terminal

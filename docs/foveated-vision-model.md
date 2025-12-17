@@ -107,7 +107,7 @@ The biological architecture produces several emergent properties that Scrutinize
 |----------------------|-------|---------------------------|
 | **Resolution loss** | Receptor pooling (100:1) | MIP-based pooling (textureLod) |
 | **Color blindness** | Rod dominance (no color) | Oklab desaturation + cyan tint |
-| **Crowding** | Receptive field overlap | Domain warping + lateral smash |
+| **Crowding** | Receptive field overlap | Fractal Crowding (Tier 2.0) + vertical chop |
 | **Motion sensitivity** | Magnocellular pathway | Preserved contrast in periphery |
 | **Positional uncertainty** | Large receptive fields | Simplex noise displacement |
 
@@ -324,91 +324,59 @@ Uses the **Green Channel (Mass)** to modulate the biological simulation.
 
 ---
 
-## 7. Coherent Crowding ("The Melter")
+## 7. Nuclear Scramble & Static Disintegration (Tier 3.0)
 
-### Tier 1.8 & 1.8.1: Structural Melting & Lateral Smash
+### The Problem: Fidelity Bias & "Ghosting"
+In v1.4, we introduced "Fidelity Bias" (Saliency Gating) to protect high-contrast elements. This inadvertently protected large text headers, making them *more* readable in the far periphery than intended. Additionally, the "Magnocellular Contrast Preservation" (which keeps edge contrast high for motion detection) was making these preserved letters look crisp and legible, rather than "ghostly."
 
-Earlier versions (v1.2-1.3) used "jitter" (random positional noise) to disrupt recognition. This created a "broken TV" aesthetic that felt like digital glitches rather than biological vision loss.
+### The Solution: Tier 3 "Nuclear Scramble"
+Tier 3 introduces a more aggressive, topology-breaking model that specifically targets letter recognition while maintaining biological plausibility.
 
-**Tier 1.8** replaces this with **Coherent Micro-Warping**, targeting the stroke width of text rather than the word shape.
+#### Core Mechanic: The "Bender" vs. The "Shredder"
+The peripheral field is divided into two distinct zones with linear progression:
 
-1.  **Micro-Warp (The "Melter")**:
-    *   High-frequency Simplex noise (freq ~900.0) matches the width of letter stems.
-    *   This "twists" the strokes, breaking the clean vertical lines of ascenders/descenders.
+1.  **Parafovea ("The Bender")**: 
+    *   **Effect**: Fractal Domain Warping.
+    *   **Mechanism**: Low-frequency Simplex noise bends the coordinate space.
+    *   **Tuning**: 
+        *   **Amplitude**: Reduced base amplitude (0.003 -> 0.0024) for a cleaner near-periphery.
+        *   **Bias**: Reduced horizontal bias (2x) prevents "smearing" and keeps the distortion structural.
 
-2.  **Lateral Smash (Anisotropic Crowding)** (Tier 1.8.1):
-    *   Reading is a horizontal task. To break it, we must smash letters into their neighbors.
-    *   **X-Bias**: The horizontal distortion is multiplied by **6.0x**.
-    *   **Effect**: Letters slide sideways into each other, merging into a "mongrel" blob, while the vertical structure (the list or paragraph shape) remains intact.
+2.  **Far Periphery ("The Shredder")**:
+    *   **Effect**: Discrete Grid Scrambling.
+    *   **Mechanism**: The screen is divided into a fine grid (~400x300 cells). Each cell receives a random, static offset vector derived from "Gold Noise."
+    *   **Tuning**:
+        *   **Progressive Scaling**: Scramble amplitude scales linearly with distance (1.0x at start, >2.0x at far edge) to prevent plateauing.
+        *   **Base Intensity**: 0.8% horizontal (reduced from 1.0%) for a balanced global profile.
 
-3.  **Coupled Pooling**:
-    *   The warp strength drives the MIP level selection. Stronger warp = larger pooling region.
-    *   This ensures that as letters collide, they also blur together, physically simulating "Feature Integration Failure."
+### Regression Fixes & Refinements (v1.4.2)
+Based on user feedback, the following critical tunings were applied to stabilize the effect:
 
+1.  **Static Mode (Animation Killed)**
+    *   *Problem*: Previous versions used animated noise (`u_time`), creating a "boiling" or "broken TV" effect that attracted attention.
+    *   *Fix*: All time dependencies were removed from the distortion noise. The periphery is now spatially distorted but **temporally stable**. This allows the user to saccade to a "ghost" they saw, only to find it wasn't what they thought—a key property of peripheral vision.
 
-### Second Pass Softening (v1.2) and Smooth Transitions (v1.3)
+2.  **Chromatic Aberration (CA) Suppression**
+    *   *Problem*: High-contrast text edges, when scrambled, created thousands of artificial sharp edges. The CA shader applied color fringing to *every single cut*, turning the text into messy "glitch art."
+    *   *Fix*: CA is now **linearly suppressed** as the Scramble effect fades in. By the time the text is fully shredded, CA is zero. The result is monochromatic "texture" rather than colored noise.
 
-**v1.2:** To improve perceptual comfort and reduce motion sickness, the "Second Pass" update introduced:
-1. **Variable Gaussian Blur**: Replaces blocky pixelation with a smooth blur that increases exponentially with eccentricity (0px → 3px → 15px+).
-2. **Slow Wave Distortion**: Replaces high-frequency "glitch" jitter with a slow (0.1Hz), smooth sine-wave warp. This maintains the "underwater" feel without the rapid, distracting shaking.
+3.  **Linear Distortion Progression**
+    *   *Problem*: "Inverse Valley" effect where the Parafovea (Wrap) felt stronger than the Periphery (Scramble).
+    *   *Fix*: Amplitudes were rebalanced for a smooth ramp:
+        *   **Parafovea**: Tuned down (cleaner start).
+        *   **Periphery**: Tuned up (progressive growth).
 
-**v1.3:** Smoothed the parafovea-periphery transition to eliminate abrupt visual "kinks":
+4.  **Ghosting (Contrast Killing)**
+    *   *Problem*: Magnocellular distinction kept text "black."
+    *   *Fix*: Contrast preservation is disabled in the far periphery, forcing the text to blend with the background luminance ("ghosting"), simulating signal loss.
 
-**Previous implementation (v1.2):**
-- Parafovea: Linear blur ramp (0px → 3px)
-- Periphery: Steep exponential (`3px + distFromPara * 40.0`)
-- **Problem:** Hard slope change at boundary created visible discontinuity
-
-**New implementation (v1.3):**
-```glsl
-// Continuous exponential blur curve
-float eccentricity = dist - fovea_radius;
-blurRadius = 8.0 * (exp(eccentricity * 2.0) - 1.0);
-blurRadius = min(blurRadius, 20.0); // Cap maximum
-```
-
-**Benefits:**
-- No hard boundary at parafovea edge
-- Smooth acceleration from parafovea to periphery
-- Natural visual transition
-
-**Contrast preservation** also uses smooth gradient:
-```glsl
-// Gradual falloff instead of hard switch
-float contrastPreservation = mix(0.6, 0.3, 
-    smoothstep(0.0, parafovea_radius - fovea_radius, eccentricity));
-```
-
-### MIP-Based Pooling (v1.4)
-
-**v1.4:** Replaced the 5-tap Gaussian blur approximation with **hardware MIP-based pooling**, which more accurately models how the peripheral visual system compresses information into "pooling regions."
-
-**Key Insight (Rosenholtz et al.):** The peripheral visual system doesn't just blur the image—it computes summary statistics over pooling regions that grow with eccentricity. Each MIP level doubles the pooling region size, naturally modeling receptive field growth.
-
-**Implementation:**
-```glsl
-// Calculate MIP level based on eccentricity
-float normalizedEcc = max(0.0, eccentricity) / fovea_radius;
-float mipScaling = 2.5; // Tune: higher = faster pooling growth
-float maxMipLevel = 4.0; // Cap at 16x16 pooling (level 4)
-float mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
-
-// Sample using textureLod with computed MIP level
-vec4 col = textureLod(u_texture, uv, mipLevel);
-```
-
-**Smooth Transition:** To eliminate visible boundaries at the fovea edge, a smooth blend zone is applied:
-```glsl
-vec3 foveaCol = sampleSource(v1.distortedUV).rgb;
-vec3 pooledCol = sampleMIPPooled(v1.distortedUV, eccentricity, fovea_radius).rgb;
-float blendFactor = smoothstep(0.0, fovea_radius * 0.1, eccentricity);
-vec3 col = mix(foveaCol, pooledCol, blendFactor);
-```
-
-**Benefits:**
-- **Biologically accurate**: Models receptive field pooling, not just blur
-- **Performance**: Hardware-accelerated MIP sampling is essentially free
-- **Consistent**: Same `textureLod()` function used throughout pipeline
+### Validation Status
+| Metric | Status | Observation |
+|:-------|:-------|:------------|
+| **Legibility** | ✅ Destroyed | "Wikipedia" header is unreadable in periphery. |
+| **Stability** | ✅ Static | No shimmering or boiling. |
+| **Artifacts** | ✅ Clean | No "fuzz" or "white noise" grain (frequencies reduced 800->150). |
+| **CA Fringing** | ✅ Suppressed | Shredded text is monochromatic/textural. |
 
 ---
 
@@ -765,6 +733,9 @@ In future versions, these can be exposed as user‑tunable parameters by mapping
   - Warp and jitter amplitude envelopes by zone.
   - Rod strength onset and saturation.
   - Chromatic aberration strength.
+- Fractal parameters:
+  - Fractal Octaves (Detail density).
+  - Shear vs. Chop Blend (Discontinuity hardness).
 
 Those sliders would effectively reshape the smoothstep curves described above, allowing different “profiles” of peripheral disruption while preserving the same underlying model.
 

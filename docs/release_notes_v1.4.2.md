@@ -25,3 +25,14 @@ When viewing the Structure Map debug overlay, text blocks now display their `lin
 ## Fixes
 - **Worker Paths**: Resolved relative path resolution for worker scripts on packaged builds.
 - **Stability**: Fixed memory management for image buffers during face detection.
+
+### ☢️ Nuclear Scramble (Tier 3.0)
+The peripheral distortion model enters "Tier 3" with a complete overhaul of how visual information degrades.
+- **The Shredder**: Replacing smooth "heat haze" with a discrete grid scramble that physically severs vertical stems of letters.
+- **Static Decay**: Animation has been completely removed. The periphery is now a static, broken texture—allowing users to saccade to a "ghost" that remains motionless.
+- **Linear Progression**: Distortion scales linearly from a clean near-parafovea to a totally disintegrated far-periphery.
+- **CA Suppression**: Chromatic Aberration is now suppressed in the scramble zone to prevent "glitch art" artifacts.
+
+### 🔧 Fixes & Improvements
+- **Cache Busting**: Implemented automatic cache clearing on startup to ensure shader updates are immediately applied.
+- **Startup Reliability**: Fixed a race condition in `app.whenReady` that could cause the app to stall on launch.

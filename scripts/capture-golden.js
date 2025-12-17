@@ -61,6 +61,13 @@ const CAPTURE_TASKS = [
         }
     },
 
+    // --- TECHMEME (Text Density) ---
+    {
+        page: 'techmeme',
+        fixations: ['center'],
+        variants: DEBUG_VARIANTS
+    },
+
     // --- GRID (Distortion Check) ---
     { page: 'grid', fixations: ['center'] }
 ];
@@ -93,6 +100,7 @@ async function runCapture(task, fixation, variant = { id: 'standard', overlay: f
 
         const env = {
             ...process.env,
+            TEST_MODE: 'true',
             TEST_URL: fileUrl,
             TEST_MODES: variant.mode || '0', // Use variant mode or default to '0'
             TEST_FIXATION_X: fixationDef.x,
