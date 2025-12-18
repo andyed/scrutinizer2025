@@ -20,6 +20,7 @@ let currentStartPage;
 let currentVisualMemory;
 
 let mainWindow;
+let splashWindow;
 
 // Track modifier keys for screenshot detection (Cmd+Shift+4)
 let isCmdPressed = false;
@@ -517,7 +518,8 @@ function createScrutinizerWindow(startUrl) {
         height: bounds.height,
         x: bounds.x,
         y: bounds.y,
-        show: true,
+        y: bounds.y,
+        show: false, // Wait for ready-to-show to prevent white flash
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true
@@ -543,6 +545,18 @@ function createScrutinizerWindow(startUrl) {
     };
     win.on('resize', saveBounds);
     win.on('move', saveBounds);
+
+    // Show window when ready (Splash Screen handoff)
+    win.once('ready-to-show', () => {
+        // slight delay to ensure render process has painted at least one frame
+        setTimeout(() => {
+            win.show();
+            if (splashWindow && !splashWindow.isDestroyed()) {
+                splashWindow.close();
+                splashWindow = null;
+            }
+        }, 500);
+    });
 
     // Create content WebContentsView (the actual browser content)
     const contentView = new WebContentsView({
@@ -903,7 +917,28 @@ ipcMain.on('log:renderer', (event, message) => {
     }
 });
 
+function createSplashWindow() {
+    splashWindow = new BrowserWindow({
+        width: 500,
+        height: 300,
+        transparent: false,
+        frame: false,
+        alwaysOnTop: true,
+        resizable: false,
+        movable: true,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true
+        }
+    });
+
+    splashWindow.loadFile('renderer/splash.html');
+    splashWindow.center();
+}
+
 function createWindow() {
+    // Show splash immediately
+    createSplashWindow();
     // Initialize settings manager
     settingsManager.init();
 
