@@ -183,28 +183,59 @@ window.addEventListener('DOMContentLoaded', () => {
 
     let isScanning = false;
     let scrollDebounceTimer = null;
+    let typingDebounceTimer = null;
 
+    // Throttled scan function with differentiated handling for scroll vs mutations
     // Throttled scan function with differentiated handling for scroll vs mutations
     const scanAndSend = (isScrollEvent = false) => {
         if (!domAdapter || isScanning) return;
-        isScanning = true;
 
-        // Run in next frame to avoid blocking main thread immediately
-        requestAnimationFrame(() => {
-            try {
-                // Scan the DOM
-                const blocks = domAdapter.scan(document.body);
-                ipcRenderer.send('structure-update', blocks);
-            } catch (err) {
-                console.error('[Preload] Scan failed:', err);
-            } finally {
-                // Faster throttle for scroll events (16ms ~60fps) vs mutations (100ms)
-                const throttleMs = isScrollEvent ? 16 : 100;
-                setTimeout(() => {
-                    isScanning = false;
-                }, throttleMs);
+        // Strategy: 
+        // Scroll = High Priority (RAF) -> 16ms throttle
+        // Mutation = Low Priority (IdleCallback) -> 300ms debounce/throttle
+
+        if (isScrollEvent) {
+            isScanning = true;
+            requestAnimationFrame(() => {
+                performScan();
+                setTimeout(() => { isScanning = false; }, 16);
+            });
+        } else {
+            // Check if user is typing (active element is input)
+            const active = document.activeElement;
+            const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+
+            // FIX: Robust debounce for any input interaction
+            // Previously this erroneously depended on scrollDebounceTimer being active
+            if (isTyping) {
+                if (typingDebounceTimer) clearTimeout(typingDebounceTimer);
+
+                // Debounce scan for 1.5s after last typing activity to prevent layout thrashing
+                // This completely yields the main thread to the input/UI
+                typingDebounceTimer = setTimeout(() => {
+                    typingDebounceTimer = null;
+                    scanAndSend(); // Trigger a scan when done typing
+                }, 1500);
+
+                return; // Abort immediate scan
             }
-        });
+
+            isScanning = true;
+            window.requestIdleCallback(() => {
+                performScan();
+                // Relaxed throttle for mutations
+                setTimeout(() => { isScanning = false; }, 300);
+            }, { timeout: 1000 });
+        }
+    };
+
+    const performScan = () => {
+        try {
+            const blocks = domAdapter.scan(document.body);
+            ipcRenderer.send('structure-update', blocks);
+        } catch (err) {
+            console.error('[Preload] Scan failed:', err);
+        }
     };
 
     // Debounced final scan to capture scroll endpoint
