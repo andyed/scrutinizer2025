@@ -235,6 +235,20 @@ The Magnocellular pathway (motion/luminance) processes information faster than t
     * **The Insight**: A comprehensive review of how the visual system compresses redundant information (like rows of text) into a "Gist."
     * **Relevance to Scrutinizer**: Supports the use of **Quantization** (blocking). The visual system compresses 10 lines of text into a single "Text Object." Scrutinizer visualizes this compression algorithm in real-time.
 
+
+### Applied Foveated Rendering & Perceptual Graphics
+*Real-world applications and research validating the democratization of gaze-contingent rendering.*
+
+* **Eyeware FidelityFX-SDK (Fork)**: [GitHub Repository](https://github.com/eyeware/FidelityFX-SDK)
+    * **The Project**: A fork of AMD's optimal FidelityFX SDK that integrates with the **Beam Eye Tracker** to enable foveated rendering using standard webcams, rather than specialized research hardware.
+    * **Technical Implementation**: The project utilizes **Variable Rate Shading (VRS)**—a technique that reduces shading rate in peripheral regions—driven by real-time gaze data.
+    * **Relevance to Scrutinizer**: This validates the transition of foveated rendering from a theoretical or lab-based constraint to a consumer-accessible optimization technique. It demonstrates that the biological efficiency principles simulated in Scrutinizer (allocating resources to the fovea) are actively being productized for performance in gaming and graphics.
+
+* **Noised-Foveation (SIGGRAPH 2022)**: [GitHub Repository](https://github.com/taimoor6864/Noised-Foveation)
+    * **The Research**: Tariq, T. et al. (2022). "Noise-based Enhancement for Foveated Rendering". *ACM Transactions on Graphics*.
+    * **The Concept**: This research exploits the human visual system's high tolerance for peripheral noise. Instead of just blurring or reducing resolution (which creates visible aliasing), they inject specific noise patterns to "mask" the artifacts of aggressive shading rate reduction.
+    * **Relevance to Scrutinizer**: This directly validates Scrutinizer's **Domain Warping** and **Noise Field** aesthetics. It provides scientific backing for the idea that the periphery is better modeled as a "noisy texture" than simply a blurred image. The brain accepts the noise as natural, allowing for greater data compression (or performance gains) than blur alone.
+
 ---
 
 ## 4. Key References by Topic
