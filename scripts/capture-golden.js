@@ -6,7 +6,7 @@
  * 
  * Usage:
  *   npm run capture-golden                    # Capture current version
- *   npm run capture-golden -- --version=1.5.0 # Capture specific version
+ *   npm run capture-golden -- --version=1.4.3 # Capture specific version
  */
 
 const { spawn } = require('child_process');
