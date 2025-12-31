@@ -756,6 +756,24 @@ The "Gatekeeper" stage determines *where* effects are applied.
     -   **Structure Masking**: Masks out whitespace (if enabled).
     -   **Saliency Gating**: Masks out high-saliency areas (Fidelity Bias).
 
+#### Combined Protection Signal
+For effects like Chromatic Aberration, the shader uses a **dual-source protection pattern** that combines both saliency and structure information:
+
+```glsl
+float protection = max(lgn.saliency, lgn.density);
+```
+
+This takes the maximum of:
+- **`lgn.saliency`** — High-contrast, colorful regions (computed from pixels via Itti-Koch color opponency)
+- **`lgn.density`** — Structural regions from DOM/node tree (TEXT blocks, images, UI controls)
+
+**Rationale**: Using `max()` ensures protection applies if *either* signal detects important content:
+- **Text in live DOM** → High structure density, even if low contrast (light gray text)
+- **Text in bitmaps/screenshots** → High saliency from contrast, even without structure data
+- **Colorful logos/icons** → High saliency from color opponency
+
+This dual-source approach provides robust protection across both live DOM content (browser) and flattened bitmap exports (Figma plugin).
+
 ### Stage 2: V1 (Geometry & Distortion)
 The "Feature Extractor" stage determines *how* the image is warped.
 -   **Inputs**: `suppressionFactor` (from LGN), `ModeConfig`.
