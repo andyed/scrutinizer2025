@@ -316,7 +316,10 @@ During the "Lateral Smash" migration, we encountered a persistent issue where di
 2.  **Vertical Flattening**: Missing `u_fovea_aspect_ratio` caused `uv_lateral.x` to multiply by 0, resulting in 1D vertical noise (straight text).
     - **Fix**: Hardcode `1.33` or ensure robust prop passing.
 3.  **UV Artifacts**: High distortion strength pushed UVs < 0 or > 1. Without clamping, this caused edge streaking or "leopard print" artifacts.
-    - **Fix**: Add `clamp(uv, 0.001, 0.999)` to all texture samplers.
+    - **Fix**: Add `clamp(uv, 0.005, 0.995)` to all texture samplers (tighter margin than 0.001).
+4.  **MIP Edge Sampling (v1.4.x)**: Even with clamped UVs, high MIP levels sample a wider footprint via hardware texture filtering. Near image edges (especially with aspect ratio letterboxing), this caused "leopard spots" as the MIP blur picked up the black canvas border.
+    - **Fix**: Edge-aware MIP clamping in `sampleMIPPooled()`. Progressively reduce MIP level to 0 as sample position approaches the edge: `mipLevel *= smoothstep(0.0, edgeMargin, edgeDist)` where `edgeMargin = 0.15 + mipLevel * 0.03`.
+    - **Fix (Preferred)**: Enable `ENABLE_AUTO_TRIM` in `App.tsx`. Auto-resizes the plugin window on image load to match the image aspect ratio, eliminating black letterbox bars entirely. This is the root-cause fix.
 
 ## Future Work / Retro
 This migration highlighted the difficulty of manually porting complex shader logic and state management from Vanilla/Electron to React/Figma.
