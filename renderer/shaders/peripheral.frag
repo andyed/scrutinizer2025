@@ -411,6 +411,14 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     float boundaryProgress = smoothstep(parafovea_radius, parafovea_radius + transitionWidth, dist);
     float eccentricityScale = mix(0.15, 1.0, boundaryProgress); 
     
+    // FAR PERIPHERY DISTORTION BOOST
+    // Continue increasing distortion linearly beyond the transition zone
+    // to prevent the effect from plateauing at screen edges.
+    if (boundaryProgress >= 1.0) {
+        float deepDist = max(0.0, dist - (parafovea_radius + transitionWidth));
+        eccentricityScale += deepDist * 2.5; // 2.5x linear increase
+    }
+    
     // Cyberpunk/Wireframe Override: We want structural distortion (blocks) to start immediately
     // in the parafovea to create a strong "tech" aesthetic.
     if (config.v4_style_id == 4 || config.v4_style_id == 3) {
