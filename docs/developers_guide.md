@@ -457,6 +457,15 @@ This generates 18+ screenshots across 6 reference pages (`techmeme`, `dashboard`
 -   **Report**: `tests/golden-captures/v1.4.1/gallery.html` (Open in browser to review)
 -   **Reference**: See [Test Suite Reference](test_suite_reference.md) for details on all scenarios.
 
+### Browser ↔ Figma Golden Compare (Parity Harness)
+- Capture browser goldens and compute SSIM/PSNR against Figma exports:
+    ```bash
+    npm run golden-compare -- --version=1.4.3
+    ```
+- Figma pairing: export plugin canvas PNGs with identical filenames into docs/golden/figma/v1.4.3, then rerun with `--skip-browser-capture` to avoid recapturing and generate summary-<version>.json.
+- Flags: `--figma-only`, `--browser-only`, `--threshold-ssim=0.98`, `--threshold-psnr=35`. Storage layout and workflow are in docs/golden/README.md.
+- Determinism: keep TEST_* env (seed, fixation, viewport) aligned between browser capture and Figma export for meaningful diffs.
+
 ### Manual Testing
 To run the standard smoke test:
 ```bash

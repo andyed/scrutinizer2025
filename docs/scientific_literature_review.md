@@ -249,6 +249,13 @@ The Magnocellular pathway (motion/luminance) processes information faster than t
     * **The Concept**: This research exploits the human visual system's high tolerance for peripheral noise. Instead of just blurring or reducing resolution (which creates visible aliasing), they inject specific noise patterns to "mask" the artifacts of aggressive shading rate reduction.
     * **Relevance to Scrutinizer**: This directly validates Scrutinizer's **Domain Warping** and **Noise Field** aesthetics. It provides scientific backing for the idea that the periphery is better modeled as a "noisy texture" than simply a blurred image. The brain accepts the noise as natural, allowing for greater data compression (or performance gains) than blur alone.
 
+### Remote Gaze Estimation & Calibration
+*Real-time measurement of viewing distance and screen size is a prerequisite for accurate foveated rendering.*
+
+* **EasyEyes Remote Calibrator**: [GitHub Repository](https://github.com/EasyEyes/remote-calibrator)
+    * **The Tool**: A lightweight, web-based framework for calibrating screen size, viewing distance, and gaze position in remote participants using standard webcams.
+    * **Relevance to Scrutinizer**: Essential for ensuring that "foveal" regions in a web simulation actually align with the user's anatomical fovea (approx. 2° visual angle). Without precise calibration of pixels-to-degrees, any biological simulation of peripheral vision is merely an approximation.
+
 ---
 
 ## 4. Key References by Topic

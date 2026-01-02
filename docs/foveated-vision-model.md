@@ -553,6 +553,7 @@ To mitigate "breathing" artifacts on full-motion video, the Saliency Map is used
 1. **Multi-scale Saliency**: Combine detection at multiple blur levels
 2. **Inhibition of Return**: Reduce saliency in recently-viewed areas
 3. **Parafoveal Band Modulation**: Extend V1/V4 modulation into parafovea with tighter constraints
+4. **Far Periphery Distortion Boost**: (Implemented in Figma v1.4.x) Introduce a linear increase in distortion strength (2.5x slope) beyond the transition zone to create more distinct visual degradation at the far edges of the screen, preventing the effect from plateauing.
 
 ## Technical Details
 

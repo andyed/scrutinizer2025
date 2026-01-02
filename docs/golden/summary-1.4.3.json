@@ -1,0 +1,76 @@
+{
+  "version": "1.4.3",
+  "thresholds": {
+    "ssim": 0.98,
+    "psnr": 35
+  },
+  "generatedAt": "2025-12-30T16:09:38.922Z",
+  "results": [
+    {
+      "file": "article_center.png",
+      "browserPath": "/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/docs/golden/browser/v1.4.3/article_center.png",
+      "figmaPath": null,
+      "status": "missing-figma"
+    },
+    {
+      "file": "article_center_saliency.png",
+      "browserPath": "/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/docs/golden/browser/v1.4.3/article_center_saliency.png",
+      "figmaPath": null,
+      "status": "missing-figma"
+    },
+    {
+      "file": "article_center_structure.png",
+      "browserPath": "/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/docs/golden/browser/v1.4.3/article_center_structure.png",
+      "figmaPath": null,
+      "status": "missing-figma"
+    },
+    {
+      "file": "dashboard_center.png",
+      "browserPath": "/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/docs/golden/browser/v1.4.3/dashboard_center.png",
+      "figmaPath": null,
+      "status": "missing-figma"
+    },
+    {
+      "file": "dashboard_center_saliency.png",
+      "browserPath": "/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/docs/golden/browser/v1.4.3/dashboard_center_saliency.png",
+      "figmaPath": null,
+      "status": "missing-figma"
+    },
+    {
+      "file": "dashboard_center_structure.png",
+      "browserPath": "/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/docs/golden/browser/v1.4.3/dashboard_center_structure.png",
+      "figmaPath": null,
+      "status": "missing-figma"
+    },
+    {
+      "file": "ecommerce_product_image.png",
+      "browserPath": "/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/docs/golden/browser/v1.4.3/ecommerce_product_image.png",
+      "figmaPath": null,
+      "status": "missing-figma"
+    },
+    {
+      "file": "grid_center.png",
+      "browserPath": "/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/docs/golden/browser/v1.4.3/grid_center.png",
+      "figmaPath": null,
+      "status": "missing-figma"
+    },
+    {
+      "file": "techmeme_center.png",
+      "browserPath": "/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/docs/golden/browser/v1.4.3/techmeme_center.png",
+      "figmaPath": null,
+      "status": "missing-figma"
+    },
+    {
+      "file": "techmeme_center_saliency.png",
+      "browserPath": "/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/docs/golden/browser/v1.4.3/techmeme_center_saliency.png",
+      "figmaPath": null,
+      "status": "missing-figma"
+    },
+    {
+      "file": "techmeme_center_structure.png",
+      "browserPath": "/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/docs/golden/browser/v1.4.3/techmeme_center_structure.png",
+      "figmaPath": null,
+      "status": "missing-figma"
+    }
+  ]
+}
