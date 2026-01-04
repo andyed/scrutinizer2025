@@ -510,123 +510,97 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     float effectFactor = v1.distortionStrength; 
     float bypassTransition = smoothstep(fovea_radius * 0.5, fovea_radius * 0.7, dist);
 
-    if (config.v4_style_id == 0) { // High-Key (Desaturated)
-        
-        // === SALIENCY DAMPENING ===
+    if (config.v4_style_id <= 1) { // Research Modes: 0=Usability, 1=Biological(Purkinje)
+    
+        // === SHARED BIOLOGICAL PIPELINE ===
+        float noiseVal = (rand(uv) - 0.5);
         float protection = max(lgn.saliency, lgn.density);
         float dampener = mix(1.0, 0.85, protection);
         
         float desatIntensity = smoothstep(0.0, 0.6, u_intensity);
         float strengthMult = desatIntensity * dampener;
-
-        float noiseVal = (rand(uv) - 0.5);
         
-        // Recalculate periphery_start (radius_norm * 1.2)
-        // Recalculate periphery_start (radius_norm * 1.2)
-        float periphery_start = fovea_radius * 1.2;
-        
-        // Use CLEAN distance for CA to avoid noise artifacts
-        float caFactor = smoothstep(periphery_start, periphery_start + 0.25, dist);
-        
-        // === CA SUPPRESSION (The "Anti-Fringe" Fix) ===
-        // As we enter the Scramble Zone (Parafovea end), we must kill CA.
-        // Otherwise, CA highlights the artificial edges of the scramble grid.
-        float scrambleOnset = parafovea_radius * 1.0;
-        float scrambleFull = parafovea_radius * 1.5;
-        float scrambleStrength = smoothstep(scrambleOnset, scrambleFull, dist);
-        
-        // Inverse: High Scramble = Low CA
-        float caSuppression = 1.0 - scrambleStrength; 
-        
-        // Apply Strength Modulation AND Suppression
-        caFactor *= strengthMult * caSuppression;
-        
-        if (caFactor > 0.01) {
-            float offset = 0.005 * caFactor; 
-            vec2 caOffset = vec2(offset, 0.0); 
-            col.r = sampleSource(v1.distortedUV + caOffset).r;
-            col.b = sampleSource(v1.distortedUV - caOffset).b;
-        }
-
-        // === ROD VISION AESTHETIC (OKLAB) ===
-        vec3 lab = rgbToOklab(col);
-        
-        float contrast = 1.2;
-        float L_contrasted = (lab.x - 0.5) * contrast + 0.5;
-        L_contrasted = clamp(L_contrasted, 0.0, 1.0);
-        
-        vec3 eigengrauLab = vec3(0.1, 0.0, -0.05);
-        vec3 whiteLab = vec3(1.0, 0.0, 0.0);
-        vec3 rodColorLab = mix(eigengrauLab, whiteLab, L_contrasted);
-        
-        vec3 rodColor = oklabToRgb(rodColorLab);
-        
-        float grainStrength = 0.08;
-        rodColor += noiseVal * grainStrength;
-        rodColor = clamp(rodColor, 0.0, 1.0);
-        
-        // === DECOUPLED DESATURATION (OKLAB) ===
-        float rampEnd = fovea_radius * config.lgn_ramp_end_mult;
-        float desaturationFactor = smoothstep(fovea_radius, rampEnd, dist);
-        
-        desaturationFactor *= strengthMult;
-        
-        if (u_enable_saliency_modulation > 0.5 && dist > parafovea_radius) {
-            float s = lgn.saliency;
-            float rodMod = mix(1.0, 0.85, s);
-            desaturationFactor *= rodMod;
-        }
-        
-        vec3 desaturatedLab = lab;
-        desaturatedLab.y *= (1.0 - desaturationFactor * bypassTransition); 
-        desaturatedLab.z *= (1.0 - desaturationFactor * bypassTransition); 
-        
-        vec3 desaturatedColor = oklabToRgb(desaturatedLab);
-        
-        vec3 finalColor = mix(desaturatedColor, rodColor, desaturationFactor * bypassTransition * 0.3);
-        return finalColor;
-        
-    } else if (config.v4_style_id == 1) { // Oklab
-        // === CHROMATIC ABERRATION ===
-        float noiseVal = (rand(uv) - 0.5);
-        float protection = max(lgn.saliency, lgn.density);
-        float dampener = mix(1.0, 0.85, protection);
-        float strengthMult = smoothstep(0.0, 0.6, u_intensity) * dampener;
-        
+        // 1. Chromatic Aberration
         float periphery_start = fovea_radius * 1.2;
         float caFactor = smoothstep(periphery_start, periphery_start + 0.25, dist);
         caFactor *= strengthMult;
         
+        // CA Suppression (Parafovea) - High Scramble = Low CA
+        float scrambleOnset = parafovea_radius * 1.0;
+        float scrambleFull = parafovea_radius * 1.5;
+        float scrambleStrength = smoothstep(scrambleOnset, scrambleFull, dist);
+        float caSuppression = 1.0 - scrambleStrength;
+        caFactor *= caSuppression;
+        
         if (caFactor > 0.01) {
             float offset = 0.005 * caFactor; 
-            vec2 caOffset = vec2(offset, 0.0); 
+            vec2 caOffset = vec2(offset, 0.0);
             col.r = sampleSource(v1.distortedUV + caOffset).r;
             col.b = sampleSource(v1.distortedUV - caOffset).b;
         }
 
+        // 2. Oklab Conversion
         vec3 lab = rgbToOklab(col);
         
-        vec3 rodColorLab = vec3(
-            lab.x * 0.96,
-            0.0,          
-            -0.05         
-        );
-        
-        vec3 rodColor = oklabToRgb(rodColorLab);
-        rodColor += (rand(uv) - 0.5) * 0.1;
-        rodColor = mix(rodColor, vec3(0.01), saccadeFactor * 0.9);
-        
+        // 3. Rod Desaturation Factor
         float rampEnd = fovea_radius * config.lgn_ramp_end_mult;
         float desaturationFactor = smoothstep(fovea_radius, rampEnd, dist);
         desaturationFactor *= strengthMult;
         
-        if (u_enable_saliency_modulation > 0.5 && dist > parafovea_radius) {
-            float s = lgn.saliency;
-            float rodMod = mix(1.0, 0.85, s);
-            desaturationFactor *= rodMod;
-        }
+        float fade = desaturationFactor * bypassTransition;
         
-        return mix(col, rodColor, desaturationFactor);
+        // Apply Base Desaturation (Chrominance only)
+        lab.y *= (1.0 - fade); 
+        lab.z *= (1.0 - fade);
+        
+        // === DIVERGENCE: USABILITY VS BIOLOGY ===
+        
+        if (config.v4_style_id == 0) { 
+            // === MODE 0: USABILITY (High-Key Ghosting) ===
+            // Goal: Red buttons turn Grey (structural retention), not Black (invisible).
+            
+            // Red Kill Switch (Prevent Mustard)
+            float rednessFactor = max(0.0, lab.y);
+            if (rednessFactor > 0.0) {
+                 float peripheralFade = smoothstep(parafovea_radius, periphery_start + (fovea_radius * 2.0), dist);
+                 float desatStrength = peripheralFade * 0.95;
+                 lab.y = mix(lab.y, 0.0, desatStrength); // Kill a (Red)
+                 lab.z = mix(lab.z, 0.0, desatStrength); // Kill b (Yellow)
+            }
+            
+            // Standard Rod Color Mix (Visual consistency / Fog)
+            vec3 finalCol = oklabToRgb(lab);
+            
+            // Generate clean rod base (Eigengrau-ish)
+            vec3 rodColorLab = vec3(0.96 * lab.x, 0.0, -0.05); 
+            vec3 rodColor = oklabToRgb(rodColorLab);
+            rodColor += noiseVal * 0.08;
+            rodColor = clamp(rodColor, 0.0, 1.0);
+            
+            return mix(finalCol, rodColor, desaturationFactor * bypassTransition * 0.3);
+            
+        } else {
+            // === MODE 1: BIOLOGICAL (Purkinje Darkening) ===
+            // Goal: Simulation accuracy. Red objects vanish into shadows.
+            
+            // Purkinje Shift + Optical Vignette
+            float deepPeriphery = smoothstep(parafovea_radius, periphery_start + (fovea_radius * 0.8), dist);
+            float rednessFactor = max(0.0, lab.y * 2.0); // Boosted sensitivity
+             
+            if (rednessFactor > 0.0) {
+                float purkinjeDarkness = deepPeriphery * rednessFactor;
+                lab.y = mix(lab.y, 0.0, purkinjeDarkness);
+                lab.z = mix(lab.z, 0.0, purkinjeDarkness);
+                lab.x = mix(lab.x, 0.02, purkinjeDarkness); // Kill Light (Simulate Rod Blank)
+            }
+            
+            // Safe Global Vignette (Contrast Dimming)
+            // Lowers brightness/contrast at edges without creating a "tunnel"
+            float globalDim = deepPeriphery * 0.4;
+            lab.x = mix(lab.x, lab.x * 0.6, globalDim);
+            
+            return oklabToRgb(lab);
+        }
         
     } else if (config.v4_style_id == 2) { // Frosted
         vec3 frosted = mix(col, vec3(0.9), 0.3);
