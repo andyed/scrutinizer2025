@@ -150,11 +150,11 @@ The following table details the rendering characteristics of each built-in mode 
 | Mode | Stage | Configuration / Effect |
 | :--- | :--- | :--- |
 | **0: High-Key** | **LGN** | **Standard**: Structure Masking + Saliency Gating |
-| *(Baseline)* | **V1** | **Slow Wave**: 0.1Hz sine warp (Type 1). |
-| | **V4** | **MIP Pooling** + Rod Vision: Receptive field pooling + Desaturation + Eigengrau tint. |
-| **1: Lab** | **LGN** | Standard |
-| | **V1** | Same as Baseline |
-| | **V4** | **MIP Pooling** + Clinical Grayscale. |
+| *(Usability)* | **V1** | **Slow Wave**: 0.1Hz sine warp (Type 1). |
+| | **V4** | **Clean Desaturation**: Red -> Grey (Mustard Fix). **High-Key**: Mixed with Eigengrau for usability. |
+| **1: Biological** | **LGN** | Standard |
+| *(Purkinje)* | **V1** | Same as Baseline |
+| | **V4** | **Purkinje Shift**: Red -> Black shadows. **Optical Vignette**: Contrast dimming at edges. |
 | **2: Frosted** | **LGN** | Standard |
 | | **V1** | Same as Baseline |
 | | **V4** | **MIP Pooling** + Privacy blur (No Blue Shift). |
@@ -281,6 +281,16 @@ const scaledBox = {
 ```
 
 **Reuse Opportunity**: If other features (e.g., text detection, logo detection) need higher resolution, they can share the 640px canvas created for face detection.
+
+### 4. UI Protection (Scrollbars)
+**Problem**: Applying heavy geometric distortion (like the "Shatter" or "Double Vision" modes) to the entire window renders the native scrollbar unusable, as the user cannot accurately target the thumb or track.
+
+**Solution**: The shader pipeline includes a hard **Scrollbar Override** controlled by the `u_scrollbarWidth` uniform (default: 20px).
+
+*   **Logic**: This check occurs at the very end of the fragment shader. If `pixel_x > window_width - scrollbar_width`, we force the output to be the clean, undistorted source image (`sampleSource`).
+*   **Robustness**: This overrides ALL other effects (LGN inhibition, V1 distortion, V4 styling, Visual Memory).
+*   **Uniforms**:
+    *   `u_scrollbarWidth`: Float, pixel width from right edge (configurable in `scrutinizer.js`).
 
 ## Future Roadmap: Abstraction
 
