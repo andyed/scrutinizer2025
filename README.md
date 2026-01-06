@@ -2,6 +2,7 @@
 
 [![Electron](https://img.shields.io/badge/Electron-28.0-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![WebGL](https://img.shields.io/badge/WebGL-2.0-990000?style=flat-square&logo=webgl&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API)
+[![Figma](https://img.shields.io/badge/Figma-Plugin-F24E1E?style=flat-square&logo=figma&logoColor=white)](https://www.figma.com/community/plugin/1579671593390938191/scrutinizer-pro)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 
 ➡️ Live site: **[scrutinizer.app](https://andyed.github.io/scrutinizer-www/)**
@@ -70,7 +71,7 @@ Scrutinizer is designed for **designers, UX researchers, and HCI/vision scientis
 
 > **Open Source & Extensible**: The browser app is MIT-licensed and designed for customization. Aesthetic modes serve as test cases for the modular pipeline—see the [Developer's Guide](docs/developers_guide.md) for adding your own.
 >
-> **Commercial Plugin**: A Figma plugin is also available for design-tool integration.
+> **Commercial Plugin**: The [**Scrutinizer Pro**](https://www.figma.com/community/plugin/1579671593390938191/scrutinizer-pro) Figma plugin is now available!
 
 ---
 
