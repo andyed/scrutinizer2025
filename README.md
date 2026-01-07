@@ -70,7 +70,7 @@ Scrutinizer is designed for **designers, UX researchers, and HCI/vision scientis
 
 > **Open Source & Extensible**: The browser app is MIT-licensed and designed for customization. Aesthetic modes serve as test cases for the modular pipeline—see the [Developer's Guide](docs/developers_guide.md) for adding your own.
 >
-> **Commercial Plugin**: The [**Scrutinizer Pro**](https://www.figma.com/community/plugin/1579671593390938191/scrutinizer-pro) Figma plugin is now available!
+> **Figma Plugin**: [**Scrutinizer Pro**](https://www.figma.com/community/plugin/1579671593390938191/scrutinizer-pro) is free to use with watermark. Uses the Figma DOM for full functionality with prototypes.
 
 ---
 
