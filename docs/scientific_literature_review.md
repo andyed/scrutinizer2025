@@ -103,24 +103,24 @@ The primary visual cortex (V1) is where the brain first constructs a representat
 
 ### 3.4. Neural Approximation of Peripheral Statistics
 
-[cite_start]While the Texture Tiling Model (TTM) successfully predicts peripheral encoding and crowding, its iterative synthesis process is computationally prohibitive for real-time applications, often requiring hours to generate a single "mongrel" image[cite: 49]. Recent work at MIT has focused on using deep learning to approximate these statistical constraints in a feed-forward manner, enabling real-time simulation.
+While the Texture Tiling Model (TTM) successfully predicts peripheral encoding and crowding, its iterative synthesis process is computationally prohibitive for real-time applications, often requiring hours to generate a single "mongrel" image [49]. Recent work at MIT has focused on using deep learning to approximate these statistical constraints in a feed-forward manner, enabling real-time simulation.
 
 #### 3.4.1. SideEye and Foveated Generative Networks (FGN)
 
-Fridman et al. (2017) [cite_start]introduced the **Foveated Generative Network (FGN)**, a fully convolutional architecture designed to learn the non-linear mapping between a foveal input and its peripheral representation[cite: 2, 49].
+Fridman et al. (2017) introduced the **Foveated Generative Network (FGN)**, a fully convolutional architecture designed to learn the non-linear mapping between a foveal input and its peripheral representation [2, 49].
 
-* [cite_start]**Architecture:** The model extends fully convolutional networks (FCN) with a spatial weight mask that propagates foveal distance constraints through the network biases[cite: 146, 148].
-* [cite_start]**Performance:** FGN achieves a **21,000-fold reduction** in processing time compared to TTM (reducing generation time from ~4 hours to ~0.7 seconds), effectively enabling real-time design iteration[cite: 24, 229].
-* [cite_start]**Validation:** While pixel-wise comparison is impossible due to the stochastic nature of mongrels, FGN was statistically validated by comparing texture feature vectors in pooling regions, achieving a mean error of less than 8% relative to TTM outputs[cite: 216, 223].
-* [cite_start]**Application:** The authors demonstrated the utility of this speedup for **A/B testing** web layouts (predicting button click-through rates based on peripheral saliency) and analyzing **logo recognizability** (e.g., assessing how brand identity degrades in the periphery)[cite: 55, 267, 301].
+* **Architecture:** The model extends fully convolutional networks (FCN) with a spatial weight mask that propagates foveal distance constraints through the network biases [146, 148].
+* **Performance:** FGN achieves a **21,000-fold reduction** in processing time compared to TTM (reducing generation time from ~4 hours to ~0.7 seconds), effectively enabling real-time design iteration [24, 229].
+* **Validation:** While pixel-wise comparison is impossible due to the stochastic nature of mongrels, FGN was statistically validated by comparing texture feature vectors in pooling regions, achieving a mean error of less than 8% relative to TTM outputs [216, 223].
+* **Application:** The authors demonstrated the utility of this speedup for **A/B testing** web layouts (predicting button click-through rates based on peripheral saliency) and analyzing **logo recognizability** (e.g., assessing how brand identity degrades in the periphery) [55, 267, 301].
 
 #### 3.4.2. GAN-Based Synthesis and Perceptual Metrics
 
-[cite_start]Building on the FGN approach, Shumikhin (2020) evaluated advanced generative architectures, including Cycle-GAN and **pix2pixHD**, for synthesizing high-resolution mongrels[cite: 436, 743].
+Building on the FGN approach, Shumikhin (2020) evaluated advanced generative architectures, including Cycle-GAN and **pix2pixHD**, for synthesizing high-resolution mongrels [436, 743].
 
-* [cite_start]**pix2pixHD:** This architecture was found to produce the highest quality mongrels, successfully capturing the "jumbling" and texture pooling effects of TTM better than standard convolutional networks, particularly for text and fonts[cite: 903].
-* [cite_start]**Quantitative Metrics:** Shumikhin moved beyond qualitative assessment by utilizing **ResNet-18 feature vectors** (Image2Vec) to measure the perceptual distance between original and mongrelized images[cite: 720]. [cite_start]This allowed for the quantification of "crowding susceptibility" using **Cosine Similarity** and **Wasserstein Distance** on high-level semantic features rather than raw pixels[cite: 726, 733].
-* [cite_start]**Design Implications:** This framework was used to rank thousands of fonts by their resilience to crowding, finding that heavy fonts with high styling variation were generally less susceptible to peripheral degradation[cite: 1082].
+* **pix2pixHD:** This architecture was found to produce the highest quality mongrels, successfully capturing the "jumbling" and texture pooling effects of TTM better than standard convolutional networks, particularly for text and fonts [903].
+* **Quantitative Metrics:** Shumikhin moved beyond qualitative assessment by utilizing **ResNet-18 feature vectors** (Image2Vec) to measure the perceptual distance between original and mongrelized images [720]. This allowed for the quantification of "crowding susceptibility" using **Cosine Similarity** and **Wasserstein Distance** on high-level semantic features rather than raw pixels [726, 733].
+* **Design Implications:** This framework was used to rank thousands of fonts by their resilience to crowding, finding that heavy fonts with high styling variation were generally less susceptible to peripheral degradation [1082].
 
 ### Stage 4: V4 and Beyond (Color, Shape, Recognition)
 
