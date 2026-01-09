@@ -79,3 +79,8 @@ ipcRenderer.on('toolbar:update-nav-state', (event, { canGoBack, canGoForward }) 
     backBtn.disabled = !canGoBack;
     forwardBtn.disabled = !canGoForward;
 });
+
+ipcRenderer.on('toolbar:set-version', (event, version) => {
+    const el = document.getElementById('app-version');
+    if (el) el.innerText = `v${version}`;
+});

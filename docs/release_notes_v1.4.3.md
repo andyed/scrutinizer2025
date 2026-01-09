@@ -1,11 +1,17 @@
 # Release Notes v1.4.3
 
-**Release Date:** TBD
+**Release Date:** 2026-01-04
 
 ## Overview
-This release focuses on significant performance optimizations to improve startup time and interaction responsiveness, alongside internal structural improvements for better stability.
+This release focuses on significant performance optimizations to improve startup time and interaction responsiveness, alongside robust fixes for visual stability in the interface.
 
 ## Key Changes
+
+### Visual Stability
+*   **Scrollbar Protection:** Implemented a robust shader-level exclusion for the scrollbar area. This prevents the "Visual Noising" effects from distorting the scrollbar, ensuring navigability is never compromised regardless of the active aesthetic mode.
+*   **Biological Color Fidelity:** Refined the peripheral color model to better match human rod vision.
+    *   **Protanopia Simulation:** Red objects in the far periphery now fade to dark grey/black instead of desaturated pink, simulating the rod cells' blindness to long wavelengths.
+    *   **Usability Mode:** Implemented a "Progressive Fade" that crushes both Red and Yellow channels to prevent "mustard" artifacts, ensuring high-contrast UI elements (like buttons) remain visible and structurally intact as neutral grey forms.
 
 ### Performance Optimization
 *   **Startup Speed:** Implemented a **Splash Screen** to provide immediate visual feedback while the core application initializes, eliminating the "white screen of death" effect at launch.

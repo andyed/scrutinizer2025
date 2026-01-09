@@ -575,6 +575,9 @@ function createScrutinizerWindow(startUrl) {
         }
     });
     toolbarView.webContents.loadFile('renderer/toolbar.html');
+    toolbarView.webContents.once('did-finish-load', () => {
+        toolbarView.webContents.send('toolbar:set-version', app.getVersion());
+    });
 
     // Add views to main window
     win.contentView.addChildView(toolbarView);
@@ -934,6 +937,12 @@ function createSplashWindow() {
 
     splashWindow.loadFile('renderer/splash.html');
     splashWindow.center();
+    splashWindow.webContents.once('did-finish-load', () => {
+        splashWindow.webContents.executeJavaScript(`
+            const v = document.getElementById('version');
+            if(v) v.innerText = 'v${app.getVersion()}';
+        `).catch(e => console.error('Splash version injection failed', e));
+    });
 }
 
 function createWindow() {

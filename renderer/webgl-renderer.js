@@ -56,6 +56,7 @@
                 this.useMaskLocation = null;
                 this.velocityLocation = null;
                 this.mongrelModeLocation = null;
+                this.scrollbarWidthLocation = null;
                 // this.aestheticModeLocation = null; // Removed in favor of granular uniforms
 
                 // Granular Uniform Locations
@@ -143,6 +144,7 @@
                 this.useMaskLocation = gl.getUniformLocation(this.program, "u_useMask");
                 this.velocityLocation = gl.getUniformLocation(this.program, "u_velocity");
                 this.mongrelModeLocation = gl.getUniformLocation(this.program, "u_mongrel_mode");
+                this.scrollbarWidthLocation = gl.getUniformLocation(this.program, "u_scrollbarWidth");
                 this.timeLocation = gl.getUniformLocation(this.program, "u_time");
                 // this.aestheticModeLocation = gl.getUniformLocation(this.program, "u_aesthetic_mode");
 
@@ -333,7 +335,7 @@
                 gl.clearColor(0.0, 0.0, 0.0, 0.0);
                 gl.clear(gl.COLOR_BUFFER_BIT);
             }
-            render(width, height, mouseX, mouseY, foveaRadius, foveaAspectRatio = 1.33, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, debugStructure = 0.0, useMask = 0.0, mongrelMode = 1.0, aestheticMode = 0.0, velocity = 0.0, stableMouseX = 0.0, stableMouseY = 0.0, hasStructure = 0.0, enableSaliencyModulation = 1.0, time = 0.0) {
+            render(width, height, mouseX, mouseY, foveaRadius, foveaAspectRatio = 1.33, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, debugStructure = 0.0, useMask = 0.0, mongrelMode = 1.0, aestheticMode = 0.0, velocity = 0.0, stableMouseX = 0.0, stableMouseY = 0.0, hasStructure = 0.0, enableSaliencyModulation = 1.0, time = 0.0, scrollbarWidth = 17.0) {
                 if (!this.program) {
                     console.error('[WebGLRenderer] render() called but program is null!');
                     return;
@@ -411,7 +413,9 @@
 
                 gl.uniform1f(this.velocityLocation, velocity);
                 gl.uniform1f(this.mongrelModeLocation, mongrelMode);
+                gl.uniform1f(this.mongrelModeLocation, mongrelMode);
                 gl.uniform1f(this.timeLocation, time);
+                gl.uniform1f(this.scrollbarWidthLocation, scrollbarWidth);
                 // gl.uniform1f(this.aestheticModeLocation, aestheticMode);
 
                 // Update Config based on Mode (Legacy Support / Preset Logic)

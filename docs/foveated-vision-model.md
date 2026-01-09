@@ -527,14 +527,8 @@ warpVector *= saliencyWarpMod;
 ```
 
 **V4 (Aesthetics) Modulation**:
-```glsl
-// Rod vision: Reduce desaturation near salient areas (far periphery only)
-if (u_enable_saliency_modulation > 0.5 && dist > parafovea_radius) {
-    float s = lgn.saliency;
-    float rodMod = mix(1.0, 0.85, s); // 15% max reduction
-    desaturationFactor *= rodMod;
-}
-```
+**V4 (Aesthetics) Modulation**:
+> **Update (v1.4.3)**: Saliency modulation was removed from the color/desaturation stage. Biological accuracy takes precedence: rods are colorblind regardless of how "salient" an object is. A bright red logo in the periphery is now strictly desaturated/darkened to match rod sensitivity, preventing it from artificially "popping" and competing with the fovea.
 
 **Effect**: Salient areas (logos, icons, UI elements) in the far periphery retain slightly more geometric stability and color, making them more recognizable for saccade guidance without compromising illegibility.
 
@@ -622,15 +616,20 @@ lab.b *= (1 - desaturationAmount);
 const rgb = oklabToRgb(lab.L, lab.a, lab.b);
 ```
 
-**Rod-sensitive desaturation** preserves cyan (505nm peak rod sensitivity):
-```javascript
-// Detect cyan in Oklab space (positive b, negative a)
-const isCyan = (lab.b > 0.05 && lab.a < 0);
+**Rod-sensitive desaturation (v1.4.3 "Usability Mode")**:
+To prevent "mustard" artifacts (where removing Red leaves Yellow) and simulate rod blindness to long wavelengths:
 
-// Less desaturation for cyan
-const desatAmount = isCyan ? 0.7 : 1.0;
-lab.a *= (1 - desatAmount);
-lab.b *= (1 - desatAmount);
+```javascript
+// Progressive Red Crush
+// If we are in the periphery and the pixel is Red, we crush BOTH 'a' and 'b'.
+if (dist > parafovea && lab.a > 0) {
+    // Progressive fade calculation
+    const factor = smoothstep(parafovea, far_periphery, dist) * 0.95; 
+    
+    lab.a = mix(lab.a, 0.0, factor); // Kill Red
+    lab.b = mix(lab.b, 0.0, factor); // Kill Yellow (prevent mustard artifact)
+}
+// Lightness (L) is preserved, ensuring the button remains visible as a grey form.
 ```
 
 #### GLSL (GPU-side)
@@ -793,7 +792,7 @@ The "Interpreter" stage determines *what* the final pixel looks like. This stage
 *   **Customization Examples (Architectural Stress Tests)**:
     *These modes not only demonstrate visual possibilities but also serve as stress-tests for the pipeline's flexibility.*
     -   **High-Key (Default)**: Simulates standard peripheral degradation with desaturation and ghosting.
-    -   **Lab (Scotopic)**: A "night vision" model (dark blue-grey) simulating rod-dominated vision in low light.
+    -   **Biological (Purkinje Darkening)**: A rigorously accurate simulation of rod vision, where red objects fade to black shadows (Protanopia) and luminance drops significantly.
     -   **Frosted**: A low-contrast, milky aesthetic useful for simulating cataracts or foggy conditions.
     -   **Blueprint**: A "wireframe" mode that visualizes the underlying Gestalt structure (rhythm/mass) detected by the engine.
     -   **Cyberpunk**: An exaggerated "glitch" aesthetic using neon colors and blocky artifacts.

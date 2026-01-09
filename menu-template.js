@@ -405,7 +405,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     click: () => sendToOverlays('menu:set-aesthetic-mode', 0)
                                 },
                                 {
-                                    label: 'Lab Mode (Scotopic)',
+                                    label: 'Biological (Purkinje Darkening)',
                                     type: 'radio',
                                     click: () => sendToOverlays('menu:set-aesthetic-mode', 1)
                                 },

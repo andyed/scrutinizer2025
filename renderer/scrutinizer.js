@@ -22,6 +22,7 @@
                 velocityDecayStop: 0.02,
                 maskSmoothness: 0.4, // Increased from 0.1 for tighter mouse tracking
                 saccadicSuppressionThreshold: 4.0,
+                scrollbarWidth: 20.0, // Width of specific scrollbar protection zone (right edge)
                 ...config
             };
 
@@ -649,7 +650,8 @@
                 this.mouseY, // stableMouseY
                 (this.hasStructure && this.config.enableStructureMap) ? 1.0 : 0.0, // hasStructure (only if enabled)
                 this.config.enableSaliencyModulation ? 1.0 : 0.0, // enableSaliencyModulation
-                now / 1000.0 // time (seconds)
+                now / 1000.0, // time (seconds)
+                this.config.scrollbarWidth // scrollbarWidth
             );
         }
 
