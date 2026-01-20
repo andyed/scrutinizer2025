@@ -48,11 +48,22 @@ node -e "require('./renderer/citation-export').extractMetadata('screenshot.png')
 |------|---------|
 | `shared/modes.json` | Declarative mode registry with pipeline configs |
 | `renderer/citation-export.js` | PNG metadata embedding utility |
+| `docs/tutorials/blueprint_case_study.md` | Comprehensive walkthrough of Blueprint mode |
 
 ### 📝 Documentation Updates
 
 - **Developer's Guide:** Updated "Adding a New Aesthetic Mode" section with the new `modes.json` workflow
+- **Blueprint Case Study:** New tutorial showing how modes work, with modification examples
 - Added documentation for citation metadata in image exports
+
+### ⚠️ Known Limitations (Documented)
+
+**Shader Monolith:** The main shader (`peripheral.frag`) is ~1160 lines in a single file. This creates:
+- Merge conflicts when multiple researchers experiment
+- Cognitive overload finding the right function
+- No hot-reloading (must restart app for GLSL changes)
+
+Future work may split this into modular includes. See the [Blueprint Case Study](tutorials/blueprint_case_study.md#known-limitations) for details.
 
 ## Implementation Details
 
