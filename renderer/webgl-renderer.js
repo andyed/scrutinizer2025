@@ -12,6 +12,16 @@
 
         const Logger = require('./logger');
 
+        // Load mode registry from shared/modes.json
+        let modesRegistry = null;
+        try {
+            const modesPath = path.join(__dirname, '..', 'shared', 'modes.json');
+            modesRegistry = JSON.parse(fs.readFileSync(modesPath, 'utf8'));
+            ipcRenderer.send('log:renderer', `[WebGLRenderer] Loaded ${Object.keys(modesRegistry.modes).length} modes from registry`);
+        } catch (e) {
+            console.warn('[WebGLRenderer] Could not load modes.json, using built-in defaults:', e.message);
+        }
+
         class WebGLRenderer {
             constructor(canvas) {
                 this.canvas = canvas;
@@ -296,16 +306,42 @@
 
             updateConfigFromMode(modeId) {
                 // Default: High-Key (0)
-                this.config = {
+                const defaults = {
                     lgn_use_structure_mask: true,
                     lgn_use_saliency_gate: true,
                     v1_distortion_type: 1, // Shatter
                     v1_strength_mult: 1.0,
                     v4_style_id: 0,
-                    lgn_ramp_end_mult: 2.0, // Was 3.0. Tightened to make desaturation reach full strength sooner.
+                    lgn_ramp_end_mult: 2.0,
                     v1_animate: false
                 };
 
+                this.config = { ...defaults };
+
+                // Try registry-based lookup first
+                if (modesRegistry && modesRegistry.modes) {
+                    // Find mode by ID
+                    const modeEntry = Object.values(modesRegistry.modes).find(m =>
+                        m.id === Math.round(modeId)
+                    );
+
+                    if (modeEntry && modeEntry.pipeline) {
+                        const p = modeEntry.pipeline;
+                        this.config.lgn_use_structure_mask = p.lgn_use_structure_mask ?? defaults.lgn_use_structure_mask;
+                        this.config.lgn_use_saliency_gate = p.lgn_use_saliency_gate ?? defaults.lgn_use_saliency_gate;
+                        this.config.lgn_ramp_end_mult = p.lgn_ramp_end_mult ?? defaults.lgn_ramp_end_mult;
+                        this.config.v1_distortion_type = p.v1_distortion_type ?? defaults.v1_distortion_type;
+                        this.config.v1_strength_mult = p.v1_strength_mult ?? defaults.v1_strength_mult;
+                        this.config.v1_animate = p.v1_animate ?? defaults.v1_animate;
+                        this.config.v4_style_id = p.v4_style_id ?? defaults.v4_style_id;
+
+                        // Store current mode metadata for export
+                        this.currentMode = modeEntry;
+                        return;
+                    }
+                }
+
+                // Fallback: Original hardcoded logic (for backward compatibility)
                 if (modeId > 0.5 && modeId < 1.5) { // Lab (1)
                     this.config.v4_style_id = 1;
                     this.config.lgn_ramp_end_mult = 3.0;

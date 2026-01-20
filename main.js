@@ -920,6 +920,92 @@ ipcMain.on('log:renderer', (event, message) => {
     }
 });
 
+// Citation-Ready Export Handler
+// Captures the current HUD view and embeds metadata for academic reproducibility
+ipcMain.on('export:citation-screenshot', async (event, options = {}) => {
+    const { dialog } = require('electron');
+    const fs = require('fs');
+    const p = require('path');
+
+    try {
+        // Find the window that sent this request
+        const windows = BrowserWindow.getAllWindows();
+        const win = windows.find(w => w.scrutinizerHud &&
+            w.scrutinizerHud.webContents === event.sender);
+
+        if (!win || !win.scrutinizerHud) {
+            console.error('[CitationExport] No valid HUD window found');
+            event.reply('export:citation-screenshot:result', { success: false, error: 'No HUD window' });
+            return;
+        }
+
+        // Capture the HUD
+        const image = await win.scrutinizerHud.capturePage();
+        const rawBuffer = image.toPNG();
+
+        // Load citation-export module
+        const citationExport = require('./renderer/citation-export');
+
+        // Build metadata from current state
+        const metadata = {
+            modeId: options.modeId || 0,
+            modeName: options.modeName || null,
+            foveaRadius: options.foveaRadius || currentRadius || 180,
+            foveaAspect: options.foveaAspect || 1.33,
+            intensity: options.intensity || currentIntensity || 0.6,
+            caStrength: options.caStrength || 1.0,
+            url: options.url || '',
+            pipeline: options.pipeline || null,
+            customFields: options.customFields || {}
+        };
+
+        // Embed metadata into PNG
+        const annotatedBuffer = await citationExport.embedMetadata(rawBuffer, metadata);
+
+        // Show save dialog
+        const defaultName = `scrutinizer_${options.modeName || 'capture'}_${Date.now()}.png`;
+        const result = await dialog.showSaveDialog(win, {
+            title: 'Export Citation-Ready Screenshot',
+            defaultPath: defaultName,
+            filters: [
+                { name: 'PNG Images', extensions: ['png'] }
+            ],
+            properties: ['createDirectory']
+        });
+
+        if (result.canceled || !result.filePath) {
+            event.reply('export:citation-screenshot:result', { success: false, canceled: true });
+            return;
+        }
+
+        // Save PNG with metadata
+        fs.writeFileSync(result.filePath, annotatedBuffer);
+
+        // Generate JSON sidecar
+        const sidecarPath = citationExport.generateSidecar(result.filePath, metadata);
+
+        console.log(`[CitationExport] Saved: ${result.filePath}`);
+        console.log(`[CitationExport] Sidecar: ${sidecarPath}`);
+
+        // Get citation string for display
+        const citation = citationExport.generateCitation({
+            modeId: metadata.modeId,
+            modeLabel: options.modeName
+        });
+
+        event.reply('export:citation-screenshot:result', {
+            success: true,
+            filePath: result.filePath,
+            sidecarPath,
+            citation
+        });
+
+    } catch (err) {
+        console.error('[CitationExport] Error:', err);
+        event.reply('export:citation-screenshot:result', { success: false, error: err.message });
+    }
+});
+
 function createSplashWindow() {
     splashWindow = new BrowserWindow({
         width: 500,
@@ -1182,7 +1268,7 @@ function runIntegrationTest() {
                         console.log(`[Test] Capturing screenshot for Mode ${mode}...`);
                         try {
                             const image = await mainWindow.scrutinizerHud.capturePage();
-                            const buffer = image.toPNG();
+                            let buffer = image.toPNG();
 
                             // Reuse save logic
                             const fs = require('fs');
@@ -1210,6 +1296,21 @@ function runIntegrationTest() {
                                     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                                     filename = `${baseName}_${timestamp}.png`;
                                 }
+                            }
+
+                            // Embed citation metadata into PNG
+                            try {
+                                const citationExport = require('./renderer/citation-export');
+                                buffer = await citationExport.embedMetadata(buffer, {
+                                    modeId: typeof mode === 'number' ? mode : 0,
+                                    modeName: String(mode),
+                                    foveaRadius: testRadius || currentRadius || 180,
+                                    intensity: testIntensity || currentIntensity || 0.6,
+                                    url: testUrl
+                                });
+                                console.log(`[Test] Embedded citation metadata`);
+                            } catch (metaErr) {
+                                console.warn(`[Test] Could not embed metadata: ${metaErr.message}`);
                             }
 
                             const filePath = p.join(screenshotsDir, filename);

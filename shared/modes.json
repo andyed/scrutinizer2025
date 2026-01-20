@@ -1,0 +1,193 @@
+{
+    "$comment": "Declarative mode registry for Scrutinizer. Aesthetic modes are functional test cases for the LGN→V1→V4 pipeline. See docs/developers_guide.md for adding new modes.",
+    "modes": {
+        "highkey": {
+            "id": 0,
+            "label": "High-Key Ghosting (Default)",
+            "shortLabel": "High-Key",
+            "category": "research",
+            "description": "Simulates standard peripheral degradation with rod-like desaturation, Eigengrau tinting, and chromatic aberration. The default mode for usability research.",
+            "pipeline": {
+                "lgn_use_structure_mask": true,
+                "lgn_use_saliency_gate": true,
+                "lgn_ramp_end_mult": 2.0,
+                "v1_distortion_type": 1,
+                "v1_strength_mult": 1.0,
+                "v1_animate": false,
+                "v4_style_id": 0
+            },
+            "tests": [
+                "structure_masking",
+                "saliency_gating",
+                "oklab_desaturation"
+            ],
+            "citations": {
+                "technique": "Oklab desaturation (Ottosson, 2020)",
+                "biological_basis": "Rod-dominated peripheral vision, Eigengrau tint"
+            }
+        },
+        "biological": {
+            "id": 1,
+            "label": "Biological (Purkinje Darkening)",
+            "shortLabel": "Purkinje",
+            "category": "research",
+            "description": "Rigorous simulation of rod vision: red objects fade to black shadows (Purkinje shift), luminance drops significantly. More accurate but less usable.",
+            "pipeline": {
+                "lgn_use_structure_mask": true,
+                "lgn_use_saliency_gate": true,
+                "lgn_ramp_end_mult": 3.0,
+                "v1_distortion_type": 1,
+                "v1_strength_mult": 1.0,
+                "v1_animate": false,
+                "v4_style_id": 1
+            },
+            "tests": [
+                "purkinje_shift",
+                "rod_sensitivity_curve"
+            ],
+            "citations": {
+                "technique": "Purkinje shift simulation",
+                "biological_basis": "Rod spectral sensitivity peaks at 505nm (cyan)"
+            }
+        },
+        "frosted": {
+            "id": 2,
+            "label": "Frosted Glass (iOS)",
+            "shortLabel": "Frosted",
+            "category": "research",
+            "description": "Low-contrast, milky aesthetic simulating cataracts or foggy conditions. Uses MIP-based pooling without aggressive color shifts.",
+            "pipeline": {
+                "lgn_use_structure_mask": true,
+                "lgn_use_saliency_gate": true,
+                "lgn_ramp_end_mult": 3.0,
+                "v1_distortion_type": 1,
+                "v1_strength_mult": 1.0,
+                "v1_animate": false,
+                "v4_style_id": 2
+            },
+            "tests": [
+                "mip_pooling",
+                "contrast_reduction"
+            ],
+            "citations": {
+                "technique": "MIP-based receptive field pooling",
+                "biological_basis": "Light scatter in aging lens"
+            }
+        },
+        "blueprint": {
+            "id": 3,
+            "label": "Wireframe (Gestalt)",
+            "shortLabel": "Blueprint",
+            "category": "presentation",
+            "description": "Visualization mode that reveals underlying Gestalt structure (rhythm, mass) detected by the Structure Map. No geometric distortion - uses edge detection on structure texture.",
+            "pipeline": {
+                "lgn_use_structure_mask": true,
+                "lgn_use_saliency_gate": true,
+                "lgn_ramp_end_mult": 2.0,
+                "v1_distortion_type": 2,
+                "v1_strength_mult": 1.0,
+                "v1_animate": false,
+                "v4_style_id": 3
+            },
+            "tests": [
+                "edge_detection",
+                "structure_map_visualization",
+                "v1_bypass"
+            ],
+            "architectural_purpose": "Stress-test for V1 bypass while V4 renders from texture data",
+            "citations": {
+                "technique": "Sobel edge detection on structure map",
+                "design_basis": "Gestalt principles of visual grouping"
+            }
+        },
+        "cyberpunk": {
+            "id": 4,
+            "label": "Cyberpunk (Neon)",
+            "shortLabel": "Cyberpunk",
+            "category": "presentation",
+            "description": "Exaggerated glitch aesthetic with massive block pixelation (up to 1200px), neon contrast boost, and halftone textures. Tests variable quantization at extreme scales.",
+            "pipeline": {
+                "lgn_use_structure_mask": true,
+                "lgn_use_saliency_gate": true,
+                "lgn_ramp_end_mult": 2.0,
+                "v1_distortion_type": 3,
+                "v1_strength_mult": 1.0,
+                "v1_animate": false,
+                "v4_style_id": 4
+            },
+            "tests": [
+                "variable_quantization",
+                "extreme_block_size",
+                "saliency_driven_pixelation"
+            ],
+            "architectural_purpose": "Stress-test for V1 pixelation at 1200px blocks without coordinate collapse",
+            "citations": {
+                "technique": "Saliency-guided variable block quantization",
+                "aesthetic_basis": "Cyberpunk visual language, blocky futurism"
+            }
+        },
+        "double_vision": {
+            "id": 5,
+            "label": "Double Vision",
+            "shortLabel": "Trippy",
+            "category": "presentation",
+            "description": "Fluid wave-based distortion simulating temporary visual impairments or disorienting states. Bypasses LGN structure masking for full ungated distortion.",
+            "pipeline": {
+                "lgn_use_structure_mask": false,
+                "lgn_use_saliency_gate": true,
+                "lgn_ramp_end_mult": 1.5,
+                "v1_distortion_type": 0,
+                "v1_strength_mult": 3.0,
+                "v1_animate": true,
+                "v4_style_id": 5
+            },
+            "tests": [
+                "stream_integration",
+                "lgn_bypass",
+                "animated_noise"
+            ],
+            "architectural_purpose": "Stress-test for bypassing LGN gating without breaking pipeline",
+            "citations": {
+                "technique": "Animated simplex noise domain warping",
+                "perceptual_basis": "Alcohol/fatigue-induced double vision"
+            }
+        }
+    },
+    "v1_distortion_types": {
+        "0": {
+            "name": "noise",
+            "label": "Noise (Dynamic)",
+            "description": "Fluid, continuous distortion using animated simplex noise"
+        },
+        "1": {
+            "name": "shatter",
+            "label": "Slow Wave (Mongrel)",
+            "description": "Slow sine wave distortion approximating mongrel texture theory"
+        },
+        "2": {
+            "name": "none",
+            "label": "None",
+            "description": "No geometric distortion - pass UV unchanged"
+        },
+        "3": {
+            "name": "pixelate",
+            "label": "Pixelate (Saliency-Guided)",
+            "description": "Blocky quantization with saliency-driven variable block sizes"
+        }
+    },
+    "categories": {
+        "research": {
+            "label": "Research Modes",
+            "description": "Optimized for simulation accuracy and biological plausibility"
+        },
+        "presentation": {
+            "label": "Presentation Modes",
+            "description": "Optimized for storytelling, demonstrations, and artistic expression"
+        }
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "lastUpdated": "2026-01-19",
+        "documentation": "docs/developers_guide.md#adding-a-new-aesthetic-mode"
+    }
+}

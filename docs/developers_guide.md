@@ -118,30 +118,67 @@ In Scrutinizer, an "Aesthetic Mode" is not just a visual filter—it is a **func
 
 ### Adding a New Aesthetic Mode
 
-To add a new mode, you no longer write a monolithic `if/else` block. Instead, you define a **Configuration** for the pipeline.
+Modes are now defined declaratively in `shared/modes.json`. This eliminates magic numbers and makes mode configuration self-documenting.
 
-1.  **Register the Mode**: Add a new ID in `menu-template.js` (e.g., `6.0`).
-2.  **Configure the Pipeline**: In `webgl-renderer.js` (inside `updateConfigFromMode`), add a configuration block:
+#### Step 1: Define the Mode in `modes.json`
 
-```javascript
-// Inside updateConfigFromMode(modeId)
-} else if (modeId > 5.5) { // Mode 6: My New Mode
-    this.config.lgn_use_structure_mask = true;  // Protect text?
-    this.config.v1_distortion_type = 0;         // 0=Noise, 1=Shatter, 2=None
-    this.config.v1_strength_mult = 2.0;         // Double distortion?
-    this.config.v4_style_id = 6;                // Custom Style ID
+Add a new entry to the `modes` object:
+
+```json
+{
+    "my_new_mode": {
+        "id": 6,
+        "label": "My New Mode",
+        "shortLabel": "NewMode",
+        "category": "research",
+        "description": "Description of what this mode simulates or demonstrates.",
+        "pipeline": {
+            "lgn_use_structure_mask": true,
+            "lgn_use_saliency_gate": true,
+            "lgn_ramp_end_mult": 2.5,
+            "v1_distortion_type": 0,
+            "v1_strength_mult": 2.0,
+            "v1_animate": false,
+            "v4_style_id": 6
+        },
+        "tests": ["what_this_mode_tests"],
+        "architectural_purpose": "Why this mode exists as a stress-test",
+        "citations": {
+            "technique": "Academic reference for the technique",
+            "biological_basis": "The science behind it"
+        }
+    }
 }
 ```
 
-3.  **Implement the Style**: In `processV4`, add the rendering logic for your `style_id`:
+#### Step 2: Add Menu Item in `menu-template.js`
+
+```javascript
+{
+    label: 'My New Mode',
+    type: 'radio',
+    click: () => sendToOverlays('menu:set-aesthetic-mode', 6)
+}
+```
+
+#### Step 3: Implement V4 Style in `peripheral.frag`
+
+Add rendering logic in the `processV4` function:
 
 ```glsl
-if (config.v4_style_id == 6) {
-    // My Custom Style
+} else if (config.v4_style_id == 6) { // My New Mode
+    // Custom style logic
     vec3 tint = vec3(1.0, 0.5, 0.0); // Orange
     return mix(col, tint, effectFactor);
 }
 ```
+
+#### Mode Registry Reference
+
+The full mode registry lives in `shared/modes.json` and includes:
+- **Pipeline configuration** (LGN, V1, V4 parameters)
+- **Test cases** (what architectural capability this mode validates)
+- **Citation metadata** (academic references embedded in exports)
 
 ### Aesthetic Modes Reference
 
@@ -414,6 +451,61 @@ When developing new models that use these textures:
 4. **Consider performance** - texture lookups are fast, but avoid redundancy
 
 See `ROADMAP.md` for upcoming saliency map integration details.
+
+---
+
+## Citation-Ready Image Exports
+
+All screenshots captured via the golden capture system (`npm run capture-golden`) automatically include embedded metadata for academic reproducibility.
+
+### Embedded Metadata Fields
+
+| Field | Example | Purpose |
+|-------|---------|---------|
+| `Scrutinizer:Version` | `1.4.5` | Software version |
+| `Scrutinizer:Mode` | `Blueprint (Gestalt)` | Human-readable mode name |
+| `Scrutinizer:ModeId` | `3` | Numeric mode ID |
+| `Scrutinizer:FoveaRadius` | `180` | Foveal radius in pixels |
+| `Scrutinizer:Intensity` | `0.6` | Peripheral intensity |
+| `Scrutinizer:URL` | `https://...` | Source page URL |
+| `Scrutinizer:Timestamp` | `2026-01-19T...` | Capture timestamp |
+| `Scrutinizer:CiteAs` | `Scrutinizer v1.4.5, Blueprint Mode (Captured 2026-01-19)` | Citation string |
+| `Scrutinizer:Pipeline` | `{"lgn_use_structure_mask":true,...}` | Full pipeline config (JSON) |
+
+### Extracting Metadata
+
+```bash
+# Using exiftool (macOS: brew install exiftool)
+exiftool screenshot.png | grep Scrutinizer
+
+# Using the built-in extractor (Node.js)
+node -e "require('./renderer/citation-export').extractMetadata('test.png').then(m => console.log(m))"
+```
+
+### Programmatic Usage
+
+```javascript
+const { embedMetadata, extractMetadata, generateCitation } = require('./renderer/citation-export');
+
+// Embed metadata into a PNG buffer
+const annotatedBuffer = await embedMetadata(rawPngBuffer, {
+    modeId: 3,
+    modeName: 'Blueprint',
+    foveaRadius: 180,
+    intensity: 0.6,
+    url: 'https://example.com'
+});
+
+// Extract from existing file
+const metadata = await extractMetadata('screenshot.png');
+console.log(metadata['Scrutinizer:CiteAs']);
+```
+
+### Best Practices for Academic Use
+
+1. **Always capture with golden system** - Manual screenshots won't have metadata
+2. **Include sidecar JSON** - Some tools can't read PNG tEXt chunks; the `.meta.json` sidecar is human-readable
+3. **Reference the citation string** - Use `Scrutinizer:CiteAs` value in paper appendices
 
 ---
 

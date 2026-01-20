@@ -548,7 +548,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
             role: 'help',
             submenu: [
                 {
-                    label: 'Check for Updates...',
+                    label: `Check for Updates... (v${app.getVersion()})`,
                     click: () => {
                         app.emit('check-for-updates');
                     }
