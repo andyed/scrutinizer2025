@@ -71,32 +71,31 @@ button:disabled {
     align-items: center;
 }
 
-#url-input {
+#url-trigger {
     width: 100%;
     background-color: var(--input-bg);
     border: 1px solid transparent;
     border-radius: 4px;
-    /* Reduced contrast default state */
     color: #999;
-    opacity: 0.7;
     padding: 6px 10px;
     font-size: 13px;
-    outline: none;
-    transition: all 0.2s ease;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    /* Override default flex from generic button rule */
+    cursor: pointer;
 }
 
-#url-input:hover {
+#url-trigger:hover {
     opacity: 0.9;
     color: #ccc;
     background-color: var(--hover-bg);
 }
 
-#url-input:focus {
-    /* distinct active state */
-    opacity: 1.0;
-    color: var(--text-color);
-    background-color: var(--input-focus-bg);
-    border-color: var(--accent-color);
+#url-trigger:active {
+    background-color: var(--active-bg);
 }
 
 /* Fovea Toggle Button */

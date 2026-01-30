@@ -1,6 +1,20 @@
 # Scrutinizer Roadmap
 
-## ✅ Completed Features (v1.0-v1.4.2)
+## ✅ Completed Features (v1.0-v1.5)
+
+### v1.5: Mobile Emulation & Usability
+**Date:** 2026-01-30
+
+- [x] **Mobile Emulation Mode**
+  - Toggle via `View > Mobile Emulation`
+  - Simulates iPhone viewport (390x844), scale (3x), and User Agent
+  - Auto-resizes window and locks dimensions
+- [x] **Touch Event Synthesis**
+  - Option+Click in mobile mode triggers true `touchStart`/`touchEnd` events
+- [x] **Toolbar 2.0**
+  - Touch-friendly URL trigger button
+  - Dedicated URL input dialog for better mobile UX
+
 
 ### v1.4.2: Reference Pages & Biology-Forward Docs
 

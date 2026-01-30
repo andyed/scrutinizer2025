@@ -17,7 +17,9 @@ let currentIntensity;
 let currentEnabled;
 let currentShowWelcome;
 let currentStartPage;
+
 let currentVisualMemory;
+let currentMobileEmulation = false;
 
 let mainWindow;
 let splashWindow;
@@ -59,7 +61,7 @@ function rebuildMenu() {
     // Ensure settings are initialized
     const radius = currentRadius || 180;
     const blur = currentBlur || 10;
-    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur));
+    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur, currentMobileEmulation));
     Menu.setApplicationMenu(menu);
 
     // Explicitly set for all non-HUD windows (Windows/Linux)
@@ -112,6 +114,123 @@ ipcMain.on('settings:page-changed', (event, url) => {
     if (url && url.startsWith('http')) {
         currentStartPage = url;
         settingsManager.set('startPage', url);
+    }
+
+});
+
+
+// Handle Touch Emulation Request
+ipcMain.on('emulate-touch', async (event, { type, x, y }) => {
+    if (!currentMobileEmulation) return;
+
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
+
+    if (win && win.scrutinizerView) {
+        const wc = win.scrutinizerView.webContents;
+        const width = win.scrutinizerView.getBounds().width;
+
+        try {
+            if (!wc.debugger.isAttached()) {
+                wc.debugger.attach('1.3');
+            }
+
+            // Synthesize a touch event
+            // Note: coordinates from renderer are likely client coordinates (relative to view)
+            // Input.dispatchTouchEvent expects absolute coordinates relative to viewport? 
+            // In a WebContentsView, client coordinates should be viewport coordinates.
+
+            // We need to send a sequence: touchStart -> touchEnd to simulate a tap
+            // Or just forward the specific event type requested
+
+            // For a single "click" replacement, we usually want a full sequence.
+            // But if we are forwarding mousedown/up, we should map them.
+
+            const touchPoints = [{ x: x, y: y }];
+
+            await wc.debugger.sendCommand('Input.dispatchTouchEvent', {
+                type: type, // 'touchStart', 'touchEnd', 'touchMove'
+                touchPoints: touchPoints
+            });
+
+        } catch (err) {
+            console.warn('[Main] Touch simulation failed:', err.message);
+        }
+    }
+});
+// Handle Mobile Emulation Toggle
+app.on('mobile-emulation', async (enabled) => {
+    currentMobileEmulation = enabled;
+    rebuildMenu();
+
+    const windows = BrowserWindow.getAllWindows();
+    for (const win of windows) {
+        if (win.scrutinizerView) {
+            const wc = win.scrutinizerView.webContents;
+            const TOOLBAR_HEIGHT = 40; // Must match constant in createScrutinizerWindow
+
+            try {
+                // Attach debugger if not already attached
+                if (!wc.debugger.isAttached()) {
+                    try {
+                        wc.debugger.attach('1.3');
+                    } catch (err) {
+                        console.warn('[Main] Debugger attach warning:', err.message);
+                    }
+                }
+
+                if (enabled) {
+                    console.log('[Main] Enabling Mobile Emulation (iPhone)');
+                    // Mobile Emulation ON (iPhone 12/13/14 Pro generic)
+                    await wc.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
+                        width: 390,
+                        height: 844,
+                        deviceScaleFactor: 3,
+                        mobile: true
+                    });
+
+                    // User Agent
+                    await wc.debugger.sendCommand('Network.setUserAgentOverride', {
+                        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+                    });
+
+                    // Resize Window to Phone Size + Toolbar
+                    // 390x844 + Toolbar
+                    const width = 390;
+                    const height = 844 + TOOLBAR_HEIGHT;
+
+                    // TODO: Provide rotate phone option
+
+                    win.setResizable(true); // Ensure we can resize first
+                    win.setSize(width, height, true);
+                    win.setResizable(false); // Lock size
+
+                } else {
+                    console.log('[Main] Disabling Mobile Emulation');
+                    // Mobile Emulation OFF
+                    await wc.debugger.sendCommand('Emulation.clearDeviceMetricsOverride');
+                    await wc.debugger.sendCommand('Network.setUserAgentOverride', { userAgent: '' });
+
+                    // Detach
+                    if (wc.debugger.isAttached()) {
+                        wc.debugger.detach();
+                    }
+
+                    // Restore
+                    win.setResizable(true);
+
+                    // Restore size from settings or default
+                    const bounds = settingsManager.get('windowBounds') || { width: 1200, height: 900 };
+                    // Default back to reasonable desktop size if bounds are weirdly small (like phone size)
+                    const targetW = bounds.width < 500 ? 1200 : bounds.width;
+                    const targetH = bounds.height < 600 ? 900 : bounds.height;
+
+                    win.setSize(targetW, targetH, true);
+                }
+            } catch (err) {
+                console.error('[Main] Mobile Emulation Error:', err);
+            }
+        }
     }
 });
 
@@ -505,6 +624,46 @@ ipcMain.on('toolbar:toggle-fovea', (event) => {
     });
 });
 
+ipcMain.on('toolbar:open-url-dialog', (event) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
+
+    if (win && win.scrutinizerView) {
+        const currentURL = win.scrutinizerView.webContents.getURL();
+
+        // Prevent multiple dialogs
+        if (win.urlDialog && !win.urlDialog.isDestroyed()) {
+            win.urlDialog.focus();
+            return;
+        }
+
+        const dialog = new BrowserWindow({
+            width: 500,
+            height: 207,
+            parent: win,
+            modal: true,
+            show: false,
+            resizable: false,
+            minimizable: false,
+            maximizable: false,
+            webPreferences: {
+                nodeIntegration: true,
+                contextIsolation: false
+            }
+        });
+
+        // Use absolute path for main process
+        dialog.loadFile(path.join(__dirname, 'renderer', 'url-dialog.html'));
+
+        dialog.once('ready-to-show', () => {
+            dialog.show();
+            dialog.webContents.send('set-url', currentURL);
+        });
+
+        win.urlDialog = dialog;
+    }
+});
+
 function createScrutinizerWindow(startUrl) {
     console.log('[Main] Creating new Scrutinizer window (dual-window architecture)', startUrl ? 'with URL: ' + startUrl : '(default URL)');
 
@@ -518,7 +677,7 @@ function createScrutinizerWindow(startUrl) {
         height: bounds.height,
         x: bounds.x,
         y: bounds.y,
-        y: bounds.y,
+
         show: false, // Wait for ready-to-show to prevent white flash
         webPreferences: {
             nodeIntegration: false,
@@ -535,6 +694,7 @@ function createScrutinizerWindow(startUrl) {
     // Save bounds on resize/move (debounced)
     let saveTimeout;
     const saveBounds = () => {
+        if (currentMobileEmulation) return; // Don't save bounds during emulation
         if (saveTimeout) clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
             if (!win.isDestroyed()) {

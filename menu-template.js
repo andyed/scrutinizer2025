@@ -2,7 +2,7 @@ const { app, shell } = require('electron');
 
 const { RADIUS_OPTIONS, ASPECT_OPTIONS, INTENSITY_OPTIONS } = require('./shared/constants.json');
 
-function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10) {
+function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10, currentMobileEmulation = false) {
     const isMac = process.platform === 'darwin';
     const { BrowserWindow } = require('electron');
 
@@ -139,7 +139,25 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                 { role: 'zoomIn' },
                 { role: 'zoomOut' },
                 { type: 'separator' },
-                { role: 'togglefullscreen' }
+                { role: 'togglefullscreen' },
+                { type: 'separator' },
+                {
+                    label: 'Mobile Emulation',
+                    submenu: [
+                        {
+                            label: 'Off',
+                            type: 'radio',
+                            checked: !currentMobileEmulation,
+                            click: () => app.emit('mobile-emulation', false)
+                        },
+                        {
+                            label: 'On (iPhone)',
+                            type: 'radio',
+                            checked: currentMobileEmulation,
+                            click: () => app.emit('mobile-emulation', true)
+                        }
+                    ]
+                }
             ]
         },
         // Go Menu (navigation)

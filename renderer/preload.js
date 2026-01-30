@@ -291,7 +291,28 @@ window.addEventListener('DOMContentLoaded', () => {
             });
             ticking = true;
         }
-    }, true); // CAPTURE PHASE - important for catching events over modals
+    }); // CAPTURE PHASE - important for catching events over modals
+
+    // Touch Emulation (Option+Click)
+    window.addEventListener('mousedown', (e) => {
+        if (e.altKey) {
+            // Emulate touch
+            console.log('[Preload] Option+Click intercepted: Emulating touch');
+            // e.preventDefault();
+            // e.stopPropagation();
+
+            const x = e.clientX;
+            const y = e.clientY;
+
+            // Send sequence: touchStart, then touchEnd
+            ipcRenderer.send('emulate-touch', { type: 'touchStart', x, y });
+
+            // Short delay for touchEnd to simulate tap
+            setTimeout(() => {
+                ipcRenderer.send('emulate-touch', { type: 'touchEnd', x, y });
+            }, 50);
+        }
+    }, true);
 
     // Track zoom/resize changes
     window.addEventListener('resize', () => {
