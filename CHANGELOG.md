@@ -7,8 +7,9 @@
     - Simulates iPhone viewport (390x844), scale factor (3.0), and User Agent.
     - Automatically resizes and locks window to phone dimensions.
     - Restores previous window size and desktop mode when disabled.
-- **Touch Simulation**: Added support for synthesizing touch events.
+- **Touch Simulation (Alpha)**: Added support for synthesizing touch events.
     - Hold `Option` (Alt) + Click while in Mobile Emulation mode to trigger `touchStart` sequence instead of mouse events.
+    - *Note: This is an experimental feature to unblock testing of touch-only interactions.*
 - **Responsive Toolbar**: Redesigned toolbar URL input for better usability on narrow (mobile) screens.
     - Replaced inline text input with a clickable trigger button.
     - Added dedicated URL entry dialog window.

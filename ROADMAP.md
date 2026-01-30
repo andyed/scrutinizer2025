@@ -9,8 +9,9 @@
   - Toggle via `View > Mobile Emulation`
   - Simulates iPhone viewport (390x844), scale (3x), and User Agent
   - Auto-resizes window and locks dimensions
-- [x] **Touch Event Synthesis**
+- [x] **Touch Event Synthesis (Alpha)**
   - Option+Click in mobile mode triggers true `touchStart`/`touchEnd` events
+  - *Note: Experimental feature*
 - [x] **Toolbar 2.0**
   - Touch-friendly URL trigger button
   - Dedicated URL input dialog for better mobile UX

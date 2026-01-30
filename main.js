@@ -18,8 +18,9 @@ let currentEnabled;
 let currentShowWelcome;
 let currentStartPage;
 
+
 let currentVisualMemory;
-let currentMobileEmulation = false;
+let currentMobileEmulation = settingsManager.get('mobileEmulation') || false;
 
 let mainWindow;
 let splashWindow;
@@ -158,81 +159,87 @@ ipcMain.on('emulate-touch', async (event, { type, x, y }) => {
         }
     }
 });
+// Helper to apply mobile emulation state
+async function applyMobileEmulation(win, enabled) {
+    if (!win || !win.scrutinizerView) return;
+    const wc = win.scrutinizerView.webContents;
+    const TOOLBAR_HEIGHT = 40;
+
+    try {
+        // Attach debugger if not already attached
+        if (!wc.debugger.isAttached()) {
+            try {
+                wc.debugger.attach('1.3');
+            } catch (err) {
+                console.warn('[Main] Debugger attach warning:', err.message);
+            }
+        }
+
+        if (enabled) {
+            console.log('[Main] Enabling Mobile Emulation (iPhone)');
+            // Mobile Emulation ON (iPhone 12/13/14 Pro generic)
+            await wc.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
+                width: 390,
+                height: 844,
+                deviceScaleFactor: 3,
+                mobile: true
+            });
+
+            // User Agent
+            await wc.debugger.sendCommand('Network.setUserAgentOverride', {
+                userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+            });
+
+            // Resize Window to Phone Size + Toolbar
+            const width = 390;
+            const height = 844 + TOOLBAR_HEIGHT;
+
+            win.setResizable(true); // Ensure we can resize first
+            win.setSize(width, height, true);
+            win.setResizable(false); // Lock size
+
+        } else {
+            console.log('[Main] Disabling Mobile Emulation');
+            // Mobile Emulation OFF
+            await wc.debugger.sendCommand('Emulation.clearDeviceMetricsOverride');
+            await wc.debugger.sendCommand('Network.setUserAgentOverride', { userAgent: '' });
+
+            // Detach
+            if (wc.debugger.isAttached()) {
+                wc.debugger.detach();
+            }
+
+            // Restore
+            win.setResizable(true);
+
+            // Restore size from settings or default
+            const bounds = settingsManager.get('windowBounds') || { width: 1200, height: 900 };
+            const targetW = bounds.width < 500 ? 1200 : bounds.width;
+            const targetH = bounds.height < 600 ? 900 : bounds.height;
+
+            win.setSize(targetW, targetH, true);
+        }
+    } catch (err) {
+        console.error('[Main] Mobile Emulation Verify Error:', err);
+    }
+}
+
 // Handle Mobile Emulation Toggle
 app.on('mobile-emulation', async (enabled) => {
     currentMobileEmulation = enabled;
+    settingsManager.set('mobileEmulation', enabled);
     rebuildMenu();
 
     const windows = BrowserWindow.getAllWindows();
     for (const win of windows) {
         if (win.scrutinizerView) {
-            const wc = win.scrutinizerView.webContents;
-            const TOOLBAR_HEIGHT = 40; // Must match constant in createScrutinizerWindow
-
-            try {
-                // Attach debugger if not already attached
-                if (!wc.debugger.isAttached()) {
-                    try {
-                        wc.debugger.attach('1.3');
-                    } catch (err) {
-                        console.warn('[Main] Debugger attach warning:', err.message);
-                    }
-                }
-
-                if (enabled) {
-                    console.log('[Main] Enabling Mobile Emulation (iPhone)');
-                    // Mobile Emulation ON (iPhone 12/13/14 Pro generic)
-                    await wc.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
-                        width: 390,
-                        height: 844,
-                        deviceScaleFactor: 3,
-                        mobile: true
-                    });
-
-                    // User Agent
-                    await wc.debugger.sendCommand('Network.setUserAgentOverride', {
-                        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
-                    });
-
-                    // Resize Window to Phone Size + Toolbar
-                    // 390x844 + Toolbar
-                    const width = 390;
-                    const height = 844 + TOOLBAR_HEIGHT;
-
-                    // TODO: Provide rotate phone option
-
-                    win.setResizable(true); // Ensure we can resize first
-                    win.setSize(width, height, true);
-                    win.setResizable(false); // Lock size
-
-                } else {
-                    console.log('[Main] Disabling Mobile Emulation');
-                    // Mobile Emulation OFF
-                    await wc.debugger.sendCommand('Emulation.clearDeviceMetricsOverride');
-                    await wc.debugger.sendCommand('Network.setUserAgentOverride', { userAgent: '' });
-
-                    // Detach
-                    if (wc.debugger.isAttached()) {
-                        wc.debugger.detach();
-                    }
-
-                    // Restore
-                    win.setResizable(true);
-
-                    // Restore size from settings or default
-                    const bounds = settingsManager.get('windowBounds') || { width: 1200, height: 900 };
-                    // Default back to reasonable desktop size if bounds are weirdly small (like phone size)
-                    const targetW = bounds.width < 500 ? 1200 : bounds.width;
-                    const targetH = bounds.height < 600 ? 900 : bounds.height;
-
-                    win.setSize(targetW, targetH, true);
-                }
-            } catch (err) {
-                console.error('[Main] Mobile Emulation Error:', err);
-            }
+            await applyMobileEmulation(win, enabled);
         }
     }
 });
+
+
+
 
 // Handle Home navigation requests from renderer (Go → Home)
 ipcMain.on('navigate:home', (event) => {
@@ -667,17 +674,33 @@ ipcMain.on('toolbar:open-url-dialog', (event) => {
 function createScrutinizerWindow(startUrl) {
     console.log('[Main] Creating new Scrutinizer window (dual-window architecture)', startUrl ? 'with URL: ' + startUrl : '(default URL)');
 
-    // Get bounds from settings if available
-    const bounds = settingsManager.get('windowBounds') || { width: 1200, height: 900 };
+    const TOOLBAR_HEIGHT = 40;
+
+    // Determine initial bounds based on emulation state
+    let initialWidth, initialHeight, initialResizable;
+
+    // Get saved desktop bounds
+    const savedBounds = settingsManager.get('windowBounds') || { width: 1200, height: 900 };
+
+    if (currentMobileEmulation) {
+        // iPhone dimensions (390 x 844) + Toolbar
+        initialWidth = 390;
+        initialHeight = 844 + TOOLBAR_HEIGHT;
+        initialResizable = false;
+    } else {
+        initialWidth = savedBounds.width;
+        initialHeight = savedBounds.height;
+        initialResizable = true;
+    }
 
     // ===== MAIN BROWSER WINDOW =====
     // This window contains only the browser content (via WebContentsView)
     const win = new BrowserWindow({
-        width: bounds.width,
-        height: bounds.height,
-        x: bounds.x,
-        y: bounds.y,
-
+        width: initialWidth,
+        height: initialHeight,
+        x: savedBounds.x, // Always use saved position
+        y: savedBounds.y,
+        resizable: initialResizable,
         show: false, // Wait for ready-to-show to prevent white flash
         webPreferences: {
             nodeIntegration: false,
@@ -827,6 +850,16 @@ function createScrutinizerWindow(startUrl) {
     // Content view loading events - forward to HUD
     contentView.webContents.on('did-start-loading', () => {
         console.log('[Main] ContentView did-start-loading');
+
+        // Ensure emulation settings are applied if enabling on startup
+        if (currentMobileEmulation) {
+            // Re-apply to ensure they stick on navigation/reload if needed, 
+            // but critically for initial load. We can just call applyMobileEmulation.
+            // Note: window resize isn't needed here, just protocols.
+            // But applyMobileEmulation does both harmlessly.
+            applyMobileEmulation(win, true);
+        }
+
         if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
             hudWindow.webContents.send('hud:browser:did-start-loading');
             hudWindow.webContents.send('browser:did-start-loading'); // Legacy
