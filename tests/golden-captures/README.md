@@ -47,6 +47,8 @@ npm run capture-golden
 | `{page}_mode3.png` | Wireframe mode |
 | `{page}_mode4.png` | Cyberpunk mode |
 | `{page}_memory.png` | Visual Memory enabled |
+| `{page}_iphone14.png` | iPhone 14 Pro Layout |
+| `{page}_ipad_air.png` | iPad Air Layout |
 
 ## When to Update
 

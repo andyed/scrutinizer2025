@@ -150,12 +150,17 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             checked: !currentMobileEmulation,
                             click: () => app.emit('mobile-emulation', false)
                         },
-                        {
-                            label: 'On (iPhone)',
-                            type: 'radio',
-                            checked: currentMobileEmulation,
-                            click: () => app.emit('mobile-emulation', true)
-                        }
+                        { type: 'separator' },
+                        // Dynamic Device Profiles
+                        ...Object.keys(require('./shared/constants.json').DEVICE_PROFILES).map(key => {
+                            const profile = require('./shared/constants.json').DEVICE_PROFILES[key];
+                            return {
+                                label: profile.label,
+                                type: 'radio',
+                                checked: currentMobileEmulation === key || (currentMobileEmulation === true && key === 'iphone_14_pro'), // Handle legacy true
+                                click: () => app.emit('mobile-emulation', key)
+                            };
+                        })
                     ]
                 }
             ]

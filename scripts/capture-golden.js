@@ -48,14 +48,22 @@ const CAPTURE_TASKS = [
     {
         page: 'article',
         fixations: ['center'],
-        variants: DEBUG_VARIANTS
+        variants: [
+            ...DEBUG_VARIANTS,
+            { id: 'iphone14', mode: '0', overlay: false, mobile: 'iphone_14_pro' },
+            { id: 'ipad_air', mode: '0', overlay: false, mobile: 'ipad_air_landscape' }
+        ]
     },
 
     // --- ECOMMERCE ---
     {
         page: 'ecommerce',
         fixations: ['product_image'],
-        variants: [{ id: 'standard', overlay: false }], // Just standard for now
+        variants: [
+            { id: 'standard', overlay: false },
+            { id: 'iphone14', overlay: false, mobile: 'iphone_14_pro' },
+            { id: 'ipad_air', overlay: false, mobile: 'ipad_air_landscape' }
+        ],
         selectors: {
             'product_image': '.product-image'
         }
@@ -89,6 +97,9 @@ async function runCapture(task, fixation, variant = { id: 'standard', overlay: f
         if (variant.id !== 'standard') {
             filename += `_${variant.id}`;
         }
+        if (variant.mobile === true) {
+            filename += '_mobile';
+        }
         filename += '.png';
 
         const fixationDef = FIXATION_COORDS[fixation] || { x: 0.5, y: 0.5 }; // Default fallback
@@ -107,6 +118,8 @@ async function runCapture(task, fixation, variant = { id: 'standard', overlay: f
             TEST_FIXATION_Y: fixationDef.y,
             TEST_SELECTOR: selector || '', // Pass selector
             TEST_OVERLAY: variant.overlay ? 'true' : 'false',
+            TEST_OVERLAY: variant.overlay ? 'true' : 'false',
+            TEST_MOBILE_EMULATION: variant.mobile ? (typeof variant.mobile === 'string' ? variant.mobile : 'true') : 'false',
             TEST_OUTPUT_FILENAME: filename,
             SCREENSHOT_MODE: 'update', // Force precise naming
             ELECTRON_RUN_AS_NODE: undefined // Ensure Electron runs as app

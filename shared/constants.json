@@ -19,5 +19,55 @@
         0.6,
         0.8,
         1.0
-    ]
+    ],
+    "DEVICE_PROFILES": {
+        "iphone_14_pro": {
+            "label": "iPhone 14 Pro",
+            "width": 390,
+            "height": 844,
+            "scaleFactor": 3,
+            "mobile": true,
+            "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+        },
+        "iphone_14_pro_max": {
+            "label": "iPhone 14 Pro Max",
+            "width": 430,
+            "height": 932,
+            "scaleFactor": 3,
+            "mobile": true,
+            "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+        },
+        "pixel_7_pro": {
+            "label": "Pixel 7 Pro",
+            "width": 412,
+            "height": 915,
+            "scaleFactor": 3.5,
+            "mobile": true,
+            "userAgent": "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36"
+        },
+        "ipad_air_landscape": {
+            "label": "iPad Air (Landscape)",
+            "width": 1180,
+            "height": 820,
+            "scaleFactor": 2,
+            "mobile": true,
+            "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15"
+        },
+        "ipad_air_portrait": {
+            "label": "iPad Air (Portrait)",
+            "width": 820,
+            "height": 1180,
+            "scaleFactor": 2,
+            "mobile": true,
+            "userAgent": "Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+        },
+        "galaxy_s23_ultra": {
+            "label": "Samsung Galaxy S23 Ultra",
+            "width": 412,
+            "height": 915,
+            "scaleFactor": 3.5,
+            "mobile": true,
+            "userAgent": "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36"
+        }
+    }
 }

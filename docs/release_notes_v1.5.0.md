@@ -4,7 +4,11 @@
 
 ## 📱 Mobile Emulation Mode
 We've added a powerful new **Mobile Emulation** feature (accessible via `View > Mobile Emulation`). 
-- **iPhone Simulation**: Instantly toggles the viewport to iPhone dimensions (390x844) with a 3x device scale factor.
+- **Device Profiles**: Instantly toggle between common mobile viewports including:
+  - **iPhone 14 Pro** (390x844) / **Pro Max** (430x932)
+  - **Pixel 7 Pro** (412x915) / **Galaxy S23 Ultra** (412x915)
+  - **iPad Air** Landscape (1180x820) / Portrait (820x1180)
+- **High-DPI Simulation**: All profiles use appropriate device scale factors (2x-3.5x).
 - **User Agent Override**: Automatically switches the User Agent to a mobile Safari string, ensuring responsive sites load their mobile views.
 - **Window Locking**: The window automatically resizes and locks to the phone's aspect ratio to prevent accidental resizing during testing.
 
@@ -21,3 +25,4 @@ The toolbar has been redesigned to support the narrower mobile viewport.
 ## 🐛 Bug Fixes & Improvements
 - **Persistence**: Mobile emulation state is now saved between sessions.
 - **Window Management**: Fixed issues where window bounds were not restoring correctly after exiting mobile mode.
+- **Startup Stability**: Fixed a crash on startup caused by uninitialized settings.

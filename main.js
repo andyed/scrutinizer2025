@@ -20,7 +20,7 @@ let currentStartPage;
 
 
 let currentVisualMemory;
-let currentMobileEmulation = settingsManager.get('mobileEmulation') || false;
+let currentMobileEmulation;
 
 let mainWindow;
 let splashWindow;
@@ -175,24 +175,37 @@ async function applyMobileEmulation(win, enabled) {
             }
         }
 
-        if (enabled) {
-            console.log('[Main] Enabling Mobile Emulation (iPhone)');
-            // Mobile Emulation ON (iPhone 12/13/14 Pro generic)
+        // 'enabled' param can be boolean (legacy) or string (profile key)
+        console.log(`[Main] applyMobileEmulation called with enabled=${enabled} (type: ${typeof enabled})`);
+        const profileId = (typeof enabled === 'string') ? enabled : (enabled ? 'iphone_14_pro' : false);
+
+        if (profileId) {
+            const { DEVICE_PROFILES } = require('./shared/constants.json');
+            const profile = DEVICE_PROFILES[profileId];
+
+            if (!profile) {
+                console.warn(`[Main] Mobile profile '${profileId}' not found. Falling back to iPhone 14 Pro.`);
+            }
+            const targetProfile = profile || DEVICE_PROFILES['iphone_14_pro'];
+
+            console.log(`[Main] Enabling Mobile Emulation: ${targetProfile.label}`);
+
+            // Apply Metrics
             await wc.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
-                width: 390,
-                height: 844,
-                deviceScaleFactor: 3,
-                mobile: true
+                width: targetProfile.width,
+                height: targetProfile.height,
+                deviceScaleFactor: targetProfile.scaleFactor,
+                mobile: targetProfile.mobile
             });
 
-            // User Agent
+            // Apply User Agent
             await wc.debugger.sendCommand('Network.setUserAgentOverride', {
-                userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+                userAgent: targetProfile.userAgent
             });
 
-            // Resize Window to Phone Size + Toolbar
-            const width = 390;
-            const height = 844 + TOOLBAR_HEIGHT;
+            // Resize Window
+            const width = targetProfile.width;
+            const height = targetProfile.height + TOOLBAR_HEIGHT;
 
             win.setResizable(true); // Ensure we can resize first
             win.setSize(width, height, true);
@@ -683,10 +696,22 @@ function createScrutinizerWindow(startUrl) {
     const savedBounds = settingsManager.get('windowBounds') || { width: 1200, height: 900 };
 
     if (currentMobileEmulation) {
-        // iPhone dimensions (390 x 844) + Toolbar
-        initialWidth = 390;
-        initialHeight = 844 + TOOLBAR_HEIGHT;
-        initialResizable = false;
+        // Resolve profile
+        const { DEVICE_PROFILES } = require('./shared/constants.json');
+        const profileId = (typeof currentMobileEmulation === 'string') ? currentMobileEmulation : 'iphone_14_pro';
+        const profile = DEVICE_PROFILES[profileId];
+
+        if (profile) {
+            console.log(`[Main] Initializing window with mobile profile: ${profile.label}`);
+            initialWidth = profile.width;
+            initialHeight = profile.height + TOOLBAR_HEIGHT;
+            initialResizable = false;
+        } else {
+            // Fallback
+            initialWidth = 390;
+            initialHeight = 844 + TOOLBAR_HEIGHT;
+            initialResizable = false;
+        }
     } else {
         initialWidth = savedBounds.width;
         initialHeight = savedBounds.height;
@@ -766,7 +791,7 @@ function createScrutinizerWindow(startUrl) {
     win.contentView.addChildView(toolbarView);
     win.contentView.addChildView(contentView);
 
-    const TOOLBAR_HEIGHT = 40;
+
 
     // Position views
     const updateViewBounds = () => {
@@ -851,13 +876,11 @@ function createScrutinizerWindow(startUrl) {
     contentView.webContents.on('did-start-loading', () => {
         console.log('[Main] ContentView did-start-loading');
 
-        // Ensure emulation settings are applied if enabling on startup
+        // Initialize Emulation State on Navigation
         if (currentMobileEmulation) {
-            // Re-apply to ensure they stick on navigation/reload if needed, 
-            // but critically for initial load. We can just call applyMobileEmulation.
-            // Note: window resize isn't needed here, just protocols.
-            // But applyMobileEmulation does both harmlessly.
-            applyMobileEmulation(win, true);
+            // Re-apply to ensure they stick on navigation/reload
+            // Pass the actual currentMobileEmulation value (string ID), not just 'true'
+            applyMobileEmulation(win, currentMobileEmulation);
         }
 
         if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
@@ -1235,6 +1258,7 @@ function createWindow() {
     currentBlur = settingsManager.get('blur');
     currentIntensity = settingsManager.get('intensity');
     currentVisualMemory = settingsManager.get('visualMemory'); // Load saved visual memory setting
+    currentMobileEmulation = settingsManager.get('mobileEmulation') || false;
     currentEnabled = true; // Force enabled for debugging
     // currentEnabled = settingsManager.get('enabled') !== undefined ? settingsManager.get('enabled') : true; // Default to true for debugging
     currentShowWelcome = settingsManager.get('showWelcomePopup');
@@ -1344,12 +1368,22 @@ function runIntegrationTest() {
     const testOverlay = process.env.TEST_OVERLAY === 'true';
     const screenshotMode = process.env.SCREENSHOT_MODE || 'date';
     const outputFilename = process.env.TEST_OUTPUT_FILENAME || null;
+    const testMobileEmulation = process.env.TEST_MOBILE_EMULATION === 'true';
 
     console.log(`[Main] Running INTEGRATION TEST`);
     console.log(`[Main] URL: ${testUrl}`);
     console.log(`[Main] Modes: ${testModes.join(', ')}`);
     console.log(`[Main] Selector: ${testSelector || 'None'}`);
     console.log(`[Main] Fixation: ${testFixationX}, ${testFixationY}`);
+
+    // Force Mobile Emulation if requested
+    if (testMobileEmulation) {
+        console.log('[Main] Forcing Mobile Emulation ON for test');
+        const settingsManager = require('./settings-manager');
+        // We must update the setting BEFORE createWindow is called
+        // because createWindow reads this setting to decide initial window size.
+        settingsManager.set('mobileEmulation', true);
+    }
 
     // Create window normally
     createWindow();
@@ -1363,6 +1397,14 @@ function runIntegrationTest() {
     }, 100);
 
     function startScenario() {
+
+        // Revert mobile emulation setting so it doesn't persist to user sessions
+        // (The window is already created with the correct dimensions/mode)
+        if (testMobileEmulation) {
+            const settingsManager = require('./settings-manager');
+            settingsManager.set('mobileEmulation', false);
+        }
+
         console.log(`[Test] Navigating to ${testUrl}...`);
         mainWindow.scrutinizerView.webContents.loadURL(testUrl);
 
