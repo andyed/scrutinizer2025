@@ -12,6 +12,8 @@ We've added a powerful new **Mobile Emulation** feature (accessible via `View > 
 - **User Agent Override**: Automatically switches the User Agent to a mobile Safari string, ensuring responsive sites load their mobile views.
 - **Window Locking**: The window automatically resizes and locks to the phone's aspect ratio to prevent accidental resizing during testing.
 
+![Mobile Emulation Example](../tests/golden-captures/v1.5.0/article_center_iphone14.png)
+
 ## 👆 Touch Event Simulation (Alpha)
 Testing touch interactions on the desktop is now easier.
 - **Option + Click**: While in Mobile Emulation mode, holding the `Option` (Alt) key and clicking simulates a genuine `touchStart` -> `touchEnd` sequence.
