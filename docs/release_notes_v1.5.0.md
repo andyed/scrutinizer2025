@@ -20,22 +20,6 @@ We've added a powerful new **Mobile Emulation** feature (accessible via `View > 
 
 ![Mobile Emulation Example](../tests/golden-captures/v1.5.0/article_center_iphone14.png)
 
-## 🧠 Simulation Engine Upgrades
-Biological accuracy has been significantly improved with new rendering techniques:
-
-### 🌈 Oklab Saliency
-The feature extraction engine now utilizes the **Oklab** color space instead of RGB.
-- **Why?**: Oklab is perceptually uniform and separates Lightness (L) from Color (a, b), perfectly mimicking the eye's Magnocellular (Luminance) and Parvocellular (Color) pathways.
-- **Result**: More stable, biologically readable saliency maps.
-
-### 🌫️ MIP-Based Peripheral Pooling (Mongrel Tier 1)
-Replaced the previous 5-tap Gaussian blur with **hardware MIP-map pooling**.
-- **Accuracy**: Simulates the way receptive field sizes double with eccentricity (Rosenholtz et al.), creating a more realistic loss of peripheral detail than simple blur.
-- **Performance**: **5x faster** rendering using hardware acceleration.
-
-### 🚫 Inhibition of Return
-A new Visual Memory mode (`Visual Memory > Inhibition of Return`) that simulates the brain's tendency to de-prioritize recently visited locations, encouraging exploration of new areas.
-
 ## 🎓 Academic Research Tools
 
 ### Citation-Ready Image Exports
@@ -52,6 +36,7 @@ Aesthetic modes are now centrally defined in `shared/modes.json`, making it easi
 - **Responsive Toolbar**: Redesigned to support narrow mobile viewports; features a compact URL button and dedicated address dialog.
 - **Visual Overlay 2.0**: The debug grid has been refined with linear spacing and variable stroke width for better visibility.
 - **Auto-Updates**: Scrutinizer now checks for updates on startup and notifies you of new releases.
+- **Version Display**: Current version is now visible on the splash screen and toolbar (from v1.4.4).
 
 ## 🐛 Bug Fixes
 - **Persistence**: Mobile emulation state is now saved accurately between sessions.
