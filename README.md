@@ -6,7 +6,7 @@
 
 ➡️ Live site: **[scrutinizer.app](https://andyed.github.io/scrutinizer-www/)**
 
-🍎 macOS Installer: **[Download v1.4.1](https://github.com/andyed/scrutinizer2025/releases/download/v1.4.1/Scrutinizer-1.4.1-arm64.dmg)** | [Release Notes](docs/release_notes_v1.4.1.md)
+🍎 macOS Installer: **[Download v1.5.0](https://github.com/andyed/scrutinizer2025/releases/download/v1.5.0/Scrutinizer-1.5.0-arm64.dmg)** | [Release Notes](docs/release_notes_v1.5.0.md)
 
 **A design constraint model for studying foveal vs. peripheral vision on the web.**
 
@@ -91,11 +91,11 @@ Scrutinizer is designed for **designers, UX researchers, and HCI/vision scientis
 
 ## Installation
 
-### 📥 Download (v1.4.0)
+### 📥 Download (v1.5.0)
 
 > **Note:** Scrutinizer for macOS is now **Signed & Notarized**! No more security warnings.
 
-*   🍎 **macOS (Apple Silicon):** [**Download Scrutinizer-1.4.0.dmg**](https://github.com/andyed/scrutinizer2025/releases/download/v1.4.0/Scrutinizer-1.4.0-arm64.dmg)
+*   🍎 **macOS (Apple Silicon):** [**Download Scrutinizer-1.5.0.dmg**](https://github.com/andyed/scrutinizer2025/releases/download/v1.5.0/Scrutinizer-1.5.0-arm64.dmg)
 *   🪟 **Windows:** Manual build required (Coming soon though, see [Releases Page](https://github.com/andyed/scrutinizer2025/releases))
 
 [**View All Releases & Changelogs**](https://github.com/andyed/scrutinizer2025/releases)
