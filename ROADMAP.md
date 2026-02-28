@@ -469,6 +469,9 @@ const midPeripheryRadius = degreesToPixels(20);  // True 20°
 - [x] **Per-mode gating**: `dog_enabled`, `dog_e2`, `dog_sharpness` in `modes.json`. Enabled for High-Key and Biological modes.
 - [x] **Biological M-scaling**: Per-band cutoff eccentricities follow geometric progression (0.3, 0.6, 1.2, 2.4 × E2).
 
+**Next: Oriented DoG Bands (Specced):**
+- [ ] **Orientation-selective band attenuation**: Cardinal (H/V) edges get M-scaling cutoffs pushed ~50% further, modeling the oblique effect (Appelle, 1972). Spec: `docs/specs/oriented_dog_bands.md`
+
 **Remaining (saliency-driven DoG):**
 The current DoG implementation operates on the *rendered content* (spatial frequency decomposition). The original vision of *saliency-driven* DoG (where clutter modulates distortion strength) is still open:
 

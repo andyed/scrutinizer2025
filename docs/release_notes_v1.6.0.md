@@ -13,7 +13,7 @@ This release pairs a major **architectural refactor** of the renderer with a new
 The 969-line `scrutinizer.js` monolith has been decomposed into three domain modules, each mapping to a distinct biological subsystem:
 
 | Module | Lines | Biological Analog | Responsibility |
-|--------|-------|-------------------|----------------|
+| --- | --- | --- | --- |
 | `gaze-model.js` | 166 | Oculomotor system | Velocity tracking, fixation detection, saccadic suppression |
 | `visual-memory.js` | 254 | Visuospatial sketchpad (Baddeley & Hitch, 1974) | Fixation buffer, mask rendering, time-decay |
 | `content-analysis.js` | 356 | Pre-cortical feature extraction (LGN pathways) | Structure map, saliency map, DOM observation |
@@ -48,7 +48,7 @@ band_k = textureLod(tex, uv, k) - textureLod(tex, uv, k+1)
 Each band captures a different spatial frequency range:
 
 | Band | MIP Levels | Scale | Content |
-|------|-----------|-------|---------|
+| --- | --- | --- | --- |
 | Band 0 | 0 - 1 | 1-2px | Serifs, thin strokes, fine textures |
 | Band 1 | 1 - 2 | 2-4px | Letter bodies, small icons |
 | Band 2 | 2 - 3 | 4-8px | Words, UI element outlines |
@@ -60,7 +60,7 @@ Each band is attenuated by a smoothstep rolloff based on eccentricity, with cuto
 ### Parameters
 
 | Parameter | Default | Description |
-|-----------|---------|-------------|
+| --- | --- | --- |
 | `dog_enabled` | `false` | Toggle DoG vs legacy MIP pooling |
 | `dog_e2` | `0.5` | M-scaling half-resolution eccentricity (lower = more aggressive filtering) |
 | `dog_sharpness` | `0.0` | Band rolloff transition width (0 = biological/gradual, 1 = sharp cutoff) |
@@ -70,7 +70,7 @@ Each band is attenuated by a smoothstep rolloff based on eccentricity, with cuto
 DoG is enabled by default in research-oriented modes:
 
 | Mode | dog_enabled | dog_e2 | Rationale |
-|------|------------|--------|-----------|
+| --- | --- | --- | --- |
 | High-Key (0) | true | 0.5 | Standard M-scaling |
 | Biological (1) | true | 0.4 | More aggressive, pushes peripheral degradation |
 | Frosted (2) | false | — | Not biologically motivated |
@@ -101,10 +101,20 @@ DoG is enabled by default in research-oriented modes:
 
 ---
 
+## What's Next
+
+Two directions under consideration for v1.7:
+
+- **Oriented DoG Bands (Oblique Effect)** — The current DoG decomposition is isotropic: all edge orientations attenuate equally. Real V1 cells are orientation-selective, and humans have ~30-50% better acuity for cardinal (H/V) edges than oblique ones. This would add a 4-tap gradient analysis to modulate per-band M-scaling cutoffs by local edge orientation — horizontal text strokes would persist ~50% further into the periphery than diagonal noise. Cost: +4 texture lookups, ~0.2ms. Spec: `docs/specs/oriented_dog_bands.md`
+
+- **Pre-Attentive Semantic Simulation** — Real-time comparison of user goal embeddings against page content embeddings to model pre-attentive semantic filtering. The idea: peripheral vision doesn't just lose spatial resolution, it also loses semantic access. But goal-relevant content (a "Buy" button when you're shopping) breaks through peripheral degradation more than irrelevant content. This would embed page elements and a user-specified goal via a local LLM, then modulate distortion strength by cosine similarity — goal-aligned content gets partial fidelity preservation even in the periphery.
+
+---
+
 ## Files Changed
 
 | Area | Files |
-|------|-------|
+| --- | --- |
 | **Architecture** | `renderer/scrutinizer.js`, `renderer/gaze-model.js`, `renderer/visual-memory.js`, `renderer/content-analysis.js` |
 | **DoG Shader** | `renderer/shaders/peripheral2.frag` |
 | **DoG Plumbing** | `renderer/webgl-renderer.js`, `renderer/config.js`, `shared/modes.json` |
