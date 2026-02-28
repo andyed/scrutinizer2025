@@ -78,6 +78,11 @@
                 this.lgnRampEndMultLocation = null;
                 this.v1AnimateLocation = null;
 
+                // DoG uniform locations
+                this.dogEnabledLocation = null;
+                this.dogE2Location = null;
+                this.dogSharpnessLocation = null;
+
                 // Default Configuration
                 this.config = {
                     lgn_use_structure_mask: true,
@@ -86,7 +91,10 @@
                     v1_strength_mult: 1.0,
                     v4_style_id: 0, // High-Key
                     lgn_ramp_end_mult: 3.0,
-                    v1_animate: false
+                    v1_animate: false,
+                    dog_enabled: false,
+                    dog_e2: 0.5,
+                    dog_sharpness: 0.0
                 };
 
                 this.init(vsSource, fsSource);
@@ -166,6 +174,11 @@
                 this.v4StyleIdLocation = gl.getUniformLocation(this.program, "u_v4_style_id");
                 this.lgnRampEndMultLocation = gl.getUniformLocation(this.program, "u_lgn_ramp_end_mult");
                 this.v1AnimateLocation = gl.getUniformLocation(this.program, "u_v1_animate");
+
+                // DoG uniform lookups
+                this.dogEnabledLocation = gl.getUniformLocation(this.program, "u_dog_enabled");
+                this.dogE2Location = gl.getUniformLocation(this.program, "u_dog_e2");
+                this.dogSharpnessLocation = gl.getUniformLocation(this.program, "u_dog_sharpness");
 
                 // Create buffers
                 this.positionBuffer = gl.createBuffer();
@@ -313,7 +326,10 @@
                     v1_strength_mult: 1.0,
                     v4_style_id: 0,
                     lgn_ramp_end_mult: 2.0,
-                    v1_animate: false
+                    v1_animate: false,
+                    dog_enabled: false,
+                    dog_e2: 0.5,
+                    dog_sharpness: 0.0
                 };
 
                 this.config = { ...defaults };
@@ -334,6 +350,9 @@
                         this.config.v1_strength_mult = p.v1_strength_mult ?? defaults.v1_strength_mult;
                         this.config.v1_animate = p.v1_animate ?? defaults.v1_animate;
                         this.config.v4_style_id = p.v4_style_id ?? defaults.v4_style_id;
+                        this.config.dog_enabled = p.dog_enabled ?? defaults.dog_enabled;
+                        this.config.dog_e2 = p.dog_e2 ?? defaults.dog_e2;
+                        this.config.dog_sharpness = p.dog_sharpness ?? defaults.dog_sharpness;
 
                         // Store current mode metadata for export
                         this.currentMode = modeEntry;
@@ -465,6 +484,9 @@
                 gl.uniform1i(this.v4StyleIdLocation, this.config.v4_style_id);
                 gl.uniform1f(this.lgnRampEndMultLocation, this.config.lgn_ramp_end_mult);
                 gl.uniform1f(this.v1AnimateLocation, this.config.v1_animate ? 1.0 : 0.0);
+                gl.uniform1f(this.dogEnabledLocation, this.config.dog_enabled ? 1.0 : 0.0);
+                gl.uniform1f(this.dogE2Location, this.config.dog_e2);
+                gl.uniform1f(this.dogSharpnessLocation, this.config.dog_sharpness);
                 gl.uniform1f(this.hasStructureLocation, hasStructure);
                 gl.uniform1f(this.enableSaliencyModulationLocation, enableSaliencyModulation);
 

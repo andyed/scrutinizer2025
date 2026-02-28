@@ -37,6 +37,11 @@ const CONFIG = {
     chromaticAberration: true, // Enable chromatic aberration
     mongrelMode: 0.0, // 0.0 = Noise/Fractal Crowding (Tier 2.0), 1.0 = Shatter/Slow Wave
 
+    // DoG peripheral reconstruction (V4 MIP replacement)
+    dogEnabled: false,      // false = legacy MIP pooling, true = DoG band reconstruction
+    dogE2: 0.5,             // M-scaling E2 parameter (calibrated to normEcc range ~0-0.8)
+    dogSharpness: 0.0,      // Band rolloff sharpness (0=biological/gradual, 1=sharp/crisp)
+
     // Debug settings
     enableLogger: true, // Enable renderer logs passing through to main process terminal
     debugBoundary: 0.0,

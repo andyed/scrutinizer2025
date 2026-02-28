@@ -36,12 +36,21 @@ const DEBUG_VARIANTS = [
     { id: 'structure', mode: 'structure' }
 ];
 
+// Mobile/tablet variants appended to desktop captures (never replacing them)
+const MOBILE_VARIANTS = [
+    { id: 'iphone14', mode: '0', overlay: false, mobile: 'iphone_14_pro' },
+    { id: 'ipad_air', mode: '0', overlay: false, mobile: 'ipad_air_landscape' }
+];
+
 const CAPTURE_TASKS = [
     // --- DASHBOARD ---
     {
         page: 'dashboard',
         fixations: ['center'],
-        variants: DEBUG_VARIANTS
+        variants: [
+            ...DEBUG_VARIANTS,
+            ...MOBILE_VARIANTS
+        ]
     },
 
     // --- ARTICLE ---
@@ -50,8 +59,7 @@ const CAPTURE_TASKS = [
         fixations: ['center'],
         variants: [
             ...DEBUG_VARIANTS,
-            { id: 'iphone14', mode: '0', overlay: false, mobile: 'iphone_14_pro' },
-            { id: 'ipad_air', mode: '0', overlay: false, mobile: 'ipad_air_landscape' }
+            ...MOBILE_VARIANTS
         ]
     },
 
@@ -60,9 +68,8 @@ const CAPTURE_TASKS = [
         page: 'ecommerce',
         fixations: ['product_image'],
         variants: [
-            { id: 'standard', overlay: false },
-            { id: 'iphone14', overlay: false, mobile: 'iphone_14_pro' },
-            { id: 'ipad_air', overlay: false, mobile: 'ipad_air_landscape' }
+            { id: 'standard', mode: '0', overlay: false },
+            ...MOBILE_VARIANTS
         ],
         selectors: {
             'product_image': '.product-image'
@@ -73,7 +80,10 @@ const CAPTURE_TASKS = [
     {
         page: 'techmeme',
         fixations: ['center'],
-        variants: DEBUG_VARIANTS
+        variants: [
+            ...DEBUG_VARIANTS,
+            ...MOBILE_VARIANTS
+        ]
     },
 
     // --- GRID (Distortion Check) ---
@@ -117,7 +127,6 @@ async function runCapture(task, fixation, variant = { id: 'standard', overlay: f
             TEST_FIXATION_X: fixationDef.x,
             TEST_FIXATION_Y: fixationDef.y,
             TEST_SELECTOR: selector || '', // Pass selector
-            TEST_OVERLAY: variant.overlay ? 'true' : 'false',
             TEST_OVERLAY: variant.overlay ? 'true' : 'false',
             TEST_MOBILE_EMULATION: variant.mobile ? (typeof variant.mobile === 'string' ? variant.mobile : 'true') : 'false',
             TEST_OUTPUT_FILENAME: filename,

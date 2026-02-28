@@ -1368,21 +1368,28 @@ function runIntegrationTest() {
     const testOverlay = process.env.TEST_OVERLAY === 'true';
     const screenshotMode = process.env.SCREENSHOT_MODE || 'date';
     const outputFilename = process.env.TEST_OUTPUT_FILENAME || null;
-    const testMobileEmulation = process.env.TEST_MOBILE_EMULATION === 'true';
+    // Parse mobile emulation: accepts 'true', 'false', or a profile name string like 'iphone_14_pro'
+    const testMobileEmulationRaw = process.env.TEST_MOBILE_EMULATION || 'false';
+    const testMobileEmulation = testMobileEmulationRaw !== 'false' && testMobileEmulationRaw !== '';
 
     console.log(`[Main] Running INTEGRATION TEST`);
     console.log(`[Main] URL: ${testUrl}`);
     console.log(`[Main] Modes: ${testModes.join(', ')}`);
     console.log(`[Main] Selector: ${testSelector || 'None'}`);
     console.log(`[Main] Fixation: ${testFixationX}, ${testFixationY}`);
+    console.log(`[Main] Mobile Emulation: ${testMobileEmulation ? testMobileEmulationRaw : 'disabled'}`);
 
-    // Force Mobile Emulation if requested
+    // Reset mobile emulation before createWindow to prevent persisted state from leaking.
+    // Then enable only if this specific test requests it.
+    const settingsManager = require('./settings-manager');
+    settingsManager.init(); // Ensure settings loaded before we modify them
     if (testMobileEmulation) {
-        console.log('[Main] Forcing Mobile Emulation ON for test');
-        const settingsManager = require('./settings-manager');
-        // We must update the setting BEFORE createWindow is called
-        // because createWindow reads this setting to decide initial window size.
-        settingsManager.set('mobileEmulation', true);
+        console.log(`[Main] Forcing Mobile Emulation ON for test: ${testMobileEmulationRaw}`);
+        // Store the profile name (or true) so createWindow picks it up
+        settingsManager.set('mobileEmulation', testMobileEmulationRaw === 'true' ? true : testMobileEmulationRaw);
+    } else {
+        // Explicitly disable — prevents leaking from a previous session
+        settingsManager.set('mobileEmulation', false);
     }
 
     // Create window normally
@@ -1400,10 +1407,8 @@ function runIntegrationTest() {
 
         // Revert mobile emulation setting so it doesn't persist to user sessions
         // (The window is already created with the correct dimensions/mode)
-        if (testMobileEmulation) {
-            const settingsManager = require('./settings-manager');
-            settingsManager.set('mobileEmulation', false);
-        }
+        const settingsManager = require('./settings-manager');
+        settingsManager.set('mobileEmulation', false);
 
         console.log(`[Test] Navigating to ${testUrl}...`);
         mainWindow.scrutinizerView.webContents.loadURL(testUrl);

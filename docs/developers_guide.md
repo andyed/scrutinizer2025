@@ -11,11 +11,47 @@ Scrutinizer uses a custom WebGL renderer (`webgl-renderer.js`) to apply fragment
 
 ### Key Components
 
-1.  **`webgl-renderer.js`**: The main WebGL class. Contains the shader source code (`fsSource`) and handles uniform binding.
-2.  **`scrutinizer.js`**: The high-level controller that manages the renderer, mouse tracking, and configuration.
-3.  **`menu-template.js`**: Defines the critical application menu, including simulation settings.
-4.  **`docs/architecture-module-pattern.md`**: **CRITICAL** - Explains the hybrid CommonJS/Window module pattern used to prevent `ReferenceError`s. Read this before refactoring any class files.
-5.  **`docs/coordinate_systems.md`**: **CRITICAL** - Explains the complex mapping between Screen, Window, WebGL, and SVG coordinate spaces. Read this if overlays are drifting or jumping.
+1.  **`webgl-renderer.js`**: The main WebGL class. Loads shaders from `renderer/shaders/` and handles uniform binding.
+2.  **`scrutinizer.js`**: The **Pipeline Orchestrator** — a thin controller (~535 lines) that wires together the extracted domain modules (see below) and manages the render loop.
+3.  **`gaze-model.js`**: **Oculomotor System Proxy** — velocity tracking, fixation detection, saccadic suppression, hysteresis smoothing.
+4.  **`visual-memory.js`**: **Visuospatial Working Memory** — fixation buffer, mask rendering, memory decay.
+5.  **`content-analysis.js`**: **Pre-Cortical Feature Extraction** — structure map scanning, saliency computation, DOM observation.
+6.  **`menu-template.js`**: Defines the critical application menu, including simulation settings.
+7.  **`docs/architecture-module-pattern.md`**: **CRITICAL** - Explains the hybrid CommonJS/Window module pattern used to prevent `ReferenceError`s. Read this before refactoring any class files.
+8.  **`docs/coordinate_systems.md`**: **CRITICAL** - Explains the complex mapping between Screen, Window, WebGL, and SVG coordinate spaces. Read this if overlays are drifting or jumping.
+
+> **Note (v1.6)**: `scrutinizer.js` was de-monolithed from a 969-line single file into the three domain modules above. Backward-compatible property proxies preserve access patterns for test HTML files and `overlay.js`.
+
+### Module Dependency Graph (v1.6)
+
+```
+overlay.js
+  └─→ scrutinizer.js (Pipeline Orchestrator, ~535 lines)
+        ├─→ gaze-model.js (Oculomotor System, ~166 lines)
+        │     └── Tracks mouse/gaze velocity, fixation vs saccade state
+        │     └── Swappable: mouse proxy → eye tracker (Tobii, WebGazer)
+        │
+        ├─→ visual-memory.js (Visuospatial Sketchpad, ~254 lines)
+        │     └── Records fixation locations with dwell-time gating
+        │     └── Renders soft mask texture (u_maskTexture) for distortion bypass
+        │     └── Time-decay & inhibition of return
+        │
+        ├─→ content-analysis.js (Pre-Cortical Feature Extraction, ~356 lines)
+        │     ├── structure-map.js → DOM scanning → u_structureMap
+        │     ├── gestalt-processor.js → Proximity/similarity grouping
+        │     └── color-saliency-map.js → Chromatic attention → u_saliencyMap
+        │
+        └─→ webgl-renderer.js (WebGL2 Pipeline)
+              └── peripheral2.frag (LGN → V1 → V4 shader stages)
+```
+
+**Design principles:**
+- Each module maps to a distinct biological subsystem (oculomotor, working memory, pre-cortical)
+- Modules communicate via the orchestrator, not directly with each other
+- `scrutinizer.js` exposes backward-compatible property proxies (e.g., `this.velocity` delegates to `this.gazeModel.velocity`) so existing callers (`overlay.js`, test harnesses) don't need changes
+- Each module is independently testable — see `tests/unit/` for 138 tests across pure-function modules
+
+**Swapping a module:** To replace the gaze input (e.g., eye tracker instead of mouse), implement the same interface as `GazeModel` (`update(mouseX, mouseY, timestamp)`, `getPosition()`, `getVelocity()`, `isSaccade()`) and inject it in the orchestrator constructor.
 
 ### 4. Visual Memory & Input Layers
 Scrutinizer now supports a **Visual Memory** system. This uses a secondary texture (`u_maskTexture`) to represent areas the user has "fixated" on, which bypass distortion.
@@ -103,8 +139,9 @@ The shader uses a modular architecture inspired by the human visual system to or
 3.  **Stage 3: V4 (Aesthetics & Style)**
     *   **Role**: The "Interpreter". Handles color, pooling, and stylistic rendering.
     *   **Function**: `processV4`
-    *   **Logic**: Determines *what* the final pixel looks like. Now includes **MIP-based pooling** for peripheral compression.
+    *   **Logic**: Determines *what* the final pixel looks like. Includes peripheral spatial filtering and aesthetic processing.
     *   **Key Feature (v1.4)**: Hardware MIP-map sampling simulates biological receptive field growth.
+    *   **Key Feature (v1.6)**: **DoG Band Decomposition** — decomposes MIP chain into Laplacian pyramid bands with per-band M-scaling rolloff. Preserves low-frequency structure (layout, buttons) while filtering high-frequency detail (serifs, fine textures). Gated by `dog_enabled` uniform. See `foveated-vision-model.md` Section 5.1.
     *   **Examples**: High-Key ghosting, Neon colors, Wireframe overlays.
 
 ### Philosophy: Aesthetic Modes as Test Cases
@@ -139,7 +176,10 @@ Add a new entry to the `modes` object:
             "v1_distortion_type": 0,
             "v1_strength_mult": 2.0,
             "v1_animate": false,
-            "v4_style_id": 6
+            "v4_style_id": 6,
+            "dog_enabled": false,
+            "dog_e2": 2.5,
+            "dog_sharpness": 0.0
         },
         "tests": ["what_this_mode_tests"],
         "architectural_purpose": "Why this mode exists as a stress-test",
@@ -188,10 +228,10 @@ The following table details the rendering characteristics of each built-in mode 
 | :--- | :--- | :--- |
 | **0: High-Key** | **LGN** | **Standard**: Structure Masking + Saliency Gating |
 | *(Usability)* | **V1** | **Slow Wave**: 0.1Hz sine warp (Type 1). |
-| | **V4** | **Clean Desaturation**: Red -> Grey (Mustard Fix). **High-Key**: Mixed with Eigengrau for usability. |
+| | **V4** | **DoG Reconstruction** (E2=0.5): Preserves layout structure. **Clean Desaturation**: Red -> Grey (Mustard Fix). **High-Key**: Mixed with Eigengrau for usability. |
 | **1: Biological** | **LGN** | Standard |
 | *(Purkinje)* | **V1** | Same as Baseline |
-| | **V4** | **Purkinje Shift**: Red -> Black shadows. **Optical Vignette**: Contrast dimming at edges. |
+| | **V4** | **DoG Reconstruction** (E2=0.4, more aggressive): Preserves layout structure. **Purkinje Shift**: Red -> Black shadows. **Optical Vignette**: Contrast dimming at edges. |
 | **2: Frosted** | **LGN** | Standard |
 | | **V1** | Same as Baseline |
 | | **V4** | **MIP Pooling** + Privacy blur (No Blue Shift). |
@@ -232,8 +272,8 @@ float baseJitter = isParafovea ? 0.008 : 0.04; // 5x reduction
 **Second Pass Softening (v1.2)**:
 The "Shatter" mode now uses a **Slow Wave** distortion (0.1Hz sine wave) instead of random jitter to reduce motion sickness.
 
-**MIP-Based Pooling (v1.4)**:
-The V4 stage now uses **hardware MIP-maps** to simulate receptive field growth in the periphery:
+**MIP-Based Pooling (v1.4, legacy)**:
+The V4 stage uses **hardware MIP-maps** to simulate receptive field growth in the periphery:
 
 ```glsl
 // Calculate MIP level based on eccentricity
@@ -250,6 +290,19 @@ vec4 pooled = textureLod(u_texture, uv, mipLevel);
 - Hardware-accelerated (~0.1ms vs ~0.5ms)
 - Biologically accurate receptive field doubling per MIP level
 
+**DoG Band Decomposition (v1.6, replaces simple MIP in research modes)**:
+The simple MIP approach uniformly blurs all spatial frequencies together. The DoG upgrade decomposes the same hardware MIP chain into a Laplacian pyramid and attenuates each frequency band independently based on eccentricity (M-scaling). This preserves low-frequency structure (buttons, layout blocks) while filtering high-frequency detail (serifs, thin strokes).
+
+```glsl
+// DoG bands from existing MIP chain
+vec4 band0 = textureLod(tex, uv, 0.0) - textureLod(tex, uv, 1.0); // fine detail
+vec4 band1 = textureLod(tex, uv, 1.0) - textureLod(tex, uv, 2.0); // letter bodies
+// ... per-band smoothstep rolloff based on eccentricity
+vec4 result = residual + band3*w3 + band2*w2 + band1*w1 + band0*w0;
+```
+
+Controlled by three `modes.json` fields: `dog_enabled`, `dog_e2`, `dog_sharpness`. See `foveated-vision-model.md` Section 5.1 for full details.
+
 **WebGL2 Requirements:**
 ```javascript
 // Texture setup for MIP pooling
@@ -263,11 +316,6 @@ gl.generateMipmap(gl.TEXTURE_2D);
 **Magnocellular Contrast Preservation**: In `processV4`, luminance contrast is boosted to simulate the M-cell pathway:
 
 ```glsl
-// 60% in parafovea, 30% in far periphery
-float contrastPreservation = dist < 1.35 * fovea_radius ? 0.6 : 0.3;
-col *= mix(1.0, lumaRatio, contrastPreservation);
-```
-
 // 60% in parafovea, 30% in far periphery
 float contrastPreservation = dist < 1.35 * fovea_radius ? 0.6 : 0.3;
 col *= mix(1.0, lumaRatio, contrastPreservation);
@@ -552,11 +600,20 @@ For reliable regression testing, we use a dedicated suite that spawns isolated E
 npm run capture-golden
 ```
 
-This generates 18+ screenshots across 6 reference pages (`techmeme`, `dashboard`, `figma`, etc.) in `tests/golden-captures/vX.X.X/`.
+This generates 19 screenshots across 5 reference pages (`dashboard`, `article`, `ecommerce`, `techmeme`, `grid`) in `tests/golden-captures/vX.X.X/`.
+
+**Capture matrix (v1.6):**
+
+| Page | Standard | Saliency | Structure | iPhone 14 | iPad Air |
+|------|----------|----------|-----------|-----------|----------|
+| dashboard | x | x | x | x | x |
+| article | x | x | x | x | x |
+| ecommerce | x | | | x | x |
+| techmeme | x | x | x | x | x |
+| grid | x | | | | |
 
 **Artifacts**:
--   **Generated Images**: `tests/golden-captures/v1.4.1/*.png`
--   **Report**: `tests/golden-captures/v1.4.1/gallery.html` (Open in browser to review)
+-   **Generated Images**: `tests/golden-captures/vX.X.X/*.png`
 -   **Reference**: See [Test Suite Reference](test_suite_reference.md) for details on all scenarios.
 
 ### Browser ↔ Figma Golden Compare (Parity Harness)
@@ -610,6 +667,7 @@ TEST_URL=https://www.figma.com TEST_MODES=0,3 npm start
   - `5`: Trippy (Psychedelic + Curvy)
 - `TEST_RADIUS`: Override foveal radius (pixels)
 - `TEST_INTENSITY`: Override peripheral intensity (0.0-1.0)
+- `TEST_MOBILE_EMULATION`: Device profile name (`iphone_14_pro`, `ipad_air_landscape`, etc.) or `true`/`false`
 - `SCREENSHOT_MODE`: `date` (default) or `update`
 
 **Custom Launch:**

@@ -105,7 +105,7 @@ The biological architecture produces several emergent properties that Scrutinize
 
 | Biological Phenomenon | Cause | Scrutinizer Implementation |
 |----------------------|-------|---------------------------|
-| **Resolution loss** | Receptor pooling (100:1) | MIP-based pooling (textureLod) |
+| **Resolution loss** | Receptor pooling (100:1) | DoG band decomposition (MIP Laplacian pyramid) with M-scaling rolloff; legacy: simple MIP pooling |
 | **Color blindness** | Rod dominance (no color) | Oklab desaturation + cyan tint |
 | **Crowding** | Receptive field overlap | Fractal Crowding (Tier 2.0) + vertical chop |
 | **Motion sensitivity** | Magnocellular pathway | Preserved contrast in periphery |
@@ -247,6 +247,43 @@ Intuition:
 
 - In the parafovea, text looks like it is seen through shimmering heat haze.
 - In the far periphery, letters collide and smear (mongrelize), but the image does not completely melt.
+
+### 5.1 DoG Band Decomposition (v1.6+)
+
+The simple MIP pooling approach uniformly blurs content, progressively destroying spatial structure. Real peripheral vision is more selective: low-frequency structure (layout, button shapes, large text) persists while high-frequency detail (letter serifs, fine textures) drops off first. This is because retinal ganglion cells have **center-surround receptive fields** that are well-modeled by Difference-of-Gaussians (DoG) filters, and their size grows with eccentricity (**M-scaling**).
+
+**Key insight**: The hardware MIP chain (generated every frame by `gl.generateMipmap()`) provides an approximate multi-scale decomposition using box/bilinear filtering (not true Gaussian convolution as in Burt & Adelson 1983). Subtracting adjacent MIP levels gives **approximate Laplacian pyramid bands** that function analogously to DoG, with some spectral leakage between bands:
+
+```glsl
+// DoG bands from existing MIP chain — no new textures needed
+vec4 band0 = textureLod(tex, uv, 0.0) - textureLod(tex, uv, 1.0);  // 1-2px: serifs, thin strokes
+vec4 band1 = textureLod(tex, uv, 1.0) - textureLod(tex, uv, 2.0);  // 2-4px: letter bodies, icons
+vec4 band2 = textureLod(tex, uv, 2.0) - textureLod(tex, uv, 3.0);  // 4-8px: words, UI elements
+vec4 band3 = textureLod(tex, uv, 3.0) - textureLod(tex, uv, 4.0);  // 8-16px: buttons, layout
+// residual = textureLod(tex, uv, 4.0)                               // DC: overall luminance
+```
+
+Each band is attenuated by a **smoothstep rolloff** based on normalized eccentricity, with cutoff distances following a geometric progression (M-scaling: each band persists ~2x further into the periphery):
+
+| Band | Spatial Scale | Cutoff (× E2) | Content Preserved |
+|------|--------------|----------------|-------------------|
+| band0 | 1-2px | 0.3 | Serifs, hairlines |
+| band1 | 2-4px | 0.6 | Letter bodies, small icons |
+| band2 | 4-8px | 1.2 | Words, UI elements |
+| band3 | 8-16px | 2.4 | Buttons, layout blocks |
+| residual | 16px+ | Always | Overall color/luminance |
+
+**Parameters** (configurable per mode in `modes.json`):
+- `dog_e2` — Scaling parameter controlling how rapidly bands are attenuated with eccentricity. Named after the psychophysical E2 (the eccentricity at which a threshold doubles), but operates in **normalized screen coordinates** (eccentricity / fovea_radius), not degrees of visual angle. Calibrated to the effective `normEcc` range (~0–0.8) produced by the V4 coupled eccentricity pipeline. Lower = more aggressive filtering. Default: 0.5 (High-Key), 0.4 (Biological).
+- `dog_sharpness` — Band transition sharpness. 0.0 = gradual rolloff (wider transitions), 1.0 = sharp cutoff (narrow transitions).
+- `dog_enabled` — Boolean gate. When false, falls back to legacy simple MIP pooling.
+
+**Caveats and design choices**:
+- The 2× geometric progression for band cutoffs is an **engineering approximation**, not a direct derivation from M-scaling. Biological receptive field growth is approximately linear: s_min(e) ≈ s_0 × (1 + e/E₂) (Rovamo & Virsu 1979, Levi et al. 1985). The geometric progression was chosen because it maps naturally to the octave spacing of MIP levels.
+- The DoG input (`coupledEccentricity`) is modulated by V1 distortion strength and intensity, making it **attention-gated** rather than purely position-dependent. This diverges from biology (where RF size is fixed by retinal position) but produces a more usable result for the simulation's interactive context.
+- Band differences (mip_k − mip_{k+1}) can be negative. The shader clamps the final reconstruction to [0,1] to prevent out-of-range artifacts.
+
+**Result**: Parafoveal text shows a "frosted glass" quality—letter shapes and word boundaries remain visible but unreadable—rather than the uniform fog of simple MIP pooling. This better matches the subjective experience of peripheral vision.
 
 ---
 
@@ -817,7 +854,7 @@ This model mimics the **"Hunt vs. Gather"** cycle of the eye:
 
 **Implementation Details**:
 *   The visualizer calculates velocity and smooths the "Current Blur" state (Reactivity: 0.1).
-*   The shader scales the **MIP Pooling Strength** based on this blur radius.
+*   The shader scales the **peripheral pooling strength** (DoG band reconstruction or legacy MIP pooling) based on this blur radius.
 *   **Result**: The screen "breathes"—blurring during movement and sharpening during rest—rewarding the user for paying attention.
 
 ### Architectural Guarantee: Foveal Integrity

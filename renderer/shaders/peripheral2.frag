@@ -35,6 +35,11 @@ uniform int   u_v4_style_id;
 uniform float u_lgn_ramp_end_mult;
 uniform float u_v1_animate;
 
+// DoG (Difference-of-Gaussians) peripheral reconstruction uniforms
+uniform float u_dog_enabled;     // 0.0 = legacy MIP, 1.0 = DoG reconstruction
+uniform float u_dog_e2;          // M-scaling E2 (half-resolution eccentricity)
+uniform float u_dog_sharpness;   // Band rolloff sharpness (0=biological, 1=sharp)
+
 in vec2 v_texCoord;
 out vec4 fragColor;
 
@@ -84,7 +89,60 @@ vec4 sampleBlurred(vec2 uv, float radius) {
     return sum / totalWeight;
 }
 
-// === HELPER: MIP-BASED POOLING (Mongrel Tier 1) ===
+// === DoG PERIPHERAL RECONSTRUCTION ===
+// Decomposes the existing hardware MIP chain into a Laplacian pyramid (DoG bands)
+// and selectively attenuates high-frequency bands based on eccentricity (M-scaling).
+// Biology: retinal ganglion cells have center-surround receptive fields ≈ DoG filters.
+// Field size grows with eccentricity. At fovea: all bands. In periphery: only low-freq survives.
+vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
+                             float dog_e2, float dog_sharpness) {
+    float normEcc = max(0.0, eccentricity) / max(fovea_radius, 0.001);
+
+    // Sample 5 MIP levels (existing hardware chain)
+    vec4 mip0 = textureLod(u_texture, uv, 0.0);
+    vec4 mip1 = textureLod(u_texture, uv, 1.0);
+    vec4 mip2 = textureLod(u_texture, uv, 2.0);
+    vec4 mip3 = textureLod(u_texture, uv, 3.0);
+    vec4 mip4 = textureLod(u_texture, uv, 4.0);
+
+    // DoG bands (Laplacian pyramid)
+    vec4 band0 = mip0 - mip1;  // 1-2px: serifs, thin strokes
+    vec4 band1 = mip1 - mip2;  // 2-4px: letter bodies, small icons
+    vec4 band2 = mip2 - mip3;  // 4-8px: words, UI elements
+    vec4 band3 = mip3 - mip4;  // 8-16px: buttons, layout blocks
+    // residual = mip4          // DC: overall color/luminance
+
+    // Per-band cutoff eccentricities (M-scaling)
+    // Geometric progression: each band persists ~2x further
+    float e2 = max(dog_e2, 0.1);
+    float c0 = 0.3 * e2;
+    float c1 = 0.6 * e2;
+    float c2 = 1.2 * e2;
+    float c3 = 2.4 * e2;
+
+    // Transition width: biological (wide, gradual) vs sharp (narrow, crisp)
+    float transMult = mix(0.4, 0.05, dog_sharpness);
+
+    // Per-band weights via smoothstep rolloff
+    float w0 = 1.0 - smoothstep(c0 - c0 * transMult, c0 + c0 * transMult, normEcc);
+    float w1 = 1.0 - smoothstep(c1 - c1 * transMult, c1 + c1 * transMult, normEcc);
+    float w2 = 1.0 - smoothstep(c2 - c2 * transMult, c2 + c2 * transMult, normEcc);
+    float w3 = 1.0 - smoothstep(c3 - c3 * transMult, c3 + c3 * transMult, normEcc);
+
+    // Reconstruct: residual (always full) + weighted bands
+    // Clamp to [0,1] — band differences can be negative, partial attenuation
+    // may produce out-of-range values
+    vec4 result = clamp(mip4 + band3 * w3 + band2 * w2 + band1 * w1 + band0 * w0, 0.0, 1.0);
+
+    // BGRA → RGBA (Electron capture quirk)
+    float temp = result.r;
+    result.r = result.b;
+    result.b = temp;
+
+    return result;
+}
+
+// === LEGACY: Simple MIP pooling (used when DoG disabled) ===
 vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
     float normalizedEcc = max(0.0, eccentricity) / fovea_radius;
     float mipScaling = 2.5;
@@ -479,7 +537,16 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     // TIER 1.8: COUPLED POOLING
     float blurMult = 1.0 + (u_blurRadius * 0.3);
     float coupledEccentricity = v1.distortionStrength * u_intensity * fovea_radius * blurMult;
-    vec3 pooledCol = sampleMIPPooledGrad(v1.distortedUV, duvdx, duvdy, coupledEccentricity, fovea_radius).rgb;
+
+    vec3 pooledCol;
+    if (u_dog_enabled > 0.5) {
+        pooledCol = sampleDoGReconstructed(
+            v1.distortedUV, coupledEccentricity, fovea_radius,
+            u_dog_e2, u_dog_sharpness
+        ).rgb;
+    } else {
+        pooledCol = sampleMIPPooledGrad(v1.distortedUV, duvdx, duvdy, coupledEccentricity, fovea_radius).rgb;
+    }
     
     float baseBlend = smoothstep(0.0, fovea_radius * 0.1, eccentricity);
     float blendFactor = baseBlend * u_intensity;

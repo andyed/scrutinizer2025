@@ -458,54 +458,48 @@ const midPeripheryRadius = degreesToPixels(20);  // True 20°
 ---
 
 ### 🔍 High-Impact: Center-Surround Saliency
-**Priority**: HIGH  
-**Effort**: MEDIUM  
+**Priority**: HIGH
+**Effort**: MEDIUM
 **Impact**: VERY HIGH (realism)
 
 **Goal**: Replace distance-only blur with clutter-sensitive distortion using center-surround mechanism.
 
-**Current State:**
-- Blur based purely on eccentricity (distance from fovea)
-- Uniform regions get same treatment as cluttered regions
-- Missing biological "pop-out" effect
+**Partial Implementation (v1.6 — DoG Band Decomposition):**
+- [x] **DoG in V4 pooling path**: Hardware MIP chain decomposed into Laplacian pyramid bands with M-scaling rolloff per band. Replaces uniform MIP blur with frequency-selective attenuation.
+- [x] **Per-mode gating**: `dog_enabled`, `dog_e2`, `dog_sharpness` in `modes.json`. Enabled for High-Key and Biological modes.
+- [x] **Biological M-scaling**: Per-band cutoff eccentricities follow geometric progression (0.3, 0.6, 1.2, 2.4 × E2).
 
-**Proposed:**
-Implement Difference-of-Gaussians (DoG) for true saliency:
+**Remaining (saliency-driven DoG):**
+The current DoG implementation operates on the *rendered content* (spatial frequency decomposition). The original vision of *saliency-driven* DoG (where clutter modulates distortion strength) is still open:
 
 ```glsl
-// Multi-scale center-surround
+// Multi-scale center-surround (saliency worker side)
 for each feature map (I, RG, BY):
     fine = blur(feature, sigma=1)
     coarse = blur(feature, sigma=3)
     centerSurround = abs(fine - coarse)
-    
+
 // Modulate distortion by inverse saliency
 clutterStrength = 1.0 - saliency
 warpStrength *= clutterStrength
 jitterAmount *= clutterStrength
 ```
 
-**Benefits:**
-- Isolated objects "pop out" (less distortion)
-- Dense clutter becomes harder to parse (more distortion)
-- Matches biological attention mechanisms
-- Enables design tool (saliency overlay mode)
-
-**Implementation:**
-- [ ] Implement DoG in saliency worker
-- [ ] Multi-scale pyramid (3-5 scales)
-- [ ] Integrate with existing saliency modulation
-- [ ] Add saliency overlay debug mode
+**Remaining Implementation:**
+- [ ] Implement DoG in saliency worker (separate from V4 band decomposition)
+- [ ] Multi-scale pyramid (3-5 scales) for attention map
+- [ ] Combine saliency-driven clutter with V4 DoG band weights
 - [ ] Validate against eye-tracking data
 
 **Dependencies:**
 - Existing saliency worker ✅
 - Temporal smoothing ✅
-- Need: Multi-scale DoG implementation
+- V4 DoG band decomposition ✅
+- Need: Saliency-side DoG and clutter integration
 
 **Files to Modify:**
-- `renderer/saliency-worker.js` - Add DoG
-- `renderer/shaders/peripheral.frag` - Clutter modulation
+- `renderer/saliency-worker.js` - Add DoG for attention map
+- `renderer/shaders/peripheral2.frag` - Clutter modulation of band weights
 - `renderer/color-saliency-map.js` - Multi-scale processing
 
 ---
