@@ -8,6 +8,7 @@ Step-by-step workflow for shipping a versioned release. Written to be automatabl
 - Apple Developer certificate installed (see `docs/archive/release-prep.md`)
 - `.env` file with `APPLE_ID`, `APPLE_ID_PASSWORD`, `APPLE_TEAM_ID`
 - GitHub CLI (`gh`) authenticated with push access to `andyed/scrutinizer2025`
+- Sibling repo `scrutinizer-www` cloned at `~/Documents/dev/scrutinizer-repo/scrutinizer-www/`
 
 ## Release Workflow
 
@@ -144,7 +145,26 @@ gh release create v{VERSION} \
 
 The `publish` config in `package.json` points to GitHub releases (`provider: "github"`, `owner: "andyed"`, `repo: "scrutinizer2025"`), so `electron-updater` will check GitHub releases for auto-updates.
 
-### 11. Verify Auto-Update
+### 11. Update Website (scrutinizer-www)
+
+The marketing site lives in a sibling repo and deploys via GitHub Actions on push to `master`.
+
+```bash
+cd ~/Documents/dev/scrutinizer-repo/scrutinizer-www
+
+# Update version badge and download link in src/index.html:
+#   - Version badge (line ~249): v{PREV} → v{VERSION}
+#   - Download URL (line ~255): v{PREV}/Scrutinizer-{PREV}-arm64.dmg → v{VERSION}/Scrutinizer-{VERSION}-arm64.dmg
+
+# Commit and push (triggers GitHub Actions → GitHub Pages deploy)
+git add src/index.html
+git commit -m "site: update download link to v{VERSION}"
+git push origin master
+```
+
+The deploy workflow (`.github/workflows/deploy.yml`) runs `npm run build` which copies `src/` → `dist/`, builds Tailwind CSS, then deploys `dist/` to GitHub Pages at `andyed.github.io/scrutinizer-www/`.
+
+### 12. Verify Auto-Update
 
 On a machine running the previous version, verify that `electron-updater` detects the new release and offers to update. The `latest-mac.yml` file is generated automatically by `electron-builder` and included in the GitHub release assets.
 
