@@ -4,7 +4,7 @@
 
 ## Overview: Architecture & Peripheral Vision Overhaul
 
-This release pairs a major **architectural refactor** of the renderer with a new **biologically-motivated peripheral rendering model**. The monolithic `scrutinizer.js` has been decomposed into domain modules aligned with the neuroscience they simulate, and the peripheral vision pipeline now uses Difference-of-Gaussians (DoG) band decomposition instead of simple MIP pooling — producing more realistic peripheral degradation that preserves layout structure while filtering fine detail.
+This release pairs a major **architectural refactor** of the renderer with a new **biologically-motivated peripheral rendering model**. The monolithic `scrutinizer.js` has been decomposed into domain modules aligned with the neuroscience they simulate, and the peripheral vision pipeline now uses Difference-of-Gaussians (DoG) band decomposition instead of simple MIP pooling. Like the biological visual system, the simulation selectively allocates processing bandwidth — low-frequency structure (layout, buttons, large text) passes through while high-frequency detail (serifs, fine textures) is filtered, mirroring the retina-to-optic-nerve bottleneck that drives peripheral vision in the first place.
 
 ---
 
@@ -55,7 +55,7 @@ Each band captures a different spatial frequency range:
 | Band 3 | 3 - 4 | 8-16px | Buttons, layout blocks |
 | Residual | 4 | 16px+ | Overall color/luminance (DC) |
 
-Each band is attenuated by a smoothstep rolloff based on eccentricity, with cutoff eccentricities following a geometric progression (M-scaling approximation). High-frequency bands (Band 0) are suppressed first; low-frequency bands (Band 3) persist furthest into the periphery.
+Each band is weighted by a smoothstep rolloff based on eccentricity, with cutoff eccentricities following a geometric progression (M-scaling approximation). The system selectively filters frequency bands rather than uniformly blurring — high-frequency bands (Band 0) are filtered first as eccentricity increases, while low-frequency bands (Band 3) pass through furthest into the periphery. This mirrors the biological bottleneck: ganglion cell receptive fields grow with eccentricity, naturally passing low-frequency structure while rejecting fine detail.
 
 ### Parameters
 
@@ -107,7 +107,7 @@ Two directions under consideration for v1.7:
 
 - **Oriented DoG Bands (Oblique Effect)** — The current DoG decomposition is isotropic: all edge orientations attenuate equally. Real V1 cells are orientation-selective, and humans have ~30-50% better acuity for cardinal (H/V) edges than oblique ones. This would add a 4-tap gradient analysis to modulate per-band M-scaling cutoffs by local edge orientation — horizontal text strokes would persist ~50% further into the periphery than diagonal noise. Cost: +4 texture lookups, ~0.2ms. Spec: `docs/specs/oriented_dog_bands.md`
 
-- **Pre-Attentive Semantic Simulation** — Real-time comparison of user goal embeddings against page content embeddings to model pre-attentive semantic filtering. The idea: peripheral vision doesn't just lose spatial resolution, it also loses semantic access. But goal-relevant content (a "Buy" button when you're shopping) breaks through peripheral degradation more than irrelevant content. This would embed page elements and a user-specified goal via a local LLM, then modulate distortion strength by cosine similarity — goal-aligned content gets partial fidelity preservation even in the periphery.
+- **Pre-Attentive Semantic Simulation** — Real-time comparison of user goal embeddings against page content embeddings to model pre-attentive semantic filtering. The idea: peripheral vision doesn't just lose spatial resolution, it also loses semantic access. But goal-relevant content (a "Buy" button when you're shopping) receives more attentional bandwidth than irrelevant content. This would embed page elements and a user-specified goal via a local LLM, then modulate the processing budget by cosine similarity — goal-aligned content receives more of the rendering pipeline even in the periphery.
 
 ---
 

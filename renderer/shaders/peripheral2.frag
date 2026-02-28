@@ -322,9 +322,11 @@ LGN_Signal processLGN(vec2 uv, ModeConfig config, float dist, float fovea_radius
         }
     }
     
-    // Saliency Gating (Fidelity Bias)
+    // Saliency Gating (Selective resource allocation)
+    // High-saliency regions get more processing bandwidth (less peripheral filtering).
+    // Mirrors biological compute demand management: retina → optic nerve bottleneck.
     if (config.lgn_use_saliency_gate && u_enable_saliency_modulation > 0.5) {
-        // NOTE: This reduction (to 0.3) is what protects text. 
+        // NOTE: This reduction (to 0.3) is what protects text.
         // We will override this in processV1 for the scramble zone.
         signal.suppressionFactor *= mix(1.0, 0.3, signal.saliency);
     }
@@ -440,8 +442,8 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         signal.distortedUV = uv + signal.displacement;
         
         // 4. Bypass Strength Gating in Scramble Zone
-        // CRITICAL FIX: If we are in the scramble zone, ignore the Saliency/LGN suppression.
-        // This stops "Fidelity Bias" from cleaning up the text.
+        // CRITICAL FIX: If we are in the scramble zone, ignore saliency gating.
+        // Saliency would otherwise allocate bandwidth to text, keeping it readable.
         if (scrambleZone > 0.5) {
              signal.distortionStrength = 1.0; // Force full effect
         } else {

@@ -208,8 +208,10 @@ function generateStructureMasks(blocks, targetW, targetH, sourceW, sourceH, dpr)
     const inhibitor = new Float32Array(len);
     const excitor = new Float32Array(len);
 
-    // sourceW/H are Physical pixels. blocks are Logical pixels.
-    // We must scale blocks by DPR to get Physical, then by (target/source) to get Saliency Space.
+    // sourceW/H are Physical pixels (from NativeImage.getSize() which returns
+    // full-resolution bitmap dimensions — confirmed: getScaleFactors()=[1]).
+    // Blocks are in CSS/logical pixels (from getBoundingClientRect × zoom).
+    // Scale: CSS → physical (× dpr) → saliency space (× targetW/sourceW).
     const scaleX = (targetW / sourceW) * dpr;
     const scaleY = (targetH / sourceH) * dpr;
 
@@ -289,6 +291,8 @@ self.onmessage = async function (e) {
     const srcW = imageBitmap.width;
     const srcH = imageBitmap.height;
     const maxDim = Math.max(srcW, srcH);
+
+
 
     // Calculate scales
     const saliencyScale = maxDim > 0 ? Math.min(1.0, SALIENCY_MAX_DIM / maxDim) : 0.25;
@@ -435,17 +439,21 @@ self.onmessage = async function (e) {
 
         let val = raw + (faceMap[i] * W_FACE);
 
-        // --- PHASE 5: GATED SALIENCY (Cognitive Alignment) ---
+        // --- PHASE 5: STRUCTURE-GATED SALIENCY (Bandwidth Allocation) ---
+        // Structure masks determine which regions deserve processing budget.
+        // Inhibitor: zero out non-content areas (whitespace, background).
+        // Excitor: multiplicative gain on content blocks (media, UI elements).
         if (inhibitorMask && excitorMask) {
             const inhibition = inhibitorMask[i];
             const excitation = excitorMask[i];
 
-            // 1. Gating (Suppress background/whitespace)
+            // 1. Gating (filter non-content — don't waste bandwidth on whitespace)
             val *= (inhibition * 0.9 + 0.1);
 
-            // 2. Boosting (Slightly highlight content areas, but don't overwhelm visual features)
-            // Was 0.8, which washed out actual image details. Reduced to 0.15.
-            val += (excitation * 0.15);
+            // 2. Gain modulation (amplify existing signal, don't create from nothing)
+            // Multiplicative ensures dark featureless regions stay low-priority.
+            // Was additive +0.15, which dominated in low-saliency dark regions.
+            val *= (1.0 + excitation * 0.3);
         }
 
         saliency[i] = val;

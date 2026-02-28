@@ -294,6 +294,7 @@
             const contentState = this.contentAnalysis.getState();
 
             // 8. Render (single call to WebGL with all composed state)
+            const debugMode = this.contentAnalysis.getDebugMode();
             this.renderer.render(
                 this.canvas.width,
                 this.canvas.height,
@@ -304,7 +305,7 @@
                 effectiveIntensity,
                 this.config.caStrength,
                 0.0, // Force disable shader debug (we use SVG now)
-                this.contentAnalysis.getDebugMode(),
+                debugMode,
                 useMask ? (this.visualMemory.isInhibitionMode() ? 2.0 : 1.0) : 0.0,
                 this.config.mongrelMode,
                 this.aestheticMode,

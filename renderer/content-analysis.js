@@ -10,7 +10,8 @@
  * controls which analyzers are active per aesthetic mode.
  *
  * Biological analog: Pre-cortical feature extraction (retinal ganglion cells,
- * LGN magno/parvo pathways)
+ * LGN magno/parvo pathways). Both biology and simulation solve the same problem:
+ * selectively allocating limited processing bandwidth to high-value input.
  *
  * @module ContentAnalysis
  */
@@ -112,11 +113,15 @@
             if (this.saliencyFrameCounter % 15 !== 0) return;
 
             // Create a copy for the async worker (main buffer is reused each frame)
-            const saliencyImageData = new ImageData(
-                new Uint8ClampedArray(imageDataBuffer),
-                width,
-                height
-            );
+            // Fix BGRA→RGBA: Electron's capturePage returns BGRA byte order,
+            // but ImageData expects RGBA. Swap R↔B to get correct color features.
+            const rgbaBuffer = new Uint8ClampedArray(imageDataBuffer);
+            for (let i = 0; i < rgbaBuffer.length; i += 4) {
+                const b = rgbaBuffer[i];
+                rgbaBuffer[i] = rgbaBuffer[i + 2];     // R ← was B
+                rgbaBuffer[i + 2] = b;                  // B ← was R
+            }
+            const saliencyImageData = new ImageData(rgbaBuffer, width, height);
 
             createImageBitmap(saliencyImageData).then(bitmap => {
                 this.saliencyWorker.postMessage({
