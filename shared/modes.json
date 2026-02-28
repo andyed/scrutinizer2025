@@ -6,7 +6,7 @@
             "label": "High-Key Ghosting (Default)",
             "shortLabel": "High-Key",
             "category": "research",
-            "description": "Simulates standard peripheral degradation with rod-like desaturation, Eigengrau tinting, and chromatic aberration. The default mode for usability research.",
+            "description": "Simulates peripheral bandwidth filtering with rod-like desaturation, Eigengrau tinting, and chromatic aberration. The default mode for usability research.",
             "pipeline": {
                 "lgn_use_structure_mask": true,
                 "lgn_use_saliency_gate": true,

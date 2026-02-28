@@ -73,7 +73,7 @@ The Lateral Geniculate Nucleus is traditionally viewed as a "relay station," but
 
 * **McAlonan, K., Cavanaugh, J., & Wurtz, R. H. (2008)**: ["Guarding the gateway to cortex with attention in visual thalamus"](https://doi.org/10.1038/nature07382). *Nature*.
     * **The Discovery**: Spatial attention enhances LGN responses to stimuli at attended locations even before information reaches V1.
-    * **Relevance**: This validates Scrutinizer's saliency-based fidelity bias—the brain really does preserve more detail around salient targets.
+    * **Relevance**: This validates Scrutinizer's saliency gating — the brain really does allocate more processing bandwidth to salient peripheral targets.
 
 ### Stage 3: V1 (Feature Extraction & Crowding)
 

@@ -358,13 +358,11 @@ LGN_Signal processLGN(vec2 uv, ModeConfig config, float dist, float fovea_radius
         }
     }
     
-    // 4. Saliency Gating (Fidelity Bias)
+    // 4. Saliency Gating (Selective resource allocation)
+    // High-saliency regions receive more processing bandwidth (less peripheral filtering).
+    // Even at saliency=1.0, the floor is 0.3 — only the fovea gets full bandwidth.
+    // Mirrors biological compute demand management: retina → optic nerve bottleneck.
     if (config.lgn_use_saliency_gate && u_enable_saliency_modulation > 0.5) {
-        // Biologically Plausible: Saliency reduces distortion but doesn't eliminate it.
-        // Even if something grabs attention (Saliency 1.0), it's still in the periphery.
-        // We allow it to be CLEARER (reduced suppression) but not PERFECT (0.0).
-        // Mix from 1.0 (Full Distortion) to 0.3 (30% Distortion) based on Saliency.
-        // This ensures the TRUE Fovea is always the clearest point.
         signal.suppressionFactor *= mix(1.0, 0.3, signal.saliency);
     }
     

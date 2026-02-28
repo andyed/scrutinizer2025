@@ -72,7 +72,7 @@ DoG is enabled by default in research-oriented modes:
 | Mode | dog_enabled | dog_e2 | Rationale |
 | --- | --- | --- | --- |
 | High-Key (0) | true | 0.5 | Standard M-scaling |
-| Biological (1) | true | 0.4 | More aggressive, pushes peripheral degradation |
+| Biological (1) | true | 0.4 | More aggressive filtering, Purkinje mode |
 | Frosted (2) | false | — | Not biologically motivated |
 | Blueprint (3) | false | — | Uses Sobel edges, not pooling |
 | Cyberpunk (4) | false | — | Uses pixelation, not pooling |

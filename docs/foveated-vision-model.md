@@ -363,8 +363,8 @@ Uses the **Green Channel (Mass)** to modulate the biological simulation.
 
 ## 7. Nuclear Scramble & Static Disintegration (Tier 3.0)
 
-### The Problem: Fidelity Bias & "Ghosting"
-In v1.4, we introduced "Fidelity Bias" (Saliency Gating) to protect high-contrast elements. This inadvertently protected large text headers, making them *more* readable in the far periphery than intended. Additionally, the "Magnocellular Contrast Preservation" (which keeps edge contrast high for motion detection) was making these preserved letters look crisp and legible, rather than "ghostly."
+### The Problem: Saliency Gating & "Ghosting"
+In v1.4, we introduced saliency gating to allocate more bandwidth to high-contrast elements. This inadvertently allocated too much bandwidth to large text headers, keeping them *more* readable in the far periphery than intended. Additionally, the "Magnocellular Contrast Preservation" (which keeps edge contrast high for motion detection) was making these letters look crisp and legible, rather than "ghostly."
 
 ### The Solution: Tier 3 "Nuclear Scramble"
 Tier 3 introduces a more aggressive, topology-breaking model that specifically targets letter recognition while maintaining biological plausibility.
@@ -417,25 +417,25 @@ Based on user feedback, the following critical tunings were applied to stabilize
 
 ---
 
-# Saliency Map & Fidelity Bias
+# Saliency Map & Bandwidth Allocation
 
 ## Overview
 
-The **Saliency Map** implements computational visual attention, predicting where the eye is drawn based on contrast, edges, and visual "attractiveness." This enables **Fidelity Bias** - the biological principle that periphery degrades less around salient targets to preserve detail for accurate saccade guidance.
+The **Saliency Map** implements computational visual attention, predicting where the eye is drawn based on contrast, edges, and visual "attractiveness." This enables **saliency gating** — the LGN allocates more processing bandwidth to salient peripheral content, the same compute demand management strategy the biological visual system uses (retina captures ~10⁷ bits/sec, optic nerve transmits ~10⁶).
 
 ## Cognitive vs Retinal Constraint
 
 ### Retinal Constraint (Saliency Modulation OFF)
-- Degradation is **purely distance-based** (radial from fovea)
-- All content at same eccentricity receives equal warping/jitter
+- Filtering is **purely distance-based** (radial from fovea)
+- All content at same eccentricity receives equal filtering
 - Geometric, homogeneous "heat-haze" effect
-- **No cognitive priority** - logos treated same as body text
+- **No cognitive priority** — logos treated same as body text
 
 ### Cognitive Constraint (Saliency Modulation ON)
-- Degradation is **content-aware** and non-uniform
-- High-saliency areas (logos, icons, edges) remain **clearer** in periphery
-- M-channel cues preserved for saccadic targeting
-- **Brain-like prioritization** - important elements stand out
+- Filtering is **content-aware** and non-uniform
+- High-saliency areas (logos, icons, edges) receive **more bandwidth** in periphery
+- M-channel cues allocated for saccadic targeting
+- **Brain-like prioritization** — important elements receive more resources
 
 ## Implementation
 
@@ -499,44 +499,44 @@ To prevent "flicker" and "dropouts" during rapid content updates (e.g., video pl
 -   **Upload**: The smoothed "Current" buffer is uploaded to the GPU every frame.
 -   **Sampling**: `float saliency = texture2D(u_saliencyMap, uv).r;`
 
-### 4. Fidelity Bias Formula
-**File**: `renderer/webgl-renderer.js` (in `processLGN` function)
+### 4. Saliency Gating Formula
+**File**: `renderer/shaders/peripheral2.frag` (in `processLGN` function)
 
 ```glsl
 // Sample saliency at current pixel
-float saliency = texture2D(u_saliencyMap, uv).r;
+float saliency = texture(u_saliencyMap, uv).r;
 
-// Modulate warp strength (reduce distortion near salient areas)
+// Allocate bandwidth: high saliency → more signal passes through
 if (u_enable_saliency_modulation > 0.5) {
-    warpStrength *= (1.0 - saliency); // High saliency = less distortion
+    signal.suppressionFactor *= mix(1.0, 0.3, saliency);
 }
 ```
 
 **Effect**:
--   `saliency = 0.0` (low) → `warpStrength` unchanged (full degradation)
--   `saliency = 1.0` (high) → `warpStrength = 0` (no distortion, sharp)
+-   `saliency = 0.0` (low) → full peripheral filtering (minimum bandwidth)
+-   `saliency = 1.0` (high) → suppression drops to 0.3 (70% bandwidth allocated)
 -   Smooth gradient between extremes
 
 ### 5. Validation Results
 
 **Observed Behavior** :
--   **Social media icons** (Twitter, etc.): Visibly clearer than surrounding text (verified pop-out effect)
--   **Logos** (Bitrix24): Resist warping/jitter compared to background
+-   **Social media icons** (Twitter, etc.): Visibly clearer than surrounding text (pop-out effect)
+-   **Logos** (Bitrix24): Receive more bandwidth, resist warping/jitter
 -   **UI elements**: Retain structural integrity for saccade guidance
--   **Body text**: Full peripheral degradation applied normally
+-   **Body text**: Full peripheral filtering applied (minimum bandwidth)
 
-**Interpretation**: Successfully demonstrates shift from optical model to cognitive model, reflecting brain's prioritization of salient targets.
+**Interpretation**: Successfully demonstrates shift from optical model to cognitive model, reflecting the brain's resource allocation strategy for salient targets.
 
 ## Usage
 
 ### Menu Controls
 - **Simulation > Content Signals > Show Saliency Map**: Visualize saliency heatmap (Blue→Cyan→Green→Yellow→Red)
-- **Simulation > Content Signals > Use Saliency Modulation**: Toggle fidelity bias on/off
+- **Simulation > Content Signals > Use Saliency Modulation**: Toggle saliency-based bandwidth allocation
 
 ### Config
 ```javascript
 {
-    enableSaliencyModulation: true  // Enable/disable fidelity bias
+    enableSaliencyModulation: true  // Enable/disable saliency gating
 }
 ```
 
@@ -571,7 +571,7 @@ warpVector *= saliencyWarpMod;
 
 **Key Design Constraints**:
 -   **Parafoveal Isolation**: Foveal and parafoveal motion cannot affect far periphery distortion
--   **Conservative Modulation**: 15-25% max effect, ensuring periphery stays degraded
+-   **Conservative Modulation**: 15-25% max effect, keeping peripheral filtering active
 -   **Temporal Smoothing**: Double-buffered saliency (15% blend/frame) prevents flicker on live video
 
 ### 7. Saliency Stabilization (Movie Mode)
@@ -584,7 +584,7 @@ To mitigate "breathing" artifacts on full-motion video, the Saliency Map is used
 1. **Multi-scale Saliency**: Combine detection at multiple blur levels
 2. **Inhibition of Return**: Reduce saliency in recently-viewed areas
 3. **Parafoveal Band Modulation**: Extend V1/V4 modulation into parafovea with tighter constraints
-4. **Far Periphery Distortion Boost**: ✅ (Implemented in Browser & Figma v1.4.x) A linear increase in distortion strength (2.5x slope) beyond the transition zone creates more distinct visual degradation at the far edges of the screen, preventing the effect from plateauing.
+4. **Far Periphery Distortion Boost**: ✅ (Implemented in Browser & Figma v1.4.x) A linear increase in distortion strength (2.5x slope) beyond the transition zone creates more distinct peripheral filtering at the far edges of the screen, preventing the effect from plateauing.
 
 ## Technical Details
 
@@ -594,8 +594,8 @@ To mitigate "breathing" artifacts on full-motion video, the Saliency Map is used
 - **Memory**: Double-buffered architecture prevents read/write hazards.
 
 ### Edge Cases
-- **Blank pages**: Uniform low saliency (full degradation)
-- **High-contrast text**: Edges highlighted, readability preserved
+- **Blank pages**: Uniform low saliency (full peripheral filtering, minimum bandwidth)
+- **High-contrast text**: Edges highlighted, bandwidth allocated for saccade targets
 - **Images**: Strong edges detected, structural forms maintained
 - **UI elements**: Buttons, icons remain clear for interaction
 ---
@@ -791,25 +791,25 @@ The "Gatekeeper" stage determines *where* effects are applied.
 -   **Logic**:
     -   **Foveal Protection**: Masks out the fovea.
     -   **Structure Masking**: Masks out whitespace (if enabled).
-    -   **Saliency Gating**: Masks out high-saliency areas (Fidelity Bias).
+    -   **Saliency Gating**: Allocates bandwidth to high-saliency areas.
 
-#### Combined Protection Signal
-For effects like Chromatic Aberration, the shader uses a **dual-source protection pattern** that combines both saliency and structure information:
+#### Combined Bandwidth Signal
+For effects like Chromatic Aberration, the shader uses a **dual-source bandwidth signal** that combines both saliency and structure information:
 
 ```glsl
-float protection = max(lgn.saliency, lgn.density);
+float bandwidth = max(lgn.saliency, lgn.density);
 ```
 
 This takes the maximum of:
 - **`lgn.saliency`** — High-contrast, colorful regions (computed from pixels via Itti-Koch color opponency)
 - **`lgn.density`** — Structural regions from DOM/node tree (TEXT blocks, images, UI controls)
 
-**Rationale**: Using `max()` ensures protection applies if *either* signal detects important content:
+**Rationale**: Using `max()` ensures bandwidth is allocated if *either* signal detects important content:
 - **Text in live DOM** → High structure density, even if low contrast (light gray text)
 - **Text in bitmaps/screenshots** → High saliency from contrast, even without structure data
 - **Colorful logos/icons** → High saliency from color opponency
 
-This dual-source approach provides robust protection across both live DOM content (browser) and flattened bitmap exports (Figma plugin).
+This dual-source approach provides robust bandwidth allocation across both live DOM content (browser) and flattened bitmap exports (Figma plugin).
 
 ### Stage 2: V1 (Geometry & Distortion)
 The "Feature Extractor" stage determines *how* the image is warped.
@@ -828,7 +828,7 @@ The "Interpreter" stage determines *what* the final pixel looks like. This stage
 *   **Operation**: Applies color grading and pixel effects.
 *   **Customization Examples (Architectural Stress Tests)**:
     *These modes not only demonstrate visual possibilities but also serve as stress-tests for the pipeline's flexibility.*
-    -   **High-Key (Default)**: Simulates standard peripheral degradation with desaturation and ghosting.
+    -   **High-Key (Default)**: Standard peripheral bandwidth filtering with desaturation and ghosting.
     -   **Biological (Purkinje Darkening)**: A rigorously accurate simulation of rod vision, where red objects fade to black shadows (Protanopia) and luminance drops significantly.
     -   **Frosted**: A low-contrast, milky aesthetic useful for simulating cataracts or foggy conditions.
     -   **Blueprint**: A "wireframe" mode that visualizes the underlying Gestalt structure (rhythm/mass) detected by the engine.
@@ -887,5 +887,5 @@ To simulate the brain's ability to "hold" visual information, Scrutinizer implem
 #### 2. Inhibition of Return (Saliency Suppression)
 *   **Behavior**: Recently visited areas are rendered with *increased* distortion or lower saliency.
 *   **Biological Mechanism**: Mimics the "Inhibition of Return" phenomenon, where the attention system discourages re-orienting to a recently visited location to facilitate efficient foraging/search.
-*   **Implementation**: `u_useMask = 2.0`. The mask suppresses LGN signals (Saliency, Density) but *not* V1 distortion. This effectively "masks out" the visited area from the Saliency/Structure maps, causing it to lose any protection it might have had (e.g., text protection), forcing it to be processed by the raw peripheral distortion.
+*   **Implementation**: `u_useMask = 2.0`. The mask suppresses LGN signals (Saliency, Density) but *not* V1 distortion. This effectively zeroes out the visited area's bandwidth allocation, reverting it to minimum-bandwidth peripheral filtering.
 

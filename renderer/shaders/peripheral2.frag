@@ -326,8 +326,8 @@ LGN_Signal processLGN(vec2 uv, ModeConfig config, float dist, float fovea_radius
     // High-saliency regions get more processing bandwidth (less peripheral filtering).
     // Mirrors biological compute demand management: retina → optic nerve bottleneck.
     if (config.lgn_use_saliency_gate && u_enable_saliency_modulation > 0.5) {
-        // NOTE: This reduction (to 0.3) is what protects text.
-        // We will override this in processV1 for the scramble zone.
+        // NOTE: At saliency=1.0, suppression drops to 0.3 (text gets 70% bandwidth).
+        // We override this in processV1 for the scramble zone.
         signal.suppressionFactor *= mix(1.0, 0.3, signal.saliency);
     }
     

@@ -240,7 +240,7 @@
         }
 
         /**
-         * Toggle saliency modulation (fidelity bias in LGN).
+         * Toggle saliency modulation (bandwidth allocation in LGN).
          * @param {boolean} enabled
          */
         toggleSaliencyModulation(enabled) {

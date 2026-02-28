@@ -47,7 +47,7 @@ const CONFIG = {
     debugBoundary: 0.0,
     debugStructure: 0.0,
     enableStructureMap: true,
-    enableSaliencyModulation: true, // Enable fidelity bias by default
+    enableSaliencyModulation: true, // Saliency-based bandwidth allocation in LGN
     visualMemory: 0.0,
 };
 

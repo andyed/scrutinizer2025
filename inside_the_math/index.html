@@ -970,7 +970,7 @@
           </div>
         </div>
         <div class="caption"><strong>Dashboard — center focus.</strong> The fovea reveals full detail at
-          gaze point. Peripheral regions degrade through the full LGN→V1→V4 pipeline.</div>
+          gaze point. Peripheral regions are filtered through the full LGN→V1→V4 pipeline.</div>
       </div>
       <div class="capture-card">
         <img src="../tests/golden-captures/v1.6.0/dashboard_center_saliency.png"
@@ -1073,8 +1073,8 @@ discreteScramble = jitter * throwDist * scrambleZone²;</code></pre>
             <span><span class="dot dot-periph"></span>periph</span>
           </div>
         </div>
-        <div class="caption"><strong>Article — center focus.</strong> V1 crowding degrades paragraph text in the periphery
-          while headlines remain partially legible (larger receptive fields).</div>
+        <div class="caption"><strong>Article — center focus.</strong> V1 crowding filters paragraph text in the periphery
+          while headlines receive more bandwidth (larger receptive fields).</div>
       </div>
       <div class="capture-card">
         <div class="capture-zones">
@@ -1088,7 +1088,7 @@ discreteScramble = jitter * throwDist * scrambleZone²;</code></pre>
           </div>
         </div>
         <div class="caption"><strong>E-commerce — product focus.</strong> When you fixate on the product image,
-          the price tag, CTA button, and reviews degrade through V1 scrambling — a visualization
+          the price tag, CTA button, and reviews are filtered through V1 scrambling — a visualization
           of the feature pooling that constrains peripheral object recognition.</div>
       </div>
     </div>
@@ -1219,8 +1219,8 @@ discreteScramble = jitter * throwDist * scrambleZone²;</code></pre>
       2–3 and the residual remain: you see buttons and layout blocks but not their labels.
     </p>
     <p>
-      This cascade — fine detail lost first, coarse structure preserved longest — is how
-      information degrades in the biological system, and it's how the shader degrades it too.
+      This cascade — fine detail filtered first, coarse structure passing through longest — is how
+      the biological system manages its bandwidth, and it's how the shader manages it too.
       The signal isn't uniformly blurred; it's selectively attenuated by frequency band,
       approximating the frequency-selective loss that Rosenholtz's summary statistics model
       predicts, at real-time rates.

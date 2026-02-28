@@ -76,11 +76,11 @@ Scrutinizer is designed for **designers, UX researchers, and HCI/vision scientis
 
 ## Features
 
-* **Foveal/Peripheral Vision Simulation**: Toggle between clear central vision and degraded peripheral zones
+* **Foveal/Peripheral Vision Simulation**: Selective processing — full bandwidth at fixation, filtered periphery
 * **Content Analysis**:
   - **Structure Map**: Analyzes page layout (text rhythm, density, semantic type)
   - **Saliency Map**: Detects visual attention (edges, contrast, high-importance areas)
-  - **Fidelity Bias**: Reduces peripheral degradation near salient targets
+  - **Saliency Gating**: Allocates more processing bandwidth to salient peripheral content
 * **Aesthetic Modes**: High-Key Ghosting, Lab Mode, Frosted Glass, Blueprint, Cyberpunk (with saliency-driven pixelation)
 * **Visual Memory**: Simulates iconic memory decay (Off, Limited, Extended, Infinite)
 * **Chromatic Aberration**: Lens-like color fringing in periphery
