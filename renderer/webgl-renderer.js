@@ -83,6 +83,11 @@
                 this.dogE2Location = null;
                 this.dogSharpnessLocation = null;
 
+                // FOVI (Cortical Magnification) uniform locations
+                this.foviEnabledLocation = null;
+                this.cmfALocation = null;
+                this.foviColorSigmaLocation = null;
+
                 // Default Configuration
                 this.config = {
                     lgn_use_structure_mask: true,
@@ -94,7 +99,10 @@
                     v1_animate: false,
                     dog_enabled: false,
                     dog_e2: 0.5,
-                    dog_sharpness: 0.0
+                    dog_sharpness: 0.0,
+                    fovi_enabled: false,
+                    fovi_a: 2.78,
+                    fovi_color_sigma: 0.0
                 };
 
                 this.init(vsSource, fsSource);
@@ -179,6 +187,11 @@
                 this.dogEnabledLocation = gl.getUniformLocation(this.program, "u_dog_enabled");
                 this.dogE2Location = gl.getUniformLocation(this.program, "u_dog_e2");
                 this.dogSharpnessLocation = gl.getUniformLocation(this.program, "u_dog_sharpness");
+
+                // FOVI (Cortical Magnification) uniform lookups
+                this.foviEnabledLocation = gl.getUniformLocation(this.program, "u_fovi_enabled");
+                this.cmfALocation = gl.getUniformLocation(this.program, "u_cmf_a");
+                this.foviColorSigmaLocation = gl.getUniformLocation(this.program, "u_fovi_color_sigma");
 
                 // Create buffers
                 this.positionBuffer = gl.createBuffer();
@@ -329,7 +342,10 @@
                     v1_animate: false,
                     dog_enabled: false,
                     dog_e2: 0.5,
-                    dog_sharpness: 0.0
+                    dog_sharpness: 0.0,
+                    fovi_enabled: false,
+                    fovi_a: 2.78,
+                    fovi_color_sigma: 0.0
                 };
 
                 this.config = { ...defaults };
@@ -353,6 +369,9 @@
                         this.config.dog_enabled = p.dog_enabled ?? defaults.dog_enabled;
                         this.config.dog_e2 = p.dog_e2 ?? defaults.dog_e2;
                         this.config.dog_sharpness = p.dog_sharpness ?? defaults.dog_sharpness;
+                        this.config.fovi_enabled = p.fovi_enabled ?? defaults.fovi_enabled;
+                        this.config.fovi_a = p.fovi_a ?? defaults.fovi_a;
+                        this.config.fovi_color_sigma = p.fovi_color_sigma ?? defaults.fovi_color_sigma;
 
                         // Store current mode metadata for export
                         this.currentMode = modeEntry;
@@ -487,6 +506,9 @@
                 gl.uniform1f(this.dogEnabledLocation, this.config.dog_enabled ? 1.0 : 0.0);
                 gl.uniform1f(this.dogE2Location, this.config.dog_e2);
                 gl.uniform1f(this.dogSharpnessLocation, this.config.dog_sharpness);
+                gl.uniform1f(this.foviEnabledLocation, this.config.fovi_enabled ? 1.0 : 0.0);
+                gl.uniform1f(this.cmfALocation, this.config.fovi_a);
+                gl.uniform1f(this.foviColorSigmaLocation, this.config.fovi_color_sigma);
                 gl.uniform1f(this.hasStructureLocation, hasStructure);
                 gl.uniform1f(this.enableSaliencyModulationLocation, enableSaliencyModulation);
 

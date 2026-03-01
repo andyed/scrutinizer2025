@@ -6,7 +6,7 @@
 
 ➡️ Live site: **[scrutinizer.app](https://andyed.github.io/scrutinizer-www/)**
 
-🍎 macOS Installer: **[Download v1.5.0](https://github.com/andyed/scrutinizer2025/releases/download/v1.5.0/Scrutinizer-1.5.0-arm64.dmg)** | [Release Notes](docs/release_notes_v1.5.0.md)
+🍎 macOS Installer: **[Download v1.7.0](https://github.com/andyed/scrutinizer2025/releases/tag/v1.7.0)** | [Changelog](CHANGELOG.md)
 
 **A design constraint model for studying foveal vs. peripheral vision on the web.**
 
@@ -81,7 +81,7 @@ Scrutinizer is designed for **designers, UX researchers, and HCI/vision scientis
   - **Structure Map**: Analyzes page layout (text rhythm, density, semantic type)
   - **Saliency Map**: Detects visual attention (edges, contrast, high-importance areas)
   - **Saliency Gating**: Allocates more processing bandwidth to salient peripheral content
-* **Aesthetic Modes**: High-Key Ghosting, Lab Mode, Frosted Glass, Blueprint, Cyberpunk (with saliency-driven pixelation)
+* **Aesthetic Modes**: 6 rendering styles (High-Key Ghosting, Biological, Frosted Glass, Wireframe, Cyberpunk, Double Vision) + 3 experimental pipelines (FOVI cortical magnification, Legacy v1.6, Gaussian desaturation)
 * **Visual Memory**: Simulates iconic memory decay (Off, Limited, Extended, Infinite)
 * **Chromatic Aberration**: Lens-like color fringing in periphery
 * **Adjustable Parameters**: Foveal radius (20-450px), shape (4 ratios), intensity (0-100%)
@@ -91,11 +91,11 @@ Scrutinizer is designed for **designers, UX researchers, and HCI/vision scientis
 
 ## Installation
 
-### 📥 Download (v1.5.0)
+### 📥 Download (v1.7.0)
 
 > **Note:** Scrutinizer for macOS is now **Signed & Notarized**! No more security warnings.
 
-*   🍎 **macOS (Apple Silicon):** [**Download Scrutinizer-1.5.0.dmg**](https://github.com/andyed/scrutinizer2025/releases/download/v1.5.0/Scrutinizer-1.5.0-arm64.dmg)
+*   🍎 **macOS (Apple Silicon):** [**Download Scrutinizer-1.7.0.dmg**](https://github.com/andyed/scrutinizer2025/releases/tag/v1.7.0)
 *   🪟 **Windows:** Manual build required (Coming soon though, see [Releases Page](https://github.com/andyed/scrutinizer2025/releases))
 
 [**View All Releases & Changelogs**](https://github.com/andyed/scrutinizer2025/releases)
@@ -152,15 +152,15 @@ The new browser toolbar provides:
 
 ### Menu Structure
 Access all features via **Simulation** menu:
+- **Behavior**: Visual Memory (5 modes), Enable Structure Map, Enable Saliency Modulation — the cognitive processes being simulated
 - **Foveal**: Toggle, Radius (6 sizes), Shape (4 ratios)
 - **Peripheral**: Intensity (5 levels), Effect Type, Chromatic Aberration
-- **Behavior**: Aesthetic Mode (5 styles), Visual Memory (4 modes)
-- **Content Analysis**: Enable/Show Structure Map, Enable/Show Saliency Map
+- **Utility**: 9 aesthetic/rendering modes, Show Structure Map, Show Saliency Map — rendering presentation and debug views
 
 ### Debug Visualization
-- **Show Boundary**: View foveal edge
-- **Show Structure Map**: View layout analysis (RGB channels: rhythm, density, type)
-- **Show Saliency Map**: View attention heatmap (Blue=Low → Green=Medium → Red=High) 
+- **Visual Overlay**: View foveal/parafoveal/peripheral boundary rings
+- **Show Structure Map** (Utility): View layout analysis (RGB channels: rhythm, density, type)
+- **Show Saliency Map** (Utility): View attention heatmap (Blue=Low → Green=Medium → Red=High)
 
 ### Keyboard Shortcuts
 

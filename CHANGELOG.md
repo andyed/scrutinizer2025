@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.7.1] - 2026-02-28
+
+### Changed
+- **Simulation Menu Reorganization**: Restructured the Simulation menu to foreground behavioral simulation over rendering presentation.
+    - **Behavior** submenu is now first — contains Visual Memory, Enable Structure Map, Enable Saliency Modulation (the cognitive processes being modeled).
+    - Experimental simulation models (FOVI, Legacy v1.6, Gaussian Desaturation) moved from Utility to Behavior — these are alternative pipelines for testing, not rendering styles.
+    - **Utility** submenu replaces the old "Aesthetic Mode" nesting — contains the 6 rendering/presentation modes plus Show Structure Map / Show Saliency Map debug views.
+    - **Content Analysis** submenu removed — its items redistributed to Behavior (Enable toggles) and Utility (Show toggles).
+    - Foveal, Peripheral, and Visual Overlay submenus unchanged.
+    - Aesthetic mode radio buttons now sync across Behavior and Utility submenus via menu rebuild on selection.
+    - No shader or modes.json changes — purely a menu organization change.
+
+## [1.7.0] - 2026-02-28
+
+### Added
+- **FOVI Cortical Magnification Infrastructure**: Added FOVI pipeline support (Blauch, Alvarez & Konkle, 2026, arxiv:2602.03766) as a switchable rendering path.
+    - New uniforms: `u_fovi_enabled`, `u_cmf_a`, `u_fovi_color_sigma`.
+    - When enabled: logarithmic MIP scaling via CMF (log2((r_deg + a) / a)) and CMF-derived DoG band cutoffs.
+    - Modes 0 & 1 retain legacy pipeline (`fovi_enabled: false`) — FOVI models cortical magnification only, not the full peripheral detail loss (crowding, RF growth, contrast sensitivity). Existing parameters already approximate the combined perceptual effect.
+- **Mode 6: FOVI (Cortical Magnification)**: Pure FOVI reference implementation, orthogonal to Scrutinizer pipeline.
+    - Single CMF-driven MIP blur (no DoG band decomposition).
+    - Gaussian color decay (V4 style 6) simulating rod-cone transition with configurable sigma.
+    - No LGN gating or V1 distortion — clean comparison baseline.
+- **Mode 7: Legacy v1.6 (Comparison)**: Frozen v1.6 pipeline snapshot for A/B dogfooding.
+    - Linear MIP scaling, hand-tuned DoG cutoffs, `fovi_enabled: false`.
+    - Identical to pre-v1.7 mode 0 behavior.
+- **Mode 8: Gaussian Desaturation (Experimental)**: Controlled experiment isolating desaturation curve shape.
+    - Identical pipeline to mode 0 (same DoG, LGN gating, V1 distortion, MIP).
+    - Replaces smoothstep ramp with Gaussian exponential decay: `1 - exp(-r_deg / sigma)`.
+    - Single variable changed for perceptual matching study: which curve better models the rod-cone transition?
+    - Sigma (4.0 default) maps to effective cone density falloff distance in degrees.
+
+### Changed
+- modes.json metadata version bumped to 2.0.0 (new `fovi_*` pipeline params).
+
 ## [1.6.0] - 2026-02-28
 
 ### Changed

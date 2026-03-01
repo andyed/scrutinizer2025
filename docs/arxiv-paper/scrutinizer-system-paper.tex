@@ -1,0 +1,194 @@
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+% --- Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=0.65in,top=0.75in,bottom=0.65in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{natbib}
+\usepackage{microtype}
+
+% Compact spacing
+\setlength{\parskip}{1.5pt plus 1pt}
+\setlength{\parindent}{0.5em}
+\setlength{\abovecaptionskip}{4pt}
+\setlength{\belowcaptionskip}{2pt}
+\setlength{\textfloatsep}{6pt}
+\setlength{\floatsep}{4pt}
+\setlength{\dbltextfloatsep}{6pt}
+
+% Compact sections
+\makeatletter
+\renewcommand\section{\@startsection{section}{1}{\z@}{5pt}{2pt}{\normalfont\bfseries\normalsize}}
+\renewcommand\subsection{\@startsection{subsection}{2}{\z@}{3pt}{1.5pt}{\normalfont\bfseries\small}}
+\makeatother
+
+% Compact abstract
+\renewenvironment{abstract}{\small\noindent\textbf{Abstract.}\enspace\ignorespaces}{\par\vspace{4pt}}
+
+\hypersetup{colorlinks=true, linkcolor=blue!70!black, citecolor=blue!70!black, urlcolor=blue!70!black}
+
+\title{\vspace{-8pt}\textbf{Scrutinizer: A Biologically-Motivated Foveated Vision Simulator for Web Interfaces, Built Through AI-Human Collaboration}\vspace{-4pt}}
+
+\author{
+  Andy Edmonds\\[-2pt]
+  {\small Independent Researcher, San Francisco, CA}\\[-2pt]
+  {\small\texttt{andyed@alum.cmu.edu}}
+}
+
+\date{\vspace{-12pt}}
+
+\begin{document}
+\maketitle
+\vspace{-6pt}
+
+% ============================================================
+\begin{abstract}
+We present Scrutinizer, an open-source, real-time gaze-contingent foveated rendering system for live web content. An 888-line GLSL shader implements a pipeline mapped to the visual pathway (retinal ganglion cells~$\rightarrow$ LGN~$\rightarrow$ V1~$\rightarrow$ V4), with four swappable JavaScript modules aligned to biological subsystems. The key technical contribution is a Difference-of-Gaussians (DoG) band decomposition exploiting the hardware MIP chain for frequency-selective peripheral filtering---high-frequency detail attenuates first while low-frequency structure persists, mirroring M-scaling. The system was developed through iterative AI-human collaboration where an AI agent (Claude, Anthropic) cross-referenced neuroscience literature against shader code, caught coordinate-space bugs empirically, and maintained biological grounding across 27 uniforms. Open source (MIT), 60\,fps, 138 unit tests.
+\end{abstract}
+
+% ============================================================
+\section{Introduction}
+
+Peripheral vision is not blurry---it is \emph{differently encoded}. The retina compresses ${\sim}10^7$ photoreceptor signals into ${\sim}10^6$ optic nerve fibers, selectively preserving low-frequency structure while filtering high-frequency detail~\citep{curcio1990, dacey1993}. This is compute demand management: limited bandwidth allocated to information most likely to guide the next saccade.
+
+Existing gaze-contingent tools---BubbleView~\citep{kim2017}, ViewSer~\citep{lagun2011}, ScreenMasker---apply Gaussian blur as a peripheral proxy, uniformly destroying spatial structure and preventing layout-level judgments that real peripheral vision supports. These tools also operate on static images, not live interactive content.
+
+\begin{table}[t]
+\centering
+\caption{Comparison with existing gaze-contingent tools.}\vspace{-2pt}
+\label{tab:comparison}
+\footnotesize
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Tool} & \rotatebox{60}{\textbf{Live}} & \rotatebox{60}{\textbf{Bio Model}} & \rotatebox{60}{\textbf{Crowding}} & \rotatebox{60}{\textbf{Saliency}} & \rotatebox{60}{\textbf{Open}} \\
+\midrule
+BubbleView~\citeyearpar{kim2017} & -- & Gauss. & -- & -- & \checkmark \\
+ViewSer~\citeyearpar{lagun2011} & SERP & Gauss. & -- & -- & -- \\
+ScreenMasker & -- & Gauss. & -- & -- & \checkmark \\
+\textbf{Scrutinizer} & \checkmark & \textbf{DoG} & \checkmark & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Scrutinizer contributes \textbf{(1)} a modular architecture where each module maps to a biological subsystem (Table~\ref{tab:architecture}), enabling independent swapping---replace the mouse-based gaze proxy with an eye tracker by changing one module---and \textbf{(2)} an AI-assisted development process where biological grounding is maintained by an agent cross-referencing neuroscience literature against rendering code.
+
+% ============================================================
+\section{Architecture: Biology $\rightarrow$ Computation}
+
+The pipeline is a single-pass fragment shader (888~LOC, GLSL~ES~3.0) with 27 uniforms organized into biological stages, fed by four JavaScript modules (Table~\ref{tab:architecture}).
+
+\begin{table}[t]
+\centering
+\caption{Module architecture mapped to biological subsystems.}\vspace{-2pt}
+\label{tab:architecture}
+\footnotesize
+\begin{tabular}{@{}p{1.4cm}p{1.7cm}p{3.5cm}@{}}
+\toprule
+\textbf{Biology} & \textbf{Module (LOC)} & \textbf{Function} \\
+\midrule
+Oculomotor & GazeModel (166) & Velocity, fixation, saccadic suppression \\
+Retinal GC & ContentAnalysis (361) & DoG center-surround via MIP chain \\
+LGN gating & ContentAnalysis & Structure mask + saliency gate \\
+V1 features & Orchestrator (536) & Noise crowding, grid scramble \\
+V4 color & Renderer (526) & Oklab desat., chrom.\ aberration \\
+Saliency & Worker (489) & Oklab DoG + face det.\ + structure \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{DoG Band Decomposition}
+
+Retinal ganglion cells have center-surround receptive fields modeled as DoG filters~\citep{kuffler1953}, with field size growing with eccentricity (M-scaling). We decompose the hardware MIP chain into a Laplacian pyramid:
+\vspace{-2pt}
+\begin{equation}
+\text{band}_k = \text{textureLod}(\mathit{tex}, \mathit{uv}, k) - \text{textureLod}(\mathit{tex}, \mathit{uv}, k{+}1)
+\end{equation}
+\vspace{-4pt}
+
+Four bands span 1--2\,px (serifs) to 8--16\,px (buttons), each weighted by a smoothstep rolloff with cutoffs following a geometric progression ($0.3, 0.6, 1.2, 2.4 \times E_2$), approximating M-scaling~\citep{curcio1990}. The DC residual always passes through. Result: peripheral text shows letter shapes (low-frequency visible, identity unreadable) rather than uniform fog. Cost: 5 \texttt{textureLod} calls vs.\ 1, but near-zero practical overhead---higher MIP levels are cheaper, already cached, and arithmetic is trivial.
+
+\subsection{Saliency-Driven Bandwidth Allocation}
+
+The LGN's synaptic inputs are ${\sim}90\%$ modulatory, with ${\sim}30\%$ from V1 feedback~\citep{sherman2002}; spatial attention enhances LGN gain~\citep{mcalonan2008}. We model this as saliency gating: a Web Worker computes a saliency map (Oklab opponent-channel DoG + face detection + Gestalt structure masks), uploaded as a GPU texture. High-saliency regions receive up to 70\% of rendering bandwidth.
+
+\subsection{V1 Crowding and V4 Color}
+
+Crowding is feature binding failure, not blur~\citep{pelli2008}. We model it via simplex noise domain warping and grid-based feature scrambling~\citep{rosenholtz2012}. V4 applies Oklab desaturation~\citep{ottosson2020} for rod dominance and chromatic aberration for M/P asynchrony~\citep{livingstone1988}.
+
+\subsection{Extensibility Branch Points}
+
+The architecture exposes five branch points where researchers substitute implementations without modifying the core pipeline (Table~\ref{tab:branch}).
+
+\begin{table}[h]
+\vspace{-2pt}
+\centering
+\caption{Extensibility branch points.}\vspace{-2pt}
+\label{tab:branch}
+\footnotesize
+\begin{tabular}{@{}p{1.3cm}p{2.1cm}p{3.2cm}@{}}
+\toprule
+\textbf{Branch} & \textbf{Interface} & \textbf{Swap examples} \\
+\midrule
+Gaze input & \texttt{update(x,y)} $\rightarrow$ pos, vel, fixation & Tobii SDK, WebGazer.js, scanpath replay \\
+Saliency & bitmap $\rightarrow$ heatmap texture & Itti-Koch, DeepGaze~II, ONNX model \\
+Crowding & integer uniform selects V1 type & Portilla-Simoncelli, oriented DoG \\
+Structure & DOM blocks $\rightarrow$ RGBA texture & CV segmentation, semantic embed \\
+Pipeline & JSON registry & Zero-code new profiles \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ============================================================
+\section{AI-Assisted Development Process}
+
+This documents AI as \emph{research collaborator} maintaining biological grounding---not a report on code generation.
+
+\textbf{Cross-process bug detection.}
+The saliency worker computed Oklab opponent channels on BGRA-ordered pixels from Electron's \texttt{capturePage()}. The agent traced the byte-order mismatch across 4 files and 3 processes (main $\rightarrow$ renderer $\rightarrow$ Worker).
+
+\textbf{AI checking AI.}
+A separate AI session removed DPR scaling from structure masks, reasoning \texttt{toBitmap()} returns logical pixels. The primary agent disproved this empirically: \texttt{getSize()=3252$\times$1690} (physical) on a 1626-logical display, DPR\,=\,2.
+
+\textbf{Conceptual reframing.}
+Documentation described ``degradation with preservation.'' The human identified the biological analog is \emph{selective bandwidth allocation}. The agent then swept 12 files (${\sim}$30 edits) to align language.
+
+\textbf{Literature--shader validation.}
+Shader comments cite \citet{kuffler1953}, \citet{pelli2008}, \citet{mcalonan2008}. The agent validated these against the scientific literature review, ensuring shader claims matched cited mechanisms.
+
+The modular architecture \emph{enables} this workflow: the agent reasons per biological module, not across an 888-line monolith.
+
+% ============================================================
+\section{Status \& Future Work}
+
+\textbf{Implemented (v1.6.0):}
+DoG band decomposition; saliency bandwidth allocation; noise crowding and grid scrambling; Oklab desaturation and chromatic aberration; foveal calibration; mobile emulation; 138 tests; golden capture regression.
+
+\textbf{Future:}
+Oriented DoG bands (oblique effect~\citep{appelle1972}); calibrated visual angles; eye tracker integration (GazeModel branch point); Portilla-Simoncelli mongrel synthesis (V1 branch point).
+
+\section{Availability}
+
+Open source (MIT), Electron~30.5, macOS signed. Architecture docs, literature review, and a 14-project grad student backlog ship with the repository.
+
+% ============================================================
+\vspace{2pt}
+\noindent\textbf{Acknowledgments.}
+{\small System architecture, documentation, and this paper were developed through collaboration with Claude (Anthropic, Opus~4.6) via Claude Code. The AI agent exclusively authored the grad student project backlog~\citep*{hcibib}. AE directed architecture, identified conceptual framings, and validated perceptual accuracy.}
+
+\vspace{2pt}
+\begingroup
+\footnotesize
+\setlength{\bibsep}{1pt}
+\bibliographystyle{plainnat}
+\bibliography{references}
+\endgroup
+
+\end{document}

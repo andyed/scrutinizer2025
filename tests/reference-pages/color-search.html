@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Search: Color in Periphery</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #333;
+            color: #eee;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            user-select: none;
+        }
+
+        /* --- Intro Panel --- */
+        #intro {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            background: #333;
+        }
+        #intro h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        #intro p {
+            font-size: 15px;
+            color: #aaa;
+            max-width: 520px;
+            text-align: center;
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+        #intro .hint {
+            font-size: 13px;
+            color: #777;
+            margin-top: 16px;
+            max-width: 480px;
+            text-align: center;
+            line-height: 1.4;
+        }
+        button {
+            margin-top: 24px;
+            padding: 12px 32px;
+            font-size: 16px;
+            font-weight: 500;
+            background: #e85040;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        button:hover { background: #d04030; }
+
+        /* --- Arena --- */
+        #arena {
+            position: absolute;
+            inset: 0;
+            display: none;
+        }
+
+        /* Fixation cross */
+        #fixation {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 32px;
+            color: #888;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* Dots */
+        .dot {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            transition: opacity 0.05s;
+        }
+        .dot:hover { opacity: 0.85; }
+        .dot.target { z-index: 2; }
+
+        /* Feedback flash */
+        #feedback {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+            font-weight: 600;
+            pointer-events: none;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        #feedback.show { opacity: 1; }
+
+        /* --- Results Panel --- */
+        #results {
+            position: absolute;
+            inset: 0;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #333;
+            z-index: 10;
+        }
+        #results h2 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        #results-body {
+            display: flex;
+            gap: 40px;
+            align-items: flex-end;
+        }
+
+        /* Bar chart */
+        .ring-bar {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+        .bar-fill {
+            width: 48px;
+            background: #e85040;
+            border-radius: 4px 4px 0 0;
+            transition: height 0.4s ease-out;
+        }
+        .bar-label {
+            font-size: 12px;
+            color: #aaa;
+        }
+        .bar-value {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 13px;
+            color: #666;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        /* Settings bar */
+        #settings {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            font-size: 12px;
+            color: #777;
+            z-index: 5;
+        }
+        #settings label { cursor: pointer; }
+        #settings select {
+            background: #444;
+            color: #ddd;
+            border: 1px solid #555;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Intro -->
+<div id="intro">
+    <h1>Peripheral Color Search</h1>
+    <p>Find the colored dot among gray distractors. Keep your eyes on the fixation cross (+) — use peripheral vision only.</p>
+    <p>Tests how desaturation models affect color target detection at different eccentricities.</p>
+    <div class="hint">
+        Run with Scrutinizer active. Switch between Aesthetic Modes<br>
+        (High-Key vs Gaussian Desaturation) to compare desaturation curves.<br>
+        20 trials &middot; ~2 minutes
+    </div>
+    <button id="startBtn">Start</button>
+</div>
+
+<!-- Arena -->
+<div id="arena">
+    <div id="fixation">+</div>
+    <div id="feedback"></div>
+    <div id="hud"></div>
+    <div id="settings">
+        <label>Target: <select id="colorSelect">
+            <option value="red">Red</option>
+            <option value="blue">Blue</option>
+            <option value="green">Green</option>
+        </select></label>
+        <label>Size: <select id="sizeSelect">
+            <option value="20">Small (20px)</option>
+            <option value="24" selected>Medium (24px)</option>
+            <option value="32">Large (32px)</option>
+        </select></label>
+    </div>
+</div>
+
+<!-- Results -->
+<div id="results">
+    <h2>Results by Eccentricity Ring</h2>
+    <div id="results-body"></div>
+    <p id="results-summary" style="margin-top: 24px; color: #aaa; font-size: 14px;"></p>
+    <button id="restartBtn" style="margin-top: 20px;">Run Again</button>
+</div>
+
+<script>
+// === CONFIG ===
+const TRIALS = 20;
+const FIXATION_MS = 800;
+
+// 5 eccentricity rings (px from center)
+const RINGS = [100, 200, 300, 420, 560];
+const RING_LABELS = ['100px', '200px', '300px', '420px', '560px'];
+const DOTS_PER_RING = 8; // evenly spaced at 45°
+
+// Target colors with luminance-matched grays
+// Luminance = 0.299R + 0.587G + 0.114B
+const TARGET_COLORS = {
+    red:   { rgb: 'rgb(200, 70, 70)',   gray: 'rgb(108, 108, 108)' },  // L≈108
+    blue:  { rgb: 'rgb(70, 100, 210)',  gray: 'rgb(103, 103, 103)' },  // L≈103
+    green: { rgb: 'rgb(70, 180, 70)',   gray: 'rgb(114, 114, 114)' },  // L≈114
+};
+
+// === STATE ===
+let trial = 0;
+let trialData = [];     // { ring, rt, correct }
+let trialStartTime = 0;
+let phase = 'idle';     // idle | fixation | search | feedback
+let currentTargetRing = -1;
+let currentTargetAngleIdx = -1;
+let dotSize = 24;
+
+// === ELEMENTS ===
+const introEl = document.getElementById('intro');
+const arenaEl = document.getElementById('arena');
+const resultsEl = document.getElementById('results');
+const fixationEl = document.getElementById('fixation');
+const feedbackEl = document.getElementById('feedback');
+const hudEl = document.getElementById('hud');
+const startBtn = document.getElementById('startBtn');
+const restartBtn = document.getElementById('restartBtn');
+const colorSelect = document.getElementById('colorSelect');
+const sizeSelect = document.getElementById('sizeSelect');
+
+// === HELPERS ===
+function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+// Build a balanced trial sequence: 4 trials per ring, shuffled
+function buildTrialSequence() {
+    const seq = [];
+    const trialsPerRing = Math.floor(TRIALS / RINGS.length);
+    for (let r = 0; r < RINGS.length; r++) {
+        for (let t = 0; t < trialsPerRing; t++) {
+            seq.push(r);
+        }
+    }
+    return shuffle(seq);
+}
+
+let trialSequence = [];
+
+// === TRIAL LOGIC ===
+function startExperiment() {
+    introEl.style.display = 'none';
+    resultsEl.style.display = 'none';
+    arenaEl.style.display = 'block';
+    trial = 0;
+    trialData = [];
+    dotSize = parseInt(sizeSelect.value);
+    trialSequence = buildTrialSequence();
+    nextTrial();
+}
+
+function nextTrial() {
+    if (trial >= TRIALS) {
+        showResults();
+        return;
+    }
+    phase = 'fixation';
+    clearDots();
+    fixationEl.style.color = '#ccc';
+    hudEl.textContent = `Trial ${trial + 1} / ${TRIALS}`;
+
+    setTimeout(() => {
+        if (phase !== 'fixation') return;
+        showStimuli();
+    }, FIXATION_MS);
+}
+
+function showStimuli() {
+    phase = 'search';
+    fixationEl.style.color = '#555';
+
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    const color = TARGET_COLORS[colorSelect.value];
+
+    // Pick target ring and angle
+    currentTargetRing = trialSequence[trial];
+    currentTargetAngleIdx = Math.floor(Math.random() * DOTS_PER_RING);
+
+    // Place all dots
+    for (let r = 0; r < RINGS.length; r++) {
+        const radius = RINGS[r];
+        for (let a = 0; a < DOTS_PER_RING; a++) {
+            // Jitter angle slightly so pattern isn't perfectly regular
+            const baseAngle = (a / DOTS_PER_RING) * Math.PI * 2;
+            const jitter = (Math.random() - 0.5) * 0.15;
+            const angle = baseAngle + jitter;
+
+            const x = cx + Math.cos(angle) * radius;
+            const y = cy + Math.sin(angle) * radius;
+
+            const isTarget = (r === currentTargetRing && a === currentTargetAngleIdx);
+
+            const dot = document.createElement('div');
+            dot.className = isTarget ? 'dot target' : 'dot';
+            dot.style.left = x + 'px';
+            dot.style.top = y + 'px';
+            dot.style.width = dotSize + 'px';
+            dot.style.height = dotSize + 'px';
+            dot.style.backgroundColor = isTarget ? color.rgb : color.gray;
+            dot.dataset.ring = r;
+            dot.dataset.isTarget = isTarget ? '1' : '0';
+
+            dot.addEventListener('click', onDotClick);
+            arenaEl.appendChild(dot);
+        }
+    }
+
+    trialStartTime = performance.now();
+}
+
+function onDotClick(e) {
+    if (phase !== 'search') return;
+    phase = 'feedback';
+
+    const rt = Math.round(performance.now() - trialStartTime);
+    const correct = e.target.dataset.isTarget === '1';
+
+    trialData.push({
+        ring: currentTargetRing,
+        rt: rt,
+        correct: correct,
+        color: colorSelect.value
+    });
+
+    // Flash feedback
+    feedbackEl.textContent = correct ? `${rt}ms` : 'Miss';
+    feedbackEl.style.color = correct ? '#5a5' : '#e55';
+    feedbackEl.classList.add('show');
+
+    setTimeout(() => {
+        feedbackEl.classList.remove('show');
+        trial++;
+        nextTrial();
+    }, 600);
+}
+
+function clearDots() {
+    arenaEl.querySelectorAll('.dot').forEach(d => d.remove());
+}
+
+// === RESULTS ===
+function showResults() {
+    arenaEl.style.display = 'none';
+    resultsEl.style.display = 'flex';
+    clearDots();
+
+    const body = document.getElementById('results-body');
+    body.innerHTML = '';
+
+    let totalCorrect = 0;
+    let totalRT = 0;
+    let correctCount = 0;
+
+    for (let r = 0; r < RINGS.length; r++) {
+        const ringTrials = trialData.filter(t => t.ring === r);
+        const correct = ringTrials.filter(t => t.correct).length;
+        const total = ringTrials.length;
+        const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+        const avgRT = ringTrials.filter(t => t.correct).length > 0
+            ? Math.round(ringTrials.filter(t => t.correct).reduce((s, t) => s + t.rt, 0) / ringTrials.filter(t => t.correct).length)
+            : '-';
+
+        totalCorrect += correct;
+        if (typeof avgRT === 'number') {
+            totalRT += avgRT * correct;
+            correctCount += correct;
+        }
+
+        const col = document.createElement('div');
+        col.className = 'ring-bar';
+
+        const barFill = document.createElement('div');
+        barFill.className = 'bar-fill';
+        barFill.style.height = '0px';
+        // Animate in
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                barFill.style.height = Math.max(4, pct * 1.8) + 'px';
+            });
+        });
+
+        const valueLbl = document.createElement('div');
+        valueLbl.className = 'bar-value';
+        valueLbl.textContent = `${pct}%`;
+
+        const rtLbl = document.createElement('div');
+        rtLbl.className = 'bar-label';
+        rtLbl.textContent = avgRT !== '-' ? `${avgRT}ms` : '—';
+
+        const ringLbl = document.createElement('div');
+        ringLbl.className = 'bar-label';
+        ringLbl.textContent = RING_LABELS[r];
+
+        col.appendChild(valueLbl);
+        col.appendChild(barFill);
+        col.appendChild(rtLbl);
+        col.appendChild(ringLbl);
+        body.appendChild(col);
+    }
+
+    const overallPct = Math.round((totalCorrect / TRIALS) * 100);
+    const overallRT = correctCount > 0 ? Math.round(totalRT / correctCount) : '-';
+    document.getElementById('results-summary').textContent =
+        `Overall: ${overallPct}% accuracy, ${overallRT}ms avg RT (correct trials) · ${colorSelect.value} targets`;
+}
+
+// === EVENTS ===
+startBtn.addEventListener('click', startExperiment);
+restartBtn.addEventListener('click', startExperiment);
+
+// Spacebar to skip to next trial (if stuck)
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && phase === 'search') {
+        phase = 'feedback';
+        trialData.push({
+            ring: currentTargetRing,
+            rt: -1,
+            correct: false,
+            color: colorSelect.value
+        });
+        feedbackEl.textContent = 'Skipped';
+        feedbackEl.style.color = '#888';
+        feedbackEl.classList.add('show');
+        setTimeout(() => {
+            feedbackEl.classList.remove('show');
+            trial++;
+            nextTrial();
+        }, 400);
+    }
+});
+</script>
+</body>
+</html>

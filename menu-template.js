@@ -2,7 +2,7 @@ const { app, shell } = require('electron');
 
 const { RADIUS_OPTIONS, ASPECT_OPTIONS, INTENSITY_OPTIONS } = require('./shared/constants.json');
 
-function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10, currentMobileEmulation = false) {
+function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10, currentMobileEmulation = false, currentAestheticMode = 0) {
     const isMac = process.platform === 'darwin';
     const { BrowserWindow } = require('electron');
 
@@ -250,6 +250,18 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     win.scrutinizerView.webContents.loadFile(target);
                                 }
                             }
+                        },
+                        { type: 'separator' },
+                        {
+                            label: 'Color Search (Experiment)',
+                            click: () => {
+                                const win = BrowserWindow.getFocusedWindow();
+                                if (win && win.scrutinizerView) {
+                                    const path = require('path');
+                                    const target = path.join(__dirname, 'tests', 'reference-pages', 'color-search.html');
+                                    win.scrutinizerView.webContents.loadFile(target);
+                                }
+                            }
                         }
                     ]
                 }
@@ -259,6 +271,78 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
         {
             label: 'Simulation',
             submenu: [
+                // === BEHAVIOR (cognitive processes being modeled) ===
+                {
+                    label: 'Behavior',
+                    submenu: [
+                        {
+                            label: 'Visual Memory',
+                            submenu: [
+                                {
+                                    label: 'Off (Default)',
+                                    type: 'radio',
+                                    checked: true,
+                                    click: () => sendToOverlays('menu:set-visual-memory', 0)
+                                },
+                                {
+                                    label: 'Limited (5 fixations)',
+                                    type: 'radio',
+                                    click: () => sendToOverlays('menu:set-visual-memory', 5)
+                                },
+                                {
+                                    label: 'Extended (10 fixations)',
+                                    type: 'radio',
+                                    click: () => sendToOverlays('menu:set-visual-memory', 10)
+                                },
+                                {
+                                    label: 'Infinite',
+                                    type: 'radio',
+                                    click: () => sendToOverlays('menu:set-visual-memory', -1)
+                                },
+                                { type: 'separator' },
+                                {
+                                    label: 'Inhibition of Return (10 fixations)',
+                                    type: 'radio',
+                                    click: () => sendToOverlays('menu:set-visual-memory', 20)
+                                }
+                            ]
+                        },
+                        { type: 'separator' },
+                        {
+                            label: 'Enable Structure Map',
+                            type: 'checkbox',
+                            checked: true,
+                            click: (menuItem) => sendToOverlays('menu:toggle-enable-structure-map', menuItem.checked)
+                        },
+                        {
+                            label: 'Enable Saliency Modulation',
+                            type: 'checkbox',
+                            checked: true,
+                            click: (menuItem) => sendToOverlays('menu:toggle-saliency-modulation', menuItem.checked)
+                        },
+                        { type: 'separator' },
+                        // === EXPERIMENTAL MODELS (alternative simulation pipelines) ===
+                        {
+                            label: 'FOVI (Cortical Magnification)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 6,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 6); app.emit('aesthetic-mode-changed', 6); }
+                        },
+                        {
+                            label: 'Legacy v1.6 (Comparison)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 7,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 7); app.emit('aesthetic-mode-changed', 7); }
+                        },
+                        {
+                            label: 'Gaussian Desaturation (Experimental)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 8,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 8); app.emit('aesthetic-mode-changed', 8); }
+                        }
+                    ]
+                },
+
                 // === FOVEAL ===
                 {
                     label: 'Foveal',
@@ -413,98 +497,49 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     ]
                 },
 
-                // === BEHAVIOR ===
-                {
-                    label: 'Behavior',
-                    submenu: [
-                        {
-                            label: 'Aesthetic Mode',
-                            submenu: [
-                                // === RESEARCH MODES (Optimized for simulation accuracy) ===
-                                {
-                                    label: 'High-Key Ghosting (Default)',
-                                    type: 'radio',
-                                    checked: true,
-                                    click: () => sendToOverlays('menu:set-aesthetic-mode', 0)
-                                },
-                                {
-                                    label: 'Biological (Purkinje Darkening)',
-                                    type: 'radio',
-                                    click: () => sendToOverlays('menu:set-aesthetic-mode', 1)
-                                },
-                                {
-                                    label: 'Frosted Glass (iOS)',
-                                    type: 'radio',
-                                    click: () => sendToOverlays('menu:set-aesthetic-mode', 2)
-                                },
-                                // === PRESENTATION MODES (Storytelling & demos) ===
-                                {
-                                    label: 'Wireframe (Gestalt)',
-                                    type: 'radio',
-                                    click: () => sendToOverlays('menu:set-aesthetic-mode', 3)
-                                },
-                                {
-                                    label: 'Cyberpunk (Neon)',
-                                    type: 'radio',
-                                    click: () => sendToOverlays('menu:set-aesthetic-mode', 4)
-                                },
-                                {
-                                    label: 'Double Vision',
-                                    type: 'radio',
-                                    click: () => sendToOverlays('menu:set-aesthetic-mode', 5)
-                                }
-                            ]
-                        },
-                        {
-                            label: 'Visual Memory',
-                            submenu: [
-                                {
-                                    label: 'Off (Default)',
-                                    type: 'radio',
-                                    checked: true,
-                                    click: () => sendToOverlays('menu:set-visual-memory', 0)
-                                },
-                                {
-                                    label: 'Limited (5 fixations)',
-                                    type: 'radio',
-                                    click: () => sendToOverlays('menu:set-visual-memory', 5)
-                                },
-                                {
-                                    label: 'Extended (10 fixations)',
-                                    type: 'radio',
-                                    click: () => sendToOverlays('menu:set-visual-memory', 10)
-                                },
-                                {
-                                    label: 'Infinite',
-                                    type: 'radio',
-                                    click: () => sendToOverlays('menu:set-visual-memory', -1)
-                                },
-                                { type: 'separator' },
-                                {
-                                    label: 'Inhibition of Return (10 fixations)',
-                                    type: 'radio',
-                                    click: () => sendToOverlays('menu:set-visual-memory', 20)
-                                }
-                            ]
-                        }
-                    ]
-                },
+                { type: 'separator' },
 
-                // === CONTENT ANALYSIS ===
+                // === UTILITY (rendering modes & debug views) ===
                 {
-                    label: 'Content Analysis',
+                    label: 'Utility',
                     submenu: [
+                        // === RESEARCH MODES (Optimized for simulation accuracy) ===
                         {
-                            label: 'Enable Structure Map',
-                            type: 'checkbox',
-                            checked: true,
-                            click: (menuItem) => sendToOverlays('menu:toggle-enable-structure-map', menuItem.checked)
+                            label: 'High-Key Ghosting (Default)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 0,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 0); app.emit('aesthetic-mode-changed', 0); }
                         },
                         {
-                            label: 'Enable Saliency Modulation',
-                            type: 'checkbox',
-                            checked: true,
-                            click: (menuItem) => sendToOverlays('menu:toggle-saliency-modulation', menuItem.checked)
+                            label: 'Biological (Purkinje Darkening)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 1,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 1); app.emit('aesthetic-mode-changed', 1); }
+                        },
+                        {
+                            label: 'Frosted Glass (iOS)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 2,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 2); app.emit('aesthetic-mode-changed', 2); }
+                        },
+                        // === PRESENTATION MODES (Storytelling & demos) ===
+                        {
+                            label: 'Wireframe (Gestalt)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 3,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 3); app.emit('aesthetic-mode-changed', 3); }
+                        },
+                        {
+                            label: 'Cyberpunk (Neon)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 4,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 4); app.emit('aesthetic-mode-changed', 4); }
+                        },
+                        {
+                            label: 'Double Vision',
+                            type: 'radio',
+                            checked: currentAestheticMode === 5,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 5); app.emit('aesthetic-mode-changed', 5); }
                         },
                         { type: 'separator' },
                         {

@@ -40,6 +40,11 @@ uniform float u_dog_enabled;     // 0.0 = legacy MIP, 1.0 = DoG reconstruction
 uniform float u_dog_e2;          // M-scaling E2 (half-resolution eccentricity)
 uniform float u_dog_sharpness;   // Band rolloff sharpness (0=biological, 1=sharp)
 
+// FOVI (Cortical Magnification) uniforms — Blauch, Alvarez & Konkle (2026)
+uniform float u_fovi_enabled;     // 0.0 = legacy linear, 1.0 = CMF logarithmic
+uniform float u_cmf_a;            // Cortical magnification constant (default 2.78)
+uniform float u_fovi_color_sigma; // Gaussian color decay sigma (0.0 = disabled)
+
 in vec2 v_texCoord;
 out vec4 fragColor;
 
@@ -113,12 +118,22 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     // residual = mip4          // DC: overall color/luminance
 
     // Per-band cutoff eccentricities (M-scaling)
-    // Geometric progression: each band persists ~2x further
-    float e2 = max(dog_e2, 0.1);
-    float c0 = 0.3 * e2;
-    float c1 = 0.6 * e2;
-    float c2 = 1.2 * e2;
-    float c3 = 2.4 * e2;
+    float c0, c1, c2, c3;
+    if (u_fovi_enabled > 0.5) {
+        // CMF-derived: cutoff_i = a * (2^level - 1) / fovea_deg
+        float fovea_deg = 2.0;
+        c0 = u_cmf_a * (pow(2.0, 0.5) - 1.0) / fovea_deg;
+        c1 = u_cmf_a * (pow(2.0, 1.0) - 1.0) / fovea_deg;
+        c2 = u_cmf_a * (pow(2.0, 1.5) - 1.0) / fovea_deg;
+        c3 = u_cmf_a * (pow(2.0, 2.0) - 1.0) / fovea_deg;
+    } else {
+        // Legacy: geometric progression from hand-tuned E2
+        float e2 = max(dog_e2, 0.1);
+        c0 = 0.3 * e2;
+        c1 = 0.6 * e2;
+        c2 = 1.2 * e2;
+        c3 = 2.4 * e2;
+    }
 
     // Transition width: biological (wide, gradual) vs sharp (narrow, crisp)
     float transMult = mix(0.4, 0.05, dog_sharpness);
@@ -147,14 +162,23 @@ vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
     float normalizedEcc = max(0.0, eccentricity) / fovea_radius;
     float mipScaling = 2.5;
     float maxMipLevel = 4.0;
-    float mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
-    
+
+    float mipLevel;
+    if (u_fovi_enabled > 0.5) {
+        // FOVI: Logarithmic cortical magnification (CMF = 1/(r+a))
+        float fovea_deg = 2.0;
+        float r_deg = normalizedEcc * fovea_deg;
+        mipLevel = clamp(log2(max(1.0, (r_deg + u_cmf_a) / u_cmf_a)), 0.0, maxMipLevel);
+    } else {
+        mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
+    }
+
     vec4 col = textureLod(u_texture, uv, mipLevel);
-    
+
     float temp = col.r;
     col.r = col.b;
     col.b = temp;
-    
+
     return col;
 }
 
@@ -163,14 +187,23 @@ vec4 sampleMIPPooledGrad(vec2 uv, vec2 duvdx, vec2 duvdy, float eccentricity, fl
     float normalizedEcc = max(0.0, eccentricity) / fovea_radius;
     float mipScaling = 2.5;
     float maxMipLevel = 4.0;
-    float mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
-    
+
+    float mipLevel;
+    if (u_fovi_enabled > 0.5) {
+        // FOVI: Logarithmic cortical magnification (CMF = 1/(r+a))
+        float fovea_deg = 2.0;
+        float r_deg = normalizedEcc * fovea_deg;
+        mipLevel = clamp(log2(max(1.0, (r_deg + u_cmf_a) / u_cmf_a)), 0.0, maxMipLevel);
+    } else {
+        mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
+    }
+
     vec4 col = textureGrad(u_texture, uv, duvdx * pow(2.0, mipLevel), duvdy * pow(2.0, mipLevel));
-    
+
     float temp = col.r;
     col.r = col.b;
     col.b = temp;
-    
+
     return col;
 }
 
@@ -281,12 +314,13 @@ float rand(vec2 co){
 
 struct ModeConfig {
     bool lgn_use_structure_mask;
-    bool lgn_use_saliency_gate; 
-    int  v1_distortion_type;    
-    float v1_strength_mult;     
-    int  v4_style_id;           
-    float lgn_ramp_end_mult;    
-    bool v1_animate;            
+    bool lgn_use_saliency_gate;
+    int  v1_distortion_type;
+    float v1_strength_mult;
+    int  v4_style_id;
+    float lgn_ramp_end_mult;
+    bool v1_animate;
+    bool fovi_enabled;
 };
 
 struct LGN_Signal {
@@ -579,7 +613,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     float effectFactor = v1.distortionStrength; 
     float bypassTransition = smoothstep(fovea_radius * 0.5, fovea_radius * 0.7, dist);
 
-    if (config.v4_style_id <= 1) { // Research Modes: 0=Usability, 1=Biological(Purkinje)
+    if (config.v4_style_id <= 1 || config.v4_style_id == 7) { // Research Modes: 0=Usability, 1=Biological(Purkinje), 7=Gaussian Desaturation
     
         // === SHARED BIOLOGICAL PIPELINE ===
         float noiseVal = (rand(uv) - 0.5);
@@ -612,8 +646,19 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         vec3 lab = rgbToOklab(col);
         
         // 3. Rod Desaturation Factor
-        float rampEnd = fovea_radius * config.lgn_ramp_end_mult;
-        float desaturationFactor = smoothstep(fovea_radius, rampEnd, dist);
+        float desaturationFactor;
+        if (config.v4_style_id == 7 && u_fovi_color_sigma > 0.01) {
+            // Gaussian exponential decay: models cone density falloff
+            // desatFactor = 0 at fovea edge, asymptotic toward 1 in periphery
+            float fovea_deg = 2.0;
+            float normEcc = max(0.0, eccentricity) / max(fovea_radius, 0.001);
+            float r_deg = normEcc * fovea_deg;
+            desaturationFactor = 1.0 - exp(-r_deg / max(u_fovi_color_sigma, 0.1));
+        } else {
+            // Smoothstep ramp (modes 0 & 1): S-curve between fovea and ramp end
+            float rampEnd = fovea_radius * config.lgn_ramp_end_mult;
+            desaturationFactor = smoothstep(fovea_radius, rampEnd, dist);
+        }
         desaturationFactor *= strengthMult;
         
         float fade = desaturationFactor * bypassTransition;
@@ -624,8 +669,9 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         
         // === DIVERGENCE: USABILITY VS BIOLOGY ===
         
-        if (config.v4_style_id == 0) { 
-            // === MODE 0: USABILITY (High-Key Ghosting) ===
+        if (config.v4_style_id == 0 || config.v4_style_id == 7) {
+            // === MODE 0/7: USABILITY (High-Key Ghosting) ===
+            // Style 7 uses same aesthetic, only desaturation curve differs (Gaussian vs smoothstep)
             // Goal: Red buttons turn Grey (structural retention), not Black (invisible).
             
             // Red Kill Switch (Prevent Mustard)
@@ -698,14 +744,25 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             
     } else if (config.v4_style_id == 5) { // Double Vision
         float luma = dot(col, vec3(0.299, 0.587, 0.114));
-        vec3 saturated = mix(vec3(luma), col, 1.6); 
+        vec3 saturated = mix(vec3(luma), col, 1.6);
         vec2 warpUV = v1.distortedUV * 2.0;
         float n = snoise(warpUV + vec2(u_time * 0.1));
         float subtleNoise = n * 0.05 * effectFactor;
         vec3 finalColor = clamp(saturated + subtleNoise, 0.0, 1.0);
         return mix(col, finalColor, effectFactor * bypassTransition);
+
+    } else if (config.v4_style_id == 6) { // FOVI: Gaussian color decay (rod-cone transition)
+        if (u_fovi_color_sigma > 0.01) {
+            float fovea_deg = 2.0;
+            float normEcc = max(0.0, eccentricity) / max(fovea_radius, 0.001);
+            float r_deg = normEcc * fovea_deg;
+            float decay = exp(-r_deg / max(u_fovi_color_sigma, 0.1));
+            float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+            col = mix(vec3(lum), col, decay);
+        }
+        return col;
     }
-    
+
     return col;
 }
 
@@ -742,7 +799,8 @@ void main() {
     config.v4_style_id = u_v4_style_id;
     config.lgn_ramp_end_mult = u_lgn_ramp_end_mult;
     config.v1_animate = u_v1_animate > 0.5;
-    
+    config.fovi_enabled = u_fovi_enabled > 0.5;
+
     if (config.v4_style_id == 5) {
         config.lgn_use_structure_mask = false;
         config.lgn_use_saliency_gate = false;

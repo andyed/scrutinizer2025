@@ -21,6 +21,7 @@ let currentStartPage;
 
 let currentVisualMemory;
 let currentMobileEmulation;
+let currentAestheticMode = 0;
 
 let mainWindow;
 let splashWindow;
@@ -62,7 +63,7 @@ function rebuildMenu() {
     // Ensure settings are initialized
     const radius = currentRadius || 180;
     const blur = currentBlur || 10;
-    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur, currentMobileEmulation));
+    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur, currentMobileEmulation, currentAestheticMode));
     Menu.setApplicationMenu(menu);
 
     // Explicitly set for all non-HUD windows (Windows/Linux)
@@ -119,6 +120,11 @@ ipcMain.on('settings:page-changed', (event, url) => {
 
 });
 
+// Aesthetic mode changed — rebuild menu to sync radio buttons across Behavior/Utility submenus
+app.on('aesthetic-mode-changed', (mode) => {
+    currentAestheticMode = mode;
+    rebuildMenu();
+});
 
 // Handle Touch Emulation Request
 ipcMain.on('emulate-touch', async (event, { type, x, y }) => {
