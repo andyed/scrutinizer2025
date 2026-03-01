@@ -85,7 +85,7 @@ Scrutinizer is designed for **designers, UX researchers, and HCI/vision scientis
 * **Visual Memory**: Simulates iconic memory decay (Off, Limited, Extended, Infinite)
 * **Chromatic Aberration**: Lens-like color fringing in periphery
 * **Adjustable Parameters**: Foveal radius (20-450px), shape (4 ratios), intensity (0-100%)
-* **Neural Processing Model (WebGL)**: Biologically accurate retinal simulation with domain warping
+* **Neural Processing Model (WebGL)**: Biologically grounded retinal simulation with domain warping
 
 ---
 

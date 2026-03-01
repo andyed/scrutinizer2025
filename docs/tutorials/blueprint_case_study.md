@@ -231,7 +231,7 @@ Blueprint demonstrates:
 ✅ The `modes.json` registry pattern  
 ✅ The three-stage pipeline architecture  
 
-Use this as a template when creating your own modes. The key insight: **modes are architectural stress-tests**, not just visual filters.
+Use this as a template when creating your own modes. Modes are architectural stress-tests, not just visual filters.
 
 ---
 

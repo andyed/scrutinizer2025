@@ -26,7 +26,7 @@ The human retina contains two fundamentally different photoreceptor types, each 
 - **Convergent wiring**: ~100 rods share a single ganglion cell
 - **Peak density**: ~160,000 rods/mm² at ~20° eccentricity
 
-> **The Key Insight**: This distribution is not a design flaw—it's an optimization. The fovea sacrifices sensitivity for resolution (1:1 wiring). The periphery sacrifices resolution for sensitivity (100:1 convergence). You can't have both.
+This distribution is not a design flaw — it's an optimization. The fovea sacrifices sensitivity for resolution (1:1 wiring). The periphery sacrifices resolution for sensitivity (100:1 convergence). You can't have both.
 
 ### 1.2 The Wiring: Why Periphery is "Blurry"
 
@@ -142,7 +142,7 @@ The **parafoveal region** (fovea + parafovea combined) corresponds to the **5° 
 - **Foveal (0-2°) radius**: ~92px
 - **Ratio**: 231/92 = **2.5x**
 
-**Key Insight**: This ~462px diameter zone is where users can rapidly perceive holistic information and spatial cues without making a saccade (direct eye movement). Optimizing web layouts for this region leverages the brain's parafoveal processing for key tasks like:
+This ~462px diameter zone is where users can rapidly perceive holistic information and spatial cues without making a saccade. Parafoveal processing handles:
 - Word length perception (saccade planning)
 - Link detection (contrast + geometric cues)
 - Layout structure (spatial relationships)
