@@ -21,6 +21,11 @@ const version = versionArg
 
 const OUTPUT_DIR = path.join(__dirname, '..', 'tests', 'golden-captures', `v${version}`);
 
+// Reference page base URL — GitHub Pages (scrutinizer-www).
+// Electron can't load file:// URLs due to web security restrictions.
+// Override with BASE_URL env var for local development.
+const BASE_URL = process.env.BASE_URL || 'https://andyed.github.io/scrutinizer-www/reference-pages';
+
 // Configuration for all captures
 // fixation: 'center' | 'top_left' | 'sidebar'
 const FIXATION_COORDS = {
@@ -117,8 +122,7 @@ if (!fs.existsSync(OUTPUT_DIR)) {
 
 async function runCapture(task, fixation, variant = { id: 'standard', overlay: false }) {
     return new Promise((resolve, reject) => {
-        const pagePath = path.resolve(__dirname, '..', 'tests', 'reference-pages', `${task.page}.html`);
-        const fileUrl = `file://${pagePath}`;
+        const pageUrl = `${BASE_URL}/${task.page}.html`;
 
         let filename = `${task.page}_${fixation}`;
         if (variant.id !== 'standard') {
@@ -133,13 +137,13 @@ async function runCapture(task, fixation, variant = { id: 'standard', overlay: f
         const selector = task.selectors?.[fixation];
 
         console.log(`📸 Capturing: ${filename}`);
-        console.log(`   URL: ${fileUrl}`);
+        console.log(`   URL: ${pageUrl}`);
         if (variant.debugFlag) console.log(`   Debug Flag: ${variant.debugFlag}`);
 
         const env = {
             ...process.env,
             TEST_MODE: 'true',
-            TEST_URL: fileUrl,
+            TEST_URL: pageUrl,
             TEST_MODES: variant.mode || '0', // Use variant mode or default to '0'
             TEST_FIXATION_X: fixationDef.x,
             TEST_FIXATION_Y: fixationDef.y,
