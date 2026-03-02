@@ -51,15 +51,21 @@
 
 % ============================================================
 \begin{abstract}
-We present Scrutinizer, an open-source, real-time gaze-contingent foveated rendering system for live web content. A 1157-line GLSL shader implements a pipeline mapped to the visual pathway (retinal ganglion cells~$\rightarrow$ LGN~$\rightarrow$ V1~$\rightarrow$ V4), with four swappable JavaScript modules aligned to biological subsystems. The key technical contribution is a Difference-of-Gaussians (DoG) band decomposition exploiting the hardware MIP chain for frequency-selective peripheral filtering---high-frequency detail attenuates first while low-frequency structure persists, mirroring cortical magnification~\citep{rovamo1979}. A reference implementation of FOVI~\citep{blauch2026} enables direct comparison of cortical magnification strategies within the same framework. Open source (MIT), 60\,fps, 138 unit tests.
+Gaze-contingent tools used in HCI research---BubbleView, ViewSer, ScreenMasker---simulate peripheral vision with Gaussian blur, uniformly destroying the spatial structure that real peripheral vision preserves. They also operate on static images, not live interactive content. We present Scrutinizer, an open-source foveated rendering system that applies biologically-grounded peripheral filtering to live web pages at 60\,fps. A 1157-line GLSL shader implements a pipeline mapped to the visual pathway (retinal ganglion cells~$\rightarrow$ LGN~$\rightarrow$ V1~$\rightarrow$ V4), using Difference-of-Gaussians band decomposition on the hardware MIP chain for frequency-selective attenuation---high-frequency detail falls off first while low-frequency structure persists, approximating cortical magnification~\citep{rovamo1979}. The modular architecture maps each JavaScript module to a biological subsystem, enabling researchers to swap components independently (e.g., mouse gaze proxy~$\rightarrow$ eye tracker) and compare peripheral filtering strategies side-by-side---including FOVI's cortical magnification function~\citep{blauch2026} as a switchable mode. Open source (MIT), 110 unit tests.
 \end{abstract}
 
 % ============================================================
 \section{Introduction}
 
-Peripheral vision is not blurry---it is \emph{differently encoded}. The retina compresses ${\sim}10^7$ photoreceptor signals into ${\sim}10^6$ optic nerve fibers, selectively preserving low-frequency structure while filtering high-frequency detail~\citep{curcio1990, dacey1993}. This is compute demand management: limited bandwidth allocated to information most likely to guide the next saccade.
+Peripheral vision is not blurry---it is \emph{differently encoded}. The retina compresses ${\sim}10^7$ photoreceptor signals into ${\sim}10^6$ optic nerve fibers~\citep{curcio1990}, with ganglion cell receptive fields growing with eccentricity~\citep{dacey1993}---effectively preserving low-frequency structure while filtering high-frequency detail. This is compute demand management: limited bandwidth allocated to information most likely to guide the next saccade.
 
-Existing gaze-contingent tools---BubbleView~\citep{kim2017}, ViewSer~\citep{lagun2011}, ScreenMasker---apply Gaussian blur as a peripheral proxy, uniformly destroying spatial structure and preventing layout-level judgments that real peripheral vision supports. These tools also operate on static images, not live interactive content.
+Existing gaze-contingent tools---BubbleView~\citep{kim2017}, ViewSer~\citep{lagun2011}, ScreenMasker~\citep{orlov2016}---apply Gaussian blur as a peripheral proxy, uniformly destroying spatial structure and preventing layout-level judgments that real peripheral vision supports. These tools also operate on static images, not live interactive content (Table~\ref{tab:comparison}).\footnote{An earlier Scrutinizer prototype~\citep{edmonds2007} demonstrated mouse-contingent Gaussian blur on live web pages using Adobe AIR (2007), establishing real-time fidelity as the key technical challenge. Modern GPU APIs now make biologically-grounded filtering practical at 60\,fps.}
+
+Scrutinizer contributes \textbf{(1)} a DoG band decomposition exploiting the GPU MIP chain for frequency-selective peripheral filtering at near-zero cost (5 \texttt{textureLod} calls), \textbf{(2)} a DOM structure extractor that harvests web accessibility annotations (ARIA roles, semantic HTML, computed styles) as top-down priors for the saliency pipeline---a computational analog of attentional modulation, without requiring a vision model, \textbf{(3)} a modular architecture (Table~\ref{tab:architecture}) with five branch points where researchers swap implementations without modifying the core shader, and \textbf{(4)} a side-by-side comparison with FOVI's cortical magnification function~\citep{blauch2026}: Scrutinizer's effective cutoff falls 3.5--4.6$\times$ lower at matched eccentricities, illustrating the combined effect of crowding, saliency gating, and color processing that FOVI delegates to downstream neural networks.
+
+These contributions serve three use cases. \textbf{(a)~Vision research:} the branch-point architecture and parameter-controlled shader make Scrutinizer a platform for perceptual experiments---e.g., comparing frequency-selective filtering against Gaussian blur on reading speed and visual search (Section~\ref{sec:validation}). \textbf{(b)~HCI and usability:} instrumented browsers have logged mouse and navigation events for usability research since Uzilla~\citep{edmonds2003}; ViewSer~\citep{lagun2011} added restricted foveal viewing to study SERP examination at scale. Scrutinizer extends this lineage---the same cursor stream that drives interaction logging now also drives a biologically-grounded peripheral model on live content, letting researchers observe what users see, not just where they click. \textbf{(c)~Design evaluation:} \citet{queen2006} showed that icons with distinct low-spatial-frequency silhouettes are identified ${\sim}$0.5\,s faster---but this analysis requires spatial-frequency filtering that most designers lack access to. Scrutinizer provides it live: designers see which icons, buttons, and headings survive peripheral vision and which collapse into indistinguishable blobs, stress-testing information hierarchy before deployment.
+
+\textbf{Limitations.} The current gaze input is mouse cursor position---a reasonable proxy when the user's eyes track the cursor, but unable to capture saccades, reading fixations, or gaze-cursor dissociation. Eccentricity is computed in pixel units; without per-user viewing distance and display DPI calibration, the mapping to degrees of visual angle is approximate. Perceptual validation against human peripheral discrimination thresholds is future work.
 
 \begin{table}[t]
 \centering
@@ -72,35 +78,33 @@ Existing gaze-contingent tools---BubbleView~\citep{kim2017}, ViewSer~\citep{lagu
 \midrule
 BubbleView~\citeyearpar{kim2017} & -- & Gauss. & -- & -- & \checkmark \\
 ViewSer~\citeyearpar{lagun2011} & SERP & Gauss. & -- & -- & -- \\
-ScreenMasker & -- & Gauss. & -- & -- & \checkmark \\
+ScreenMasker~\citeyearpar{orlov2016} & -- & Gauss. & -- & -- & \checkmark \\
 FOVI~\citeyearpar{blauch2026} & \checkmark & CMF & -- & -- & \checkmark \\
 \textbf{Scrutinizer} & \checkmark & \textbf{DoG} & \checkmark & \checkmark & \checkmark \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Scrutinizer contributes \textbf{(1)} a modular architecture where each module maps to a biological subsystem (Table~\ref{tab:architecture}), enabling independent swapping---replace the mouse-based gaze proxy with an eye tracker by changing one module---and \textbf{(2)} a swappable pipeline enabling side-by-side comparison of peripheral filtering strategies, including a reference implementation of FOVI cortical magnification~\citep{blauch2026}.
-
 % ============================================================
 \section{Architecture: Biology $\rightarrow$ Computation}
 
-The pipeline is a single-pass fragment shader (1157~LOC, GLSL~ES~3.0) with 27 uniforms organized into biological stages, fed by four JavaScript modules (Table~\ref{tab:architecture}).
+The pipeline is a single-pass fragment shader (1157~LOC, GLSL~ES~3.0) with 34 uniforms organized into biological stages, fed by four JavaScript modules (Table~\ref{tab:architecture}).
 
 \begin{table}[t]
 \centering
-\caption{Module architecture mapped to biological subsystems.}\vspace{-2pt}
+\caption{Pipeline stages mapped to biological subsystems.}\vspace{-2pt}
 \label{tab:architecture}
 \footnotesize
-\begin{tabular}{@{}p{1.4cm}p{1.7cm}p{3.5cm}@{}}
+\begin{tabular}{@{}ll@{}}
 \toprule
-\textbf{Biology} & \textbf{Module (LOC)} & \textbf{Function} \\
+\textbf{Biology} & \textbf{Computation} \\
 \midrule
-Oculomotor & GazeModel (166) & Velocity, fixation, saccadic suppression \\
-Retinal GC & ContentAnalysis (361) & DoG center-surround via MIP chain \\
-LGN gating & ContentAnalysis & Structure mask + saliency gate \\
-V1 features & Orchestrator (536) & Noise crowding, grid scramble \\
-V4 color & Renderer (548) & Oklab desat., chrom.\ aberration \\
-Saliency & Worker (489) & Oklab DoG + face det.\ + structure \\
+Oculomotor & Velocity, fixation, saccadic suppression \\
+Retinal ganglion cells & DoG center-surround via MIP chain \\
+LGN gating & Structure mask + saliency gate \\
+V1 features & Noise crowding, grid scramble \\
+V4 color & Oklab desaturation, lateral chromatic offset \\
+Saliency map & Oklab DoG + face detection + DOM structure \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -118,11 +122,21 @@ Four bands span 1--2\,px (serifs) to 8--16\,px (buttons), each weighted by a smo
 
 \subsection{Saliency-Driven Bandwidth Allocation}
 
-The LGN's synaptic inputs are ${\sim}90\%$ modulatory, with ${\sim}30\%$ from V1 feedback~\citep{sherman2002}; spatial attention enhances LGN gain~\citep{mcalonan2008}. We model this as saliency gating: a Web Worker computes a saliency map (Oklab opponent-channel DoG + face detection + Gestalt structure masks), uploaded as a GPU texture. High-saliency regions receive up to 70\% of rendering bandwidth.
+The LGN's synaptic inputs are predominantly modulatory, with a substantial fraction from V1 feedback~\citep{sherman2002}; spatial attention enhances LGN gain~\citep{mcalonan2008}. We model this as saliency gating via a dedicated Web Worker that fuses three channels into a single GPU texture:
+
+\textbf{Bottom-up:} Oklab opponent-channel DoG (color saliency) and face detection via face-api.js~\citep{faceapijs} (TinyFaceDetector, 190\,KB).
+
+\textbf{Top-down:} A DOM structure extractor walks the live page's element tree, rendering bounding boxes of text runs (with computed font weight as density), media elements, and interactive controls---including ARIA roles (\texttt{role="button"}, \texttt{role="dialog"}, etc.)---into an RGBA mask. Two decades of web accessibility standards have produced a machine-readable semantic layer on most production websites; the extractor harvests this existing annotation as a free source of top-down priors. This provides what bottom-up saliency cannot: \emph{knowledge that a control is interactive}---a computational analog of the top-down attentional priors that modulate early visual processing. Because it reads the DOM directly, the extractor works on any web page without training data or a vision model.
+
+High-saliency regions receive up to 70\% of rendering bandwidth. To keep the pipeline at 60\,fps, the shader renders every frame but expensive analyses run asynchronously at lower rates: the saliency worker (face detection + color DoG) computes every 15th frame (${\sim}$250\,ms); the DOM structure scan defers to idle callbacks on mutations (300\,ms) and yields the main thread entirely during form input (1.5\,s debounce). The GPU texture holding the combined saliency map persists between updates, so the shader always has a map even when the analyses are in flight.
 
 \subsection{V1 Crowding and V4 Color}
 
-Crowding is feature binding failure, not blur~\citep{pelli2008}. We model it via simplex noise domain warping and grid-based feature scrambling~\citep{rosenholtz2012}. V4 applies Oklab desaturation~\citep{ottosson2020} for rod dominance and chromatic aberration for M/P asynchrony~\citep{livingstone1988}.
+Crowding is feature binding failure, not blur~\citep{pelli2008}. We approximate its visual effect via simplex noise domain warping and grid-based feature scrambling; this does not implement the summary statistic model of~\citet{rosenholtz2012} but produces qualitatively similar identity loss. V4 applies Oklab desaturation~\citep{ottosson2020} for the peripheral loss of chromatic sensitivity due to reduced cone density and reduced cortical chromatic resources~\citep{mullen2002}, plus a lateral R/B channel offset simulating longitudinal chromatic aberration of the eye.
+
+\subsection{Foveal Calibration}
+
+The foveal radius---the boundary between high-fidelity central rendering and peripheral filtering---must match each user's actual foveal extent on their display. Without calibration, a 180\,px default subtends different visual angles on a 13'' laptop at 50\,cm versus a 27'' monitor at 70\,cm. We prototype a psychophysical staircase procedure using the Motion Silence Illusion: rotating crosses that appear static in peripheral vision due to crowding~\citep{pelli2008}. The staircase converges on the eccentricity at which users can no longer detect motion onset, with reaction-time weighting to penalize guesses. The result is a pixel radius stored per user. The current implementation does not convert pixels to degrees of visual angle---doing so requires viewing distance, which the Virtual Chinrest~\citep{li2020} estimates via blind-spot geometry ($\pm$3.25\,cm) and which EasyEyes tracks continuously via webcam face landmarks. Integrating either through the Gaze Input branch point would close the pixel-to-degree gap.
 
 \subsection{Extensibility Branch Points}
 
@@ -149,31 +163,37 @@ Pipeline & JSON registry & Zero-code new profiles \\
 
 \subsection{Cortical Magnification: FOVI Comparison}
 
-\citet{blauch2026} propose FOVI, a cortical magnification transform for vision models: $\mathit{mipLevel}(e) = \log_2(1 + e/a)$, $a{=}2.78^{\circ}$. We implemented FOVI alongside Scrutinizer's DoG pipeline, enabling direct comparison. At matched eccentricities, Scrutinizer's effective cutoff falls 3.5--4.6$\times$ lower than FOVI's---the gap represents crowding, receptive-field growth, and contrast sensitivity loss that Scrutinizer bakes into its shader stages (V1 noise, saliency gating, Oklab desaturation) while FOVI leaves to the downstream neural network.
+\citet{blauch2026} propose FOVI, a foveated interface for vision models built on a kNN-convolutional architecture over a retinal sensor manifold. We implement one component---FOVI's cortical magnification function, $\mathit{mipLevel}(e) = \log_2(1 + e/a)$, $a{=}2.78^{\circ}$---as a switchable MIP-sampling mode alongside Scrutinizer's DoG pipeline. This is the spatial resolution falloff only; we do not implement FOVI's kNN sensor manifold, kernel mapping, or neural network pipeline. At matched eccentricities, Scrutinizer's effective cutoff falls 3.5--4.6$\times$ lower than FOVI's CMF alone---the gap represents crowding, contrast sensitivity loss, and color processing that Scrutinizer bakes into its shader stages (V1 noise, saliency gating, Oklab desaturation) while FOVI delegates these to downstream learned representations.
 
-Both systems share an open question: the desaturation transfer function. Scrutinizer uses smoothstep in Oklab space; FOVI applies exponential decay in RGB. Neither approach is definitively grounded---\citet{mullen2002} show red-green sensitivity declining faster than blue-yellow with eccentricity, suggesting a dual-sigma model per opponent channel rather than a uniform curve.
+An open question for both approaches is the desaturation transfer function. Scrutinizer uses smoothstep in Oklab space; we also expose a Gaussian decay mode ($e^{-r/\sigma}$) for comparison. Neither is definitively grounded---\citet{mullen2002} show red-green sensitivity declining faster than blue-yellow with eccentricity, suggesting a dual-sigma model per opponent channel rather than a uniform curve.
 
 % ============================================================
 \section{Development Process}
 
-The system was developed through iterative AI-human collaboration (Claude, Anthropic) where the agent served as \emph{research collaborator} maintaining biological grounding.
+The system was developed through iterative AI-human collaboration (Claude, Anthropic) where the agent served as \emph{research collaborator} maintaining biological grounding. Two examples illustrate complementary failure modes that the pairing catches:
 
-\textbf{Cross-process bug detection.}
-The saliency worker computed Oklab opponent channels on BGRA-ordered pixels from Electron's \texttt{capturePage()}. The agent traced the byte-order mismatch across 4 files and 3 processes (main $\rightarrow$ renderer $\rightarrow$ Worker)---a class of bug where human code review is unlikely to catch the cross-boundary semantic error.
+\textbf{Agent catches cross-boundary bug.}
+The saliency worker computed Oklab opponent channels on BGRA-ordered pixels from Electron's \texttt{capturePage()}. The agent traced the byte-order mismatch across 4 files and 3 processes (main $\rightarrow$ renderer $\rightarrow$ Worker)---a semantic error spanning process boundaries that human code review is unlikely to catch.
 
-\textbf{Conceptual reframing.}
-Documentation described ``degradation with preservation.'' The human identified the biological analog is \emph{selective bandwidth allocation}; the agent then swept 12 files (${\sim}$30 edits) to align language, illustrating the agent as conceptual partner rather than code generator.
+\textbf{Human catches conceptual drift.}
+Documentation described ``degradation with preservation''---natural language for an engineering process focused on getting visual disruption correct. The human recognized this confused implementation with function: the retina's job is \emph{selective bandwidth allocation}, not degradation. The agent then swept 12 files (${\sim}$30 edits) to align language. The drift was invisible to the agent precisely because implementation-level accuracy \emph{had} been achieved; the conceptual error sat one level above the code.
 
-The modular architecture \emph{enables} this workflow: the agent reasons per biological module, not across a monolithic shader.
+The modular architecture enables both: the agent reasons per biological module rather than across a monolithic shader, and the human audits per biological claim rather than per file.
 
 % ============================================================
 \section{Status \& Future Work}
 
-\textbf{Implemented:}
-DoG band decomposition; saliency bandwidth allocation; noise crowding and grid scrambling; Oklab desaturation and chromatic aberration; foveal calibration; mobile emulation; FOVI cortical magnification reference implementation; hot-switchable pipeline profiles; 138 tests; golden capture regression.
+\textbf{Implemented (v1.7.0):}
+DoG band decomposition; saliency bandwidth allocation; noise crowding and grid scrambling; Oklab desaturation and chromatic aberration; foveal calibration; mobile emulation; FOVI CMF equation as switchable mode; 110 tests; golden capture regression. A declarative mode registry (\texttt{modes.json}) defines 9 pipeline configurations---6 research modes (High-Key, Biological/Purkinje, Frosted Glass, Log-Polar/FOVI, Legacy~v1.6, Gaussian Desaturation) and 3 presentation modes (Wireframe/Gestalt, Cyberpunk, Double Vision)---each specifying LGN gating, V1 distortion type, V4 style, and magnification model as a JSON object, enabling zero-code A/B comparisons between pipeline variants.
 
 \textbf{Future:}
-Dual-sigma color decay per opponent channel~\citep{mullen2002}; oriented DoG bands (oblique effect~\citep{appelle1972}); calibrated visual angles; eye tracker integration (GazeModel branch point); Portilla-Simoncelli mongrel synthesis (V1 branch point).
+Dual-sigma color decay per opponent channel~\citep{mullen2002}; oriented DoG bands (oblique effect~\citep{appelle1972}); calibrated visual angles via Virtual Chinrest~\citep{li2020} or webcam distance tracking; webcam gaze integration~\citep{papoutsaki2016} as a consumer-hardware alternative to dedicated eye trackers. The V1 crowding stage currently uses noise-based appearance approximation; the branch point is designed so a Portilla-Simoncelli texture-statistics model---the same class that~\citet{walton2021} showed outperforms blur for foveated rendering---can be swapped in without modifying the rest of the pipeline. V2 (contour integration, border ownership) and V3 (global shape recognition) are not modeled---these require semantic representations beyond fragment-shader spatial filtering---but could be approximated via contour fragmentation and morphological simplification stages.
+
+\textbf{Perceptual validation via restricted viewing.}\label{sec:validation}
+Gaze-contingent restricted viewing---pioneered by \citet{mcconkie1975}---is inherently disruptive: with a one-word window, reading speed drops to 75--77\% of baseline; a three-word window matching the perceptual span recovers 98\%~\citep{rayner2010}. Gaussian blur exaggerates this cost because it destroys spatial structure that real peripheral vision preserves. \citet{walton2021} showed that texture-statistic metamers outperform bandwidth-equivalent blur for both task performance and artifact detection in foveated rendering. Scrutinizer's DoG bands preserve this kind of structure---low-frequency layout visible, high-frequency identity lost---but whether this translates to less task disruption than Gaussian blur at matched bandwidth is an empirical question. The validation experiment would compare task completion time, reading speed, and comprehension under Scrutinizer's DoG pipeline versus Gaussian blur versus unrestricted viewing. The open question is whether any gaze-contingent simulation can approach baseline performance, or whether inherent limitations impose a floor. Line-length reading is especially challenging: the perceptual span extends ${\sim}$15 characters rightward during natural reading, and the zoom-lens model of attention~\citep{eriksen1986} predicts that the attended region widens dynamically with task demands---a fixed-radius foveal window may need adaptive sizing or artificial accommodation for reading tasks. \citet{albert2019} found that fast readers are disproportionately affected by foveated rendering, making individual-difference measurement essential to any such study.
+
+\textbf{Goal-directed attentional gating.}
+The DOM structure extractor currently provides \emph{categorical} top-down priors (``this is a heading''). A richer model would encode \emph{user goals}: SNIF-ACT~\citep{fu2007} demonstrated that spreading activation between user goals and link text---``information scent''~\citep{pirolli1999}---predicts navigation behavior with remarkable accuracy. That work used PMI co-occurrence on a static corpus. Modern sentence embeddings (e.g., MiniLM, 384-dim, ${\sim}$23\,MB ONNX) make real-time cosine similarity between a goal vector and every DOM text node feasible in a Web Worker. The saliency branch point already accepts any bitmap; a ``scent map'' computed from $\cos(\vec{g}, \vec{c}_i)$ scores would close the loop from Pirolli and Card's information foraging theory to a live, gaze-contingent rendering pipeline---modeling not just \emph{what the eye can see} but \emph{what the mind is looking for}.
 
 \section{Availability}
 
@@ -182,7 +202,7 @@ Open source (MIT), Electron~30.5, macOS signed. Architecture docs, literature re
 % ============================================================
 \vspace{2pt}
 \noindent\textbf{Acknowledgments.}
-{\small System architecture, documentation, and this paper were developed through collaboration with Claude (Anthropic, Opus~4.6) via Claude Code. The AI agent exclusively authored the grad student project backlog~\citep*{hcibib}. AE directed architecture, identified conceptual framings, and validated perceptual accuracy.}
+{\small System architecture, documentation, and this paper were developed through collaboration with Claude (Anthropic, Opus~4.6) via Claude Code. The AI agent exclusively authored the grad student project backlog~\citep*{hcibib}. The human author directed architecture, identified conceptual framings, and validated perceptual accuracy.}
 
 \vspace{2pt}
 \begingroup
