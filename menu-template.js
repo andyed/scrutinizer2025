@@ -223,9 +223,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             click: () => {
                                 const win = BrowserWindow.getFocusedWindow();
                                 if (win && win.scrutinizerView) {
-                                    const path = require('path');
-                                    const target = path.join(__dirname, 'tests', 'reference-pages', 'dashboard.html');
-                                    win.scrutinizerView.webContents.loadFile(target);
+                                    win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/dashboard.html');
                                 }
                             }
                         },
@@ -234,9 +232,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             click: () => {
                                 const win = BrowserWindow.getFocusedWindow();
                                 if (win && win.scrutinizerView) {
-                                    const path = require('path');
-                                    const target = path.join(__dirname, 'tests', 'reference-pages', 'article.html');
-                                    win.scrutinizerView.webContents.loadFile(target);
+                                    win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/article.html');
                                 }
                             }
                         },
@@ -245,21 +241,17 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             click: () => {
                                 const win = BrowserWindow.getFocusedWindow();
                                 if (win && win.scrutinizerView) {
-                                    const path = require('path');
-                                    const target = path.join(__dirname, 'tests', 'reference-pages', 'ecommerce.html');
-                                    win.scrutinizerView.webContents.loadFile(target);
+                                    win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/ecommerce.html');
                                 }
                             }
                         },
                         { type: 'separator' },
                         {
-                            label: 'Color Search (Experiment)',
+                            label: 'Color Spectrum',
                             click: () => {
                                 const win = BrowserWindow.getFocusedWindow();
                                 if (win && win.scrutinizerView) {
-                                    const path = require('path');
-                                    const target = path.join(__dirname, 'tests', 'reference-pages', 'color-search.html');
-                                    win.scrutinizerView.webContents.loadFile(target);
+                                    win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/color-spectrum.html');
                                 }
                             }
                         }
@@ -323,7 +315,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         { type: 'separator' },
                         // === EXPERIMENTAL MODELS (alternative simulation pipelines) ===
                         {
-                            label: 'FOVI (Cortical Magnification)',
+                            label: 'Log-Polar MIP (Blauch 2026)',
                             type: 'radio',
                             checked: currentAestheticMode === 6,
                             click: () => { sendToOverlays('menu:set-aesthetic-mode', 6); app.emit('aesthetic-mode-changed', 6); }
