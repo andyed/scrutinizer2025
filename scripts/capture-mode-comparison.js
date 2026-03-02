@@ -2,7 +2,7 @@
 /**
  * Mode Comparison Capture
  *
- * Captures the same page under modes 0 (smoothstep), 6 (FOVI), and 8 (Gaussian)
+ * Captures the same page under modes 0 (smoothstep), 6 (Log-Polar MIP), and 8 (Gaussian)
  * for side-by-side comparison in the blog post.
  *
  * Usage:
@@ -22,7 +22,8 @@ const pages = pageArg ? [pageArg.split('=')[1]] : ['dashboard', 'article'];
 
 const MODES = [
   { id: 'mode0_smoothstep', mode: '0', label: 'Mode 0 — Smoothstep (High-Key)' },
-  { id: 'mode6_fovi',       mode: '6', label: 'Mode 6 — FOVI (CMF only)' },
+  { id: 'mode6_logpolar',   mode: '6', label: 'Mode 6 — Log-Polar MIP (Blauch 2026)' },
+  { id: 'mode7_legacy',     mode: '7', label: 'Mode 7 — Legacy v1.6' },
   { id: 'mode8_gaussian',   mode: '8', label: 'Mode 8 — Gaussian Desaturation' },
 ];
 
@@ -37,8 +38,8 @@ if (!fs.existsSync(OUTPUT_DIR)) {
 
 async function runCapture(page, modeConfig) {
   return new Promise((resolve, reject) => {
-    const pagePath = path.resolve(ROOT, 'tests', 'reference-pages', `${page}.html`);
-    const fileUrl = `file://${pagePath}`;
+    const BASE_URL = process.env.BASE_URL || 'https://andyed.github.io/scrutinizer-www/reference-pages';
+    const pageUrl = `${BASE_URL}/${page}.html`;
     const filename = `${page}_center_${modeConfig.id}.png`;
 
     console.log(`📸 ${modeConfig.label}`);
@@ -47,11 +48,11 @@ async function runCapture(page, modeConfig) {
     const env = {
       ...process.env,
       TEST_MODE: 'true',
-      TEST_URL: fileUrl,
+      TEST_URL: pageUrl,
       TEST_MODES: modeConfig.mode,
       TEST_FIXATION_X: '0.5',
       TEST_FIXATION_Y: '0.5',
-      TEST_OVERLAY: 'false',
+      TEST_OVERLAY: 'true',
       TEST_MOBILE_EMULATION: 'false',
       TEST_OUTPUT_FILENAME: filename,
       SCREENSHOT_MODE: 'update',
