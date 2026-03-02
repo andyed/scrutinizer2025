@@ -87,6 +87,7 @@
                 this.foviEnabledLocation = null;
                 this.cmfALocation = null;
                 this.foviColorSigmaLocation = null;
+                this.desatFloorLocation = null;
 
                 // Default Configuration
                 this.config = {
@@ -192,6 +193,7 @@
                 this.foviEnabledLocation = gl.getUniformLocation(this.program, "u_fovi_enabled");
                 this.cmfALocation = gl.getUniformLocation(this.program, "u_cmf_a");
                 this.foviColorSigmaLocation = gl.getUniformLocation(this.program, "u_fovi_color_sigma");
+                this.desatFloorLocation = gl.getUniformLocation(this.program, "u_desat_floor");
 
                 // Create buffers
                 this.positionBuffer = gl.createBuffer();
@@ -509,6 +511,7 @@
                 gl.uniform1f(this.foviEnabledLocation, this.config.fovi_enabled ? 1.0 : 0.0);
                 gl.uniform1f(this.cmfALocation, this.config.fovi_a);
                 gl.uniform1f(this.foviColorSigmaLocation, this.config.fovi_color_sigma);
+                gl.uniform1f(this.desatFloorLocation, this.config.desat_floor ?? 1.0);
                 gl.uniform1f(this.hasStructureLocation, hasStructure);
                 gl.uniform1f(this.enableSaliencyModulationLocation, enableSaliencyModulation);
 

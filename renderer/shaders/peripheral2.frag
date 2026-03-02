@@ -44,6 +44,7 @@ uniform float u_dog_sharpness;   // Band rolloff sharpness (0=biological, 1=shar
 uniform float u_fovi_enabled;     // 0.0 = legacy linear, 1.0 = CMF logarithmic
 uniform float u_cmf_a;            // Cortical magnification constant (default 2.78)
 uniform float u_fovi_color_sigma; // Gaussian color decay sigma (0.0 = disabled)
+uniform float u_desat_floor;      // Min desaturation multiplier in salient regions (1.0 = full desat, 0.85 = 15% cap)
 
 in vec2 v_texCoord;
 out vec4 fragColor;
@@ -618,7 +619,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         // === SHARED BIOLOGICAL PIPELINE ===
         float noiseVal = (rand(uv) - 0.5);
         float protection = max(lgn.saliency, lgn.density);
-        float dampener = mix(1.0, 0.85, protection);
+        float dampener = mix(1.0, u_desat_floor, protection);
         
         float desatIntensity = smoothstep(0.0, 0.6, u_intensity);
         float strengthMult = desatIntensity * dampener;
