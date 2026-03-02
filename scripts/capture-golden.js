@@ -87,7 +87,24 @@ const CAPTURE_TASKS = [
     },
 
     // --- GRID (Distortion Check) ---
-    { page: 'grid', fixations: ['center'] }
+    { page: 'grid', fixations: ['center'] },
+
+    // --- COLOR SPECTRUM (Desaturation Diagnostic) ---
+    // Captures across all desaturation-relevant modes to compare
+    // how each algorithm treats different hue channels peripherally.
+    // Key comparison: red (suppressed by Purkinje) vs cyan (preserved near rod peak 505nm).
+    // Mullen & Kingdom (2002): red-green declines faster than blue-yellow.
+    {
+        page: 'color-spectrum',
+        fixations: ['center'],
+        variants: [
+            { id: 'mode0_smoothstep', mode: '0', overlay: false },
+            { id: 'mode1_purkinje', mode: '1', overlay: false },
+            { id: 'mode6_fovi', mode: '6', overlay: false },
+            { id: 'mode7_legacy', mode: '7', overlay: false },
+            { id: 'mode8_gaussian', mode: '8', overlay: false }
+        ]
+    }
 ];
 
 console.log(`\n🎯 Golden Capture Script (Automated)`);
