@@ -315,6 +315,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         { type: 'separator' },
                         // === EXPERIMENTAL MODELS (alternative simulation pipelines) ===
                         {
+                            label: 'Control (Default Pipeline)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 0 || (currentAestheticMode >= 1 && currentAestheticMode <= 5),
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 0); app.emit('aesthetic-mode-changed', 0); }
+                        },
+                        {
                             label: 'Log-Polar MIP (Blauch 2026)',
                             type: 'radio',
                             checked: currentAestheticMode === 6,

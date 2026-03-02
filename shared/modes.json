@@ -164,12 +164,12 @@
                 "perceptual_basis": "Alcohol/fatigue-induced double vision"
             }
         },
-        "fovi": {
+        "log_polar_mip": {
             "id": 6,
-            "label": "FOVI (Cortical Magnification)",
-            "shortLabel": "FOVI",
+            "label": "Log-Polar MIP (Blauch 2026)",
+            "shortLabel": "Log-Polar",
             "category": "research",
-            "description": "Pure FOVI reference implementation (Blauch, Alvarez & Konkle, 2026). Logarithmic cortical magnification (CMF = 1/(r+a), a=2.78) with Gaussian color decay. No DoG bands, no crowding distortion — orthogonal to Scrutinizer pipeline for clean comparison.",
+            "description": "Cortical magnification function from Blauch, Alvarez & Konkle (2026): mipLevel = log2(1 + e/a), a=2.78°. Spatial resolution falloff only — no DoG bands, no crowding distortion. Gaussian color decay is Scrutinizer's own addition. Orthogonal to main pipeline for clean comparison.",
             "pipeline": {
                 "lgn_use_structure_mask": false,
                 "lgn_use_saliency_gate": false,
@@ -188,7 +188,7 @@
                 "gaussian_color_decay",
                 "lgn_bypass"
             ],
-            "architectural_purpose": "Reference implementation for FOVI cortical magnification, orthogonal to Scrutinizer DoG/saliency pipeline",
+            "architectural_purpose": "FOVI CMF as standalone MIP-sampling mode, orthogonal to Scrutinizer DoG/saliency pipeline",
             "citations": {
                 "technique": "Cortical magnification function CMF = 1/(r+a)",
                 "biological_basis": "Blauch, Alvarez & Konkle (2026), arxiv:2602.03766"
@@ -199,7 +199,7 @@
             "label": "Legacy v1.6 (Comparison)",
             "shortLabel": "Legacy",
             "category": "research",
-            "description": "Frozen v1.6 pipeline snapshot for A/B comparison. Linear MIP scaling (normalizedEcc * 2.5), hand-tuned DoG band cutoffs. No FOVI cortical magnification.",
+            "description": "Frozen v1.6 pipeline snapshot for A/B comparison. Linear MIP scaling (normalizedEcc * 2.5), hand-tuned DoG band cutoffs. No CMF logarithmic scaling.",
             "pipeline": {
                 "lgn_use_structure_mask": true,
                 "lgn_use_saliency_gate": true,
@@ -219,7 +219,7 @@
                 "legacy_linear_mip",
                 "dog_hand_tuned_cutoffs"
             ],
-            "architectural_purpose": "Frozen v1.6 baseline for A/B dogfooding against FOVI-enhanced v1.7",
+            "architectural_purpose": "Frozen v1.6 baseline for A/B dogfooding against CMF-enhanced v1.7",
             "citations": {
                 "technique": "Linear MIP scaling with DoG band decomposition",
                 "biological_basis": "Scrutinizer v1.6 hand-tuned parameters"
@@ -230,7 +230,7 @@
             "label": "Gaussian Desaturation (Experimental)",
             "shortLabel": "Gauss",
             "category": "research",
-            "description": "Identical to High-Key (mode 0) except desaturation uses Gaussian exponential decay (exp(-r/sigma)) instead of smoothstep ramp. Isolates one variable — curve shape — for perceptual comparison. FOVI-informed rod-cone transition model.",
+            "description": "Identical to High-Key (mode 0) except desaturation uses Gaussian exponential decay (exp(-r/sigma)) instead of smoothstep ramp. Isolates one variable — curve shape — for perceptual comparison.",
             "pipeline": {
                 "lgn_use_structure_mask": true,
                 "lgn_use_saliency_gate": true,

@@ -15,13 +15,13 @@
 ## [1.7.0] - 2026-02-28
 
 ### Added
-- **FOVI Cortical Magnification Infrastructure**: Added FOVI pipeline support (Blauch, Alvarez & Konkle, 2026, arxiv:2602.03766) as a switchable rendering path.
+- **FOVI Cortical Magnification Function**: Added FOVI's CMF (Blauch, Alvarez & Konkle, 2026, arxiv:2602.03766) as a switchable MIP-sampling mode. This implements one component of FOVI — the spatial resolution falloff — not the full kNN sensor manifold or neural network pipeline.
     - New uniforms: `u_fovi_enabled`, `u_cmf_a`, `u_fovi_color_sigma`.
     - When enabled: logarithmic MIP scaling via CMF (log2((r_deg + a) / a)) and CMF-derived DoG band cutoffs.
-    - Modes 0 & 1 retain legacy pipeline (`fovi_enabled: false`) — FOVI models cortical magnification only, not the full peripheral detail loss (crowding, RF growth, contrast sensitivity). Existing parameters already approximate the combined perceptual effect.
-- **Mode 6: FOVI (Cortical Magnification)**: Pure FOVI reference implementation, orthogonal to Scrutinizer pipeline.
+    - Modes 0 & 1 retain legacy pipeline (`fovi_enabled: false`) — FOVI's CMF models cortical magnification only, not the full peripheral detail loss (crowding, RF growth, contrast sensitivity). Existing parameters already approximate the combined perceptual effect.
+- **Mode 6: FOVI (Cortical Magnification)**: FOVI's CMF as a standalone MIP-sampling mode, orthogonal to Scrutinizer pipeline.
     - Single CMF-driven MIP blur (no DoG band decomposition).
-    - Gaussian color decay (V4 style 6) simulating rod-cone transition with configurable sigma.
+    - Gaussian color decay (V4 style 6) is Scrutinizer's own addition for perceptual comparison — not from FOVI, which is purely spatial.
     - No LGN gating or V1 distortion — clean comparison baseline.
 - **Mode 7: Legacy v1.6 (Comparison)**: Frozen v1.6 pipeline snapshot for A/B dogfooding.
     - Linear MIP scaling, hand-tuned DoG cutoffs, `fovi_enabled: false`.
