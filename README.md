@@ -38,7 +38,7 @@ Additionally, there's a long history (keyword: "restricted focus viewer")of usin
 We assume we see the world in high-definition 180° video. We don't. The human eye is a biological scanner with a terrifyingly narrow bandwidth.
 
 * **The Fovea ("The What"):** You only possess "20/20 vision" in a tiny patch of retina roughly the size of your thumb held at arm's length (~2° of visual field).
-* **The Periphery ("The Where"):** Everything else is a low-resolution, color-blind, motion-sensitive sensor that doesn't "see" objects, but merely guesses at their textures.
+* **The Periphery ("The Where"):** Everything else is a low-resolution, color-impoverished, motion-sensitive sensor that doesn't "see" objects — it represents the world as texture statistics, pooled over regions that grow with distance from fixation.
 
 Your brain stitches these jittery, low-fidelity snapshots into a seamless timeline. Scrutinizer disables this "auto-correct" feature, forcing you to navigate using only the raw retinal input.
 
@@ -50,8 +50,8 @@ This simulation visualizes the split-second mechanics of a glance—how your bra
 
 ![Progressive Grid](screenshots/onedotone_progressive_grid.png)
 
-1.  **Frames 1-5 (Far Periphery): The "Mongrel" Zone.** High-frequency details are compressed into statistical noise. Color simulates rod-dominant vision (desaturated), preserving only high-contrast "blobs".
-2.  **Frames 6-10 (Parafovea): The "Crowding" Zone.** Color sensitivity returns as cone density increases. Text features emerge, but "Interactional Crowding" prevents legibility.
+1.  **Frames 1-5 (Far Periphery): The "Mongrel" Zone.** High-frequency details are pooled into summary statistics — the texture is represented, but individual features are lost. Color is attenuated as cone density drops and pooling regions widen.
+2.  **Frames 6-10 (Parafovea): The "Crowding" Zone.** Color sensitivity improves as cone density increases. Text features emerge, but crowding — the inability to identify objects flanked by neighbors — prevents legibility.
 3.  **Frames 11-14 (Fovea): The "High-Res" Zone.** The central 2° of vision resolves the image, finally allowing the brain to parse semantic meaning.
 
 ---
@@ -184,9 +184,11 @@ For implementation details, see [Implementation Notes: The Biological Model](doc
 
 ## Theoretical Foundation
 
-This project is grounded in research from vision science and cognitive psychology.  Mapping blur to surround the mouse position has been a technique for decades, and is used in tools like the Restricted Focus Viewer (RFV) and the Eye Tracking Viewer (ETV). More recently, VR headsets have utilized foveated rendering to reduce the amount of pixels needed to render the scene. 
+This project is grounded in research from vision science and cognitive psychology. Mapping blur to surround the mouse position has been a technique for decades, used in tools like the Restricted Focus Viewer (RFV). More recently, VR headsets have utilized foveated rendering to reduce pixel throughput.
 
-Research into exactly how the periphery is perceived has progressed in recent years, with the development of the "Mongrel Theory" of vision. As of 2025, AI researchers are actively trying to develop a more accurate model of how the periphery is perceived so that they can better simulate it in their own tools [ref](https://news.mit.edu/2024/researchers-enhance-peripheral-vision-ai-models-0308)
+The key theoretical advance is Rosenholtz's [Texture Tiling Model](https://dspace.mit.edu/handle/1721.1/126929) (TTM), which shows that peripheral vision represents the world via summary statistics — means and correlations of filter responses — pooled over regions that grow linearly with eccentricity. "Mongrels" are synthetic images that preserve these statistics while scrambling the details, revealing what the periphery actually encodes.
+
+Scrutinizer v1.7+ incorporates the [FOVI cortical magnification function](https://arxiv.org/abs/2602.03766) (Blauch, Konkle & Alvarez, 2026), which provides an analytically grounded eccentricity-dependent falloff replacing earlier hand-tuned approximations.
 
 - **[Scientific Literature Review](docs/scientific_literature_review.md)**: Deep dive into the science behind the simulation.
 - **[Foveal Calibration Logic](foveal-calibration-logic.md)**: Detailed psychophysics of the calibration tool.
@@ -200,11 +202,11 @@ Research into exactly how the periphery is perceived has progressed in recent ye
 > Scrutinizer is intentionally **approximate** and should be used as a **design constraint model**, not a precise physiological instrument.
 
 - It models **retinal input constraints**, not the brain's transsaccadic integration.
-- **Current implementation** uses MIP-based pooling ("Mongrel Approximation Tier 1"), which approximates receptive field growth using hardware MIP-maps. This is more biologically accurate than simple blur but does not yet implement full "Mongrel Theory" texture synthesis with statistical replacement.
+- **Current implementation** uses MIP-based pooling, which approximates cortical magnification (receptive field growth with eccentricity) using hardware MIP-maps. This captures the spatial pooling better than simple blur but does not yet implement full TTM texture synthesis with statistical replacement.
 - It assumes a fixed relationship between screen pixels and **visual angle**.
 
 ---
 
 ## License
-Copyright (c) 2012-2025, Andy Edmonds. All rights reserved.
+Copyright (c) 2012-2026, Andy Edmonds. All rights reserved.
 Licensed under the [MIT License](LICENSE).
