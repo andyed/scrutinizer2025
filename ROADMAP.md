@@ -465,7 +465,7 @@ const midPeripheryRadius = degreesToPixels(20);  // True 20°
 **Goal**: Replace distance-only blur with clutter-sensitive distortion using center-surround mechanism.
 
 **Partial Implementation (v1.6 — DoG Band Decomposition):**
-- [x] **DoG in V4 pooling path**: Hardware MIP chain decomposed into Laplacian pyramid bands with M-scaling rolloff per band. Replaces uniform MIP blur with frequency-selective attenuation.
+- [x] **DoG in V4 pooling path**: Hardware MIP chain decomposed into approximate Laplacian pyramid bands (box/bilinear, not true Gaussian — some spectral leakage) with M-scaling rolloff per band. Replaces uniform MIP blur with frequency-selective attenuation.
 - [x] **Per-mode gating**: `dog_enabled`, `dog_e2`, `dog_sharpness` in `modes.json`. Enabled for High-Key and Biological modes.
 - [x] **Biological M-scaling**: Per-band cutoff eccentricities follow geometric progression (0.3, 0.6, 1.2, 2.4 × E2).
 

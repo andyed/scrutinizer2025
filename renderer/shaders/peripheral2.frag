@@ -107,9 +107,11 @@ vec4 sampleBlurred(vec2 uv, float radius) {
 }
 
 // === DoG PERIPHERAL RECONSTRUCTION ===
-// Decomposes the existing hardware MIP chain into a Laplacian pyramid (DoG bands)
-// and selectively attenuates high-frequency bands based on eccentricity (M-scaling).
-// Biology: retinal ganglion cells have center-surround receptive fields ≈ DoG filters.
+// Decomposes the hardware MIP chain into an approximate Laplacian pyramid.
+// Hardware mipmaps use box/bilinear filtering (not Gaussian convolution), so band
+// differences are Difference-of-Boxes — an approximation of true DoG with some
+// spectral leakage between bands. See Burt & Adelson (1983) for true Laplacian pyramids.
+// Biology: retinal ganglion cells have center-surround RFs ≈ DoG filters.
 // Field size grows with eccentricity. At fovea: all bands. In periphery: only low-freq survives.
 vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
                              float dog_e2, float dog_sharpness) {
@@ -122,7 +124,7 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     vec4 mip3 = textureLod(u_texture, uv, 3.0);
     vec4 mip4 = textureLod(u_texture, uv, 4.0);
 
-    // DoG bands (Laplacian pyramid)
+    // Approximate DoG bands (box/bilinear MIP differences, not true Gaussian)
     vec4 band0 = mip0 - mip1;  // 1-2px: serifs, thin strokes
     vec4 band1 = mip1 - mip2;  // 2-4px: letter bodies, small icons
     vec4 band2 = mip2 - mip3;  // 4-8px: words, UI elements

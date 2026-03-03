@@ -47,7 +47,7 @@
 
 ### Added
 - **DoG Peripheral Reconstruction**: New biologically-inspired peripheral rendering mode replacing simple MIP pooling with Difference-of-Gaussians band decomposition.
-    - Decomposes hardware MIP chain into 4 Laplacian pyramid bands with M-scaling rolloff per band.
+    - Decomposes hardware MIP chain into 4 approximate Laplacian pyramid bands (box/bilinear, not true Gaussian) with M-scaling rolloff per band.
     - Preserves low-frequency structure (layout, buttons, large text) while filtering high-frequency detail (serifs, fine textures).
     - Gated by `dog_enabled` uniform — legacy MIP pooling preserved when disabled.
     - New uniforms: `u_dog_enabled`, `u_dog_e2` (M-scaling half-resolution eccentricity), `u_dog_sharpness` (band rolloff sharpness).

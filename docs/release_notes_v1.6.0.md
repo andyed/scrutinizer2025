@@ -39,7 +39,7 @@ The previous peripheral rendering used hardware MIP levels directly — `texture
 
 ### The DoG Approach
 
-Retinal ganglion cells have center-surround receptive fields that are well-modeled as Difference-of-Gaussians (DoG) filters. Field size grows with eccentricity (M-scaling). We exploit this by decomposing the existing hardware MIP chain into a Laplacian pyramid:
+Retinal ganglion cells have center-surround receptive fields that are well-modeled as Difference-of-Gaussians (DoG) filters. Field size grows with eccentricity (M-scaling). We approximate this by decomposing the hardware MIP chain into band differences — an approximate Laplacian pyramid (hardware mipmaps use box/bilinear filtering, not true Gaussian convolution as in Burt & Adelson 1983, so there is spectral leakage between bands):
 
 ```
 band_k = textureLod(tex, uv, k) - textureLod(tex, uv, k+1)

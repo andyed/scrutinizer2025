@@ -141,7 +141,7 @@ The shader uses a modular architecture inspired by the human visual system to or
     *   **Function**: `processV4`
     *   **Logic**: Determines *what* the final pixel looks like. Includes peripheral spatial filtering and aesthetic processing.
     *   **Key Feature (v1.4)**: Hardware MIP-map sampling simulates biological receptive field growth.
-    *   **Key Feature (v1.6)**: **DoG Band Decomposition** — decomposes MIP chain into Laplacian pyramid bands with per-band M-scaling rolloff. Preserves low-frequency structure (layout, buttons) while filtering high-frequency detail (serifs, fine textures). Gated by `dog_enabled` uniform. See `foveated-vision-model.md` Section 5.1.
+    *   **Key Feature (v1.6)**: **DoG Band Decomposition** — decomposes MIP chain into approximate Laplacian pyramid bands (box/bilinear, not true Gaussian) with per-band M-scaling rolloff. Preserves low-frequency structure (layout, buttons) while filtering high-frequency detail (serifs, fine textures). Gated by `dog_enabled` uniform. See `foveated-vision-model.md` Section 5.1.
     *   **Examples**: High-Key ghosting, Neon colors, Wireframe overlays.
 
 ### Philosophy: Aesthetic Modes as Test Cases
@@ -291,7 +291,7 @@ vec4 pooled = textureLod(u_texture, uv, mipLevel);
 - Biologically accurate receptive field doubling per MIP level
 
 **DoG Band Decomposition (v1.6, replaces simple MIP in research modes)**:
-The simple MIP approach uniformly blurs all spatial frequencies together. The DoG upgrade decomposes the same hardware MIP chain into a Laplacian pyramid and attenuates each frequency band independently based on eccentricity (M-scaling). This preserves low-frequency structure (buttons, layout blocks) while filtering high-frequency detail (serifs, thin strokes).
+The simple MIP approach uniformly blurs all spatial frequencies together. The DoG upgrade decomposes the same hardware MIP chain into an approximate Laplacian pyramid (hardware mipmaps use box/bilinear filtering, not Gaussian convolution, so band isolation has some spectral leakage) and attenuates each frequency band independently based on eccentricity (M-scaling). This preserves low-frequency structure (buttons, layout blocks) while filtering high-frequency detail (serifs, thin strokes).
 
 ```glsl
 // DoG bands from existing MIP chain

@@ -105,7 +105,7 @@ The biological architecture produces several emergent properties that Scrutinize
 
 | Biological Phenomenon | Cause | Scrutinizer Implementation |
 |----------------------|-------|---------------------------|
-| **Resolution loss** | Receptor pooling (100:1) | DoG band decomposition (MIP Laplacian pyramid) with M-scaling rolloff; legacy: simple MIP pooling |
+| **Resolution loss** | Receptor pooling (100:1) | Approximate DoG band decomposition (MIP-derived, box/bilinear not Gaussian) with M-scaling rolloff; legacy: simple MIP pooling |
 | **Color blindness** | Rod dominance (no color) | Oklab desaturation + cyan tint |
 | **Crowding** | Receptive field overlap | Fractal Crowding (Tier 2.0) + vertical chop |
 | **Motion sensitivity** | Magnocellular pathway | Preserved contrast in periphery |

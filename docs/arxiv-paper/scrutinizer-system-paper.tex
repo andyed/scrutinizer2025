@@ -111,7 +111,7 @@ Saliency map & Oklab DoG + face detection + DOM structure \\
 
 \subsection{DoG Band Decomposition}
 
-Retinal ganglion cells have center-surround receptive fields modeled as DoG filters~\citep{kuffler1953}, with field size growing with eccentricity (M-scaling). We decompose the hardware MIP chain into a Laplacian pyramid:
+Retinal ganglion cells have center-surround receptive fields modeled as DoG filters~\citep{kuffler1953}, with field size growing with eccentricity (M-scaling). We decompose the hardware MIP chain into an \emph{approximate} Laplacian pyramid---hardware mipmaps use box/bilinear filtering rather than Gaussian convolution~\citep{burt1983}, so band differences are Difference-of-Boxes rather than true DoG, with some spectral leakage between bands:
 \vspace{-2pt}
 \begin{equation}
 \text{band}_k = \text{textureLod}(\mathit{tex}, \mathit{uv}, k) - \text{textureLod}(\mathit{tex}, \mathit{uv}, k{+}1)
