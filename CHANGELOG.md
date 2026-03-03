@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.8.0] - 2026-03-03
+
+### Added
+- **Feature Congestion Pipeline (Rosenholtz 2007)**: Simplified Oklab-space Feature Congestion — local variance across L, |a|, |b| channels with fixed σ=2.5. Dual-worker architecture: saliency (256px real-time) + congestion (1024px on-demand). Scoring: `sqrt(congestion_p90 × 0.7 + edgeDensity_p90 × 0.3) × 100`. Validated against Python reference (Spearman ρ = 0.93 at 768px).
+- **ComplexityHUD**: Interactive draggable overlay with Score / Stats / Spatial tabs. Congestion heatmap on TEXTURE4 (blue → yellow → red). Scroll/navigation-aware — hides on scroll, restores when fresh results arrive.
+- **Mode 9: Congestion-Gated Pooling (Hypothesis)**: Shader wired to read `u_congestionMap` on TEXTURE4; pooling modulation not yet implemented. Tests Rosenholtz (2012) prediction that clutter and crowding share the same summary-statistic computation. Tagged `hypothesis` category.
+- **Validation pipeline**: Three-script architecture (`validate-congestion.py`, `extract-congestion.js`, `compare-congestion.js`) for Spearman rank correlation against Rosenholtz reference.
+
+### Changed
+- **Linear M-scaling**: Replaced geometric 2x band cutoffs (0.3, 0.6, 1.2, 2.4 × E2) with Rovamo & Virsu (1979) formula. New cutoffs: `E2 × (2^k − 1)` giving 1, 3, 7, 15 × E2. Coarse structure persists further into periphery.
+- **E2 recalibration**: High-Key 0.5→0.15, Biological 0.4→0.12 to preserve band-0 onset under linear cutoffs.
+- **Approximate Laplacian pyramid**: Qualified "Laplacian pyramid" terminology across all docs, arxiv paper, and shader comments. Hardware MIP uses box/bilinear, not Gaussian (Burt & Adelson 1983). Added citation to `references.bib`.
+- **Output clamping**: Final color clamped to [0,1] to prevent negative-going band artifacts.
+- **Golden captures**: Removed 348MB bulk captures from tracking, gitignored. Curated mode-comparison captures in `docs/golden/`.
+- **.claude config**: Checked in settings, skills, and agent memory.
+
 ## [1.7.1] - 2026-02-28
 
 ### Changed

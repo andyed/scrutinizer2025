@@ -2,7 +2,7 @@
 planStatus:
   planId: plan-scrutinizer-v1.8-congestion
   title: "Scrutinizer v1.8: Congestion Assessment (Rosenholtz Feature Congestion)"
-  status: draft
+  status: completed
   planType: feature
   priority: high
   owner: andyed
@@ -13,7 +13,7 @@ planStatus:
     - release
   created: "2026-03-02"
   updated: "2026-03-02T22:00:00.000Z"
-  progress: 0
+  progress: 100
 ---
 
 # Scrutinizer v1.8: Congestion Assessment Release
