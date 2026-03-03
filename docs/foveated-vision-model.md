@@ -263,23 +263,26 @@ vec4 band3 = textureLod(tex, uv, 3.0) - textureLod(tex, uv, 4.0);  // 8-16px: bu
 // residual = textureLod(tex, uv, 4.0)                               // DC: overall luminance
 ```
 
-Each band is attenuated by a **smoothstep rolloff** based on normalized eccentricity, with cutoff distances following a geometric progression (M-scaling: each band persists ~2x further into the periphery):
+Each band is attenuated by a **smoothstep rolloff** based on normalized eccentricity, with cutoff distances derived from **linear M-scaling** (Rovamo & Virsu 1979, Levi, Klein & Aitsebaomo 1985):
 
-| Band | Spatial Scale | Cutoff (× E2) | Content Preserved |
+The minimum resolvable spatial detail grows linearly with eccentricity: **s_min(e) = s₀ × (1 + e/E₂)**. Band k (spatial scale 2^k px) drops out when s_min(e) > 2^k, giving cutoff eccentricity = E₂ × (2^k − 1):
+
+| Band | Spatial Scale | Cutoff (× E₂) | Content Preserved |
 |------|--------------|----------------|-------------------|
-| band0 | 1-2px | 0.3 | Serifs, hairlines |
-| band1 | 2-4px | 0.6 | Letter bodies, small icons |
-| band2 | 4-8px | 1.2 | Words, UI elements |
-| band3 | 8-16px | 2.4 | Buttons, layout blocks |
+| band0 | 1-2px | 1 | Serifs, hairlines |
+| band1 | 2-4px | 3 | Letter bodies, small icons |
+| band2 | 4-8px | 7 | Words, UI elements |
+| band3 | 8-16px | 15 | Buttons, layout blocks |
 | residual | 16px+ | Always | Overall color/luminance |
 
+The non-uniform spacing is biologically correct: coarse structure (bands 2–3) persists far into the periphery while fine detail (band 0) drops quickly. You can see *where* a button is without being able to read its label — matching the subjective experience of peripheral vision.
+
 **Parameters** (configurable per mode in `modes.json`):
-- `dog_e2` — Scaling parameter controlling how rapidly bands are attenuated with eccentricity. Named after the psychophysical E2 (the eccentricity at which a threshold doubles), but operates in **normalized screen coordinates** (eccentricity / fovea_radius), not degrees of visual angle. Calibrated to the effective `normEcc` range (~0–0.8) produced by the V4 coupled eccentricity pipeline. Lower = more aggressive filtering. Default: 0.5 (High-Key), 0.4 (Biological).
+- `dog_e2` — M-scaling half-rate eccentricity. The eccentricity (in normalized screen coordinates) at which the resolution threshold doubles. Operates in **normalized screen coordinates** (eccentricity / fovea_radius), not degrees of visual angle. Calibrated to the effective `normEcc` range (~0–0.8) produced by the V4 coupled eccentricity pipeline. Lower = more aggressive filtering. Default: 0.15 (High-Key), 0.12 (Biological).
 - `dog_sharpness` — Band transition sharpness. 0.0 = gradual rolloff (wider transitions), 1.0 = sharp cutoff (narrow transitions).
 - `dog_enabled` — Boolean gate. When false, falls back to legacy simple MIP pooling.
 
 **Caveats and design choices**:
-- The 2× geometric progression for band cutoffs is an **engineering approximation**, not a direct derivation from M-scaling. Biological receptive field growth is approximately linear: s_min(e) ≈ s_0 × (1 + e/E₂) (Rovamo & Virsu 1979, Levi et al. 1985). The geometric progression was chosen because it maps naturally to the octave spacing of MIP levels.
 - The DoG input (`coupledEccentricity`) is modulated by V1 distortion strength and intensity, making it **attention-gated** rather than purely position-dependent. This diverges from biology (where RF size is fixed by retinal position) but produces a more usable result for the simulation's interactive context.
 - Band differences (mip_k − mip_{k+1}) can be negative. The shader clamps the final reconstruction to [0,1] to prevent out-of-range artifacts.
 

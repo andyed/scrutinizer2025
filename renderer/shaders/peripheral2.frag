@@ -131,22 +131,29 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     vec4 band3 = mip3 - mip4;  // 8-16px: buttons, layout blocks
     // residual = mip4          // DC: overall color/luminance
 
-    // Per-band cutoff eccentricities (M-scaling)
+    // Per-band cutoff eccentricities — linear M-scaling
+    // Rovamo & Virsu (1979), Levi, Klein & Aitsebaomo (1985):
+    //   s_min(e) = s_0 * (1 + e/E2)
+    // Band k (spatial scale 2^k px) drops out when s_min(e) > 2^k:
+    //   cutoff_k = E2 * (2^k - 1)
+    // With s_0 = 1px, this gives cutoffs at 1, 3, 7, 15 × E2.
+    // Coarse structure (bands 2-3) persists far into the periphery —
+    // biologically correct: you see WHERE a button is, not its label.
     float c0, c1, c2, c3;
+    float e2 = max(dog_e2, 0.01);
     if (u_fovi_enabled > 0.5) {
         // CMF-derived: cutoff_i = a * (2^level - 1) / fovea_deg
         float fovea_deg = 2.0;
-        c0 = u_cmf_a * (pow(2.0, 0.5) - 1.0) / fovea_deg;
-        c1 = u_cmf_a * (pow(2.0, 1.0) - 1.0) / fovea_deg;
-        c2 = u_cmf_a * (pow(2.0, 1.5) - 1.0) / fovea_deg;
-        c3 = u_cmf_a * (pow(2.0, 2.0) - 1.0) / fovea_deg;
+        c0 = u_cmf_a * (pow(2.0, 1.0) - 1.0) / fovea_deg;
+        c1 = u_cmf_a * (pow(2.0, 2.0) - 1.0) / fovea_deg;
+        c2 = u_cmf_a * (pow(2.0, 3.0) - 1.0) / fovea_deg;
+        c3 = u_cmf_a * (pow(2.0, 4.0) - 1.0) / fovea_deg;
     } else {
-        // Legacy: geometric progression from hand-tuned E2
-        float e2 = max(dog_e2, 0.1);
-        c0 = 0.3 * e2;
-        c1 = 0.6 * e2;
-        c2 = 1.2 * e2;
-        c3 = 2.4 * e2;
+        // Linear M-scaling: cutoff_k = E2 * (2^k - 1)
+        c0 = e2 * 1.0;    // 2^1 - 1 = 1
+        c1 = e2 * 3.0;    // 2^2 - 1 = 3
+        c2 = e2 * 7.0;    // 2^3 - 1 = 7
+        c3 = e2 * 15.0;   // 2^4 - 1 = 15
     }
 
     // Transition width: biological (wide, gradual) vs sharp (narrow, crisp)

@@ -16,7 +16,7 @@
                 "v1_animate": false,
                 "v4_style_id": 0,
                 "dog_enabled": true,
-                "dog_e2": 0.5,
+                "dog_e2": 0.15,
                 "dog_sharpness": 0.0,
                 "fovi_enabled": false,
                 "fovi_a": 2.78,
@@ -47,7 +47,7 @@
                 "v1_animate": false,
                 "v4_style_id": 1,
                 "dog_enabled": true,
-                "dog_e2": 0.4,
+                "dog_e2": 0.12,
                 "dog_sharpness": 0.0,
                 "fovi_enabled": false,
                 "fovi_a": 2.78,
@@ -209,7 +209,7 @@
                 "v1_animate": false,
                 "v4_style_id": 0,
                 "dog_enabled": true,
-                "dog_e2": 0.5,
+                "dog_e2": 0.15,
                 "dog_sharpness": 0.0,
                 "fovi_enabled": false,
                 "fovi_a": 2.78,
@@ -217,7 +217,7 @@
             },
             "tests": [
                 "legacy_linear_mip",
-                "dog_hand_tuned_cutoffs"
+                "dog_linear_mscaling_cutoffs"
             ],
             "architectural_purpose": "Frozen v1.6 baseline for A/B dogfooding against CMF-enhanced v1.7",
             "citations": {
@@ -240,7 +240,7 @@
                 "v1_animate": false,
                 "v4_style_id": 7,
                 "dog_enabled": true,
-                "dog_e2": 0.5,
+                "dog_e2": 0.15,
                 "dog_sharpness": 0.0,
                 "fovi_enabled": false,
                 "fovi_a": 2.78,
@@ -271,7 +271,7 @@
                 "v1_animate": false,
                 "v4_style_id": 0,
                 "dog_enabled": true,
-                "dog_e2": 0.5,
+                "dog_e2": 0.15,
                 "dog_sharpness": 0.0,
                 "fovi_enabled": false,
                 "congestion_pooling": true
