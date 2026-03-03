@@ -30,6 +30,13 @@
         console.warn('[Scrutinizer] Could not require svg-overlay:', e);
     }
 
+    let ComplexityHUD;
+    try {
+        ComplexityHUD = require('./complexity-hud');
+    } catch (e) {
+        console.warn('[Scrutinizer] Could not require complexity-hud:', e);
+    }
+
     class Scrutinizer {
         constructor(config) {
             // Apply defaults for missing config values
@@ -81,6 +88,10 @@
             this.lastFrameBitmap = null;
             this.aestheticMode = 0;
             this.dpr = window.devicePixelRatio || 1;
+            this._congestionReportMode = 0;
+            this._lastCongestionGeneration = 0;
+            this._lastCongestionResultTime = 0;
+            this._heatmapPendingRestore = false;
 
             // ── SVG Overlay (debug visualization) ────────────────────
             const OverlayClass = SVGOverlay || (typeof window !== 'undefined' ? window.SVGOverlay : null);
@@ -88,6 +99,17 @@
                 this.svgOverlay = new OverlayClass('debug-overlay');
             } else {
                 console.error('[Scrutinizer] SVGOverlay class NOT found');
+            }
+
+            // ── Complexity HUD (congestion stats readout) ─────────────
+            const HUDClass = ComplexityHUD || (typeof window !== 'undefined' ? window.ComplexityHUD : null);
+            if (HUDClass) {
+                this.complexityHud = new HUDClass('complexity-hud', {
+                    ipcRenderer,
+                    onClose: () => {
+                        this.setShowCongestion(0);
+                    }
+                });
             }
 
             // ── Bind & Wire ──────────────────────────────────────────
@@ -104,8 +126,59 @@
             window.addEventListener('resize', this.handleResize);
 
             // Structure updates from DOM analysis (via IPC)
-            ipcRenderer.on('structure-update', (event, blocks) => {
+            // Fires on scroll, resize, and DOM mutations.
+            // trigger: 'scroll' | 'mutation' — controls congestion recompute urgency.
+            ipcRenderer.on('structure-update', (event, blocks, trigger) => {
                 this.contentAnalysis.handleStructureUpdate(blocks, this.renderer);
+
+                // When congestion report is active, viewport changes may invalidate stats.
+                if (this._congestionReportMode > 0) {
+                    const now = performance.now();
+                    const timeSinceLastResult = now - (this._lastCongestionResultTime || 0);
+                    const isScroll = (trigger === 'scroll');
+
+                    if (isScroll) {
+                        // Scroll = viewport content changed significantly.
+                        // Full pending state (dim to 0.35) + debounced recompute.
+                        if (this.complexityHud) {
+                            this.complexityHud.setPending(true);
+                        }
+                        // Hide heatmap during scroll — stale overlay at any opacity is misleading
+                        if (this._congestionReportMode >= 2 && this.renderer) {
+                            this.renderer.config.show_congestion = 0;
+                            this._heatmapPendingRestore = true;
+                        }
+                        clearTimeout(this._congestionScrollTimer);
+                        this._congestionScrollTimer = setTimeout(() => {
+                            this._submitCongestionFrame();
+                        }, 600);
+                    } else {
+                        // DOM mutation = content changed but viewport didn't move.
+                        // Current score is mostly valid — gentle fade only.
+                        // Enforce 5s cooldown: don't recompute if we just did.
+                        if (timeSinceLastResult < 5000) {
+                            // Within cooldown — just show gentle staleness indicator.
+                            // Queue a recompute for when cooldown expires.
+                            if (this.complexityHud) {
+                                this.complexityHud.setPending(true, true); // gentle mode
+                            }
+                            clearTimeout(this._congestionMutationTimer);
+                            const remaining = 5000 - timeSinceLastResult;
+                            this._congestionMutationTimer = setTimeout(() => {
+                                this._submitCongestionFrame();
+                            }, remaining + 300); // +300ms settle time after cooldown
+                        } else {
+                            // Cooldown expired — recompute with gentle pending.
+                            if (this.complexityHud) {
+                                this.complexityHud.setPending(true, true);
+                            }
+                            clearTimeout(this._congestionMutationTimer);
+                            this._congestionMutationTimer = setTimeout(() => {
+                                this._submitCongestionFrame();
+                            }, 800);
+                        }
+                    }
+                }
             });
 
             // Menu commands → ContentAnalysis
@@ -120,6 +193,23 @@
             });
             ipcRenderer.on('menu:toggle-enable-structure-map', (event, enabled) => {
                 this.contentAnalysis.toggleEnableStructureMap(enabled);
+            });
+
+            // Re-submit to congestion worker on navigation (if report mode is active)
+            ipcRenderer.on('browser:did-navigate', () => {
+                if (this._congestionReportMode > 0) {
+                    // Clear stale heatmap immediately — old page's overlay shouldn't linger
+                    if (this._congestionReportMode >= 2 && this.renderer) {
+                        this.contentAnalysis.clearCongestionData(this.renderer);
+                        this.renderer.config.show_congestion = 0;
+                        this._heatmapPendingRestore = true;
+                    }
+                    // Delay to let the page render before capturing
+                    clearTimeout(this._congestionNavTimer);
+                    this._congestionNavTimer = setTimeout(() => {
+                        this._submitCongestionFrame();
+                    }, 500);
+                }
             });
 
             // Initial resize
@@ -265,8 +355,11 @@
                 this.visualMemory.renderMask(this.renderer);
             }
 
-            // 4. Update content analysis (saliency smoothing)
+            // 4. Update content analysis (saliency + congestion smoothing)
             this.contentAnalysis.updateSaliencySmoothing(this.renderer);
+            if (this._congestionReportMode > 0) {
+                this.contentAnalysis.updateCongestionSmoothing(this.renderer);
+            }
 
             // 5. Compose render state
             const aspectRatio = this.config.fovealAspectRatio || 1.33;
@@ -292,6 +385,25 @@
 
             // 7. Content analysis state for shader uniforms
             const contentState = this.contentAnalysis.getState();
+
+            // 7b. Detect fresh congestion data via generation counter
+            const gen = this.contentAnalysis.congestionGeneration;
+            if (gen !== this._lastCongestionGeneration) {
+                this._lastCongestionGeneration = gen;
+                this._lastCongestionResultTime = performance.now();
+                if (this.complexityHud) {
+                    this.complexityHud.setPending(false);
+                }
+                // Restore heatmap overlay after scroll/navigation hid it
+                if (this._heatmapPendingRestore && this._congestionReportMode >= 2 && this.renderer) {
+                    this.renderer.config.show_congestion = 1;
+                    this._heatmapPendingRestore = false;
+                }
+                ipcRenderer.send('overlay:congestion-processing', false);
+            }
+            if (this.complexityHud) {
+                this.complexityHud.update(contentState.congestionStats, contentState.edgeDensityStats);
+            }
 
             // 8. Render (single call to WebGL with all composed state)
             const debugMode = this.contentAnalysis.getDebugMode();
@@ -408,6 +520,70 @@
             const msg = `[Scrutinizer] Aesthetic Mode set to: ${this.aestheticMode}`;
             console.log(msg);
             ipcRenderer.send('log:renderer', msg);
+        }
+
+        /**
+         * Set congestion report mode.
+         * @param {number} mode - 0=off, 1=stats only, 2=heatmap+stats
+         */
+        setShowCongestion(mode) {
+            const m = Number(mode);
+            if (this.renderer) {
+                // Shader heatmap only in mode 2; mode 1 is stats-only
+                this.renderer.config.show_congestion = m >= 2 ? 1 : 0;
+            }
+            if (this.complexityHud) {
+                this.complexityHud.setVisible(m > 0);
+            }
+            this._congestionReportMode = m;
+
+            // Edge cases: clear pending restore when leaving heatmap mode
+            if (m < 2) {
+                this._heatmapPendingRestore = false;
+            }
+            if (m === 0) {
+                ipcRenderer.send('overlay:congestion-processing', false);
+            }
+
+            // High-res congestion worker: start/stop based on mode
+            if (m > 0) {
+                // Submit current frame to congestion worker for high-res analysis
+                this._submitCongestionFrame();
+            } else {
+                // Clear high-res congestion data, fall back to saliency worker's 256px
+                this.contentAnalysis.clearCongestionData(this.renderer);
+            }
+
+            const msg = `[Scrutinizer] Congestion report mode: ${m} (shader=${m >= 2 ? 1 : 0})`;
+            console.log(msg);
+            ipcRenderer.send('log:renderer', msg);
+        }
+
+        /**
+         * Submit current frame buffer to the high-res congestion worker.
+         * @private
+         */
+        _submitCongestionFrame() {
+            if (this.imageDataBuffer && this.imageData) {
+                this.contentAnalysis.submitForCongestion(
+                    this.imageDataBuffer,
+                    this.imageData.width,
+                    this.imageData.height
+                );
+                ipcRenderer.send('overlay:congestion-processing', true);
+            }
+        }
+
+        /**
+         * Set congestion worker resolution.
+         * @param {number} maxDim - 512, 768, or 1024
+         */
+        setCongestionResolution(maxDim) {
+            this.contentAnalysis.setCongestionResolution(maxDim);
+            // Re-submit if report is active to get updated results at new resolution
+            if (this._congestionReportMode > 0) {
+                this._submitCongestionFrame();
+            }
         }
 
         // Delegate to GazeModel

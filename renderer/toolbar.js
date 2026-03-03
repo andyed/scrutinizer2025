@@ -5,6 +5,7 @@ const forwardBtn = document.getElementById('forward-btn');
 const reloadBtn = document.getElementById('reload-btn');
 const urlTrigger = document.getElementById('url-trigger');
 const foveaToggleBtn = document.getElementById('fovea-toggle-btn');
+
 // --- Event Listeners ---
 backBtn.addEventListener('click', () => { ipcRenderer.send('toolbar:navigate-back'); });
 forwardBtn.addEventListener('click', () => { ipcRenderer.send('toolbar:navigate-forward'); });
@@ -47,4 +48,13 @@ ipcRenderer.on('toolbar:update-nav-state', (event, { canGoBack, canGoForward }) 
 ipcRenderer.on('toolbar:set-version', (event, version) => {
     const el = document.getElementById('app-version');
     if (el) el.innerText = `v${version}`;
+});
+
+// Congestion processing: amber throbber while worker is busy
+ipcRenderer.on('toolbar:congestion-processing', (event, processing) => {
+    if (processing) {
+        foveaToggleBtn.classList.add('processing');
+    } else {
+        foveaToggleBtn.classList.remove('processing');
+    }
 });

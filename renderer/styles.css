@@ -190,6 +190,17 @@ input[type="range"] {
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
 }
 
+/* Congestion processing indicator — amber to distinguish from blue page-loading */
+.icon-btn.processing {
+  box-shadow: 0 0 0 2px rgba(249, 168, 37, 0.3);
+}
+
+.icon-btn.processing .loading-dots {
+  opacity: 1;
+  color: #f9a825;
+  animation: blink 1.4s infinite;
+}
+
 @keyframes pulse {
 
   0%,

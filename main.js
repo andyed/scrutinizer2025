@@ -521,12 +521,12 @@ ipcMain.on('browser:zoom-changed', (event, zoom) => {
 });
 
 // Forward structure map updates from content to HUD
-ipcMain.on('structure-update', (event, blocks) => {
+ipcMain.on('structure-update', (event, blocks, trigger) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
     if (win && win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
-        console.log(`[Main] Forwarding ${blocks.length} structure blocks to HUD`);
-        win.scrutinizerHud.webContents.send('structure-update', blocks);
+        console.log(`[Main] Forwarding ${blocks.length} structure blocks to HUD (${trigger || 'unknown'})`);
+        win.scrutinizerHud.webContents.send('structure-update', blocks, trigger);
     }
 });
 
@@ -648,6 +648,31 @@ ipcMain.on('toolbar:toggle-fovea', (event) => {
             win.toolbarView.webContents.send('toolbar:fovea-state', currentEnabled);
         }
     });
+});
+
+// Forward congestion processing state from overlay to toolbar (amber throbber)
+ipcMain.on('overlay:congestion-processing', (event, processing) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
+    if (win && win.toolbarView && !win.toolbarView.webContents.isDestroyed()) {
+        win.toolbarView.webContents.send('toolbar:congestion-processing', processing);
+    }
+});
+
+// Toggle overlay window mouse passthrough for interactive HUD panels.
+// With setIgnoreMouseEvents(true, { forward: true }), the overlay is click-through
+// but still receives mousemove. When cursor enters an interactive panel, the panel
+// asks us to disable ignore mode so clicks land. When cursor leaves, we restore.
+ipcMain.on('overlay:set-interactive', (event, interactive) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
+    if (win && win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+        if (interactive) {
+            win.scrutinizerHud.setIgnoreMouseEvents(false);
+        } else {
+            win.scrutinizerHud.setIgnoreMouseEvents(true, { forward: true });
+        }
+    }
 });
 
 ipcMain.on('toolbar:open-url-dialog', (event) => {
@@ -836,7 +861,8 @@ function createScrutinizerWindow(startUrl) {
         }
     });
 
-    // HUD always forwards events - no toolbar to click
+    // HUD forwards mouse events by default (click-through to browser below).
+    // Interactive overlays (e.g. ComplexityHUD) toggle this off when hovered.
     hudWindow.setIgnoreMouseEvents(true, { forward: true });
 
     // Load HUD content (just canvas, no toolbar)
@@ -1503,6 +1529,10 @@ function runIntegrationTest() {
                             mainWindow.scrutinizerHud.webContents.send('menu:toggle-saliency-map', true);
                         } else if (mode === 'structure') {
                             mainWindow.scrutinizerHud.webContents.send('menu:toggle-structure-map', true);
+                        } else if (mode === 'congestion_overlay') {
+                            mainWindow.scrutinizerHud.webContents.send('menu:set-show-congestion', 1);
+                        } else if (mode === 'congestion_solo') {
+                            mainWindow.scrutinizerHud.webContents.send('menu:set-show-congestion', 2);
                         } else {
                             // Numeric Aesthetic Mode
                             mainWindow.scrutinizerHud.webContents.send('menu:set-aesthetic-mode', mode);
@@ -1572,6 +1602,8 @@ function runIntegrationTest() {
                             mainWindow.scrutinizerHud.webContents.send('menu:toggle-saliency-map', false);
                         } else if (mode === 'structure') {
                             mainWindow.scrutinizerHud.webContents.send('menu:toggle-structure-map', false);
+                        } else if (mode === 'congestion_overlay' || mode === 'congestion_solo') {
+                            mainWindow.scrutinizerHud.webContents.send('menu:set-show-congestion', 0);
                         }
                     }
 

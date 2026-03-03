@@ -50,6 +50,11 @@
 
                 const syntheticEvent = { clientX: localX, clientY: localY, zoom: zoom };
                 scrutinizer.handleMouseMove(syntheticEvent);
+
+                // Check if cursor is over the ComplexityHUD for interactivity toggle
+                if (scrutinizer.complexityHud) {
+                    scrutinizer.complexityHud.handleMousePosition(localX, localY);
+                }
             }
         });
 
@@ -250,6 +255,20 @@
 
         ipcRenderer.on('menu:set-aesthetic-mode', (event, mode) => {
             if (scrutinizer) scrutinizer.setAestheticMode(mode);
+        });
+
+        ipcRenderer.on('menu:set-show-congestion', (event, mode) => {
+            log(`[Overlay] IPC received menu:set-show-congestion: ${mode}`);
+            if (scrutinizer) scrutinizer.setShowCongestion(mode);
+        });
+
+        // Toggle congestion report (from menu keyboard shortcut)
+        ipcRenderer.on('menu:toggle-congestion-report', () => {
+            if (scrutinizer) {
+                const current = scrutinizer._congestionReportMode || 0;
+                const next = current > 0 ? 0 : 1;
+                scrutinizer.setShowCongestion(next);
+            }
         });
 
         ipcRenderer.on('hud:reset-visual-memory', () => {
