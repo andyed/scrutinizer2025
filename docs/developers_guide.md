@@ -784,6 +784,208 @@ To prevent "AI Hubris" and accidental regressions (like the "Blue Tint" or "Sali
 
 ---
 
+## scrutinizer-audit — Headless Visual Complexity CLI & MCP Server
+
+`cli/scrutinizer-audit.js` runs the same Feature Congestion + edge density pipeline that powers the ComplexityHUD, but headless — no Electron, no display server. It uses Playwright to capture pages in Chromium and `congestion-core.js` to score them.
+
+### Quick Start
+
+```bash
+cd cli
+npm install
+npx playwright install chromium
+
+# Score a single page
+node scrutinizer-audit.js https://apple.com
+
+# Score multiple pages with JSON output
+node scrutinizer-audit.js https://apple.com https://wikipedia.org https://persci.mit.edu --json
+
+# Mobile + desktop viewports
+node scrutinizer-audit.js https://apple.com --viewport desktop,mobile
+
+# Capture above-fold and first scroll position
+node scrutinizer-audit.js https://apple.com --scroll above-fold,first-scroll
+
+# CI gate — exit 1 if any page exceeds threshold
+node scrutinizer-audit.js https://your-staging-site.com --fail-above 60
+```
+
+### Architecture
+
+```
+cli/
+  scrutinizer-audit.js        # CLI entry point (bin script)
+  lib/
+    analyzer.js               # PNG buffer → metrics (wraps congestion-core.js)
+    crawler.js                # Playwright screenshot capture
+    reporter.js               # JSON / HTML / console table output
+    sitemap-parser.js         # XML sitemap → URL list
+    url-resolver.js           # --file, --sitemap, positional → URL[]
+    viewport-profiles.js      # Desktop (1440×900) + Mobile (390×844) configs
+    scroll-strategy.js        # above-fold, first-scroll positions
+  mcp/
+    server.js                 # MCP server (stdio transport)
+  package.json
+```
+
+The analysis pipeline reuses the same shared modules as the Electron app:
+
+```
+renderer/congestion-core.js   ← computeEdgeDensity, computeCompositeScore, RATINGS
+renderer/oklab-utils.js       ← srgbToLinear, linearSrgbToOklab
+```
+
+No code is duplicated. Scores from the CLI match the ComplexityHUD exactly.
+
+### CLI Reference
+
+```
+scrutinizer-audit <url> [urls...] [options]
+
+Input:
+  <url> [urls...]           Positional URLs
+  --sitemap <url>           Parse XML sitemap for URLs
+  --file <path>             One URL per line (# comments allowed)
+
+Viewport:
+  --viewport <list>         desktop,mobile (default: desktop)
+
+Scroll:
+  --scroll <list>           above-fold,first-scroll (default: above-fold)
+
+Output:
+  --output <path>           Write .json or .html report
+  --heatmaps                Save congestion + edge density heatmap PNGs
+  --screenshots             Save raw page screenshots
+  --json                    JSON to stdout (for piping)
+  --quiet                   Suppress progress output
+
+Analysis:
+  --max-dim <n>             Analysis resolution (default: 1024)
+
+CI/CD:
+  --fail-above <n>          Exit 1 if any page exceeds threshold (0-100)
+
+Comparison:
+  --compare <before> <after>  Delta report from two JSON outputs
+```
+
+### Output Format
+
+JSON output follows this schema (abbreviated):
+
+```json
+{
+  "generator": "scrutinizer-audit",
+  "version": "1.0.0",
+  "timestamp": "2026-03-03T10:00:00Z",
+  "summary": {
+    "pagesAnalyzed": 3,
+    "avgScore": 42,
+    "maxScore": 53,
+    "minScore": 0,
+    "threshold": 75,
+    "pass": true
+  },
+  "pages": [{
+    "url": "https://example.com",
+    "captures": [{
+      "viewport": { "name": "desktop", "width": 1440, "height": 900 },
+      "scrollPosition": "above-fold",
+      "score": 42,
+      "rating": "Medium",
+      "congestion": { "mean": 0.18, "p90": 0.34, "quadrants": { ... } },
+      "edgeDensity": { "mean": 0.12, "p90": 0.25, "quadrants": { ... } },
+      "computeTimeMs": 342
+    }]
+  }]
+}
+```
+
+### CI/CD Integration
+
+Use `--fail-above` to gate builds on visual complexity:
+
+```bash
+# In GitHub Actions or similar
+node cli/scrutinizer-audit.js https://staging.example.com --fail-above 60 --quiet
+# Exit code 0 = all pages under threshold
+# Exit code 1 = at least one page exceeded threshold
+```
+
+Compare before and after a design change:
+
+```bash
+# Before the change
+node cli/scrutinizer-audit.js https://example.com --output before.json --quiet
+
+# After the change
+node cli/scrutinizer-audit.js https://example.com --output after.json --quiet
+
+# Delta report
+node cli/scrutinizer-audit.js --compare before.json after.json
+```
+
+### MCP Server (Claude Code Integration)
+
+The MCP server exposes three tools via stdio transport so Claude Code can query visual complexity on demand.
+
+#### Setup
+
+```bash
+claude mcp add scrutinizer-audit -- node /path/to/scrutinizer2025/cli/mcp/server.js
+```
+
+#### Tools
+
+| Tool | Input | Output |
+|------|-------|--------|
+| `analyze_url` | `{ url, viewport?, scroll? }` | Score, rating, congestion, edgeDensity |
+| `analyze_urls` | `{ urls[], viewport? }` | Summary + per-page breakdown |
+| `compare_pages` | `{ urlA, urlB, viewport? }` | Side-by-side metrics + delta |
+
+Example from Claude Code:
+
+```
+> Use scrutinizer-audit to compare apple.com vs amazon.com
+```
+
+The MCP server launches headless Chromium, captures screenshots, runs the congestion pipeline, and returns structured JSON — same scores as the CLI and HUD.
+
+### Scoring Formula
+
+The composite score matches the ComplexityHUD exactly (shared via `congestion-core.js`):
+
+$$\text{score} = \text{round}\!\left(\sqrt{\text{congestion}_{p90} \times 0.7 + \text{edgeDensity}_{p90} \times 0.3}\;\times 100\right)$$
+
+| Score | Rating | Example |
+|-------|--------|---------|
+| 0–25 | Low | 404/empty pages (0), minimal landing pages |
+| 26–50 | Medium | wikipedia.org (31), apple.com (46), blog posts |
+| 51–75 | High | persci.mit.edu (53), news aggregators, dense dashboards |
+| 76–100 | Extreme | arngren.net (~71), competing visual systems everywhere |
+
+### Dependencies
+
+The CLI has its own `package.json` in `cli/`:
+
+- `playwright` — headless Chromium capture
+- `@modelcontextprotocol/sdk` — MCP server
+- `pngjs` — PNG decode (same as parent project)
+
+No native binary dependencies. Runs on macOS, Linux, and Windows CI runners.
+
+### Extending
+
+**Adding a viewport profile:** Edit `cli/lib/viewport-profiles.js`. The `VIEWPORTS` object maps names to Playwright context options.
+
+**Adding a scroll position:** Edit `cli/lib/scroll-strategy.js`. Each position has a `scrollFn(page)` that runs Playwright commands before screenshot.
+
+**Adding output formats:** The `reporter.js` module dispatches on file extension. Add a new branch in `writeReport()` for formats like CSV or Markdown.
+
+---
+
 ## Release & Builds
 
 ### Building for macOS

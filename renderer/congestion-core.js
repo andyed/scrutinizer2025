@@ -205,6 +205,85 @@ function computeStats(data, w, h) {
     };
 }
 
+// ── Edge Density (Sobel gradient magnitude + Gaussian smoothing) ────────
+
+/**
+ * Compute edge density via Sobel operator + Gaussian blur.
+ *
+ * Applies a 3×3 Sobel filter to the luminance channel to get gradient
+ * magnitude, then smooths with Gaussian blur (σ=3.0) to produce a
+ * local edge density map.
+ *
+ * @param {Float32Array} luminance - Lightness channel (width × height)
+ * @param {number} width
+ * @param {number} height
+ * @param {number} [blurSigma=3.0] - Gaussian σ for smoothing edge magnitudes
+ * @param {Float32Array} [tmpA] - Optional pre-allocated temp buffer for blur
+ * @param {Float32Array} [tmpB] - Optional pre-allocated temp buffer for blur
+ * @returns {Float32Array} Per-pixel edge density (not yet normalized)
+ */
+function computeEdgeDensity(luminance, width, height, blurSigma, tmpA, tmpB) {
+    if (blurSigma === undefined) blurSigma = 3.0;
+    const len = width * height;
+    const edgeMag = new Float32Array(len);
+
+    // Sobel 3×3 gradient magnitude
+    for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+            const idx = y * width + x;
+            const tl = luminance[(y - 1) * width + (x - 1)];
+            const t  = luminance[(y - 1) * width + x];
+            const tr = luminance[(y - 1) * width + (x + 1)];
+            const ml = luminance[y * width + (x - 1)];
+            const mr = luminance[y * width + (x + 1)];
+            const bl = luminance[(y + 1) * width + (x - 1)];
+            const b  = luminance[(y + 1) * width + x];
+            const br = luminance[(y + 1) * width + (x + 1)];
+
+            const gx = (tl + 2 * ml + bl) - (tr + 2 * mr + br);
+            const gy = (tl + 2 * t + tr) - (bl + 2 * b + br);
+            edgeMag[idx] = Math.sqrt(gx * gx + gy * gy);
+        }
+    }
+
+    // Smooth with Gaussian blur to get local edge density
+    const edgeMagCopy = new Float32Array(edgeMag);
+    return gaussianBlur(edgeMagCopy, width, height, blurSigma, tmpA, tmpB);
+}
+
+// ── Composite Scoring ───────────────────────────────────────────────────
+
+/**
+ * Rating thresholds — shared between ComplexityHUD and CLI.
+ * Each entry: { max, label, bars, color }
+ */
+const RATINGS = [
+    { max: 25, label: 'Low', bars: 1, color: '#43a047' },
+    { max: 50, label: 'Medium', bars: 2, color: '#f9a825' },
+    { max: 75, label: 'High', bars: 3, color: '#ef6c00' },
+    { max: 100, label: 'Extreme', bars: 4, color: '#d32f2f' }
+];
+
+/**
+ * Compute composite complexity score (0-100) from congestion and edge density stats.
+ *
+ * Formula: round(sqrt(congestion_p90 * 0.7 + edgeDensity_p90 * 0.3) * 100)
+ * - Uses p90 to capture cluttered regions without whitespace dragging down the mean
+ * - sqrt scaling spreads the 0-100 range for more perceptual linearity
+ *
+ * @param {{ p90: number }} congestionStats - Stats from computeStats on normalized congestion
+ * @param {{ p90: number }} edgeDensityStats - Stats from computeStats on normalized edge density
+ * @returns {{ score: number, rating: { max: number, label: string, bars: number, color: string } }}
+ */
+function computeCompositeScore(congestionStats, edgeDensityStats) {
+    const score = Math.round(
+        Math.sqrt(congestionStats.p90 * 0.7 + edgeDensityStats.p90 * 0.3) * 100
+    );
+    const clamped = Math.max(0, Math.min(100, score));
+    const rating = RATINGS.find(r => clamped <= r.max) || RATINGS[RATINGS.length - 1];
+    return { score: clamped, rating };
+}
+
 // ── Dual Export ──────────────────────────────────────────────────────────
 
 const exports_ = {
@@ -214,7 +293,10 @@ const exports_ = {
     gaussianBlur,
     computeLocalVariance,
     normalizeFeature,
-    computeStats
+    computeStats,
+    computeEdgeDensity,
+    computeCompositeScore,
+    RATINGS
 };
 
 if (typeof module !== 'undefined' && module.exports) {

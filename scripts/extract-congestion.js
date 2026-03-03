@@ -22,7 +22,9 @@ const {
     gaussianBlur,
     computeLocalVariance,
     normalizeFeature,
-    computeStats
+    computeStats,
+    computeEdgeDensity,
+    computeCompositeScore
 } = require('../renderer/congestion-core');
 
 // oklab-utils.js: color conversion
@@ -142,12 +144,29 @@ function computeCongestion(img, sigma) {
     }
 
     // Normalize to [0,1]
-    const normalized = normalizeFeature(congestion);
+    const normCongestion = normalizeFeature(congestion);
 
-    // Compute stats
-    const stats = computeStats(normalized, width, height);
+    // Edge density (Sobel + blur at σ=3.0) on luminance channel
+    const rawEdge = computeEdgeDensity(I, width, height, 3.0);
+    const normEdge = normalizeFeature(rawEdge);
 
-    return { congestion: normalized, stats, width, height };
+    // Stats
+    const congestionStats = computeStats(normCongestion, width, height);
+    const edgeDensityStats = computeStats(normEdge, width, height);
+
+    // Composite score (matching ComplexityHUD formula)
+    const { score, rating } = computeCompositeScore(congestionStats, edgeDensityStats);
+
+    return {
+        congestion: normCongestion,
+        edgeDensity: normEdge,
+        congestionStats,
+        edgeDensityStats,
+        score,
+        rating,
+        width,
+        height
+    };
 }
 
 // ── Save heatmap as grayscale PNG ────────────────────────────────────────
@@ -218,11 +237,14 @@ function main() {
             const effectiveDim = Math.max(scaled.width, scaled.height);
             const sigma = FIXED_SIGMA > 0 ? FIXED_SIGMA : BASE_SIGMA * (effectiveDim / BASE_DIM);
 
-            const { congestion, stats, width, height } = computeCongestion(scaled, sigma);
+            const result = computeCongestion(scaled, sigma);
+            const { congestion, edgeDensity, congestionStats, edgeDensityStats, score, rating, width, height } = result;
 
-            // Save heatmap
-            const mapName = img.name.replace(/\.\w+$/, '_congestion.png');
-            saveHeatmap(congestion, width, height, path.join(MAP_DIR, mapName));
+            // Save heatmaps
+            const congMapName = img.name.replace(/\.\w+$/, '_congestion.png');
+            saveHeatmap(congestion, width, height, path.join(MAP_DIR, congMapName));
+            const edgeMapName = img.name.replace(/\.\w+$/, '_edgedensity.png');
+            saveHeatmap(edgeDensity, width, height, path.join(MAP_DIR, edgeMapName));
 
             results.push({
                 name: img.name,
@@ -230,15 +252,27 @@ function main() {
                 width,
                 height,
                 sigma: sigma,
-                mean: stats.mean,
-                p90: stats.p90,
-                p10: stats.p10,
-                max: stats.max,
-                quadrants: stats.quadrants,
-                mapFile: mapName
+                score,
+                rating: rating.label,
+                congestion: {
+                    mean: congestionStats.mean,
+                    p90: congestionStats.p90,
+                    p10: congestionStats.p10,
+                    max: congestionStats.max,
+                    quadrants: congestionStats.quadrants
+                },
+                edgeDensity: {
+                    mean: edgeDensityStats.mean,
+                    p90: edgeDensityStats.p90,
+                    p10: edgeDensityStats.p10,
+                    max: edgeDensityStats.max,
+                    quadrants: edgeDensityStats.quadrants
+                },
+                congestionMapFile: congMapName,
+                edgeDensityMapFile: edgeMapName
             });
 
-            console.log(`${width}x${height} σ=${sigma.toFixed(1)} mean=${stats.mean.toFixed(4)} p90=${stats.p90.toFixed(4)}`);
+            console.log(`${width}x${height} σ=${sigma.toFixed(1)} score=${score} (${rating.label}) congestion_p90=${congestionStats.p90.toFixed(4)} edge_p90=${edgeDensityStats.p90.toFixed(4)}`);
         } catch (err) {
             console.log(`ERROR: ${err.message}`);
             results.push({ name: img.name, source: img.source, error: err.message });

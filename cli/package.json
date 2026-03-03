@@ -1,0 +1,26 @@
+{
+  "name": "scrutinizer-audit",
+  "version": "1.0.0",
+  "description": "Visual complexity CLI — Lighthouse for visual clutter",
+  "main": "scrutinizer-audit.js",
+  "bin": {
+    "scrutinizer-audit": "./scrutinizer-audit.js"
+  },
+  "scripts": {
+    "start": "node scrutinizer-audit.js",
+    "mcp": "node mcp/server.js"
+  },
+  "keywords": [
+    "visual-complexity",
+    "clutter",
+    "congestion",
+    "accessibility",
+    "audit"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "^1.50.0",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "pngjs": "^7.0.0"
+  }
+}

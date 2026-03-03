@@ -112,6 +112,10 @@
                 });
             }
 
+            // ── Side-by-Side Labels (saliency vs congestion) ────────
+            this._sideBySideLabels = null;
+            this._createSideBySideLabels();
+
             // ── Bind & Wire ──────────────────────────────────────────
             this.handleMouseMove = this.gazeModel.handleMouseMove.bind(this.gazeModel);
             this.handleResize = this.handleResize.bind(this);
@@ -396,7 +400,8 @@
                 }
                 // Restore heatmap overlay after scroll/navigation hid it
                 if (this._heatmapPendingRestore && this._congestionReportMode >= 2 && this.renderer) {
-                    this.renderer.config.show_congestion = 1;
+                    // Restore correct shader mode: 2=side-by-side, 1=heatmap
+                    this.renderer.config.show_congestion = this._congestionReportMode >= 3 ? 2 : 1;
                     this._heatmapPendingRestore = false;
                 }
                 ipcRenderer.send('overlay:congestion-processing', false);
@@ -524,18 +529,30 @@
 
         /**
          * Set congestion report mode.
-         * @param {number} mode - 0=off, 1=stats only, 2=heatmap+stats
+         * @param {number} mode - 0=off, 1=stats only, 2=heatmap+stats, 3=side-by-side
          */
         setShowCongestion(mode) {
             const m = Number(mode);
             if (this.renderer) {
-                // Shader heatmap only in mode 2; mode 1 is stats-only
-                this.renderer.config.show_congestion = m >= 2 ? 1 : 0;
+                // Map UI mode → shader uniform value
+                // mode 0,1 → shader 0 (no overlay)
+                // mode 2   → shader 1 (full-screen congestion heatmap)
+                // mode 3   → shader 2 (side-by-side: saliency vs congestion)
+                if (m >= 3) {
+                    this.renderer.config.show_congestion = 2;
+                } else if (m >= 2) {
+                    this.renderer.config.show_congestion = 1;
+                } else {
+                    this.renderer.config.show_congestion = 0;
+                }
             }
             if (this.complexityHud) {
                 this.complexityHud.setVisible(m > 0);
             }
             this._congestionReportMode = m;
+
+            // Show/hide side-by-side labels
+            this._updateSideBySideLabels(m === 3);
 
             // Edge cases: clear pending restore when leaving heatmap mode
             if (m < 2) {
@@ -554,7 +571,8 @@
                 this.contentAnalysis.clearCongestionData(this.renderer);
             }
 
-            const msg = `[Scrutinizer] Congestion report mode: ${m} (shader=${m >= 2 ? 1 : 0})`;
+            const shaderVal = this.renderer ? this.renderer.config.show_congestion : 'n/a';
+            const msg = `[Scrutinizer] Congestion report mode: ${m} (shader=${shaderVal})`;
             console.log(msg);
             ipcRenderer.send('log:renderer', msg);
         }
@@ -632,6 +650,53 @@
         set fixationStartTime(v) { this.visualMemory.fixationStartTime = v; }
 
         get hasStructure() { return this.contentAnalysis.hasStructure; }
+
+        // ── Side-by-Side Labels ────────────────────────────────────
+
+        /**
+         * Create DOM labels for side-by-side comparison view.
+         * @private
+         */
+        _createSideBySideLabels() {
+            const container = document.createElement('div');
+            container.id = 'side-by-side-labels';
+            container.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                pointer-events: none; z-index: 104; display: none;
+            `;
+
+            const labelStyle = `
+                position: absolute; top: 12px;
+                transform: translateX(-50%);
+                font: bold 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                color: #fff; background: rgba(0, 0, 0, 0.7);
+                padding: 5px 14px; border-radius: 4px;
+                letter-spacing: 0.5px;
+            `;
+
+            const leftLabel = document.createElement('div');
+            leftLabel.innerHTML = 'SALIENCY<span style="display:block;font-size:10px;font-weight:normal;opacity:0.7;margin-top:1px">What pops out?</span>';
+            leftLabel.style.cssText = labelStyle + 'left: 25%;';
+
+            const rightLabel = document.createElement('div');
+            rightLabel.innerHTML = 'CONGESTION<span style="display:block;font-size:10px;font-weight:normal;opacity:0.7;margin-top:1px">How cluttered?</span>';
+            rightLabel.style.cssText = labelStyle + 'left: 75%;';
+
+            container.appendChild(leftLabel);
+            container.appendChild(rightLabel);
+            document.body.appendChild(container);
+            this._sideBySideLabels = container;
+        }
+
+        /**
+         * Show/hide side-by-side comparison labels.
+         * @private
+         */
+        _updateSideBySideLabels(visible) {
+            if (this._sideBySideLabels) {
+                this._sideBySideLabels.style.display = visible ? 'block' : 'none';
+            }
+        }
 
         // ── Legacy Methods (preserved for backward compatibility) ────
 

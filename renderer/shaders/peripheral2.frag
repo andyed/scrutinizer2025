@@ -815,6 +815,20 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     return col;
 }
 
+// === SALIENCY HEATMAP (for side-by-side comparison) ===
+// Dark indigo (low) → Purple/Magenta (mid) → White (high)
+// Cool palette contrasts with congestion's warm blue→yellow→red
+vec3 saliencyHeatmap(float t) {
+    t = clamp(t, 0.0, 1.0);
+    if (t < 0.5) {
+        float s = t * 2.0;
+        return mix(vec3(0.05, 0.0, 0.15), vec3(0.7, 0.0, 0.7), s);
+    } else {
+        float s = (t - 0.5) * 2.0;
+        return mix(vec3(0.7, 0.0, 0.7), vec3(1.0, 1.0, 1.0), s);
+    }
+}
+
 // === CONGESTION HEATMAP (Rosenholtz 2007 visualization) ===
 // Blue (low) → Yellow (mid) → Red (high) — perceptually ordered
 vec3 congestionHeatmap(float t) {
@@ -1010,10 +1024,8 @@ void main() {
     // Follows same pattern as structure/saliency debug views:
     // reset to source image, then paint the visualization on top.
     // This works independently of whether the foveal effect is active.
-    if (u_show_congestion > 0) {
-        // Raw congestion from content analysis — mouse-independent diagnostic.
-        // Shows intrinsic clutter of each page region (Rosenholtz 2007).
-        // Prefer high-res congestion map from dedicated worker when available.
+    if (u_show_congestion == 1) {
+        // Full-screen congestion heatmap overlay
         float congestion = 0.0;
         if (u_hasCongestionMap > 0.5) {
             congestion = texture(u_congestionMap, v_texCoord).r;
@@ -1023,6 +1035,31 @@ void main() {
         vec3 heatmapColor = congestionHeatmap(congestion);
         vec3 src = sampleSource(uv).rgb;
         color.rgb = mix(src, heatmapColor, 0.85);
+    } else if (u_show_congestion == 2) {
+        // Side-by-side: Saliency (left) vs Congestion (right)
+        // Saliency = "what pops out?" (center-surround contrast)
+        // Congestion = "how cluttered?" (local feature variance)
+        vec3 src = sampleSource(uv).rgb;
+        float midpoint = 0.5;
+        float dividerWidth = 1.5 / u_resolution.x; // ~2px white line
+
+        if (abs(v_texCoord.x - midpoint) < dividerWidth) {
+            // Center divider
+            color.rgb = vec3(1.0);
+        } else if (v_texCoord.x < midpoint) {
+            // Left half: saliency (cool purple palette)
+            float sal = texture(u_saliencyMap, v_texCoord).r;
+            color.rgb = mix(src, saliencyHeatmap(sal), 0.85);
+        } else {
+            // Right half: congestion (warm blue→yellow→red palette)
+            float cong = 0.0;
+            if (u_hasCongestionMap > 0.5) {
+                cong = texture(u_congestionMap, v_texCoord).r;
+            } else {
+                cong = texture(u_saliencyMap, v_texCoord).g;
+            }
+            color.rgb = mix(src, congestionHeatmap(cong), 0.85);
+        }
     }
 
     fragColor = color;

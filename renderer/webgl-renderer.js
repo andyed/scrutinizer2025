@@ -115,7 +115,7 @@
                     fovi_enabled: false,
                     fovi_a: 2.78,
                     fovi_color_sigma: 0.0,
-                    show_congestion: 0,  // 0=off, 1=overlay, 2=solo
+                    show_congestion: 0,  // 0=off, 1=congestion heatmap, 2=saliency vs congestion
                     congestion_pooling: false
                 };
 

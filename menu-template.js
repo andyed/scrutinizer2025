@@ -580,6 +580,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     type: 'radio',
                                     checked: false,
                                     click: () => sendToOverlays('menu:set-show-congestion', 2)
+                                },
+                                {
+                                    label: 'Saliency vs Congestion',
+                                    type: 'radio',
+                                    checked: false,
+                                    click: () => sendToOverlays('menu:set-show-congestion', 3)
                                 }
                             ]
                         }
