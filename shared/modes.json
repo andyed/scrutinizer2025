@@ -258,9 +258,9 @@
         },
         "congestion_pooling": {
             "id": 9,
-            "label": "Congestion-Gated Pooling (Hypothesis)",
+            "label": "Congestion-Gated Pooling",
             "shortLabel": "Congestion",
-            "category": "hypothesis",
+            "category": "experimental",
             "description": "Increases peripheral pooling in high-congestion regions. Tests the prediction from Rosenholtz (2007, 2012) that visual clutter and peripheral crowding are manifestations of the same summary statistic computation. High-congestion areas get stronger MIP pooling, low-congestion areas retain more detail.",
             "pipeline": {
                 "lgn_use_structure_mask": true,
@@ -321,6 +321,10 @@
         "hypothesis": {
             "label": "Hypothesis Modes",
             "description": "Experimental modes testing specific perceptual predictions"
+        },
+        "experimental": {
+            "label": "Experimental Modes",
+            "description": "Functional modes testing perceptual predictions with active data pipelines"
         }
     },
     "metadata": {

@@ -20,6 +20,15 @@
 - coupledEccentricity in processV4 cancels out fovea_radius, so DoG is driven by distortionStrength not geometric eccentricity
 - Cones/"What" and Rods/"Where" labels in Section 1.1 conflate with dorsal/ventral stream terminology
 
+## CMF-to-MIP Review (2026-03-03)
+- See `cmf-mip-review.md` for detailed analysis of Blauch feedback
+- Key finding: `ln(1+r/a)` is algebraically identical to `ln(r+a)-ln(a)` but Blauch wants the FOVI/Schwartz notation
+- Correct shader form: `mipLevel = maxMipLevel * [ln(r+a) - ln(a)] / [ln(r_max+a) - ln(a)]`
+- Pass `u_cortical_max = ln(r_max+a) - ln(a)` as uniform instead of collapsed `k`
+- Two interpretations: "halvings" (log2, direct MIP) vs "normalized cortical distance" (ln, FOVI-style)
+- Schwartz (1980): w = log(z+a), cortical distance = ln(r+a) - ln(a), CMF = 1/(r+a)
+- FOVI code (coords.py): `log(radius+cmf_a) - log(cmf_a)` normalized by `log(fov/2+cmf_a) - log(cmf_a)`
+
 ## Key Parameters
 - dog_e2: default 0.15 (High-Key), 0.12 (Biological) -- normalized units, not degrees
 - dog_sharpness: 0.0=biological (wide transitions), 1.0=sharp

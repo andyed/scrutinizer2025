@@ -22,14 +22,22 @@ out/
 *.blockmap
 
 # Test Artifacts
+test_*.png
 tests/screenshots/
 tests/golden/*Z.png
+tests/reference-pages/screenshots/
 tests/validation/rosenholtz-maps/
 tests/validation/results/
-tests/validation/results-256/
+tests/validation/results-*/
 
 # Golden captures — bulk regression screenshots, too large for git.
 # Key illustrative captures live in docs/golden/ instead (curated per release).
 tests/golden-captures/
+# LaTeX build artifacts
+docs/arxiv-paper/*.aux
+docs/arxiv-paper/*.bbl
+docs/arxiv-paper/*.blg
+docs/arxiv-paper/*.out
+
 build/certs/
 build_error.txt

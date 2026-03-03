@@ -5,7 +5,7 @@
 ### Added
 - **Feature Congestion Pipeline (Rosenholtz 2007)**: Simplified Oklab-space Feature Congestion — local variance across L, |a|, |b| channels with fixed σ=2.5. Dual-worker architecture: saliency (256px real-time) + congestion (1024px on-demand). Scoring: `sqrt(congestion_p90 × 0.7 + edgeDensity_p90 × 0.3) × 100`. Validated against Python reference (Spearman ρ = 0.93 at 768px).
 - **ComplexityHUD**: Interactive draggable overlay with Score / Stats / Spatial tabs. Congestion heatmap on TEXTURE4 (blue → yellow → red). Scroll/navigation-aware — hides on scroll, restores when fresh results arrive.
-- **Mode 9: Congestion-Gated Pooling (Hypothesis)**: Shader wired to read `u_congestionMap` on TEXTURE4; pooling modulation not yet implemented. Tests Rosenholtz (2012) prediction that clutter and crowding share the same summary-statistic computation. Tagged `hypothesis` category.
+- **Mode 9: Congestion-Gated Pooling**: High-congestion regions get up to 2× MIP pooling boost via `coupledEccentricity × (1 + congestion)`. Auto-starts high-res congestion worker on mode selection; recomputes on scroll/navigation. Tests Rosenholtz (2012) prediction that clutter and crowding share the same summary-statistic computation. Tagged `experimental` category.
 - **Validation pipeline**: Three-script architecture (`validate-congestion.py`, `extract-congestion.js`, `compare-congestion.js`) for Spearman rank correlation against Rosenholtz reference.
 
 ### Fixed

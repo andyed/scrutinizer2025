@@ -97,13 +97,15 @@ Entry detection uses the `browser:mousemove` IPC stream (reliable when the overl
 
 ---
 
-## 🧪 Mode 9: Congestion-Gated Pooling (Hypothesis)
+## 🧪 Mode 9: Congestion-Gated Pooling
 
-New mode wired in `modes.json` with `category: "hypothesis"`. The shader reads `u_congestionMap` on TEXTURE4, but pooling modulation is not yet implemented. The hypothesis: cluttered regions should get stronger peripheral pooling — harder to read in periphery when there's more local feature variance.
+New mode that modulates peripheral pooling by local visual clutter. The shader multiplies `coupledEccentricity` by `1.0 + lgn.congestion` when active — high-congestion regions get up to 2× the MIP pooling level, making cluttered periphery degrade faster than sparse regions.
 
-This tests Rosenholtz's (2012) prediction that visual clutter and crowding are manifestations of the same summary-statistic computation. High-congestion areas would receive increased MIP pooling, simulating the degraded feature access that occurs when peripheral receptive fields pool over diverse, competing features.
+Selecting mode 9 auto-starts the high-res congestion worker (no need to enable the ComplexityHUD overlay separately). Congestion data recomputes on scroll and navigation, same as the HUD pipeline.
 
-Tagged as `hypothesis` to distinguish from the validated modes (0–8).
+This tests Rosenholtz's (2012) prediction that visual clutter and crowding are manifestations of the same summary-statistic computation. On a cluttered news page, dense text columns and image-heavy sidebars pool more aggressively in the periphery than clean whitespace — matching the degraded feature access that occurs when peripheral receptive fields pool over diverse, competing features.
+
+Tagged as `experimental` — the pipeline is functional, perceptual validation is ongoing.
 
 ---
 

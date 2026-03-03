@@ -135,8 +135,9 @@
             ipcRenderer.on('structure-update', (event, blocks, trigger) => {
                 this.contentAnalysis.handleStructureUpdate(blocks, this.renderer);
 
-                // When congestion report is active, viewport changes may invalidate stats.
-                if (this._congestionReportMode > 0) {
+                // When congestion report or congestion-gated pooling is active,
+                // viewport changes may invalidate stats.
+                if (this._congestionReportMode > 0 || this.renderer?.config.congestion_pooling) {
                     const now = performance.now();
                     const timeSinceLastResult = now - (this._lastCongestionResultTime || 0);
                     const isScroll = (trigger === 'scroll');
@@ -199,9 +200,9 @@
                 this.contentAnalysis.toggleEnableStructureMap(enabled);
             });
 
-            // Re-submit to congestion worker on navigation (if report mode is active)
+            // Re-submit to congestion worker on navigation (if report mode or congestion pooling is active)
             ipcRenderer.on('browser:did-navigate', () => {
-                if (this._congestionReportMode > 0) {
+                if (this._congestionReportMode > 0 || this.renderer?.config.congestion_pooling) {
                     // Clear stale heatmap immediately — old page's overlay shouldn't linger
                     if (this._congestionReportMode >= 2 && this.renderer) {
                         this.contentAnalysis.clearCongestionData(this.renderer);
@@ -361,7 +362,7 @@
 
             // 4. Update content analysis (saliency + congestion smoothing)
             this.contentAnalysis.updateSaliencySmoothing(this.renderer);
-            if (this._congestionReportMode > 0) {
+            if (this._congestionReportMode > 0 || this.renderer.config.congestion_pooling) {
                 this.contentAnalysis.updateCongestionSmoothing(this.renderer);
             }
 
@@ -525,6 +526,11 @@
             const msg = `[Scrutinizer] Aesthetic Mode set to: ${this.aestheticMode}`;
             console.log(msg);
             ipcRenderer.send('log:renderer', msg);
+
+            // Auto-start high-res congestion worker for congestion-gated modes
+            if (this.renderer?.config.congestion_pooling) {
+                this._submitCongestionFrame();
+            }
         }
 
         /**
