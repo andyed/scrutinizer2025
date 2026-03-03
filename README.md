@@ -65,10 +65,10 @@ Scrutinizer is designed for **designers, UX researchers, and HCI/vision scientis
 | **Solo Designer** | Iterate on layouts by revealing visual hierarchy issues before handoff |
 | **Design Review** | Objectively discuss "what draws the eye" with data-driven saliency overlays |
 | **UX Research** | Conduct attention studies using mouse-contingent viewing (validated against eye-tracking) |
-| **Client Presentation** | Use storytelling modes (Cyberpunk, Wireframe) to demonstrate design rationale |
+| **Client Presentation** | Use extensibility demos (Cyberpunk, Wireframe) to demonstrate design rationale |
 | **Vision Researchers** | Validate peripheral vision models against the simulation |
 
-> **Open Source & Extensible**: The browser app is MIT-licensed and designed for customization. Aesthetic modes serve as test cases for the modular pipeline—see the [Developer's Guide](docs/developers_guide.md) for adding your own.
+> **Open Source & Extensible**: The browser app is MIT-licensed and designed for customization. The extensibility demos (Frosted Glass, Wireframe, Cyberpunk, Double Vision) are test cases for the modular pipeline—see the [Developer's Guide](docs/developers_guide.md) for adding your own.
 >
 > **Figma Plugin**: [**Scrutinizer Pro**](https://www.figma.com/community/plugin/1579671593390938191/scrutinizer-pro) is free to use with watermark. Uses the Figma DOM for full functionality with prototypes.
 
@@ -81,11 +81,11 @@ Scrutinizer is designed for **designers, UX researchers, and HCI/vision scientis
   - **Structure Map**: Analyzes page layout (text rhythm, density, semantic type)
   - **Saliency Map**: Detects visual attention (edges, contrast, high-importance areas)
   - **Saliency Gating**: Allocates more processing bandwidth to salient peripheral content
-* **Aesthetic Modes**: 6 rendering styles (High-Key Ghosting, Biological, Frosted Glass, Wireframe, Cyberpunk, Double Vision) + 3 experimental pipelines (FOVI cortical magnification, Legacy v1.6, Gaussian desaturation)
+* **Rendering Modes**: 2 core styles (High-Key Ghosting, Biological), 4 extensibility demos (Frosted Glass, Wireframe, Cyberpunk, Double Vision), and 3 experimental pipelines (FOVI cortical magnification, Legacy v1.6, Gaussian desaturation)
 * **Visual Memory**: Simulates iconic memory decay (Off, Limited, Extended, Infinite)
 * **Chromatic Aberration**: Lens-like color fringing in periphery
 * **Adjustable Parameters**: Foveal radius (20-450px), shape (4 ratios), intensity (0-100%)
-* **Neural Processing Model (WebGL)**: Biologically grounded retinal simulation with domain warping
+* **WebGL Rendering Pipeline**: Retinal input simulation — spatial pooling, chromatic attenuation, and saliency gating driven by eccentricity
 
 ---
 
@@ -158,7 +158,7 @@ Access all features via **Simulation** menu:
 - **Utility**: 9 aesthetic/rendering modes, Show Structure Map, Show Saliency Map — rendering presentation and debug views
 
 ### Debug Visualization
-- **Visual Overlay**: View foveal/parafoveal/peripheral boundary rings
+- **Eccentricity Overlay**: View foveal/parafoveal/peripheral boundary rings
 - **Show Structure Map** (Utility): View layout analysis (RGB channels: rhythm, density, type)
 - **Show Saliency Map** (Utility): View attention heatmap (Blue=Low → Green=Medium → Red=High)
 
