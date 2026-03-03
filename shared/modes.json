@@ -169,7 +169,7 @@
             "label": "Log-Polar MIP (Blauch 2026)",
             "shortLabel": "Log-Polar",
             "category": "research",
-            "description": "Cortical magnification function from Blauch, Alvarez & Konkle (2026): mipLevel = log2(1 + e/a), a=2.78°. Spatial resolution falloff only — no DoG bands, no crowding distortion. Gaussian color decay is Scrutinizer's own addition. Orthogonal to main pipeline for clean comparison.",
+            "description": "Cortical magnification from Blauch, Konkle & Alvarez (2026): mipLevel = maxMip × [ln(r+a) - ln(a)] / [ln(r_max+a) - ln(a)]. a=2.78°, r_max derived from screen geometry. Spatial resolution falloff only — no DoG bands, no crowding distortion. Gaussian color decay is Scrutinizer's own addition.",
             "pipeline": {
                 "lgn_use_structure_mask": false,
                 "lgn_use_saliency_gate": false,

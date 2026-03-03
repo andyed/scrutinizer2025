@@ -43,6 +43,7 @@ uniform float u_dog_sharpness;   // Band rolloff sharpness (0=biological, 1=shar
 // FOVI (Cortical Magnification) uniforms — Blauch, Alvarez & Konkle (2026)
 uniform float u_fovi_enabled;     // 0.0 = legacy linear, 1.0 = CMF logarithmic
 uniform float u_cmf_a;            // Cortical magnification constant (default 2.78)
+uniform float u_cortical_max;     // ln(r_max+a) - ln(a), precomputed on JS side
 uniform float u_fovi_color_sigma; // Gaussian color decay sigma (0.0 = disabled)
 uniform float u_desat_floor;      // Min desaturation multiplier in salient regions (1.0 = full desat, 0.85 = 15% cap)
 
@@ -142,12 +143,15 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     float c0, c1, c2, c3;
     float e2 = max(dog_e2, 0.01);
     if (u_fovi_enabled > 0.5) {
-        // CMF-derived: cutoff_i = a * (2^level - 1) / fovea_deg
+        // CMF-derived: invert mipLevel = maxMip * [ln(r+a)-ln(a)] / cortical_max
+        // → r = a * (exp(level * cortical_max / maxMip) - 1)
+        // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
         float fovea_deg = 2.0;
-        c0 = u_cmf_a * (pow(2.0, 1.0) - 1.0) / fovea_deg;
-        c1 = u_cmf_a * (pow(2.0, 2.0) - 1.0) / fovea_deg;
-        c2 = u_cmf_a * (pow(2.0, 3.0) - 1.0) / fovea_deg;
-        c3 = u_cmf_a * (pow(2.0, 4.0) - 1.0) / fovea_deg;
+        float scale = u_cortical_max / maxMipLevel;
+        c0 = u_cmf_a * (exp(1.0 * scale) - 1.0) / fovea_deg;
+        c1 = u_cmf_a * (exp(2.0 * scale) - 1.0) / fovea_deg;
+        c2 = u_cmf_a * (exp(3.0 * scale) - 1.0) / fovea_deg;
+        c3 = u_cmf_a * (exp(4.0 * scale) - 1.0) / fovea_deg;
     } else {
         // Linear M-scaling: cutoff_k = E2 * (2^k - 1)
         c0 = e2 * 1.0;    // 2^1 - 1 = 1
@@ -186,10 +190,12 @@ vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
 
     float mipLevel;
     if (u_fovi_enabled > 0.5) {
-        // FOVI: Logarithmic cortical magnification (CMF = 1/(r+a))
+        // Cortical distance: d(r) = ln(r+a) - ln(a)
+        // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
         float fovea_deg = 2.0;
         float r_deg = normalizedEcc * fovea_deg;
-        mipLevel = clamp(log2(max(1.0, (r_deg + u_cmf_a) / u_cmf_a)), 0.0, maxMipLevel);
+        float cortical_dist = log(r_deg + u_cmf_a) - log(u_cmf_a);
+        mipLevel = clamp(maxMipLevel * cortical_dist / u_cortical_max, 0.0, maxMipLevel);
     } else {
         mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
     }
@@ -211,10 +217,12 @@ vec4 sampleMIPPooledGrad(vec2 uv, vec2 duvdx, vec2 duvdy, float eccentricity, fl
 
     float mipLevel;
     if (u_fovi_enabled > 0.5) {
-        // FOVI: Logarithmic cortical magnification (CMF = 1/(r+a))
+        // Cortical distance: d(r) = ln(r+a) - ln(a)
+        // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
         float fovea_deg = 2.0;
         float r_deg = normalizedEcc * fovea_deg;
-        mipLevel = clamp(log2(max(1.0, (r_deg + u_cmf_a) / u_cmf_a)), 0.0, maxMipLevel);
+        float cortical_dist = log(r_deg + u_cmf_a) - log(u_cmf_a);
+        mipLevel = clamp(maxMipLevel * cortical_dist / u_cortical_max, 0.0, maxMipLevel);
     } else {
         mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
     }

@@ -86,6 +86,7 @@
                 // FOVI (Cortical Magnification) uniform locations
                 this.foviEnabledLocation = null;
                 this.cmfALocation = null;
+                this.corticalMaxLocation = null;
                 this.foviColorSigmaLocation = null;
                 this.desatFloorLocation = null;
 
@@ -205,6 +206,7 @@
                 // FOVI (Cortical Magnification) uniform lookups
                 this.foviEnabledLocation = gl.getUniformLocation(this.program, "u_fovi_enabled");
                 this.cmfALocation = gl.getUniformLocation(this.program, "u_cmf_a");
+                this.corticalMaxLocation = gl.getUniformLocation(this.program, "u_cortical_max");
                 this.foviColorSigmaLocation = gl.getUniformLocation(this.program, "u_fovi_color_sigma");
                 this.desatFloorLocation = gl.getUniformLocation(this.program, "u_desat_floor");
 
@@ -484,7 +486,7 @@
                 this.renderCallCount++;
                 if (this.renderCallCount === 1) {
                     const { ipcRenderer } = require('electron');
-                    ipcRenderer.send('log:renderer', `[WebGLRenderer] First render: ${width}x${height}, mouse = (${mouseX},${mouseY}), radius = ${foveaRadius}, ratio = ${foveaAspectRatio}, mode = ${mongrelMode} `);
+                    ipcRenderer.send('log:renderer', `[WebGLRenderer] First render: ${width}x${height}, radius=${foveaRadius}, mode=${mongrelMode}`);
                 }
 
                 // Safety check for aspect ratio to prevent division by zero in shader
@@ -562,6 +564,21 @@
                 // Update Config based on Mode (Legacy Support / Preset Logic)
                 this.updateConfigFromMode(aestheticMode);
 
+                // Compute cortical_max from screen geometry + foveal calibration
+                // Foveal radius encodes pixels-per-degree (fovea ≈ 2° visual angle).
+                // r_max in degrees = (screen_half_diagonal / fovea_radius) × 2°.
+                // cortical_max = ln(r_max + a) - ln(a), the total cortical distance range.
+                const foveaDeg = 2.0;
+                const halfDiag = Math.sqrt(width * width + height * height) / 2;
+                const rMaxDeg = (halfDiag / foveaRadius) * foveaDeg;
+                const cmfA = this.config.fovi_a || 2.78;
+                const corticalMax = Math.log(rMaxDeg + cmfA) - Math.log(cmfA);
+
+                if (!this._lastCorticalMax || Math.abs(corticalMax - this._lastCorticalMax) > 0.01) {
+                    console.log(`[WebGLRenderer] CMF cortical_max=${corticalMax.toFixed(3)} (r_max=${rMaxDeg.toFixed(1)}° a=${cmfA} fovea=${foveaRadius}px ${width}×${height})`);
+                    this._lastCorticalMax = corticalMax;
+                }
+
                 // Upload Granular Uniforms
                 gl.uniform1f(this.lgnUseStructureMaskLocation, this.config.lgn_use_structure_mask ? 1.0 : 0.0);
                 gl.uniform1f(this.lgnUseSaliencyGateLocation, this.config.lgn_use_saliency_gate ? 1.0 : 0.0);
@@ -575,6 +592,7 @@
                 gl.uniform1f(this.dogSharpnessLocation, this.config.dog_sharpness);
                 gl.uniform1f(this.foviEnabledLocation, this.config.fovi_enabled ? 1.0 : 0.0);
                 gl.uniform1f(this.cmfALocation, this.config.fovi_a);
+                gl.uniform1f(this.corticalMaxLocation, corticalMax);
                 gl.uniform1f(this.foviColorSigmaLocation, this.config.fovi_color_sigma);
                 gl.uniform1f(this.desatFloorLocation, this.config.desat_floor ?? 1.0);
                 gl.uniform1f(this.hasStructureLocation, hasStructure);
