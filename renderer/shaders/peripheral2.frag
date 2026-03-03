@@ -421,7 +421,12 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     
     float transitionWidth = parafovea_radius * 0.3;
     float boundaryProgress = smoothstep(parafovea_radius, parafovea_radius + transitionWidth, dist);
-    float eccentricityScale = mix(0.15, 1.0, boundaryProgress); 
+    // Ramp distortion gradually through parafovea instead of flat 0.15
+    // Inner parafovea stays sharp — parafoveal acuity is ~50% of foveal,
+    // not a blurry mess. Rayner (1998): word-length cues must survive here.
+    float parafoveaRamp = smoothstep(fovea_radius * 1.5, parafovea_radius, dist);
+    float eccentricityScale = mix(0.0, 0.15, parafoveaRamp);
+    eccentricityScale = mix(eccentricityScale, 1.0, boundaryProgress);
     
     if (config.v4_style_id == 4 || config.v4_style_id == 3) {
         eccentricityScale = 1.0;
@@ -633,7 +638,9 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         pooledCol = sampleMIPPooledGrad(v1.distortedUV, duvdx, duvdy, coupledEccentricity, fovea_radius).rgb;
     }
     
-    float baseBlend = smoothstep(0.0, fovea_radius * 0.1, eccentricity);
+    // Gradual blend across inner parafovea — was 0.1 (completed in ~15px),
+    // now 0.5 (~75px) so MIP pooling doesn't step in abruptly
+    float baseBlend = smoothstep(0.0, fovea_radius * 0.5, eccentricity);
     float blendFactor = baseBlend * u_intensity;
     vec3 col = mix(foveaCol, pooledCol, blendFactor);
     

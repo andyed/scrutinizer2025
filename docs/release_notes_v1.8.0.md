@@ -107,6 +107,20 @@ Tagged as `hypothesis` to distinguish from the validated modes (0–8).
 
 ---
 
+## 🔧 Parafoveal Blur Band Fix
+
+The removal of the parafoveal saturation boost (`mix(vec3(luma), col, 1.2)`) exposed a dead zone in the V1 displacement path. Two compounding issues:
+
+1. **Flat eccentricityScale in the parafovea**: Every pixel between fovea_radius and 2.5× fovea_radius received `eccentricityScale = 0.15` — a flat 15% of full displacement. Noise mode's 800-cycle simplex noise at that strength produces 1–5px of nearly-random per-pixel jitter, indistinguishable from gaussian blur. Rayner (1998) establishes that parafoveal processing enables word-length perception and saccade planning — blurring those cues is biologically wrong.
+
+2. **Abrupt fovea-to-pooled blend**: The MIP-pooled color blend completed within 10% of fovea radius (~15px), creating a visible step from sharp to soft.
+
+**Fix:**
+- `eccentricityScale` now ramps from **0.0** in the inner parafovea (fovea edge → 1.5× fovea_radius) to **0.15** at the outer parafovea boundary, via `smoothstep`. Inner parafovea stays sharp; distortion onset is gradual and intentional.
+- MIP pooling blend widened from `fovea_radius × 0.1` (~15px) to `fovea_radius × 0.5` (~75px), retaining more of the sharp foveal sample through the inner parafovea.
+
+---
+
 ## 🧹 Housekeeping
 
 - **Golden captures** (348MB accumulated across v1.2.0–v1.6.0) removed from git tracking and gitignored. Curated mode-comparison captures live in `docs/golden/` instead.

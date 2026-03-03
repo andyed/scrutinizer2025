@@ -8,6 +8,9 @@
 - **Mode 9: Congestion-Gated Pooling (Hypothesis)**: Shader wired to read `u_congestionMap` on TEXTURE4; pooling modulation not yet implemented. Tests Rosenholtz (2012) prediction that clutter and crowding share the same summary-statistic computation. Tagged `hypothesis` category.
 - **Validation pipeline**: Three-script architecture (`validate-congestion.py`, `extract-congestion.js`, `compare-congestion.js`) for Spearman rank correlation against Rosenholtz reference.
 
+### Fixed
+- **Parafoveal blur band**: Replaced flat `eccentricityScale = 0.15` across the entire parafovea with a `smoothstep` ramp from 0.0 (inner) to 0.15 (outer boundary). Inner parafovea stays sharp — word-length cues survive per Rayner (1998). Widened fovea-to-pooled MIP blend from `fovea_radius × 0.1` to `× 0.5` to eliminate the abrupt soft step.
+
 ### Changed
 - **Linear M-scaling**: Replaced geometric 2x band cutoffs (0.3, 0.6, 1.2, 2.4 × E2) with Rovamo & Virsu (1979) formula. New cutoffs: `E2 × (2^k − 1)` giving 1, 3, 7, 15 × E2. Coarse structure persists further into periphery.
 - **E2 recalibration**: High-Key 0.5→0.15, Biological 0.4→0.12 to preserve band-0 onset under linear cutoffs.

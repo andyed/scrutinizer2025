@@ -259,9 +259,9 @@ float strength = lgn.suppressionFactor * config.v1_strength_mult * eccentricityS
 ```
 
 **Tuning for Research**:
-- Adjust `0.15` (parafovea scale) to control how much distortion is applied in the near periphery
-- Lower values (e.g., `0.05`) preserve more geometry but reduce crowding simulation
-- Higher values (e.g., `0.4`) increase distortion but may destroy critical cues like underlines
+- eccentricityScale ramps from 0.0 (inner parafovea, at 1.5× fovea_radius) to 0.15 (outer parafovea boundary) via smoothstep, then 0.15→1.0 into far periphery
+- The 0.15 ceiling controls maximum parafoveal distortion — lower values preserve more geometry but reduce crowding simulation; higher values increase distortion but may destroy critical cues like underlines
+- MIP pooling blend completes at 0.5× fovea_radius past the fovea edge (~75px) — adjust to control how quickly the sharp foveal sample fades
 
 Additionally, jitter amplitude is reduced in parafovea to prevent dissolution of linear features:
 
