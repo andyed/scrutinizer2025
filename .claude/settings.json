@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run capture-golden:*)",
+      "Bash(npm run golden-compare:*)",
+      "Bash(npm ci:*)",
+      "Bash(node scripts/:*)",
+      "Bash(git status:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git tag:*)",
+      "Bash(git push:*)",
+      "Bash(git log:*)",
+      "Bash(git describe:*)",
+      "Bash(git diff:*)",
+      "Bash(gh release:*)",
+      "Bash(ls:*)",
+      "Bash(open:*)",
+      "Bash(grep:*)"
+    ]
+  }
+}
