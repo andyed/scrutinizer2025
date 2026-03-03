@@ -6,6 +6,7 @@
 
 console.log('[SaliencyWorker] Worker starting. Location:', self.location.href);
 try {
+    importScripts('./congestion-core.js');
     importScripts('./lib/face-api.min.js');
     console.log('[SaliencyWorker] face-api.js loaded.');
 } catch (e) {
@@ -47,31 +48,7 @@ async function loadModels() {
 loadModels();
 
 
-/**
- * Generate 1D Gaussian kernel
- * @param {number} sigma - Standard deviation
- * @returns {Float32Array} Normalized kernel
- */
-function generateGaussianKernel(sigma) {
-    // Kernel size: 6σ (covers 99.7% of distribution)
-    const radius = Math.ceil(sigma * 3);
-    const size = radius * 2 + 1;
-    const kernel = new Float32Array(size);
-
-    let sum = 0;
-    for (let i = 0; i < size; i++) {
-        const x = i - radius;
-        kernel[i] = Math.exp(-(x * x) / (2 * sigma * sigma));
-        sum += kernel[i];
-    }
-
-    // Normalize
-    for (let i = 0; i < size; i++) {
-        kernel[i] /= sum;
-    }
-
-    return kernel;
-}
+// ── Color conversion (kept inline — not part of congestion-core) ────────
 
 /**
 * Convert sRGB component to linear RGB
@@ -103,70 +80,17 @@ function linearSrgbToOklab(r, g, b) {
     };
 }
 
-/**
- * Horizontal blur pass (separable)
- */
-function blurHorizontal(src, dst, width, height, kernel) {
-    const radius = Math.floor(kernel.length / 2);
+// ── Cached-buffer wrapper for gaussianBlur (frame-rate performance) ─────
+// congestion-core.js provides the pure functions; this wrapper reuses
+// module-level temp buffers to avoid per-frame allocation.
 
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            let sum = 0;
-
-            for (let k = 0; k < kernel.length; k++) {
-                const sx = x + k - radius;
-                // Clamp to edges
-                const cx = Math.max(0, Math.min(width - 1, sx));
-                sum += src[y * width + cx] * kernel[k];
-            }
-
-            dst[y * width + x] = sum;
-        }
-    }
-}
-
-/**
- * Vertical blur pass (separable)
- */
-function blurVertical(src, dst, width, height, kernel) {
-    const radius = Math.floor(kernel.length / 2);
-
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            let sum = 0;
-
-            for (let k = 0; k < kernel.length; k++) {
-                const sy = y + k - radius;
-                // Clamp to edges
-                const cy = Math.max(0, Math.min(height - 1, sy));
-                sum += src[cy * width + x] * kernel[k];
-            }
-
-            dst[y * width + x] = sum;
-        }
-    }
-}
-
-/**
- * Apply separable Gaussian blur
- */
-function gaussianBlur(data, width, height, sigma) {
-    const kernel = generateGaussianKernel(sigma);
+function gaussianBlurCached(data, width, height, sigma) {
     const len = width * height;
-
-    // Ensure temp buffers exist
     if (!tempBuffer1 || tempBuffer1.length !== len) {
         tempBuffer1 = new Float32Array(len);
         tempBuffer2 = new Float32Array(len);
     }
-
-    // Horizontal pass
-    blurHorizontal(data, tempBuffer1, width, height, kernel);
-
-    // Vertical pass
-    blurVertical(tempBuffer1, tempBuffer2, width, height, kernel);
-
-    return tempBuffer2;
+    return gaussianBlur(data, width, height, sigma, tempBuffer1, tempBuffer2);
 }
 
 /**
@@ -180,17 +104,17 @@ function computeCenterSurround(feature, width, height) {
     const featureCopy = new Float32Array(feature);
 
     // Fine scale (σ=1.0)
-    const fine = gaussianBlur(featureCopy, width, height, 1.0);
+    const fine = gaussianBlurCached(featureCopy, width, height, 1.0);
 
     // CRITICAL: Copy fine result before computing coarse
-    // (gaussianBlur reuses temp buffers)
+    // (gaussianBlurCached reuses temp buffers)
     const fineCopy = new Float32Array(fine);
 
     // Reset feature for coarse blur
     const featureCopy2 = new Float32Array(feature);
 
     // Coarse scale (σ=3.0)
-    const coarse = gaussianBlur(featureCopy2, width, height, 3.0);
+    const coarse = gaussianBlurCached(featureCopy2, width, height, 3.0);
 
     // Difference-of-Gaussians
     for (let i = 0; i < len; i++) {
@@ -391,23 +315,65 @@ self.onmessage = async function (e) {
     const cs_BY = computeCenterSurround(BY, width, height);
 
     // PASS 3: Normalize each feature map independently
-    function normalizeFeature(feature) {
-        let max = 0;
-        for (let i = 0; i < feature.length; i++) {
-            if (feature[i] > max) max = feature[i];
-        }
-        if (max < 0.001) max = 1.0;
-
-        const normalized = new Float32Array(feature.length);
-        for (let i = 0; i < feature.length; i++) {
-            normalized[i] = feature[i] / max;
-        }
-        return normalized;
-    }
-
+    // normalizeFeature() provided by congestion-core.js via importScripts
     const norm_I = normalizeFeature(cs_I);
     const norm_RG = normalizeFeature(cs_RG);
     const norm_BY = normalizeFeature(cs_BY);
+
+    // ── FEATURE CONGESTION (Rosenholtz et al. 2007) ──────────────────
+    // Local variance across I, RG, BY channels. Variance = E[X²] - E[X]².
+    // computeLocalVariance() provided by congestion-core.js; pass cached buffers.
+
+    function computeLocalVarianceCached(channel, w, h, sigma) {
+        return computeLocalVariance(channel, w, h, sigma, tempBuffer1, tempBuffer2);
+    }
+
+    const congestionSigma = 2.5;
+    const var_I = computeLocalVarianceCached(I, width, height, congestionSigma);
+    const var_RG = computeLocalVarianceCached(RG, width, height, congestionSigma);
+    const var_BY = computeLocalVarianceCached(BY, width, height, congestionSigma);
+
+    // Sum variances across channels → raw congestion
+    const congestion = new Float32Array(len);
+    for (let i = 0; i < len; i++) {
+        congestion[i] = var_I[i] + var_RG[i] + var_BY[i];
+    }
+
+    // ── EDGE DENSITY ─────────────────────────────────────────────────
+    // Sobel magnitude on intensity channel, then blur to get local density.
+    const edgeMag = new Float32Array(len);
+    for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+            const idx = y * width + x;
+            // 3×3 Sobel on I (intensity)
+            const tl = I[(y - 1) * width + (x - 1)];
+            const t  = I[(y - 1) * width + x];
+            const tr = I[(y - 1) * width + (x + 1)];
+            const ml = I[y * width + (x - 1)];
+            const mr = I[y * width + (x + 1)];
+            const bl = I[(y + 1) * width + (x - 1)];
+            const b  = I[(y + 1) * width + x];
+            const br = I[(y + 1) * width + (x + 1)];
+
+            const gx = (tl + 2 * ml + bl) - (tr + 2 * mr + br);
+            const gy = (tl + 2 * t + tr) - (bl + 2 * b + br);
+            edgeMag[idx] = Math.sqrt(gx * gx + gy * gy);
+        }
+    }
+
+    // Blur edge magnitude to get local edge density
+    const edgeMagCopy = new Float32Array(edgeMag);
+    const blurredEdge = gaussianBlurCached(edgeMagCopy, width, height, 3.0);
+    const edgeDensity = new Float32Array(blurredEdge);
+
+    // Normalize congestion and edge density
+    const norm_congestion = normalizeFeature(congestion);
+    const norm_edgeDensity = normalizeFeature(edgeDensity);
+
+    // ── SUMMARY STATS (for Complexity HUD) ───────────────────────────
+    // computeStats() provided by congestion-core.js via importScripts
+    const congestionStats = computeStats(norm_congestion, width, height);
+    const edgeDensityStats = computeStats(norm_edgeDensity, width, height);
     // Face is already 0-1 mostly from Gaussian, but better normalize just in case
     // Actually, drawFaceBlob max is 1.0. If multiple faces overlap, it might go > 1.
     // Let's rely on final clamp.
@@ -474,16 +440,19 @@ self.onmessage = async function (e) {
         // Clamp to [0, 1]
         val = Math.max(0, Math.min(1, val));
 
-        const byteVal = Math.floor(val * 255);
-        pixels[i * 4] = byteVal;
-        pixels[i * 4 + 1] = byteVal;
-        pixels[i * 4 + 2] = byteVal;
+        // RGB-packed output: R=Saliency, G=Feature Congestion, B=Edge Density
+        // Repurposes previously wasted G/B channels (were copies of R)
+        pixels[i * 4]     = Math.floor(val * 255);                                      // R: Saliency
+        pixels[i * 4 + 1] = Math.floor(Math.max(0, Math.min(1, norm_congestion[i])) * 255);  // G: Feature Congestion
+        pixels[i * 4 + 2] = Math.floor(Math.max(0, Math.min(1, norm_edgeDensity[i])) * 255); // B: Edge Density
         pixels[i * 4 + 3] = 255;
     }
 
-    // Send back the processed ImageData
+    // Send back the processed ImageData + summary stats
     self.postMessage({
         imageData: imageData,
-        id: id
+        id: id,
+        congestionStats: congestionStats,
+        edgeDensityStats: edgeDensityStats
     }, [imageData.data.buffer]);
 };

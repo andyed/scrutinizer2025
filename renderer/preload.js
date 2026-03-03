@@ -195,12 +195,14 @@ window.addEventListener('DOMContentLoaded', () => {
         // Mutation = Low Priority (IdleCallback) -> 300ms debounce/throttle
 
         if (isScrollEvent) {
+            lastScanTrigger = 'scroll';
             isScanning = true;
             requestAnimationFrame(() => {
                 performScan();
                 setTimeout(() => { isScanning = false; }, 16);
             });
         } else {
+            lastScanTrigger = 'mutation';
             // Check if user is typing (active element is input)
             const active = document.activeElement;
             const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
@@ -229,10 +231,13 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // Track whether current scan was triggered by scroll or DOM mutation
+    let lastScanTrigger = 'mutation';
+
     const performScan = () => {
         try {
             const blocks = domAdapter.scan(document.body);
-            ipcRenderer.send('structure-update', blocks);
+            ipcRenderer.send('structure-update', blocks, lastScanTrigger);
         } catch (err) {
             console.error('[Preload] Scan failed:', err);
         }

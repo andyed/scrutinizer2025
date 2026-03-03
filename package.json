@@ -13,7 +13,14 @@
     "release:win": "electron-builder --win --publish always",
     "test": "cross-env TEST_MODE=true node scripts/run-electron.js .",
     "capture-golden": "node scripts/capture-golden.js",
-    "golden-compare": "node scripts/golden-compare.js"
+    "golden-compare": "node scripts/golden-compare.js",
+    "validate:download": "uv run --python 3.12 scripts/validate-congestion.py --download",
+    "validate:python": "uv run --python 3.12 scripts/validate-congestion.py",
+    "validate:scrutinizer": "node scripts/extract-congestion.js",
+    "validate:scrutinizer:256": "node scripts/extract-congestion.js --max-dim=256 --output-dir=tests/validation/results-256",
+    "validate:compare": "node scripts/compare-congestion.js",
+    "validate:compare:256": "node scripts/compare-congestion.js --scrutinizer-dir=tests/validation/results-256",
+    "validate-congestion": "npm run validate:download && npm run validate:python && npm run validate:scrutinizer && npm run validate:compare && npm run validate:scrutinizer:256 && npm run validate:compare:256"
   },
   "keywords": [
     "electron",

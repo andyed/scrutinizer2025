@@ -38,7 +38,9 @@ const FIXATION_COORDS = {
 const DEBUG_VARIANTS = [
     { id: 'standard', mode: '0', overlay: false },
     { id: 'saliency', mode: 'saliency' },
-    { id: 'structure', mode: 'structure' }
+    { id: 'structure', mode: 'structure' },
+    { id: 'congestion_overlay', mode: 'congestion_overlay' },
+    { id: 'congestion_solo', mode: 'congestion_solo' }
 ];
 
 // Mobile/tablet variants appended to desktop captures (never replacing them)

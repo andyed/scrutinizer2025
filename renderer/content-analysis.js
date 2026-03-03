@@ -47,6 +47,31 @@
 
             this._initSaliencyWorker();
 
+            // ── High-Res Congestion Worker (on-demand, 768px default) ─
+            // Separate worker for accurate congestion when report is toggled on.
+            // 256px saliency worker congestion stays for pooling modifier (good enough).
+            this.congestionWorker = null;
+            this._congestionWorkerBusy = false;
+            this.congestionTargetCanvas = document.createElement('canvas');
+            this.congestionCurrentCanvas = null;
+            this.congestionUpdateCountdown = 0;
+            this.congestionMaxDimension = 1024; // Configurable: 512/768/1024
+
+            this._initCongestionWorker();
+
+            // ── Complexity Stats ──────────────────────────────────────
+            // Low-res stats from saliency worker (always available)
+            this._saliencyCongestionStats = null;
+            this._saliencyEdgeDensityStats = null;
+            // High-res stats from congestion worker (when active)
+            this._hiResCongestionStats = null;
+            this._hiResEdgeDensityStats = null;
+            // Public getters prefer high-res when available
+            this.congestionStats = null;
+            this.edgeDensityStats = null;
+            // Generation counter: incremented each time congestion worker delivers fresh results
+            this.congestionGeneration = 0;
+
             // ── Debug / Visualization ────────────────────────────────
             this.showStructureMap = false;
             this.showSaliencyMap = false;
@@ -71,8 +96,17 @@
             };
 
             this.saliencyWorker.onmessage = (e) => {
-                const { imageData } = e.data;
+                const { imageData, congestionStats, edgeDensityStats } = e.data;
                 if (!imageData) return;
+
+                // Store low-res stats from saliency worker
+                this._saliencyCongestionStats = congestionStats || null;
+                this._saliencyEdgeDensityStats = edgeDensityStats || null;
+                // Public stats: prefer high-res when congestion worker has produced results
+                if (!this._hiResCongestionStats) {
+                    this.congestionStats = this._saliencyCongestionStats;
+                    this.edgeDensityStats = this._saliencyEdgeDensityStats;
+                }
 
                 // Resize target canvas if dimensions changed (adaptive scaling)
                 if (!this.saliencyTargetCanvas ||
@@ -95,6 +129,144 @@
                 // Trigger smoothing loop in render (60 frames = ~1 second)
                 this.saliencyUpdateCountdown = 60;
             };
+        }
+
+        /**
+         * Initialize the dedicated high-resolution congestion Web Worker.
+         * @private
+         */
+        _initCongestionWorker() {
+            if (!window.Worker) {
+                console.warn('[ContentAnalysis] Web Workers not available, congestion worker disabled');
+                return;
+            }
+
+            this.congestionWorker = new Worker(`./congestion-worker.js?v=${Date.now()}`);
+
+            this.congestionWorker.onerror = (error) => {
+                console.error('[ContentAnalysis] Congestion Worker Error:', error);
+                this._congestionWorkerBusy = false;
+            };
+
+            this.congestionWorker.onmessage = (e) => {
+                const { imageData, congestionStats, edgeDensityStats, resolution, computeTimeMs } = e.data;
+                this._congestionWorkerBusy = false;
+
+                if (!imageData) return;
+
+                // Store high-res stats (these override saliency worker stats for HUD)
+                this._hiResCongestionStats = congestionStats || null;
+                this._hiResEdgeDensityStats = edgeDensityStats || null;
+                this.congestionStats = this._hiResCongestionStats;
+                this.edgeDensityStats = this._hiResEdgeDensityStats;
+                this.congestionGeneration++;
+
+                // Resize target canvas if dimensions changed
+                if (!this.congestionTargetCanvas ||
+                    this.congestionTargetCanvas.width !== imageData.width ||
+                    this.congestionTargetCanvas.height !== imageData.height) {
+                    this.congestionTargetCanvas.width = imageData.width;
+                    this.congestionTargetCanvas.height = imageData.height;
+
+                    if (!this.congestionCurrentCanvas) {
+                        this.congestionCurrentCanvas = document.createElement('canvas');
+                    }
+                    this.congestionCurrentCanvas.width = imageData.width;
+                    this.congestionCurrentCanvas.height = imageData.height;
+                }
+
+                // Update target canvas with raw worker output
+                const ctx = this.congestionTargetCanvas.getContext('2d');
+                ctx.putImageData(imageData, 0, 0);
+
+                // Trigger smoothing (shorter than saliency — congestion is on-demand)
+                this.congestionUpdateCountdown = 30;
+
+                console.log(`[ContentAnalysis] High-res congestion ready: ${resolution.width}x${resolution.height} in ${computeTimeMs.toFixed(0)}ms`);
+            };
+        }
+
+        /**
+         * Submit a frame for high-resolution congestion analysis.
+         * On-demand: only called when congestion report mode is active.
+         * Debounced: skips if worker is still processing previous frame.
+         *
+         * @param {Uint8ClampedArray} imageDataBuffer - Raw BGRA pixel buffer
+         * @param {number} width
+         * @param {number} height
+         */
+        submitForCongestion(imageDataBuffer, width, height) {
+            if (!this.congestionWorker || this._congestionWorkerBusy || width <= 0 || height <= 0) return;
+
+            this._congestionWorkerBusy = true;
+
+            // BGRA→RGBA swap (same as saliency path)
+            const rgbaBuffer = new Uint8ClampedArray(imageDataBuffer);
+            for (let i = 0; i < rgbaBuffer.length; i += 4) {
+                const b = rgbaBuffer[i];
+                rgbaBuffer[i] = rgbaBuffer[i + 2];
+                rgbaBuffer[i + 2] = b;
+            }
+            const congestionImageData = new ImageData(rgbaBuffer, width, height);
+
+            createImageBitmap(congestionImageData).then(bitmap => {
+                this.congestionWorker.postMessage({
+                    imageBitmap: bitmap,
+                    id: Date.now(),
+                    maxDimension: this.congestionMaxDimension
+                }, [bitmap]);
+            });
+        }
+
+        /**
+         * Per-frame congestion smoothing: blend target → current to prevent flicker.
+         * Mirrors saliency smoothing pattern. Call once per render frame.
+         * @param {WebGLRenderer} renderer
+         */
+        updateCongestionSmoothing(renderer) {
+            if (!this.congestionTargetCanvas || !this.congestionCurrentCanvas || this.congestionUpdateCountdown <= 0) {
+                return;
+            }
+
+            const ctx = this.congestionCurrentCanvas.getContext('2d', { alpha: false });
+
+            // Fast smooth (0.8 alpha)
+            ctx.globalAlpha = 0.8;
+            ctx.drawImage(this.congestionTargetCanvas, 0, 0);
+            ctx.globalAlpha = 1.0;
+
+            // Upload high-res congestion texture to GPU
+            renderer.uploadCongestionMap(this.congestionCurrentCanvas);
+
+            this.congestionUpdateCountdown--;
+        }
+
+        /**
+         * Clear high-res congestion data (when report mode is turned off).
+         * Resets stats to fall back to saliency worker's 256px data.
+         * @param {WebGLRenderer} renderer
+         */
+        clearCongestionData(renderer) {
+            this._hiResCongestionStats = null;
+            this._hiResEdgeDensityStats = null;
+            // Fall back to saliency worker stats
+            this.congestionStats = this._saliencyCongestionStats;
+            this.edgeDensityStats = this._saliencyEdgeDensityStats;
+            this.congestionUpdateCountdown = 0;
+
+            // Clear the congestion texture so shader falls back to saliency map
+            if (renderer) {
+                renderer.clearCongestionMap();
+            }
+        }
+
+        /**
+         * Set congestion worker resolution.
+         * @param {number} maxDim - Maximum dimension (512, 768, or 1024)
+         */
+        setCongestionResolution(maxDim) {
+            this.congestionMaxDimension = maxDim;
+            console.log(`[ContentAnalysis] Congestion resolution set to: ${maxDim}px`);
         }
 
         /**
@@ -348,7 +520,9 @@
             return {
                 hasStructure: this.hasStructure,
                 enableStructureMap: this.config.enableStructureMap,
-                enableSaliencyModulation: this.config.enableSaliencyModulation
+                enableSaliencyModulation: this.config.enableSaliencyModulation,
+                congestionStats: this.congestionStats,
+                edgeDensityStats: this.edgeDensityStats
             };
         }
     }

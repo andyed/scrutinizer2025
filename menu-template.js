@@ -337,6 +337,13 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             type: 'radio',
                             checked: currentAestheticMode === 8,
                             click: () => { sendToOverlays('menu:set-aesthetic-mode', 8); app.emit('aesthetic-mode-changed', 8); }
+                        },
+                        { type: 'separator' },
+                        {
+                            label: 'Congestion-Gated Pooling',
+                            type: 'radio',
+                            checked: currentAestheticMode === 9,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 9); app.emit('aesthetic-mode-changed', 9); }
                         }
                     ]
                 },
@@ -551,6 +558,30 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             type: 'checkbox',
                             checked: false,
                             click: (menuItem) => sendToOverlays('menu:toggle-saliency-map', menuItem.checked)
+                        },
+                        { type: 'separator' },
+                        {
+                            label: 'Congestion Report',
+                            submenu: [
+                                {
+                                    label: 'Off',
+                                    type: 'radio',
+                                    checked: true,
+                                    click: () => sendToOverlays('menu:set-show-congestion', 0)
+                                },
+                                {
+                                    label: 'Stats',
+                                    type: 'radio',
+                                    checked: false,
+                                    click: () => sendToOverlays('menu:set-show-congestion', 1)
+                                },
+                                {
+                                    label: 'Heatmap',
+                                    type: 'radio',
+                                    checked: false,
+                                    click: () => sendToOverlays('menu:set-show-congestion', 2)
+                                }
+                            ]
                         }
                     ]
                 },

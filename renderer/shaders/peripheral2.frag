@@ -5,7 +5,7 @@ precision mediump float;
 uniform sampler2D u_texture;      // Captured browser frame (Live)
 uniform sampler2D u_maskTexture;  // Visual memory mask
 uniform sampler2D u_structureMap; // Structure Map (R=Rhythm, G=Density, B=Type)
-uniform sampler2D u_saliencyMap;  // Saliency Map (R=Saliency, grayscale)
+uniform sampler2D u_saliencyMap;  // Saliency Map (R=Saliency, G=Congestion, B=EdgeDensity)
 uniform float u_useMask;
 
 uniform vec2  u_resolution;
@@ -45,6 +45,17 @@ uniform float u_fovi_enabled;     // 0.0 = legacy linear, 1.0 = CMF logarithmic
 uniform float u_cmf_a;            // Cortical magnification constant (default 2.78)
 uniform float u_fovi_color_sigma; // Gaussian color decay sigma (0.0 = disabled)
 uniform float u_desat_floor;      // Min desaturation multiplier in salient regions (1.0 = full desat, 0.85 = 15% cap)
+
+// Congestion overlay (Rosenholtz et al. 2007)
+uniform int u_show_congestion;    // 0=off, 1=overlay, 2=solo
+
+// Congestion-gated pooling (hypothesis mode)
+uniform float u_congestion_pooling; // 0.0=off, 1.0=on
+
+// High-resolution congestion map (from dedicated congestion worker)
+// R=congestion, G=edgeDensity — higher quality than u_saliencyMap.gb at 256px
+uniform sampler2D u_congestionMap;
+uniform float u_hasCongestionMap; // 0.0=not available, 1.0=use high-res data
 
 in vec2 v_texCoord;
 out vec4 fragColor;
@@ -325,8 +336,10 @@ struct ModeConfig {
 };
 
 struct LGN_Signal {
-    float suppressionFactor; 
+    float suppressionFactor;
     float saliency;
+    float congestion;   // Feature Congestion (Rosenholtz 2007) — local feature variance
+    float edgeDensity;  // Edge Density — local Sobel magnitude density
     float density;
     float rhythm;
     float type;
@@ -346,7 +359,20 @@ LGN_Signal processLGN(vec2 uv, ModeConfig config, float dist, float fovea_radius
     signal.density = structure.g;
     signal.rhythm = structure.r;
     signal.type = structure.b;
-    signal.saliency = texture(u_saliencyMap, uv).r;
+
+    // Saliency texture: R=saliency, G=feature congestion, B=edge density
+    vec4 salTex = texture(u_saliencyMap, uv);
+    signal.saliency    = salTex.r;
+
+    // Congestion + edge density: prefer high-res dedicated worker when available
+    if (u_hasCongestionMap > 0.5) {
+        vec4 congTex = texture(u_congestionMap, uv);
+        signal.congestion  = congTex.r;
+        signal.edgeDensity = congTex.g;
+    } else {
+        signal.congestion  = salTex.g;
+        signal.edgeDensity = salTex.b;
+    }
     
     float rampEnd = fovea_radius * config.lgn_ramp_end_mult;
     signal.suppressionFactor = smoothstep(fovea_radius, rampEnd, dist);
@@ -456,7 +482,9 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
             // SCRAMBLE AMPLITUDE
             // Horizontal: +/- 0.8% (~16px) base (Was 1.0%)
             // Vertical: +/- 0.16% (~3px) base (Was 0.2%)
-            vec2 throwDist = vec2(0.008, 0.0016) * u_intensity; 
+            // Edge density modulation: high-edge regions crowd more strongly
+            float edgeCrowdMult = 1.0 + lgn.edgeDensity * 0.4;
+            vec2 throwDist = vec2(0.008, 0.0016) * u_intensity * edgeCrowdMult;
             
             // PROGRESSIVE SCALING: Grow distortion with eccentricity
             // At 1.5 radii (start of full scramble): 1.0x
@@ -574,6 +602,17 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     // TIER 1.8: COUPLED POOLING
     float blurMult = 1.0 + (u_blurRadius * 0.3);
     float coupledEccentricity = v1.distortionStrength * u_intensity * fovea_radius * blurMult;
+
+    // Congestion-gated pooling: high congestion → stronger blur (more aggressive MIP)
+    // Biological rationale: cluttered regions are already pooled by peripheral vision
+    // into summary statistics — this makes the simulation match that prediction.
+    // Rosenholtz et al. (2007) clutter + Rosenholtz et al. (2012) peripheral pooling.
+    if (u_congestion_pooling > 0.5) {
+        // congestion 0.0 → 1.0x MIP (no change)
+        // congestion 1.0 → 2.0x MIP (double pooling)
+        float congestionBoost = 1.0 + lgn.congestion * 1.0;
+        coupledEccentricity *= congestionBoost;
+    }
 
     vec3 pooledCol;
     if (u_dog_enabled > 0.5) {
@@ -767,6 +806,20 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     return col;
 }
 
+// === CONGESTION HEATMAP (Rosenholtz 2007 visualization) ===
+// Blue (low) → Yellow (mid) → Red (high) — perceptually ordered
+vec3 congestionHeatmap(float t) {
+    t = clamp(t, 0.0, 1.0);
+    // 3-stop gradient: blue → yellow → red
+    if (t < 0.5) {
+        float s = t * 2.0; // 0..1 over first half
+        return mix(vec3(0.1, 0.1, 0.8), vec3(1.0, 1.0, 0.0), s);
+    } else {
+        float s = (t - 0.5) * 2.0; // 0..1 over second half
+        return mix(vec3(1.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), s);
+    }
+}
+
 void main() {
     float aspect = u_resolution.x / u_resolution.y;
     vec2 uv = v_texCoord;
@@ -944,5 +997,24 @@ void main() {
         }
     }
     
+    // === CONGESTION REPORT (Rosenholtz 2007) ===
+    // Follows same pattern as structure/saliency debug views:
+    // reset to source image, then paint the visualization on top.
+    // This works independently of whether the foveal effect is active.
+    if (u_show_congestion > 0) {
+        // Raw congestion from content analysis — mouse-independent diagnostic.
+        // Shows intrinsic clutter of each page region (Rosenholtz 2007).
+        // Prefer high-res congestion map from dedicated worker when available.
+        float congestion = 0.0;
+        if (u_hasCongestionMap > 0.5) {
+            congestion = texture(u_congestionMap, v_texCoord).r;
+        } else {
+            congestion = texture(u_saliencyMap, v_texCoord).g;
+        }
+        vec3 heatmapColor = congestionHeatmap(congestion);
+        vec3 src = sampleSource(uv).rgb;
+        color.rgb = mix(src, heatmapColor, 0.85);
+    }
+
     fragColor = color;
 }

@@ -89,6 +89,17 @@
                 this.foviColorSigmaLocation = null;
                 this.desatFloorLocation = null;
 
+                // Congestion overlay uniform location
+                this.showCongestionLocation = null;
+
+                // Congestion-gated pooling (hypothesis mode)
+                this.congestionPoolingLocation = null;
+
+                // High-res congestion map (from dedicated congestion worker)
+                this.congestionMapLocation = null;
+                this.hasCongestionMapLocation = null;
+                this._hasCongestionMapData = false;
+
                 // Default Configuration
                 this.config = {
                     lgn_use_structure_mask: true,
@@ -103,7 +114,9 @@
                     dog_sharpness: 0.0,
                     fovi_enabled: false,
                     fovi_a: 2.78,
-                    fovi_color_sigma: 0.0
+                    fovi_color_sigma: 0.0,
+                    show_congestion: 0,  // 0=off, 1=overlay, 2=solo
+                    congestion_pooling: false
                 };
 
                 this.init(vsSource, fsSource);
@@ -195,6 +208,16 @@
                 this.foviColorSigmaLocation = gl.getUniformLocation(this.program, "u_fovi_color_sigma");
                 this.desatFloorLocation = gl.getUniformLocation(this.program, "u_desat_floor");
 
+                // Congestion overlay uniform lookup
+                this.showCongestionLocation = gl.getUniformLocation(this.program, "u_show_congestion");
+
+                // Congestion-gated pooling uniform lookup
+                this.congestionPoolingLocation = gl.getUniformLocation(this.program, "u_congestion_pooling");
+
+                // High-res congestion map uniform lookups
+                this.congestionMapLocation = gl.getUniformLocation(this.program, "u_congestionMap");
+                this.hasCongestionMapLocation = gl.getUniformLocation(this.program, "u_hasCongestionMap");
+
                 // Create buffers
                 this.positionBuffer = gl.createBuffer();
                 gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
@@ -260,6 +283,18 @@
                 const dummySaliency = new Uint8Array([0, 0, 0, 255]);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, dummySaliency);
                 // LINEAR filter for smooth gradients
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+                // Create high-res congestion map texture (GL_TEXTURE4)
+                this.congestionMapTexture = gl.createTexture();
+                gl.activeTexture(gl.TEXTURE4);
+                gl.bindTexture(gl.TEXTURE_2D, this.congestionMapTexture);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                // Initialize to BLACK (no congestion data)
+                const dummyCongestion = new Uint8Array([0, 0, 0, 255]);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, dummyCongestion);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
             }
@@ -332,7 +367,29 @@
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
             }
 
+            uploadCongestionMap(image) {
+                const gl = this.gl;
+                gl.activeTexture(gl.TEXTURE4);
+                gl.bindTexture(gl.TEXTURE_2D, this.congestionMapTexture);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+                this._hasCongestionMapData = true;
+            }
+
+            clearCongestionMap() {
+                const gl = this.gl;
+                gl.activeTexture(gl.TEXTURE4);
+                gl.bindTexture(gl.TEXTURE_2D, this.congestionMapTexture);
+                const empty = new Uint8Array([0, 0, 0, 255]);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, empty);
+                this._hasCongestionMapData = false;
+            }
+
             updateConfigFromMode(modeId) {
+                // Preserve runtime toggles that aren't mode-specific.
+                // show_congestion is set by setShowCongestion() and must survive
+                // the per-frame config reset — it's a user toggle, not a mode property.
+                const savedShowCongestion = this.config.show_congestion;
+
                 // Default: High-Key (0)
                 const defaults = {
                     lgn_use_structure_mask: true,
@@ -347,10 +404,12 @@
                     dog_sharpness: 0.0,
                     fovi_enabled: false,
                     fovi_a: 2.78,
-                    fovi_color_sigma: 0.0
+                    fovi_color_sigma: 0.0,
+                    congestion_pooling: false
                 };
 
                 this.config = { ...defaults };
+                this.config.show_congestion = savedShowCongestion;
 
                 // Try registry-based lookup first
                 if (modesRegistry && modesRegistry.modes) {
@@ -374,6 +433,7 @@
                         this.config.fovi_enabled = p.fovi_enabled ?? defaults.fovi_enabled;
                         this.config.fovi_a = p.fovi_a ?? defaults.fovi_a;
                         this.config.fovi_color_sigma = p.fovi_color_sigma ?? defaults.fovi_color_sigma;
+                        this.config.congestion_pooling = p.congestion_pooling ?? defaults.congestion_pooling;
 
                         // Store current mode metadata for export
                         this.currentMode = modeEntry;
@@ -470,6 +530,11 @@
                 gl.bindTexture(gl.TEXTURE_2D, this.saliencyMapTexture);
                 gl.uniform1i(this.saliencyMapLocation, 3);
 
+                gl.activeTexture(gl.TEXTURE4);
+                gl.bindTexture(gl.TEXTURE_2D, this.congestionMapTexture);
+                gl.uniform1i(this.congestionMapLocation, 4);
+                gl.uniform1f(this.hasCongestionMapLocation, this._hasCongestionMapData ? 1.0 : 0.0);
+
                 gl.uniform2f(this.resolutionLocation, width, height);
                 gl.uniform2f(this.mouseLocation, mouseX, mouseY);
                 gl.uniform2f(this.mouseStableLocation, stableMouseX, stableMouseY);
@@ -514,6 +579,8 @@
                 gl.uniform1f(this.desatFloorLocation, this.config.desat_floor ?? 1.0);
                 gl.uniform1f(this.hasStructureLocation, hasStructure);
                 gl.uniform1f(this.enableSaliencyModulationLocation, enableSaliencyModulation);
+                gl.uniform1i(this.showCongestionLocation, this.config.show_congestion);
+                gl.uniform1f(this.congestionPoolingLocation, this.config.congestion_pooling ? 1.0 : 0.0);
 
                 if (Math.random() < 0.01) {
                     // console.log(`[WebGL] Render Mode: ${ mongrelMode }, Res: ${ width }x${ height }, Mouse: ${ mouseX },${ mouseY } `);
