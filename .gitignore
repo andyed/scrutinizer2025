@@ -1,4 +1,5 @@
 node_modules/
+.venv/
 dist/
 *.log
 .DS_Store
@@ -23,5 +24,12 @@ out/
 # Test Artifacts
 tests/screenshots/
 tests/golden/*Z.png
+tests/validation/rosenholtz-maps/
+tests/validation/results/
+tests/validation/results-256/
+
+# Golden captures — bulk regression screenshots, too large for git.
+# Key illustrative captures live in docs/golden/ instead (curated per release).
+tests/golden-captures/
 build/certs/
 build_error.txt
