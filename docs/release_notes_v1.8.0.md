@@ -116,7 +116,7 @@ Tagged as `hypothesis` to distinguish from the validated modes (0–8).
 
 ## What's Next
 
-- **Perceptive-field chromatic pooling** — Abramov et al. (1991) showed that peripheral color perception degrades differently than spatial resolution: the perceptive field for color is larger than for luminance, and S-cone signals degrade faster with eccentricity. This would add chromatic-specific pooling radii to the DoG bands.
+- **Per-channel chromatic pooling** — Red-green opponency collapses ~2.5× faster than blue-yellow with eccentricity, and peripheral color perception is strongly size-dependent (large color fields persist to 20°+). The DoG bands already separate content by spatial scale — applying differential RG/YV attenuation per band models both effects. Spec: `docs/specs/chromatic_pooling.md`. Key references: Mullen & Kingdom (2002), Abramov et al. (1991), castleCSF (Ashraf et al. 2024).
 - **Oriented DoG bands (Oblique Effect)** — Cardinal (H/V) edges get M-scaling cutoffs pushed ~50% further, modeling the 30–50% acuity advantage for horizontal and vertical edges over oblique ones (Appelle 1972). Spec: `docs/specs/oriented_dog_bands.md`
 - **Validation corpus expansion** — Current corpus is 10 images. Expanding to 20+ for statistical confidence in the Spearman correlation.
 
