@@ -94,7 +94,7 @@ We implement a **Dual Strategy** in `main.js`:
 
 ### 6. HUD Display Layer Stack (v1.4.2)
 
-The HUD overlay window (`overlay.html`) uses a z-indexed layer stack for rendering. Understanding this is critical when adding new visual overlays:
+The HUD overlay window (`overlay.html`) uses a z-indexed layer stack for rendering. Understanding this is critical when adding new overlays:
 
 | Layer | Element | z-index | Purpose |
 | :--- | :--- | :---: | :--- |

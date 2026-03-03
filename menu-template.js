@@ -508,7 +508,6 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                 {
                     label: 'Utility',
                     submenu: [
-                        // === RESEARCH MODES (Optimized for simulation accuracy) ===
                         {
                             label: 'High-Key Ghosting (Default)',
                             type: 'radio',
@@ -516,35 +515,39 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             click: () => { sendToOverlays('menu:set-aesthetic-mode', 0); app.emit('aesthetic-mode-changed', 0); }
                         },
                         {
-                            label: 'Biological (Purkinje Darkening)',
-                            type: 'radio',
-                            checked: currentAestheticMode === 1,
-                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 1); app.emit('aesthetic-mode-changed', 1); }
-                        },
-                        {
-                            label: 'Frosted Glass (iOS)',
-                            type: 'radio',
-                            checked: currentAestheticMode === 2,
-                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 2); app.emit('aesthetic-mode-changed', 2); }
-                        },
-                        // === PRESENTATION MODES (Storytelling & demos) ===
-                        {
-                            label: 'Wireframe (Gestalt)',
-                            type: 'radio',
-                            checked: currentAestheticMode === 3,
-                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 3); app.emit('aesthetic-mode-changed', 3); }
-                        },
-                        {
-                            label: 'Cyberpunk (Neon)',
-                            type: 'radio',
-                            checked: currentAestheticMode === 4,
-                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 4); app.emit('aesthetic-mode-changed', 4); }
-                        },
-                        {
-                            label: 'Double Vision',
-                            type: 'radio',
-                            checked: currentAestheticMode === 5,
-                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 5); app.emit('aesthetic-mode-changed', 5); }
+                            label: 'Test Modes',
+                            submenu: [
+                                {
+                                    label: 'Biological (Purkinje Darkening)',
+                                    type: 'radio',
+                                    checked: currentAestheticMode === 1,
+                                    click: () => { sendToOverlays('menu:set-aesthetic-mode', 1); app.emit('aesthetic-mode-changed', 1); }
+                                },
+                                {
+                                    label: 'Frosted Glass (iOS)',
+                                    type: 'radio',
+                                    checked: currentAestheticMode === 2,
+                                    click: () => { sendToOverlays('menu:set-aesthetic-mode', 2); app.emit('aesthetic-mode-changed', 2); }
+                                },
+                                {
+                                    label: 'Wireframe (Gestalt)',
+                                    type: 'radio',
+                                    checked: currentAestheticMode === 3,
+                                    click: () => { sendToOverlays('menu:set-aesthetic-mode', 3); app.emit('aesthetic-mode-changed', 3); }
+                                },
+                                {
+                                    label: 'Cyberpunk (Neon)',
+                                    type: 'radio',
+                                    checked: currentAestheticMode === 4,
+                                    click: () => { sendToOverlays('menu:set-aesthetic-mode', 4); app.emit('aesthetic-mode-changed', 4); }
+                                },
+                                {
+                                    label: 'Double Vision',
+                                    type: 'radio',
+                                    checked: currentAestheticMode === 5,
+                                    click: () => { sendToOverlays('menu:set-aesthetic-mode', 5); app.emit('aesthetic-mode-changed', 5); }
+                                }
+                            ]
                         },
                         { type: 'separator' },
                         {
@@ -594,7 +597,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
 
                 { type: 'separator' },
                 {
-                    label: 'Visual Overlay',
+                    label: 'Eccentricity Overlay',
                     submenu: [
                         {
                             label: 'Off',

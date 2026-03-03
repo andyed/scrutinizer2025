@@ -907,12 +907,6 @@ void main() {
     float saccadeFactor = smoothstep(4.0, 10.0, u_velocity);
     vec3 finalRGB = processV4(uv, v1, lgn, config, dist, fovea_radius, parafovea_radius, saccadeFactor);
     
-    if (isParafovea) {
-        vec3 col = finalRGB;
-        float luma = dot(col, vec3(0.299, 0.587, 0.114));
-        finalRGB = mix(vec3(luma), col, 1.2); 
-    }
-
     vec4 color = vec4(finalRGB, 1.0);
 
     float scrollbarWidth = 17.0;

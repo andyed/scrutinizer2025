@@ -1,8 +1,15 @@
 # Grad Student Project Backlog
 
-Potential thesis/capstone projects for graduate students in HCI, Vision Science, UX Research, or Design. Each project builds on Scrutinizer's existing infrastructure — a real-time, gaze-contingent foveated rendering system running in Electron/WebGL.
+Potential thesis/capstone projects for graduate students in HCI, Vision Science, UX Research, or Design. Each project builds on Scrutinizer's existing infrastructure — a real-time, gaze-contingent foveated rendering system running in Electron/WebGL2.
 
-**Architecture advantage**: The v1.6 de-monolith (GazeModel, VisualMemory, ContentAnalysis, pipeline orchestrator) means each module can be independently swapped, extended, or instrumented without touching the rest of the pipeline.
+The modular pipeline (GazeModel, VisualMemory, ContentAnalysis, pipeline orchestrator) means each module can be independently swapped, extended, or instrumented without touching the rest. As of v1.8, the system includes:
+- **Dual-worker content analysis**: Saliency worker (256 px, continuous ~4 Hz) + Congestion worker (1024 px, on-demand) running in Web Workers
+- **Feature Congestion scoring**: Rosenholtz et al. (2007) with fixed σ=2.5, validated at Spearman ρ=0.93 against the MIT reference implementation
+- **Congestion-gated pooling**: Rendering mode where high-congestion regions receive more aggressive peripheral simplification
+- **Visual Memory with Inhibition of Return**: Fixation-history masking with configurable decay
+- **8 aesthetic modes** with granular pipeline configuration (LGN gating → V1 distortion → V4 rendering)
+- **`scrutinizer-audit` CLI**: Headless Playwright-based batch scoring with sitemap support, CI gating (`--fail-above`), and before/after comparison
+- **MCP server**: Exposes `analyze_url`, `analyze_urls`, `compare_pages` tools for AI-assisted design review via Model Context Protocol
 
 **IRB/Ethics note**: Projects marked with 👁 in the selection guide involve human participants and require IRB/ethics board approval before data collection. At most institutions this takes 1–3 months and is a hard prerequisite — factor it into semester timelines. Projects 2.2 and 2.3 involving remote participants (MTurk) may need separate protocol review.
 
@@ -78,22 +85,46 @@ Scrutinizer currently works in pixel units. Real peripheral vision research requ
 
 ---
 
-### 1.4 Saccadic Dynamics & Inhibition of Return
+### 1.4 Saccadic Dynamics (Beyond IoR)
 
 **Discipline**: Vision Science, Cognitive Science
 **Effort**: Medium | **Novelty**: Medium
 
-The current GazeModel tracks velocity and detects fixations, but doesn't model saccadic dynamics beyond simple suppression. This project adds biologically plausible saccade generation: realistic main sequence (amplitude-velocity relationship), corrective saccades, express saccades, and inhibition of return (IOR) — the tendency to avoid re-fixating recently visited locations.
+**Status**: IoR is now implemented in VisualMemory (v1.7+) as a fixation-history mask with configurable decay — recently fixated regions are suppressed. The remaining work is saccadic dynamics proper.
 
-**Research question**: Does adding IOR to the visual memory decay model change user scanning patterns on information-dense pages?
+The current GazeModel tracks velocity and detects fixations, but doesn't model saccadic dynamics beyond simple suppression. This project adds biologically plausible saccade generation: realistic main sequence (amplitude-velocity relationship), corrective saccades, express saccades, and microsaccadic drift during fixations.
+
+**Research question**: Does biologically plausible saccade modeling (main sequence, corrective saccades) combined with the existing IoR change user scanning patterns on information-dense pages?
 
 **Deliverables**:
-- Extended GazeModel with main sequence parameters
-- IOR integration with VisualMemory (recently fixated regions decay faster or resist re-clearing)
-- Behavioral study: compare scanning efficiency with/without IOR simulation (requires IRB approval)
+- Extended GazeModel with main sequence parameters (amplitude-velocity-duration relationship)
+- Corrective saccade generation for near-target fixation refinement
+- Microsaccadic drift during fixation (subtle jitter that refreshes visual processing)
+- Behavioral study: compare scanning efficiency across saccade model fidelity levels (requires IRB approval)
 - GazeModel is independently swappable — drop-in replacement
 
-**Key references**: Rayner (1998), Klein (2000) IOR review
+**Key references**: Rayner (1998), Klein (2000) IOR review, Bahill et al. (1975) main sequence
+
+---
+
+### 1.5 Congestion-Modulated Peripheral Rendering Evaluation
+
+**Discipline**: Vision Science, HCI
+**Effort**: Medium | **Novelty**: High
+**Depends on**: IRB approval required
+
+Scrutinizer v1.8 ships a congestion-gated pooling mode where high-congestion regions receive more aggressive peripheral simplification — matching the biological observation that cluttered regions are already pooled by peripheral vision. But does spatially-varying rendering actually change user behavior compared to uniform rendering? This is an A/B study using the existing infrastructure; no new engineering is needed.
+
+**Research question**: Does congestion-modulated peripheral rendering improve information foraging efficiency (fewer fixations, shorter scan paths) on heterogeneous pages compared to uniform peripheral rendering?
+
+**Deliverables**:
+- Experiment design: N participants × M pages (spanning low-to-high congestion) × 2 conditions (uniform vs. congestion-gated)
+- Pre-score all stimulus pages with `scrutinizer-audit` to select pages spanning the congestion range
+- Behavioral measures: fixation count, scan path length, task completion time, revisitation rate
+- Analysis: does the congestion-gated condition help more on high-congestion pages? Is there a threshold?
+- Design guideline: when congestion-gated rendering helps vs. when uniform rendering is sufficient
+
+**Key references**: Rosenholtz et al. (2007, 2012), Pirolli & Card (1999) Information Foraging
 
 ---
 
@@ -154,15 +185,18 @@ Kim et al. (2017) showed that click-to-reveal "bubbles" on blurred images produc
 
 Scrutinizer forces users to externalize their visual attention via mouse movements. This project instruments the scanning behavior (fixation count, scan path length, revisitation rate, information foraging efficiency) as a proxy measure for cognitive load. High-load layouts should produce more fixations, longer scan paths, and more revisits.
 
-**Research question**: Can mouse-contingent scanning metrics predict subjective cognitive load (NASA-TLX) and task completion time on information-dense pages?
+Feature Congestion scoring (v1.8+) provides a validated, objective measure of layout complexity (ρ=0.93 against the Rosenholtz reference). This gives the study an independent variable that isn't self-reported — correlate scanning metrics against congestion score rather than relying solely on "low/medium/high complexity" categories.
+
+**Research question**: Can mouse-contingent scanning metrics predict subjective cognitive load (NASA-TLX) and task completion time? Does Feature Congestion score predict scanning difficulty better than subjective complexity ratings?
 
 **Deliverables**:
 - Instrumentation layer on GazeModel (fixation log, scan path metrics, revisitation graph)
-- Experiment: N participants × M page layouts × 2 conditions (Scrutinizer on/off)
-- Regression model: scanning metrics → NASA-TLX, task time, error rate
+- Feature Congestion scoring of all stimulus pages via `scrutinizer-audit` CLI
+- Experiment: N participants × M page layouts (spanning congestion score range) × 2 conditions (Scrutinizer on/off)
+- Regression model: scanning metrics + congestion score → NASA-TLX, task time, error rate
 - Design guideline: "layouts that require >X fixations per task have excessive cognitive load"
 
-**Key references**: Pirolli & Card (1999) Information Foraging, Rayner (1998), Whitney & Leib (2018)
+**Key references**: Pirolli & Card (1999) Information Foraging, Rayner (1998), Whitney & Leib (2018), Rosenholtz et al. (2007) Feature Congestion
 
 ---
 
@@ -188,25 +222,24 @@ Low vision conditions (macular degeneration, glaucoma, diabetic retinopathy) alt
 
 ## 3. Design Tools & Applied Research
 
-### 3.1 Saliency-Driven Design Critique Tool
+### 3.1 Design Critique Evaluation Study
 
 **Discipline**: Design, HCI
 **Effort**: Medium | **Novelty**: Medium
-**ROADMAP section**: Priority 3 — Saliency Map Design Tool
 **Depends on**: IRB approval required for designer A/B study
 
-Expose Scrutinizer's saliency map as a design critique tool. Overlay heatmap on any page showing "what draws the eye" based on bottom-up features (color contrast, edge density, motion). Add inverse saliency mode highlighting low-attention regions that may be missed.
+**Status**: The visualization tools are built (saliency overlay, congestion heatmap, side-by-side comparison, spatial quadrant breakdown, CLI batch scoring). This project is now a behavioral study — does any of this actually improve design outcomes? The only remaining tool work is an inverse saliency mode highlighting low-attention dead zones.
 
-**Research question**: Does real-time saliency feedback during design iteration improve visual hierarchy quality (measured by eye-tracking task performance)?
+**Research question**: Does real-time saliency/congestion feedback during design iteration improve visual hierarchy quality (measured by eye-tracking task performance)? Which feedback modality — saliency overlay, congestion heatmap, numerical score, or side-by-side comparison — produces the largest effect?
 
 **Deliverables**:
-- Saliency overlay mode with blend controls
-- Inverse saliency mask (highlight dead zones)
-- Threshold slider for binary masking
-- Designer study: A/B — design with vs. without saliency feedback
-- Before/after comparison of attention distribution on resulting designs
+- Inverse saliency/congestion mask (highlight dead zones — the one missing tool feature)
+- Designer study: 4 conditions (no feedback, saliency only, congestion score only, full suite)
+- Before/after congestion scoring via CLI to measure objective improvement
+- Eye-tracking validation: do designs improved under feedback also perform better for naive users?
+- Design guideline: which feedback modality to use when
 
-**Use cases**: Individual iteration, team critique, client presentation
+**Use cases**: Individual iteration, team critique, client presentation, CI gating
 
 ---
 
@@ -273,19 +306,64 @@ Scrutinizer already supports mobile emulation (v1.5). This project systematicall
 
 ---
 
+### 3.5 AI-Assisted Design Iteration via MCP
+
+**Discipline**: HCI, AI + Design
+**Effort**: Medium | **Novelty**: Very High
+**Depends on**: IRB approval required for designer study
+
+Scrutinizer's MCP server lets an LLM agent score a page's visual complexity, suggest changes, and re-score. The server exposes `analyze_url` (single-page scoring), `analyze_urls` (batch), and `compare_pages` (before/after delta). An agent can interpret the congestion/saliency breakdown, propose CSS or layout changes, and verify the result. This project studies whether that closed loop produces measurably better outcomes than unaided iteration or static feedback (a score with no agent suggestions).
+
+**Research question**: Does AI-assisted design iteration with quantitative visual complexity feedback produce lower-congestion, higher-performing layouts compared to (a) unaided designer iteration, or (b) designer + congestion score without AI suggestions?
+
+**Deliverables**:
+- Study protocol: 3 conditions — designer alone, designer + congestion score, designer + AI agent with MCP
+- Task: redesign 3 high-congestion pages (congestion score > 55) to reduce clutter while preserving content
+- Measures: congestion score delta, task completion time, designer satisfaction (Likert), naive-user eye-tracking on resulting designs
+- Analysis of AI suggestion quality: which suggestions actually reduce congestion? Which are rejected and why?
+- Ethical considerations: does AI-assisted design homogenize visual style?
+
+**Key references**: Rosenholtz et al. (2007), Mozannar et al. (2024) on AI-human co-creation, MCP (Model Context Protocol)
+
+---
+
+### 3.6 Web-Scale Visual Clutter Census
+
+**Discipline**: HCI, Data Science, Design
+**Effort**: Low-Medium | **Novelty**: Medium-High
+
+The `scrutinizer-audit` CLI can score hundreds of pages per hour. This project runs it against a large sample — Alexa/Tranco top 10K, category verticals, or a curated corpus — to build a large-scale visual complexity dataset using Feature Congestion. Reinecke et al. (2013) collected subjective complexity ratings; this would be the algorithmic complement. No human participants needed.
+
+**Research question**: How does visual complexity distribute across the web? Do industry verticals (news, e-commerce, SaaS, government) cluster at different congestion levels? Has web clutter increased or decreased over time (using Wayback Machine snapshots)?
+
+**Deliverables**:
+- Crawling pipeline: `scrutinizer-audit` with sitemap parsing, retry logic, viewport variants (desktop + mobile)
+- Dataset: congestion score, edge density, spatial breakdown for N≥1000 pages
+- Statistical analysis: distribution by vertical, device, above-fold vs. first-scroll
+- Temporal analysis (stretch goal): same pages scored across Wayback Machine snapshots to measure complexity trends
+- Public dataset release for other researchers
+
+**Key references**: Rosenholtz et al. (2007), Web Almanac (HTTP Archive), Reinecke et al. (2013) visual complexity ratings
+
+---
+
 ## 4. Technical / Systems Projects
 
-### 4.1 Real-Time Saliency Model Comparison Framework
+### 4.1 Saliency & Congestion Model Comparison Framework
 
 **Discipline**: Computer Vision, HCI
 **Effort**: Medium | **Novelty**: Medium
 
-Scrutinizer's saliency worker uses a custom center-surround + face detection + structure-aware model. But many saliency models exist (Itti-Koch, DeepGaze II, GBVS, SAM). This project creates a modular saliency backend where different models can be hot-swapped, and their outputs compared against human attention data.
+Scrutinizer's saliency worker uses a custom center-surround + face detection + structure-aware model, and the congestion worker implements Rosenholtz Feature Congestion at fixed σ=2.5. But many saliency models exist (Itti-Koch, DeepGaze II, GBVS, SAM), and the congestion implementation uses a single-scale Gaussian where the original uses multi-scale steerable pyramids. This project creates a modular backend where different models can be hot-swapped, and their outputs compared against human attention data.
+
+The dual-worker architecture already defines clean input/output contracts (PNG buffer → heatmap texture). The CLI enables batch evaluation across page sets, and the side-by-side shader comparison mode can be extended to show any two model outputs.
 
 **Deliverables**:
 - Saliency model interface (input: frame, output: heatmap)
-- 3+ model implementations (current, Itti-Koch reimpl, DeepGaze via ONNX)
+- 3+ saliency implementations (current, Itti-Koch reimpl, DeepGaze via ONNX)
+- Multi-scale congestion comparison: current single-scale σ=2.5 vs. steerable pyramid approximation
 - Evaluation harness: compare model predictions vs. mouse-trajectory ground truth
+- Batch evaluation: run model comparison across 50+ pages via CLI
 - Performance profiling per model (latency, accuracy, GPU cost)
 
 ---
@@ -316,32 +394,37 @@ Move the WebGL rendering context to a Web Worker using OffscreenCanvas, decoupli
 | 1.2 Mongrel Synthesis | No | Yes | GPU cluster | 👁 for comparison | SIGGRAPH / JOV |
 | 1.3 Calibrated Angles | Yes | No | None | — | **Prerequisite** for 1.1, 1.4 |
 | 1.4 Saccadic Dynamics | Yes | Partial | None | 👁 | JOV / ETRA |
+| 1.5 Congestion-Gated Eval | Yes | Yes | Participant pool | 👁 | CHI / JOV |
 | 2.1 Fixation Recording | Eng: yes; study: thesis-scale | Yes | None | 👁 | CHI / UIST |
 | 2.2 Crowdsourced Attention | Yes | Yes | MTurk budget | 👁 (remote) | CHI |
 | 2.3 Cognitive Load | No | Yes | Participant pool | 👁 | CHI / CogSci |
 | 2.4 Accessibility | Yes | Yes | Participant pool | 👁 | ASSETS / CHI |
-| 3.1 Saliency Critique | Yes | Partial | Designer pool | 👁 | DIS / CHI |
+| 3.1 Design Critique Eval | Yes (study only) | Yes | Designer pool | 👁 | DIS / CHI |
 | 3.2 Goal-Directed Gating | No | Yes | Local LLM / GPU | 👁 | CHI / CogSci |
 | 3.3 Eye Tracker | Yes | No | Tobii hardware | 👁 | ETRA |
 | 3.4 Cross-Device | Yes | Yes | Multiple devices | 👁 | MobileHCI / CHI |
-| 4.1 Saliency Comparison | Yes | Partial | None | — | ETRA / JOV |
+| 3.5 AI-Assisted Design | Yes | Yes | None (MCP built) | 👁 | CHI / DIS |
+| 3.6 Clutter Census | Yes | No | None (CLI built) | — | CHI / Web Conf |
+| 4.1 Saliency/Congestion Comparison | Yes | Partial | None | — | ETRA / JOV |
 | 4.2 OffscreenCanvas | Yes | No | None | — | None (engineering task) |
 
 **Recommended starting points**:
 - **Vision science track**: 1.3 (Calibrated Angles) → 1.1 (Oriented DoG) → 1.2 (Mongrel)
 - **HCI/UX track**: 2.1 (Fixation Recording) → 2.3 (Cognitive Load) → 2.2 (Crowdsourced)
-- **Design track**: 3.1 (Saliency Critique) → 3.2 (Goal-Directed Gating)
+- **Design track**: 3.1 (Design Critique Eval) → 3.5 (AI-Assisted Design) → 3.2 (Goal-Directed Gating)
 - **Accessibility track**: 1.3 (Calibrated Angles) → 2.4 (Accessibility Testing)
+- **Low-barrier entry**: 3.6 (Clutter Census) — no IRB, no participants, uses existing CLI. Good for a semester project or as a warm-up before a thesis-scale study
+- **Congestion track**: 3.6 (Clutter Census) → 1.5 (Congestion-Gated Eval) → 2.3 (Cognitive Load)
 
 ---
 
 ## Acknowledgments
 
-This research backlog was initially authored by Claude (Anthropic, Opus 4.6) via Claude Code, working from the Scrutinizer v1.6.0 codebase, architecture documents, scientific literature review, and roadmap. Subsequently reviewed and corrected for terminological precision, effort calibration, reference accuracy, and practical feasibility (IRB timelines, shared infrastructure dependencies).
+This research backlog was initially authored by Claude (Anthropic, Opus 4.6) via Claude Code, working from the Scrutinizer v1.6.0 codebase, architecture documents, scientific literature review, and roadmap. Updated for v1.8+ (Feature Congestion, CLI/MCP, congestion-gated pooling). Reviewed and corrected for terminological precision, effort calibration, reference accuracy, and practical feasibility (IRB timelines, shared infrastructure dependencies).
 
 **Known limitations of the AI-generated first draft** (partially addressed):
 - Reference lists skew toward canonical papers and lack 2020–2025 work — a supervising PI should verify against current literature
 - Effort estimates were not calibrated against lived experience supervising graduate students
 - Original version contained a hallucinated reference ("Eyeware FidelityFX fork") and a terminological error (Project 3.2 misnamed "Pre-Attentive" when describing top-down attentional guidance) — both corrected
 
-**Source materials**: `docs/foveated-vision-model.md` (biological model), `docs/scientific_literature_review.md` (full references), `ROADMAP.md` (technical backlog).
+**Source materials**: `docs/foveated-vision-model.md` (biological model), `docs/scientific_literature_review.md` (full references), `ROADMAP.md` (technical backlog), `docs/congestion-journey.md` (Feature Congestion implementation & validation log), `cli/` (scrutinizer-audit CLI & MCP server source).

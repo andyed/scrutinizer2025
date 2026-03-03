@@ -4,7 +4,7 @@
 [![WebGL](https://img.shields.io/badge/WebGL-2.0-990000?style=flat-square&logo=webgl&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 
-➡️ Live site: **[scrutinizer.app](https://andyed.github.io/scrutinizer-www/)**
+➡️ Live site: **[scrutinizer.app](https://andyed.github.io/scrutinizer-www/)** | [Blog](https://andyed.github.io/scrutinizer-www/blog/)
 
 🍎 macOS Installer: **[Download v1.7.0](https://github.com/andyed/scrutinizer2025/releases/tag/v1.7.0)** | [Changelog](CHANGELOG.md)
 
@@ -190,6 +190,8 @@ The key theoretical advance is Rosenholtz's [Texture Tiling Model](https://dspac
 
 Scrutinizer v1.7+ incorporates the [FOVI cortical magnification function](https://arxiv.org/abs/2602.03766) (Blauch, Konkle & Alvarez, 2026), which provides an analytically grounded eccentricity-dependent falloff replacing earlier hand-tuned approximations.
 
+- **[FOVI & Cortical Magnification](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html)**: How FOVI replaced hand-tuned eccentricity falloff with analytically grounded M-scaling.
+- **[Feature Congestion Scoring](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html)**: Rosenholtz's visual clutter metric adapted for web pages — the science behind the 0–100 score.
 - **[Scientific Literature Review](docs/scientific_literature_review.md)**: Deep dive into the science behind the simulation.
 - **[Foveal Calibration Logic](foveal-calibration-logic.md)**: Detailed psychophysics of the calibration tool.
 - **[YouTube Playlists](https://www.youtube.com/@scrutinizer-app/playlists)**: Watch our curated videos on vision science and UX.
