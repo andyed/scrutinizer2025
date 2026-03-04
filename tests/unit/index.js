@@ -19,6 +19,7 @@ const { run } = require('./test-runner');
 require('./oklab-utils.test.js');
 require('./gestalt-processor.test.js');
 require('./color-saliency-map.test.js');
+require('./cmf-lod.test.js');
 
 // Run after all suites are registered.
 run();
