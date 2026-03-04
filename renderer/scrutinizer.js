@@ -501,6 +501,13 @@
             this.contentAnalysis.toggleEnableStructureMap(enabled);
         }
 
+        toggleChromaticPooling(enabled) {
+            if (this.renderer) {
+                this.renderer.config.chromatic_pooling = enabled;
+                ipcRenderer.send('log:renderer', `[Scrutinizer] Chromatic pooling: ${enabled}`);
+            }
+        }
+
         // Delegate to VisualMemory
         setVisualMemoryLimit(limit) {
             ipcRenderer.send('log:renderer', `[Scrutinizer] setVisualMemoryLimit called with: ${limit}`);

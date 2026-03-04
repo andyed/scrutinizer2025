@@ -28,6 +28,18 @@ Storage and workflow for browser ↔ Figma visual parity checks.
 - SSIM ≥ 0.98 and PSNR ≥ 35 dB between matching browser/figma PNGs
 - Missing pairs are reported but do not fail the run
 
+## Chromatic Pooling A/B Captures
+
+v1.9+ captures include chromatic pooling on/off comparisons for color-spectrum and dashboard pages. The capture script passes `TEST_CHROMATIC_POOLING=true|false` to override the mode default, producing paired images:
+
+- `color-spectrum_center_mode0_chromatic_on.png` — castleCSF per-channel RG/YV decay
+- `color-spectrum_center_mode0_chromatic_off.png` — legacy uniform desaturation
+
+Key visual differences to verify:
+- Red elements desaturate faster with chromatic pooling ON (RG k_e=0.059)
+- Blue elements persist further into periphery (YV k_e=0.004)
+- Small colored text loses color faster than large colored regions (DoG band frequency dependence)
+
 ## Outputs
 - docs/golden/summary-<version>.json : per-file metrics and pass/fail
 - Console summary with counts of passes, fails, missing pairs

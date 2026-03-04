@@ -47,6 +47,12 @@ uniform float u_cortical_max;     // ln(r_max+a) - ln(a), precomputed on JS side
 uniform float u_fovi_color_sigma; // Gaussian color decay sigma (0.0 = disabled)
 uniform float u_desat_floor;      // Min desaturation multiplier in salient regions (1.0 = full desat, 0.85 = 15% cap)
 
+// Chromatic pooling — per-channel RG/YV eccentricity decay (castleCSF; Ashraf et al. 2024)
+uniform float u_chromatic_pooling;  // 0.0=off (legacy uniform desat), 1.0=on
+uniform float u_rg_decay;           // RG (L-M) eccentricity decay k_e (default 0.059)
+uniform float u_yv_decay;           // YV S-(L+M) base decay k_e (default 0.004)
+uniform float u_yv_freq_decay;      // YV frequency-dependent decay k_ef (default 0.008)
+
 // Congestion overlay (Rosenholtz et al. 2007)
 uniform int u_show_congestion;    // 0=off, 1=overlay, 2=solo
 
@@ -107,6 +113,9 @@ vec4 sampleBlurred(vec2 uv, float radius) {
     return sum / totalWeight;
 }
 
+// Forward declaration — defined after Oklab conversion functions
+vec4 chromaticAttenuate(vec4 color, float rg_atten, float yv_atten);
+
 // === DoG PERIPHERAL RECONSTRUCTION ===
 // Decomposes the hardware MIP chain into an approximate Laplacian pyramid.
 // Hardware mipmaps use box/bilinear filtering (not Gaussian convolution), so band
@@ -143,7 +152,7 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     float c0, c1, c2, c3;
     float e2 = max(dog_e2, 0.01);
     if (u_fovi_enabled > 0.5) {
-        // CMF-derived: invert mipLevel = maxMip * [ln(r+a)-ln(a)] / cortical_max
+        // CMF-derived: invert mipLevel = maxMip * log1p(r/a) / cortical_max
         // → r = a * (exp(level * cortical_max / maxMip) - 1)
         // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
         float fovea_deg = 2.0;
@@ -173,12 +182,51 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     // Reconstruct: residual (always full) + weighted bands
     // Clamp to [0,1] — band differences can be negative, partial attenuation
     // may produce out-of-range values
-    vec4 result = clamp(mip4 + band3 * w3 + band2 * w2 + band1 * w1 + band0 * w0, 0.0, 1.0);
+    vec4 result;
 
-    // BGRA → RGBA (Electron capture quirk)
-    float temp = result.r;
-    result.r = result.b;
-    result.b = temp;
+    if (u_chromatic_pooling > 0.5) {
+        // Per-band chromatic attenuation (castleCSF; Ashraf et al. 2024)
+        // RG (L-M): frequency-independent steep decay — wiring constraint, not optical
+        // YV S-(L+M): frequency-dependent, slow for coarse bands, faster for fine
+        float fovea_deg = 2.0;
+        float ecc_deg = normEcc * fovea_deg;
+
+        // RG: single attenuation for all bands (k_ef ≈ 0 for RG)
+        float rg_atten = pow(10.0, -u_rg_decay * ecc_deg);
+
+        // YV: per-band attenuation — band spatial frequency determines k_ef contribution
+        // Band frequencies: band0≈4cpd, band1≈2cpd, band2≈1cpd, band3≈0.5cpd, residual≈0.25cpd
+        float yv_atten_band0 = pow(10.0, -(u_yv_decay + u_yv_freq_decay * 4.0) * ecc_deg);
+        float yv_atten_band1 = pow(10.0, -(u_yv_decay + u_yv_freq_decay * 2.0) * ecc_deg);
+        float yv_atten_band2 = pow(10.0, -(u_yv_decay + u_yv_freq_decay * 1.0) * ecc_deg);
+        float yv_atten_band3 = pow(10.0, -(u_yv_decay + u_yv_freq_decay * 0.5) * ecc_deg);
+        float yv_atten_res   = pow(10.0, -(u_yv_decay + u_yv_freq_decay * 0.25) * ecc_deg);
+
+        // BGRA → RGBA before Oklab round-trips (Electron capture quirk)
+        // chromaticAttenuate() uses rgbToOklab() which assumes RGB channel order
+        mip4 = mip4.bgra;
+        band0 = band0.bgra;
+        band1 = band1.bgra;
+        band2 = band2.bgra;
+        band3 = band3.bgra;
+
+        // Reconstruct with per-band Oklab chromatic attenuation
+        result = chromaticAttenuate(mip4, rg_atten, yv_atten_res);
+        result += chromaticAttenuate(band3, rg_atten, yv_atten_band3) * w3;
+        result += chromaticAttenuate(band2, rg_atten, yv_atten_band2) * w2;
+        result += chromaticAttenuate(band1, rg_atten, yv_atten_band1) * w1;
+        result += chromaticAttenuate(band0, rg_atten, yv_atten_band0) * w0;
+        result = clamp(result, 0.0, 1.0);
+        // Already in RGBA — skip the swap below
+    } else {
+        // Legacy: luminance-only reconstruction (no per-channel decay)
+        result = clamp(mip4 + band3 * w3 + band2 * w2 + band1 * w1 + band0 * w0, 0.0, 1.0);
+
+        // BGRA → RGBA (Electron capture quirk)
+        float temp = result.r;
+        result.r = result.b;
+        result.b = temp;
+    }
 
     return result;
 }
@@ -191,11 +239,11 @@ vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
 
     float mipLevel;
     if (u_fovi_enabled > 0.5) {
-        // Cortical distance: d(r) = ln(r+a) - ln(a)
+        // Cortical distance: d(r) = log(1 + r/a), numerically stable form
         // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
         float fovea_deg = 2.0;
         float r_deg = normalizedEcc * fovea_deg;
-        float cortical_dist = log(r_deg + u_cmf_a) - log(u_cmf_a);
+        float cortical_dist = log(1.0 + r_deg / u_cmf_a);
         mipLevel = clamp(maxMipLevel * cortical_dist / u_cortical_max, 0.0, maxMipLevel);
     } else {
         mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
@@ -218,11 +266,11 @@ vec4 sampleMIPPooledGrad(vec2 uv, vec2 duvdx, vec2 duvdy, float eccentricity, fl
 
     float mipLevel;
     if (u_fovi_enabled > 0.5) {
-        // Cortical distance: d(r) = ln(r+a) - ln(a)
+        // Cortical distance: d(r) = log(1 + r/a), numerically stable form
         // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
         float fovea_deg = 2.0;
         float r_deg = normalizedEcc * fovea_deg;
-        float cortical_dist = log(r_deg + u_cmf_a) - log(u_cmf_a);
+        float cortical_dist = log(1.0 + r_deg / u_cmf_a);
         mipLevel = clamp(maxMipLevel * cortical_dist / u_cortical_max, 0.0, maxMipLevel);
     } else {
         mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
@@ -326,6 +374,18 @@ vec3 oklabToRgb(vec3 lab) {
     vec3 linear = oklabToLinearSrgb(lab);
     vec3 srgb = linearToSrgbVec(linear);
     return clamp(srgb, 0.0, 1.0);
+}
+
+// === CHROMATIC ATTENUATION (castleCSF per-channel decay) ===
+// Attenuates Oklab a (red-green) and b (blue-yellow) independently.
+// RG is a foveal specialization (L-M opponent channel) that collapses ~2.5× faster
+// than achromatic sensitivity. YV (S-(L+M)) persists far into periphery.
+// Bowers, Gegenfurtner & Goettker (2025): at 15°, RG≈29%, YV≈79%.
+vec4 chromaticAttenuate(vec4 color, float rg_atten, float yv_atten) {
+    vec3 lab = rgbToOklab(color.rgb);
+    lab.y *= rg_atten;   // a channel (red-green)
+    lab.z *= yv_atten;   // b channel (blue-yellow)
+    return vec4(oklabToRgb(lab), color.a);
 }
 
 // === STATIC MONGREL SAMPLER ===
@@ -729,8 +789,12 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         float fade = desaturationFactor * bypassTransition;
         
         // Apply Base Desaturation (Chrominance only)
-        lab.y *= (1.0 - fade); 
-        lab.z *= (1.0 - fade);
+        // Skip when chromatic pooling is active — per-band attenuation already
+        // handled differential RG/YV decay in sampleDoGReconstructed()
+        if (u_chromatic_pooling < 0.5) {
+            lab.y *= (1.0 - fade);
+            lab.z *= (1.0 - fade);
+        }
         
         // === DIVERGENCE: USABILITY VS BIOLOGY ===
         

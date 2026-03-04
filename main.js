@@ -1510,6 +1510,14 @@ function runIntegrationTest() {
                     mainWindow.scrutinizerHud.webContents.send('menu:set-intensity', testIntensity);
                 }
 
+                // Override chromatic pooling if env var set
+                const chromaticPoolingOverride = process.env.TEST_CHROMATIC_POOLING;
+                if (chromaticPoolingOverride !== undefined) {
+                    const enabled = chromaticPoolingOverride === 'true';
+                    console.log(`[Test] Chromatic pooling override: ${enabled}`);
+                    mainWindow.scrutinizerHud.webContents.send('menu:toggle-chromatic-pooling', enabled);
+                }
+
                 // Toggle Overlay if requested
                 // Note: We need to implement 'menu:toggle-debug-overlay' in HUD or use existing property
                 if (testOverlay) {

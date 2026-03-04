@@ -253,6 +253,10 @@
             if (scrutinizer) scrutinizer.setMongrelMode(mode);
         });
 
+        ipcRenderer.on('menu:toggle-chromatic-pooling', (e, enabled) => {
+            scrutinizer.toggleChromaticPooling(enabled);
+        });
+
         ipcRenderer.on('menu:set-aesthetic-mode', (event, mode) => {
             if (scrutinizer) scrutinizer.setAestheticMode(mode);
         });

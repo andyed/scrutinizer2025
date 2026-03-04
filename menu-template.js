@@ -312,6 +312,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             checked: true,
                             click: (menuItem) => sendToOverlays('menu:toggle-saliency-modulation', menuItem.checked)
                         },
+                        {
+                            label: 'Chromatic Pooling (RG/YV)',
+                            type: 'checkbox',
+                            checked: true,
+                            click: (menuItem) => sendToOverlays('menu:toggle-chromatic-pooling', menuItem.checked)
+                        },
                         { type: 'separator' },
                         // === EXPERIMENTAL MODELS (alternative simulation pipelines) ===
                         {

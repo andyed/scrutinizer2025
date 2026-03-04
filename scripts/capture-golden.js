@@ -109,7 +109,25 @@ const CAPTURE_TASKS = [
             { id: 'mode1_purkinje', mode: '1', overlay: false },
             { id: 'mode6_fovi', mode: '6', overlay: false },
             { id: 'mode7_legacy', mode: '7', overlay: false },
-            { id: 'mode8_gaussian', mode: '8', overlay: false }
+            { id: 'mode8_gaussian', mode: '8', overlay: false },
+            // Chromatic pooling A/B: castleCSF per-channel RG/YV decay vs uniform desaturation
+            // (Ashraf et al. 2024; Bowers, Gegenfurtner & Goettker 2025)
+            { id: 'mode0_chromatic_on', mode: '0', overlay: false, chromaticPooling: true },
+            { id: 'mode0_chromatic_off', mode: '0', overlay: false, chromaticPooling: false },
+            { id: 'mode1_chromatic_on', mode: '1', overlay: false, chromaticPooling: true },
+            { id: 'mode1_chromatic_off', mode: '1', overlay: false, chromaticPooling: false }
+        ]
+    },
+
+    // --- DASHBOARD (Chromatic Pooling A/B) ---
+    // Real-world UI with colored elements: red buttons, blue links, green badges.
+    // Shows how chromatic pooling affects practical UI perception.
+    {
+        page: 'dashboard',
+        fixations: ['center'],
+        variants: [
+            { id: 'mode0_chromatic_on', mode: '0', overlay: false, chromaticPooling: true },
+            { id: 'mode0_chromatic_off', mode: '0', overlay: false, chromaticPooling: false }
         ]
     }
 ];
@@ -156,6 +174,11 @@ async function runCapture(task, fixation, variant = { id: 'standard', overlay: f
             SCREENSHOT_MODE: 'update', // Force precise naming
             ELECTRON_RUN_AS_NODE: undefined // Ensure Electron runs as app
         };
+
+        // Chromatic pooling override (castleCSF per-channel RG/YV decay)
+        if (variant.chromaticPooling !== undefined) {
+            env.TEST_CHROMATIC_POOLING = variant.chromaticPooling ? 'true' : 'false';
+        }
 
         // Construct arguments for npm start
         const args = ['start'];

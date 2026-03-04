@@ -20,7 +20,11 @@
                 "dog_sharpness": 0.0,
                 "fovi_enabled": false,
                 "fovi_a": 2.78,
-                "fovi_color_sigma": 0.0
+                "fovi_color_sigma": 0.0,
+                "chromatic_pooling": true,
+                "rg_decay": 0.059,
+                "yv_decay": 0.004,
+                "yv_freq_decay": 0.008
             },
             "tests": [
                 "structure_masking",
@@ -51,7 +55,11 @@
                 "dog_sharpness": 0.0,
                 "fovi_enabled": false,
                 "fovi_a": 2.78,
-                "fovi_color_sigma": 0.0
+                "fovi_color_sigma": 0.0,
+                "chromatic_pooling": true,
+                "rg_decay": 0.059,
+                "yv_decay": 0.004,
+                "yv_freq_decay": 0.008
             },
             "tests": [
                 "purkinje_shift",
@@ -166,7 +174,7 @@
         },
         "log_polar_mip": {
             "id": 6,
-            "label": "Log-Polar MIP (Blauch 2026)",
+            "label": "Log-Polar MIP — Color Only (Blauch 2026)",
             "shortLabel": "Log-Polar",
             "category": "research",
             "description": "Cortical magnification from Blauch, Konkle & Alvarez (2026): mipLevel = maxMip × [ln(r+a) - ln(a)] / [ln(r_max+a) - ln(a)]. a=2.78°, r_max derived from screen geometry. Spatial resolution falloff only — no DoG bands, no crowding distortion. Gaussian color decay is Scrutinizer's own addition.",
@@ -274,7 +282,11 @@
                 "dog_e2": 0.15,
                 "dog_sharpness": 0.0,
                 "fovi_enabled": false,
-                "congestion_pooling": true
+                "congestion_pooling": true,
+                "chromatic_pooling": true,
+                "rg_decay": 0.059,
+                "yv_decay": 0.004,
+                "yv_freq_decay": 0.008
             },
             "tests": [
                 "congestion_modulated_mip",
