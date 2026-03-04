@@ -38,7 +38,7 @@
   - Jiang et al. 2022: power-law exponents 0.39-0.84 (mean ~0.63); no chrom/achrom difference once equated
   - Bowers et al. 2025: RG decay is non-exponential (biphasic); castleCSF over-predicts beyond 20 deg
   - Tyler 2015: eccentricity-scaled stimuli appear vivid — loss is size-dependent
-  - Hansen et al. 2009: size-scaling preserves color appearance
+  - Hansen et al. 2009: THRESHOLD study only — shows cone opponency persists to 50 deg with large stimuli, but does NOT measure suprathreshold appearance. Overcited in our docs for saturation retention.
 - **Rosenholtz/TTM framework**: pooling preserves mean chromaticity; only fine chromatic detail is lost
 - **Next steps**: make RG decay frequency-dependent (like YV already is); raise supra_exponent to 0.65
 

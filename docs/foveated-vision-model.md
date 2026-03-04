@@ -629,7 +629,7 @@ This creates colored fringes in the periphery, supporting illegibility without n
 
 Peripheral color is **pooled, not lost** (Rosenholtz TTM). The visual system averages chromaticity over increasingly large regions with eccentricity, preserving mean color while losing spatial chromatic detail. The RG (red-green) opponent channel — a foveal specialization — loses spatial resolution faster than YV (blue-yellow), which persists into the far periphery. This is a wiring constraint (sparse L-M midget cells beyond the fovea), not an optical one.
 
-Historical claims of peripheral "color blindness" overstated the effect by conflating detection thresholds with suprathreshold appearance. At typical display contrasts, large colored regions retain perceived saturation well into the periphery (Jiang, Shooner & Mullen 2022; Hansen, Pracejus & Gegenfurtner 2009).
+Historical claims of peripheral "color blindness" overstated the effect by conflating detection thresholds with suprathreshold appearance. Cone-opponent mechanisms persist to at least 50° eccentricity when stimuli are sufficiently large (Hansen, Pracejus & Gegenfurtner 2009 — threshold data only; Bowers, Gegenfurtner & Goettker 2025). At typical display contrasts, suprathreshold color appearance shows partial constancy — perceived saturation declines less steeply than detection thresholds predict (Jiang, Shooner & Mullen 2022, power-law exponent ~0.5).
 
 ### Why Oklab?
 

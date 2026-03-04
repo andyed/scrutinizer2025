@@ -1,0 +1,1085 @@
+Journal of Vision (2009) 9(4):26, 1–12
+
+http://journalofvision.org/9/4/26/
+
+1
+
+Color perception in the intermediate
+periphery of the visual ﬁeld
+Thorsten Hansen
+
+Department of Psychology, Justus-Liebig-University,
+Giessen, Germany
+
+Lars Pracejus
+
+Department of Psychology, Justus-Liebig-University,
+Giessen, Germany
+
+Karl R. Gegenfurtner
+
+Department of Psychology, Justus-Liebig-University,
+Giessen, Germany
+
+Color perception changes across the visual ﬁeld. It is best in the fovea and declines in the periphery. Sensitivity to
+red–green color variations declines more steeply toward the periphery than sensitivity to luminance or blue–yellow colors. It
+is thought that this decline is due to the increasing size of receptive ﬁelds of parvocellular retinal ganglion cells and the
+unselective or random contribution of L- and M-cones to the receptive ﬁeld surround. In earlier psychophysical studies it has
+been found that L j M cone opponency becomes absent above 30 deg. However, physiological experiments in macaque
+monkeys have shown that midget ganglion cells exist in the intermediate zone of the peripheral retina (20–50 deg) that are
+strongly cone opponent. Here we explore this contradiction between physiological and psychophysical research, using
+stimuli of variable size at eccentricities of up to 50 deg. We found that chromatic detection gets worse with increasing
+eccentricity but is still possible even at large eccentricities. Our results show that chromatic detection at these eccentricities is
+mediated by cone-opponent mechanisms.
+Keywords: color vision, detection/discrimination, ganglion cells, peripheral vision, cone-opponent mechanisms
+Citation: Hansen, T., Pracejus, L., & Gegenfurtner, K. R. (2009). Color perception in the intermediate periphery of the visual
+ﬁeld. Journal of Vision, 9(4):26, 1–12, http://journalofvision.org/9/4/26/, doi:10.1167/9.4.26.
+
+Introduction
+The variability of visual perception across the visual
+field is one of the most important characteristics of the
+primate visual system. While visual acuity and contrast
+sensitivity are exceedingly high in the fovea, they
+deteriorate rapidly with increasing eccentricity (Virsu &
+Rovamo, 1979). What is still debated is just how badly
+this deterioration is in the case of color vision. On the one
+hand it has been reported that color vision becomes
+dichromatic (more precisely, lacks L j M cone opponency) at eccentricities of about 25–30 deg and becomes
+absent at eccentricities larger than 40 deg (Ferree & Rand,
+1919; Moreland, 1972; Moreland & Cruz, 1959), when
+tested with small stimuli. On the other hand, a number of
+studies have found that the size of the stimulus is the
+critical parameter and that fovea-like color vision exists
+out to at least 45 deg eccentricity (Abramov, Gordon, &
+Chan, 1991; Buck, Knight, Fowler, & Hunt, 1998; Gordon
+& Abramov, 1977; Johnson, 1986; Noorlander, Koenderink,
+den Ouden, & Edens, 1983; van Esch, Koldenhof, van
+Doorn, & Koenderink, 1984). Noorlander et al. (1983)
+even showed that under specific spatial and temporal
+conditions such as a large target size and a low temporal
+frequency (1 Hz) different hues can be perceived at
+doi: 1 0. 11 67 / 9 . 4 . 26
+
+eccentricities of up to at least 90 deg. However, results of
+a more recent study point in a different direction, claiming
+that L j M cone opponent vision is absent in peripheral
+vision (Mullen, Sakurai, & Chu, 2005). In this study,
+L j M cone contrast sensitivity declined steeply across the
+periphery and became behaviorally absent by 25–30 deg,
+suggesting that the L j M cone-opponent neurons in the
+primate peripheral retina are unlikely to contribute to color
+contrast detection measured behaviorally beyond this
+limit.
+The decrease in color performance is likely a result of
+the spatial organization of the retina and not just a loss in
+sensitivity (Abramov et al., 1991; Martin, Lee, White,
+Solomon, & Rüttiger, 2001). The number of spectrally
+opponent ganglion cells decreases with eccentricity
+(Zrenner & Gouras, 1983), their receptive fields (RFs)
+get larger (Dacey, 1993; Goodchild, Ghosh, & Martin,
+1996), and non-opponent cells become cone opponent if
+the stimulus size is increased (De Valois & De Valois,
+1975; Krüger, 1977). Receptive field centers and the
+dendritic fields of parvo cells (PC) increase toward the
+periphery in humans and Old World monkeys and can
+encompass an area of about 20–40 M- and L-cones
+(Dacey, 1993; Goodchild et al., 1996). The larger
+dendritic trees and larger distances between neurons
+correspond to the cortical representation of the visual
+
+Received June 20, 2008; published April 30, 2009
+
+ISSN 1534-7362 * ARVO
+
+Journal of Vision (2009) 9(4):26, 1–12
+
+Hansen, Pracejus, & Gegenfurtner
+
+field in the cortex: The fovea has a large representation
+in visual cortex while the peripheral retina projects to a
+relatively smaller area in primary visual cortex (Engel
+et al., 1994; Horton & Hoyt, 1991; Tootell, Switkes,
+Silverman, Hamilton, 1988; Wässle, Grünert, Röhrenbeck,
+Boycott, 1989).
+There is a long-standing debate whether the center and
+the surround of a retinal ganglion cell receive exclusive
+input from L- or M-cones (the selective wiring hypothesis) or random input from both cone types (the random
+wiring hypothesis). L j M cone opponent processing can
+only be achieved if the center and surround of the
+receptive field differ in the relative strengths of their cone
+inputs. In the fovea, this difference is given because the
+receptive field center of a foveal ganglion cell is driven by
+a single cone. Even if the surround contains a random
+mixture of cone types, the cells would have a coneopponent response (Lennie, Haake, & Williams, 1991). In
+the intermediate periphery, midget bipolar cells receive
+direct input from single cones, but multiple bipolar cells
+converge on a single midget ganglion cell (Dacey, 1993).
+In this part of the retina, human chromatic sensitivity has
+been found to be consistent with the random wiring
+hypothesis (Mullen & Kingdom, 1996). Mullen and
+Kingdom (1996) developed a model that calculated the
+loss of cone opponency across the visual field under the
+assumption of unselective cone projections. The model
+was based on receptive field size of parvocellular retinal
+ganglion cells in primates and cone densities in human
+retina. Using a model based on binomial probability of
+L- and M-cones, Mullen and Kingdom (1996) found that
+if only a few cones (1–5) drive the RF center, cone
+opponency could arise by chance when different proportions of L- and M-cones contribute to the center and to the
+surround. They compared their model with psychophysical data collected from three observers at eccentricities up
+to 20 deg. The results revealed that there was a selective
+loss of red–green color sensitivity across the human
+visual field until 20 deg. They found that a model of
+unselective cone contributions is sufficient to account for
+this loss in sensitivity.
+Other data provide strong support for the notion that
+the surround gets its input from a specific cone type
+(Reid & Shapley, 1992, 2002; Martin et al., 2001). Reid
+& Shapley (1992) mapped receptive fields of parvocellular neurons with cone-isolating stimuli and found cone
+specificity in both center and surround. Martin et al.
+(2001) presented red and green lights at eccentricities
+from 20 to 50 degrees and recorded midget ganglion cell
+responses from macaque monkey’s retinal periphery.
+Surprisingly, peripheral and foveal ganglion cells showed
+equivalent responses. Martin et al. (2001) proposed a
+model based on anisotropic, selective input to the RF
+center to account for the high selectivity in the periphery.
+In the simulations they found that an ellipsoidal RF center
+when properly oriented to optimize the sampling of one
+cone type results in a large change in the ratio of L- to
+
+2
+
+M-cone input. However, human psychophysics using the
+same stimuli showed a sharp decrease in psychophysical
+performance with eccentricity. Derrington (2001) concluded from the findings of Martin et al. (2001) that either
+the information from cone-opponent cells is not used
+during further cortical processing or that the macaque
+monkeys are a poor model for human chromatic vision.
+Both explanations seem unlikely and would cause problems for the interpretation of psychophysical results in
+general.
+Here we try to resolve these contradictory results by
+investigating chromatic sensitivity in the intermediate
+periphery. Unlike previous studies, we measured chromatic detection contours and discrimination ellipses,
+allowing us to make inferences about the properties of
+the mechanisms underlying chromatic sensitivity. Furthermore, we used a matte gray hollow sphere where
+stimuli of variable size could be presented at eccentricities
+up to 50 deg. Our data provide evidence that color vision
+persists in the periphery, at least up to an eccentricity of
+50 deg.
+
+Methods
+Observers
+Five naive male and female observers, aged between 21
+and 31 years, participated in the study. All observers had
+normal or corrected-to-normal visual acuity and no color
+perception deficits as tested with the Ishihara pseudoisochromatic plates. Observers were paid for participating in
+the experiment; not all observers participated in all
+experiments.
+
+Apparatus
+Stimuli were presented in a VisionStation (Elumens,
+Crescent Green, North Carolina). The VisionStation
+consists of a large, curved surface (reminiscent of a large
+satellite dish), a high-resolution LCD projector, and a
+wide-angle lens. The VisionStation is 104 cm deep by
+160 cm high by 165 cm wide. The display surface has a
+150-cm projection area with an 84-cm spherical radius of
+curvature for the screen. The screen size is 163  145 cm
+with a depth of 53 cm. The stimuli are projected onto this
+sphere by a centrally mounted LCD projector (Epson
+730c) with a resolution of 1024  768 pixels, equipped
+with a wide-angle projection “trutheta” lens. The trutheta
+lens compensates most of the distortions of the projection
+that occur due to the small distance and the curved surface
+of the projection area.
+Observers were seated at a distance of 80 cm from the
+sphere with their heads supported by a forehead and chin
+
+Journal of Vision (2009) 9(4):26, 1–12
+
+Hansen, Pracejus, & Gegenfurtner
+
+3
+
+visual impression of the homogeneous background. We
+verified that this procedure resulted in the same luminance
+across the whole sphere by measuring gamma-corrected
+luminance values at different spatial locations.
+Spatial correction
+
+Figure 1. Experimental setup.
+
+rest. For this setup, the VisionStation provides a field of
+view of 120  90 deg. The setup is depicted in Figure 1.
+
+Calibration
+We used a space-variant gamma correction and a spatial
+correction to ensure that the stimuli were of the same
+luminance and of equal size independent of their projected
+position.
+Space-variant gamma correction
+
+The VisionStation was gamma corrected and calibrated
+to ensure stimuli of the same luminance across the whole
+sphere. For gamma correction a standard procedure was
+applied: We measured for each of the three RGB
+primaries of the projector the luminance of the light
+reflected from the sphere with a Photo Research PR650
+spectroradiometer for different pixel values between 0 and
+255. A smooth function was used to interpolate between
+the measured points and was inverted to linearize the
+relationship between pixel values and intensity. We
+measured luminance values at different positions in the
+sphere to verify that the same shape of the gamma curve
+was present at different locations. While the shape was the
+same across the sphere, the overall intensity varied: the
+intensity was largest at the center and declined toward
+the periphery. To correct this decline, we measured the
+maximum intensity for each primary at different spatial
+locations and used a smooth function to interpolate
+between the measured values to obtain a map of
+intensity values for each pixel. The gamma-corrected
+intensity values were then normalized by this intensity
+map for each pixel of the stimulus image. Half-tone
+dithering was used to smooth the boundaries between the
+discrete intensity steps, resulting in a homogeneous
+
+We also used a spatial correction to compensate for
+geometrical distortions resulting from projection to the
+sphere that was present despite the trutheta lens of the
+projector. We first projected a calibration grid of horizontal and vertical lines spaced 64 pixels to the sphere and
+measured the (x, y, z) positions in space with an ultrasonic
+3D tracking device (Zebris system, Zebris Medical, Isny,
+Germany). The surface of the measured points was
+interpolated to the full resolution of 1024  768 pixels,
+and an offset in x and y directions was computed for each
+pixel to ensure that the same solid angle results from a
+stimulus of fixed size shown at different positions in the
+sphere. The solid angle was computed for a reference
+point between the two eyes of the observer. We verified
+that this procedure resulted in stimuli of the same visual
+angle independent of the position in the sphere by
+measuring the visual angle for stimuli at all positions that
+were used in the experiment.
+
+Color calibration
+
+We measured the spectra of each primary at maximum
+intensity with a Photo Research PR650 spectroradiometer.
+The spectra were multiplied with the Judd-revised CIE
+1931 color matching functions (Judd, 1951; Wyszecki &
+Stiles, 1982) to derive CIE 1931 xyY coordinates of the
+monitor phosphors (Irtel, 1992). In the following, luminance and photometric luminance refer to the V(1) curve
+as modified by Judd (1951). The xy coordinates of
+the monitor primaries are given by R = (0.5246, 0.3513),
+G = (0.2951, 0.5925), and B = (0.1787, 0.1186). The xyY
+coordinates were then used to convert between RGB and
+DKL color space. Cone contrasts were computed from the
+spectral distribution of the monitor primaries using the
+cone fundamentals of Smith and Pokorny (1975). We
+measured the xy chromaticity values at different locations
+in the sphere and found that the chromaticity values varied
+only approximately in the range of normal measurement
+fluctuations (on average only 0.0207).
+
+Stimuli
+Uniformly colored disks of two sizes (5 deg and 8 deg)
+were used as stimuli. All colors were defined in the DKL
+color space (Derrington, Krauskopf, & Lennie, 1984). A
+single disk was shown in any of the four quadrants
+(detection and identification task), or disks were shown in
+
+Journal of Vision (2009) 9(4):26, 1–12
+
+Hansen, Pracejus, & Gegenfurtner
+
+all quadrants, with one disk of slightly different color
+(discrimination task).
+
+Procedure
+
+4
+
+was used to measure the discrimination thresholds
+between the test and comparison colors. Discrimination
+was measured parafoveally with disks of 5 deg diameter
+centered at 5 deg eccentricity, and peripherally at 50 deg
+eccentricity with disks of size 8 deg.
+
+Detection
+
+Colored disks were presented on a photometrically
+isoluminant gray background in a 2  2 arrangement.
+Observers had to detect the stimulus in the periphery while
+fixating a white point in the center. Stimuli were randomly
+presented at one of four possible positions (upper or lower,
+left or right quadrant), and the observers signaled the
+position of the stimulus by pressing a corresponding
+button. Stimuli were presented for 500 ms. The short
+presentation time was chosen to prevent subjects from
+making eye movements to more than one peripheral target;
+making an eye movement to just one peripheral target in a
+4AFC paradigm would just worsen performance because
+the other positions would then become even more
+peripheral. Moreover, fixating stimuli at an eccentricity
+larger than 20 deg usually involves head movements that
+were prevented by the chin rest. Finally, we used trained
+observers that were instructed to maintain fixation.
+All colors were defined in DKL color space (Derrington
+et al., 1984). Detection was measured for four chromatic
+directions along the cardinal axis of DKL space (0, 90,
+180, 270 deg). Detection thresholds were determined by
+varying the chromatic contrast in a three-down-one-up
+staircase. The staircase terminated after six reversals or
+100 trials. Thresholds were determined as the mean of the
+last five reversal points. Sessions, including breaks, were
+limited to 1 h.
+
+Results
+Chromatic detection
+In the first experiment we presented uniformly colored
+disks in all four quadrants of the visual field. Stimuli had a
+diameter of 5 deg and were presented at eccentricities of
+10, 20, 30, 40, and 50 deg. Figure 2 shows the results
+averaged across seven observers. The main result is that
+thresholds could be reliably measured for all chromatic
+directions at all eccentricities: Color vision, in particular
+for colors varying along the L j M direction, exists at
+eccentricities up to at least 50 deg. For a fixed size of the
+stimulus, detection thresholds increase with increasing
+eccentricity. Thresholds along the S j (L + M) axis show
+an asymmetric behavior: S-cone increments are less
+affected by increasing the eccentricity compared to S-cone
+decrements. The +S j (L + M) or “blue-on” signals in
+primates are transferred by a separate opponent pathway
+that originates from a distinct type of bistratified ganglion
+
+Identiﬁcation
+
+The identification procedure was identical to the
+detection procedure with the only difference that observers
+had to press a button to identify the color of the stimulus
+(reddish, yellow-greenish, bluish-greenish, violet). In a
+training session observers learned the correspondence
+between the stimulus colors and the buttons.
+
+Discrimination
+
+The procedure to measure discrimination threshold was
+similar to the procedure we applied in previous discrimination studies (Hansen, Giesel, & Gegenfurtner, 2008;
+Krauskopf & Gegenfurtner, 1992). Colored disks were
+presented on a photometrically isoluminant gray background in a 2  2 arrangement. Three of the disks had the
+same color, the test color, and one disk at a randomly
+determined position differed in color (comparison color).
+The task of the observers was to signal the position of the
+differently colored disk by pressing a corresponding
+button on the keyboard. A standard staircase procedure
+
+Figure 2. Detection thresholds for colored disks (size 5 deg) at ﬁve
+eccentricities (10, 20, 30, 40, and 50 deg) averaged across ﬁve
+observers. The fact that threshold could be measured at all
+eccentricities tested shows that color vision, in particular color
+vision mediated by the L – M cone-opponent channel, persists up
+to at least 50 deg.
+
+Journal of Vision (2009) 9(4):26, 1–12
+
+Hansen, Pracejus, & Gegenfurtner
+
+5
+
+Figure 3. Cone contrast sensitivity at ﬁve different eccentricities (from 10 to 50 deg) for three cardinal stimuli (size 8 deg). Results are
+averaged across three observers for the chromatic stimuli (L – M and S – (L + M)) and across two observers for the achromatic stimuli.
+Data of the present study (circles) are compared to data from Mullen and Kingdom (2002; triangles), Mullen et al. (2005; squares), and
+Martin et al. (2001; downward pointing triangles, measured only for L – M).
+
+cells in the retina (Dacey & Lee, 1994). The blue-off
+signals are not transmitted by a distinct pathway but are
+linked to the midget system of the parvocellular pathway
+(Dacey, 2000).
+In the second experiment we measured chromatic
+detection with slightly larger disks (8 deg) at the same
+five eccentricities as in the first experiment (10, 20, 30, 40,
+and 50 deg) for three observers. We measured chromatic
+detection thresholds along the two chromatic cardinal axes
+(L j M, S j (L + M)) and also along the achromatic
+luminance axes (L + M) of the DKL color space. Data
+averaged across three subjects are shown in Figure 3,
+together with data from three previous studies (Martin
+et al., 2001; Mullen & Kingdom, 2002; Mullen et al.,
+2005). For the L j M cone-opponent channel there is a
+steep decline in sensitivity up to 20 deg, which becomes
+shallower above 20 deg. The conclusion that L j M
+chromatic vision becomes absent above 25 deg may result
+from a wrong extrapolation of data measured only below
+30 deg. For S j (L + M) and achromatic stimuli we found
+a more shallow decline. Our results extend previous
+measured sensitivity curves farther into the periphery.
+To clarify whether these sensitivities were truly
+owing to cone-opponent mechanisms we ran three
+further experiments. First we ran an identification
+experiment that allowed us to compare thresholds for
+detection and identification. Second we ran a detection
+experiment in cone contrast space to investigate whether
+the detection was based on cone-opponent channels
+instead of a luminance channel driven by residual
+luminance contrast between the photometrically isoluminant stimuli. Third we measured discrimination ellipses
+at different eccentricities.
+
+color. Therefore, we ran an identification experiment
+where the observers had to identify the color of the
+stimuli by pressing a corresponding button. This allows us
+to investigate whether there exist any differences between
+the detection thresholds at which observers could just
+sense something, and the thresholds at which they could
+reliably name the color of the stimulus. We presented
+disks of 5 deg at two eccentricities (10 and 50 deg) to
+seven subjects. We found no differences between detection and identification thresholds along the L j M axis, and
+only small, negligible differences along the S j (L + M)
+axes. Almost as soon as observers can detect the stimulus,
+they can identify the color. The data shows that the
+detection is mediated by chromatic processes and that
+color perception exists even at eccentricities as far as
+50 deg (Figure 4).
+
+Detection and identiﬁcation
+
+Figure 4. Comparison of detection thresholds (solid) to identiﬁcation thresholds (dashed) for colored stimuli (5 deg) at two
+eccentricities (10 and 50 deg; from center to periphery). Data
+averaged across ﬁve subjects.
+
+So far, we have just shown that observers could detect
+something but have not shown that they perceive any
+
+Journal of Vision (2009) 9(4):26, 1–12
+
+Hansen, Pracejus, & Gegenfurtner
+
+Detection contours in cone contrast space
+Next we investigated the underlying chromatic mechanism by presenting stimuli in cone contrast space and
+measuring the detection contours at different eccentricities.
+Thresholds were measured at three eccentricities (5, 30,
+and 50 deg). The size of the stimuli was 8 deg for 50 deg
+eccentricity and 5 deg for the other eccentricities. We used
+purely achromatic stimuli and isoluminant stimuli, as well
+as colored stimuli with slight changes in luminance
+(elevation T1, 2, 3, 4, and 5 deg in DKL space).
+Figure 5 shows the results in L/M cone contrast space.
+(In the L/M cone contrast space, achromatic stimuli excite
+both the L- and M-cones and fall on the main diagonal;
+isoluminant stimuli differentially excite L- and M-cones
+and fall on a chromatic direction of about 120 deg.) Low
+thresholds occur along the isoluminant axis where all
+thresholds for all three eccentricities are projected on lines
+parallel to the luminance axis, showing that the underlying
+detection mechanism was cone opponent.
+
+Chromatic discrimination ellipses
+In the final experiment we measured chromatic discrimination contours (Hansen et al., 2008; Krauskopf &
+Gegenfurtner, 1992). Subjects had to select the odd one
+out of four colored disks presented in the periphery at
+
+6
+
+50 deg. Stimuli had a diameter of 8 deg. Chromatic
+discrimination thresholds were measured at eight different
+test locations with chromatic directions of 0, 45, 90, 135,
+180, 225, 270, and 315 deg and with an amplitude of 0.5.
+Figure 6 shows thresholds measured at the parafovea
+(5 deg) and at 50 deg eccentricity. The discrimination
+ellipses at the parafovea were similar to previous results
+(Hansen et al., 2008; Krauskopf & Gegenfurtner, 1992),
+showing that discrimination can be reliably measured with
+the present setup. Next we measured chromatic discrimination ellipses at 50 deg eccentricity. Chromatic discrimination thresholds could be measured at all test locations
+for all comparison colors, providing clear evidence that
+chromatic vision is present at large eccentricities. However, discrimination is poorer as shown by the larger
+overall thresholds, which are about 4.5 times larger
+compared to parafoveal presentation. Further, the shape
+of the discrimination ellipses along the L j M axis are
+similar to those measured in the parafovea, but the shapes
+of the other ellipses are different and more rounded.
+Behaviorally, this means that hue discrimination is poorer
+in the periphery, in particular for orange and bluish colors
+that have elongated discrimination ellipses in the fovea
+and in the parafovea. In terms of chromatic mechanisms,
+round ellipses occur if discrimination is mediated solely
+by the cardinal mechanisms. Unlike in the fovea, where
+evidence for multiple cortical mechanisms has been found
+(Hansen & Gegenfurtner, 2006), the chromatic detection
+in the periphery seems to be mediated by fewer mechanisms. In this experiment we did not use stimuli larger
+than 8 deg for peripheral presentation, thus we cannot rule
+out that larger stimuli may ultimately compensate for the
+observed changes. However, the 8 deg large stimuli
+represent a 16-fold increase in area compared to the 2 deg
+disks used by Hansen et al. (2008), and this is presumably
+large enough to compensate the coarser peripheral
+resolution. Note that the disk stimuli used in our experiment cannot be made arbitrarily large without compromising localization: A disk of, e.g., 20 deg presented at
+50 deg eccentricity would allow us to measure peripheral
+performance only up to 40 deg. Overall, our findings
+suggest that we can see colors in the periphery, but that
+we can distinguish them worse than in the fovea, even if
+the stimuli are large.
+
+Discussion
+Summary of ﬁndings
+Figure 5. Detection contours measured in cone contrast space
+(subject NH). The stimuli were presented at three eccentricities
+(5, 30, and 50 deg). Thresholds are indicated by the distance
+from the origin and are much smaller for isoluminant stimuli than
+for luminance stimuli (main diagonal).
+
+We have measured chromatic detection and discrimination in the near periphery and found that chromatic
+discrimination, in particular along the L j M axis, is
+possible even at high eccentricities up to 50 deg for stimuli
+of 8 deg. We confirmed in three control experiments
+
+Journal of Vision (2009) 9(4):26, 1–12
+
+Hansen, Pracejus, & Gegenfurtner
+
+7
+
+Figure 6. Chromatic discrimination at the fovea and peripherally at 50 deg. Discrimination is measured at eight test locations equally
+spaced around the medium gray adaptation point. The resulting discrimination ellipses have been scaled by 1.5 (parafoveal) and by 0.33
+(50 deg) for better comparison of their shapes.
+
+(identification, detection in cone contrast space, and
+chromatic discrimination) that chromatic mechanisms
+operate at these eccentricities.
+
+Chromatic mechanisms in the periphery
+The detection contours reveal that detection in the far
+periphery is supported by cone-opponent processing with
+increasing threshold from the fovea to 50 deg. Our data
+point to another, more cortical change from foveal to
+peripheral color processing. Discrimination contours for
+peripheral targets became more circular, indicating that the
+multitude of chromatic detection mechanisms that has been
+reported psychophysically (Hansen et al., 2008; Krauskopf
+& Gegenfurtner, 1992) and physiologically in visual cortex
+in V1, V2, V3, and IT (Gegenfurtner, Kiper, & Levitt,
+1997; Kiper, Fenstemaker, & Gegenfurtner, 1997;
+Komatsu, 1998, Komatsu, Ideura, Kaji, & Yamane, 1992;
+Lennie, Krauskopf, & Sclar, 1990; Wachtler, Sejnowski, &
+Albright, 2003) is a specialization of the fovea and the
+parafovea. Overall, chromatic discrimination is possible for
+suitable large stimuli at eccentricities up to at least 50 deg,
+but sensitivity is lower and hue discrimination is not as
+good as in the fovea.
+
+Comparison to other psychophysical studies
+Our results confirm a number of psychophysical studies
+that have investigated peripheral color sensitivity (Abramov
+et al., 1991; Murray, Parry, & McKeefry, 2006; Noorlander
+
+et al., 1983, Vakrou, Whitaker, McGraw, & McKeefry,
+2005). These studies agree that a decrease in chromatic
+sensitivity with peripheral presentation can be compensated
+by increasing the size of the stimuli.
+Noorlander et al. (1983) determined contrast detection
+thresholds for red–green and blue–yellow spatiotemporal
+color modulations at several eccentricities. They found
+that color vision becomes worse if a stimulus of constant
+size was moved away from the fovea; however, when the
+stimulus was enlarged with increasing eccentricity, the
+decreased sensitivity could be compensated, such that
+color discrimination in the periphery was comparable to
+that in the fovea. Noorlander et al. (1983) found that
+chromatic bars were detectable up to at least 30 deg, and
+temporal chromatic modulations were detectable up to at
+least 90 deg. They concluded that spatiotemporal chromatic discrimination is approximately constant across
+different eccentricities if the number of stimulated
+ganglion cells is constant.
+Abramov et al. (1991) measured color appearance
+based on hue and saturation scalings at different eccentricities. Abramov et al. (1991) found that increasing the
+size of the stimulus in the periphery produced a fovea-like
+performance, up to eccentricities of 20 deg. They
+presented stimuli from 0.25 to 6 deg of diameter at the
+fovea and from 5 to 40 deg of eccentricity in a perimeterlike setup with movable rear projection. Due to limited
+technical equipment, they could not find an adequate
+equivalent for presentations at 40 deg eccentricity. They
+concluded that it was not possible to find a stimulus that
+elicits fovea-like perception in this peripheral part of the
+retina.
+
+Journal of Vision (2009) 9(4):26, 1–12
+
+Hansen, Pracejus, & Gegenfurtner
+
+Vakrou et al. (2005) studied chromatic sensitivity up to
+20 deg of the nasal field with Gabor stimuli that were
+modulated along the cardinal axes of the DKL color
+space. They found that performance could be equated
+across the visual field by changing the size of the stimuli.
+They found no qualitative loss of chromatic sensitivity
+across the visual field.
+Murray et al. (2006) studied changes of color perception
+in the peripheral field up to 30 deg using an asymmetric
+simultaneous matching paradigm. They found that saturation changes could be neutralized if the test stimulus
+was increased in size. Hue changes, however, could not be
+compensated: some hues remained unchanged whereas
+others exhibit substantial changes. Hues signaled by the
+S j (L + M) channel were more robust compared to hues
+mediated by the L j M channel.
+In contrast to these studies, there are a number of recent
+experiments where diverging results were obtained. Those
+studies found that L j M cone opponency was highly
+sensitive in the fovea but fell steeply across the periphery
+(Mullen, 1991; Mullen & Kingdom, 1996, 2002; Stromeyer,
+Lee, & Eskew, 1992) resulting in a complete loss of L j M
+cone opponency at the behavioral level by 25–30 deg
+(Mullen et al., 2005). Mullen et al. (2005) tested cone
+contrast sensitivity at different eccentricities. They used a
+138 cm by 104 cm flat CRT monitor and showed stimuli at
+eccentricities between 2 and 30 deg. Contrast detection
+thresholds were measured using a staircase procedure.
+Their results showed that L j M cone opponency steeply
+declined across the visual periphery and became behaviorally absent by 25–30 deg in the nasal field. Mullen et al.
+(2005) used a sine-wave ring pattern as stimulus. The sinewave ring pattern was chosen because large spatial wavelengths (up to 16 deg) could be displayed without
+compromising localization. In the present study, we used
+disks of up to 8 deg centered at the particular eccentricity;
+thus, we measured chromatic detection and discrimination
+in a range of j4 deg and +4 deg around the particular
+eccentricity. However even if one takes this into account,
+our data show that chromatic detection is behaviorally
+present at eccentricities up to 46 deg, a value far above the
+cut-off eccentricity of about 25–30 deg reported by Mullen
+et al. (2005).
+What could be the cause for this discrepancy? One
+potential reason may be that the sine-wave ring pattern
+used by Mullen et al. (2005) was not an optimal stimulus
+for chromatic detection because of its small radial size.
+The sine-wave ring was an angular sinusoidal modulation
+with a large angular size of 5 deg but shown in a small
+annulus of 1.5 deg radial size (at 30 deg eccentricity). The
+spatial frequency of the angular sinusoidal modulation
+was chosen to optimize cone contrast sensitivity. Since the
+chromatic contrast sensitivity is low pass (Mullen, 1985),
+a low angular spatial frequency of 0.0625 cycles/deg (i.e.,
+a wavelength of 16 deg) was used at eccentricities of
+25 deg and above. However, the fixed radial size (1.5 deg)
+was non-optimal for chromatic detection. We suspect that
+
+8
+
+the reported breakdown of chromatic detection of L j M
+stimuli above 25–30 deg may be due to the small radial
+size of the stimuli.
+
+Comparison to physiological ﬁndings
+Chromatic signals originate from the absorption of light
+by three different types of cones with peak sensitivities at
+short (S-cones), medium (M-cones), and long (L-cones)
+wavelengths. The signals of the three types of cones are
+combined already in the retina in two chromatic channels,
+S j (L + M) and L j M, that have different spatial
+characteristics and are transmitted in distinct pathways to
+the cortex: S j (L + M) is signaled by the koniocellular
+pathway, while L j M is signaled by the parvocellular
+pathway; L j M cells have an antagonistic center–
+surround organization of their receptive fields (type I),
+while S j (L + M) cells have coextensive receptive fields
+(type II). Only few (G10%) of all cones are S-cones,
+resulting in fewer cells of the koniocellular pathway
+compared to the parvocellular pathway. The blue-off
+jS + (L + M) signals are not transmitted by a distinct
+pathway but are linked to the midget system of the
+parvocellular pathway (Dacey, 2000).
+The parvocellular L j M cells can signal a coneopponent response if the center and surround differ in their
+input from L- and M-cones. The strongest cone-opponent
+response would occur if the center and surround were
+driven exclusively by a single type of cone, such that the
+RF center receives input only from L-cones and the
+surround is driven only from M-cones, or vice versa. It has
+been shown that it is sufficient for a robust cone-opponent
+signal that only the center of the receptive fields gets input
+from a single type of cones, while the surround can be
+indiscriminately fed by both L- and M-cones (Lennie
+et al., 1991; Mullen & Kingdom, 1996). The layout of the
+wiring of cones to the receptive field centers of midget
+ganglion cells changes with eccentricity (for a review, see
+Dacey, 2000 or Derrington, 2001). In the fovea, a conespecific input to the RF center is guaranteed because the
+receptive field center of a midget ganglion cell is
+exclusively driven by a single bipolar cell, which is in
+turn driven by a single cone: there is a private pathway
+from a cone to a midget ganglion cell center. In the far
+periphery, a cone-opponent signal is almost impossible if
+the wiring is random because several cones converge
+directly on bipolar cells (Wässle, Grünert, Martin, &
+Boycott, 1994). In the intermediate retina, bipolar cells
+receive input from single cones, but several bipolar cells
+converge on a single ganglion cell (Dacey, 1993).
+Martin et al. (2001) measured chromatic sensitivity with
+red and green isoluminant LED stimuli of 4.7 deg foveally
+and at eccentricities between 20 and 50 deg in macaque
+monkey. They reported that most parvocellular (PC)
+ganglion cells in the periphery had an L j M sensitivity
+close to that of foveal PC cells. This finding is hard to
+
+Journal of Vision (2009) 9(4):26, 1–12
+
+Hansen, Pracejus, & Gegenfurtner
+
+reconcile with psychophysical results showing a steep
+decrease in L j M sensitivity with eccentricity, and
+possible ways out are “not very palatable” (Derrington,
+2001). Is the monkey retina different from that in humans?
+Or do postretinal mechanisms determine the deterioration
+of chromatic discrimination in the periphery, as suggested
+by Martin et al. (2001)? An inspection of the number of
+cells studied by Martin et al. (2001) suggests another
+possible way to reconcile these findings: only some
+midget cells exhibit a high selectivity, but the average
+selectivity declines with eccentricity. Martin et al. (2001)
+recorded from 131 cells at eccentricities above 20 deg,
+54 cells (41%) were PC cells, of which 34 displayed overt
+red–green opponent responses. A quantitative analysis of
+35 peripheral cells revealed that 28 cells were unambiguously cone opponent (showing a larger response to
+isoluminant modulation compared to luminance modulation produced by in-phase modulation of the red and green
+LEDs), while 7 cells (20%) responded weakly to isoluminant modulation. From the pool of these 28 coneopponent cells a sample of 11 cells recorded above 30 deg
+was chosen for further analysis. Average red–green
+modulation sensitivity of these 11 cells was 0.8 and not
+significantly different from a sample of 18 foveal cells with
+a selectivity of 1.2 that was recorded in another study.
+There are several problems with this analysis. First, only a
+sample of 11 cells (20%) from a total of 54 PC cells was
+used in the analysis. Second, the average sensitivity tended
+to be higher in the fovea than in the periphery. This higher
+foveal sensitivity might become significant for a larger
+sample of cells. Third, foveal recordings were taken from
+another study with different animal subjects, stimuli, and
+apparatus (Lee, Pokorny, Smith, Martin, & Valberg, 1990)
+and may thus not be fully comparable to the peripheral
+recordings. We argue here that based on these data the
+strong claim that most peripheral cells have the same
+sensitivity as foveal cells is not fully supported. Instead,
+the study shows that only a subset of all peripheral PC
+cells has a selectivity that is comparable to the fovea, but
+that this sensitivity still tends to be smaller, and that this
+high selectivity is definitely not present in all peripheral
+cells. Overall, the findings of Martin et al. (2001) seem to
+be in agreement with most psychophysical findings.
+Solomon, Lee, White, Rüttiger, and Martin (2005)
+recorded parvo, magno, and konio cells in vivo in the
+fovea and periphery of macaque retinae. They found
+evidence for chromatic responses of M- and K-cells being
+equivalent in foveal and peripheral parts of the retina.
+Most peripheral P-cells showed color-opponent behavior
+for low temporal frequency stimuli below 10 Hz. Some
+P-cells showed no color opponent behavior. Except for these
+cases chromatic properties of the inner 50 deg of visual angle
+were preserved. Solomon et al. (2005) conclude that the
+main change between foveal and peripheral ganglion cells
+was a higher responsiveness to high temporal frequency in
+the periphery.
+
+9
+
+Evidence for at least a high degree of cone specificity to
+both center and surround comes from the work of Reid
+and Shapley (1992, 2002). Reid and Shapley used coneisolating stimuli made up of arrays of squares whose colors
+were randomly modulated to map RFs. Spike trains were
+correlated with the patterns that preceded them. Using this
+reverse-correlation technique, Reid and Shapley (1992,
+2002) found spatially antagonistic receptive fields that
+predominantly receive input from a single cone type both
+in the center and in the surround. However, their method
+does not exclude that RF center and surround may be
+modulated simultaneously. The random grid stimuli can
+activate both the center and the surround, and optical blur
+could cause signals from the center to mask mixed input in the
+surround (Reid & Shapley, 2002, p. 6173). However, the
+findings clearly indicate that cone inputs are not entirely
+random but at least biased.
+Not all physiology is in favor of a highly selective input
+to midget retinal ganglion cells. Contrary to Martin et al.’s
+(2001) report of color opponent mechanisms in the
+periphery, Diller et al. (2004) found that nearly all
+peripheral midget cells (except a single one) were nonopponent at eccentricities of 30–60 deg. One potential
+reason for this result, which seems to be in contradiction
+to most other studies, could be the high temporal
+frequency (about 10 Hz) used to stimulate the cells.
+Buzás, Blessing, Szmajda, & Martin (2006) measured
+L- and M- cone inputs to PC receptive field in marmosets
+between the fovea and 30 deg eccentricity. They found
+that response strength depended on the overall segregation
+of L- and M-cone inputs to center and surround, consistent
+with the random wiring hypothesis. The majority of PC
+cells in both foveal and peripheral retina showed coneopponent responses; the cone purity in the RF surround
+was at least as high as in the center. Buzás et al. (2006)
+found that the inhibitory input to a PC cell was not
+constituted by the local ratio of L- and M-cones but are
+biased by some unknown additional factors. They propose
+a random wiring model with a functional bias.
+Momiji, Hankins, Barath, and Kennard (2007) developed
+a dynamic model of the peripheral retina that incorporated
+the random arrangement of L- and M-cones in the retinal
+cone mosaic and anatomically reasonable degrees of
+convergence between cones, bipolar cells, and ganglion
+cells. Numerical simulations of ganglion cell responses in
+the periphery were compared to model responses of the
+primate fovea (Momiji, Bharath, Hankins, & Kennard,
+2006). Both models were based on random wiring and
+found that peripheral ganglion cells were less color
+sensitive than foveal cells but remained color sensitive.
+Overall, a complete random wiring model does not
+seem to be able to account for most of the data. Such
+models at least need to be augmented by additional factors
+(such as the elongated RF surrounds as suggested by
+Martin et al., 2001), which bias the functional segregation
+of cone inputs.
+
+Journal of Vision (2009) 9(4):26, 1–12
+
+Hansen, Pracejus, & Gegenfurtner
+
+Summary
+The range of eccentricities over which red–green color
+vision is still possible is larger than previously thought.
+Color stimuli can be reliably detected and identified by
+chromatically opponent mechanisms even at 50 deg
+eccentricity. Earlier studies most probably underestimated
+this range. Differences could be caused by technical
+limitations and the use of stimuli of non-optimal size. In
+agreement with previous studies we found that the decline
+in reddish-greenish L j M color sensitivity was greater
+than for luminance and bluish-yellowish S j (L + M)
+signals. We interpret our findings as being consistent with
+a functional bias in the wiring of cone inputs to ganglion
+cells (Buzás et al., 2006) that predicts a decrease but not a
+lack of cone-opponent responses in the retinal periphery.
+
+Acknowledgments
+Lars Pracejus was supported by the DFG graduate program
+“Neural representation and action controlVNeuroAct”
+(885/1). Karl R. Gegenfurtner was supported by the DFG
+Grant Ge 879/5 “Cortical mechanisms of color vision”. We
+thank Volker Franz, Lukas Kaim, and Michael Merz for
+technical assistance.
+Commercial relationships: none.
+Corresponding author: Thorsten Hansen.
+Email: Thorsten.Hansen@psychol.uni-giessen.de.
+Address: Justus-Liebig-Universität Giessen, Abteilung
+Allgemeine Psychologie, Otto-Behaghel-Str. 10F, 35394
+Giessen, Germany.
+
+References
+Abramov, I., Gordon, J., & Chan, H. (1991). Color
+appearance in the peripheral retina: Effects of stimulus
+size. Journal of the Optical Society of America A,
+Optics and Image Science, 8, 404–144. [PubMed]
+Buck, S. L., Knight, R., Fowler, G., & Hunt, B. (1998).
+Rod influence on hue-scaling functions. Vision
+Research, 38, 3259–3263. [PubMed]
+Buzás, P., Blessing, E. M., Szmajda, B. A., & Martin, P. R.
+(2006). Specificity of M and L cone inputs to receptive
+fields in the parvocellular pathway: Random wiring
+with functional bias. Journal of Neuroscience, 26,
+11148–11161. [PubMed] [Article]
+Dacey, D. M. (1993). The mosaic of midget ganglion cells
+in the human retina. Journal of Neuroscience, 13,
+5334–5355. [PubMed] [Article]
+
+10
+
+Dacey, D. M. (2000). Parallel pathways for spectral
+coding in the retina. Annual Reviews of Neurosciences, 23, 743–775. [PubMed]
+Dacey, D. M., & Lee, B. B. (1994). The “blue-on”
+opponent pathway in primate retina originates from a
+distinct bistratified ganglion cell type. Nature, 367,
+731–735. [PubMed]
+Derrington, A. (2001). Why do colours fade at the edges?
+Nature, 410, 886–887. [PubMed]
+Derrington, A. M., Krauskopf, J., & Lennie, P. (1984).
+Chromatic mechanisms in the lateral geniculate
+nucleus of the macaque. The Journal of Physiology,
+357, 241–265. [PubMed] [Article]
+De Valois, R. L., & De Valois, K. K. (1975). Neural
+coding of color. In E. C. Carterette & M. P. Friedman
+(Eds.), Handbook of perception (vol. 5, pp. 117–166).
+New York: Academic Press.
+Diller, L., Packer, O. S., Verweij, J., McMahon, M. J.,
+Williams, D. R., & Dacey, D. M. (2004). L and M
+cone contributions to the midget and parasol ganglion
+cell receptive fields of macaque monkey retina.
+Journal of Neuroscience, 24, 1079–1088. [PubMed]
+[Article]
+Engel, S. A., Rumelhart, D. E., Wandell, B. A., Lee, A. T.,
+Glover, G. H., Chichilnisky, E. J., et al. (1994).
+fMRI of human visual cortex. Nature, 369, 525.
+[PubMed]
+Ferree, C. E., & Rand, G. (1919). Chromatic thresholds of
+sensation from center to periphery of the retina and
+their bearing on color theory. Psychological Review,
+26, 16–41.
+Gegenfurtner, K. R., Kiper, D. C., & Levitt, J. B. (1997).
+Functional properties of neurons in macaque area V3.
+Journal of Neurophysiology, 77, 1906–1923.
+[PubMed] [Article]
+Goodchild, A. K., Ghosh, K. K., & Martin, P. R. (1996).
+Comparison of photoreceptor spatial density and ganglion cell morphology in the retina of human, macaque
+monkey, cat, and the marmoset Callithrix jacchus.
+Journal of Comparative Neurology, 366, 55–75.
+[PubMed]
+Gordon, J., & Abramov, I. (1977). Color vision in the
+peripheral retina. II. Hue and saturation. Journal of
+the Optical Society of America, 67, 202–207.
+[PubMed]
+Hansen, T., & Gegenfurtner, K. R. (2006). Higher level
+chromatic mechanisms for image segmentation. Journal of Vision, 6(3):5, 239–259, http://journalofvision.
+org/6/3/5/, doi:10.1167/6.3.5. [PubMed] [Article]
+Hansen, T., Giesel, M., & Gegenfurtner, K. R. (2008).
+Chromatic discrimination of natural objects. Journal of
+
+Journal of Vision (2009) 9(4):26, 1–12
+
+Hansen, Pracejus, & Gegenfurtner
+
+Vision, 8(1):2, 1–19, http://journalofvision.org/8/1/2/,
+doi:10.1167/8.1.2. [PubMed] [Article]
+Horton, J. C., & Hoyt, W. F. (1991). The representation of
+the visual field in human striate cortex. A revision of
+the classic Holmes map. Archives of Ophthalmology,
+109, 816–824. [PubMed]
+Irtel, H. (1992). Computing data for color vision modeling. Behaviour Research Methods, Instruments, &
+Computers, 24, 387–401.
+Johnson, M. A. (1986). Color vision in the peripheral
+retina. American Journal of Optometry and Physiological Optics, 63, 97–103. [PubMed]
+Judd, D. B. (1951). Report of US Secretariat Committee
+on colorimetry and artificial daylight. In Proceedings
+of the Twelfth Session of the CIE, Stockholm, Sweden
+(p. 11). Paris: Bureau Central de la CIE.
+Kiper, D. C., Fenstemaker, S. B., & Gegenfurtner, K. R.
+(1997). Chromatic properties of neurons in macaque
+area V2. Visual Neuroscience, 14, 1061–1072.
+[PubMed]
+Komatsu, H. (1998). Mechanisms of central color vision.
+Current Opinion in Neurobiology, 8, 503–508.
+[PubMed]
+Komatsu, H., Ideura, Y., Kaji, S., & Yamane, S. (1992).
+Color selectivity of neurons in the inferior temporal
+cortex of the awake macaque monkey. Journal of
+Neuroscience, 12, 408–424. [PubMed] [Article]
+Krauskopf, J., & Gegenfurtner, K. (1992). Color discrimination and adaptation. Vision Research, 32,
+2165–2175. [PubMed]
+Krüger, J. (1977). Stimulus dependent colour specificity
+of monkey lateral geniculate neurons. Experimental
+Brain Research, 30, 297–311. [PubMed]
+Lee, B. B., Pokorny, J., Smith, V. C., Martin, P. R., &
+Valberg, A. (1990). Luminance and chromatic modulation sensitivity of macaque ganglion cells and human
+observers. Journal of the Optical Society of America A,
+Optics and Image Science, 7, 2223–2236. [PubMed]
+Lennie, P., Haake, P. W., & Williams, D. R. (1991). The
+design of chromatically opponent receptive fields. In
+M. S. Landy & A. Movshon (Eds.), Computational
+models of visual processing (pp. 71–82). Cambridge,
+MA: MIT Press.
+Lennie, P., Krauskopf, J., & Sclar, G. (1990). Chromatic
+mechanisms in striate cortex of macaque. Journal of
+Neuroscience, 10, 649–669. [PubMed] [Article]
+Martin, P. R., Lee, B. B., White, A. J., Solomon, S. G., &
+Rüttiger, L. (2001). Chromatic sensitivity of ganglion
+cells in the peripheral primate retina. Nature, 410,
+933–936. [PubMed]
+Momiji, H., Bharath, A. A., Hankins, M. W., & Kennard, C.
+(2006). Numerical study of short-term afterimages and
+
+11
+
+associate properties in foveal vision. Vision Research,
+46, 365–381. [PubMed]
+Momiji, H., Hankins, M. W., Bharath, A. A., & Kennard, C.
+(2007). A numerical study of red–green colour
+opponent properties in the primate retina. European
+Journal of Neuroscience, 25, 1155–1165. [PubMed]
+Moreland, J. D. (1972). Peripheral colour vision. In
+D. Jameson & L. M. Hurvich (Eds.), Handbook of
+sensory physiology: Vol. VII/4. Visual psychophysics
+(pp. 517–536). New York: Springer.
+Moreland, J. D., & Cruz, A. (1959). Colour perception
+with the peripheral retina. Optica Acta, 7, 317–323.
+Mullen, K. T. (1985). The contrast sensitivity of human
+colour vision to red–green and blue–yellow chromatic
+grating. The Journal of Physiology, 359, 381–400.
+[PubMed] [Article]
+Mullen, K. T. (1991). Colour vision as a post-receptoral
+specialization of the central visual field. Vision
+Research, 31, 119–130. [PubMed]
+Mullen, K. T., & Kingdom, F. A. (1996). Losses in
+peripheral colour sensitivity predicted from “hit and
+miss” post-receptoral cone connections. Vision
+Research, 36, 1995–2000. [PubMed]
+Mullen, K. T., & Kingdom, F. A. (2002). Differential
+distributions of red–green and blue–yellow cone
+opponency across the visual field. Visual Neuroscience, 19, 109–118. [PubMed]
+Mullen, K. T., Sakurai, M., & Chu, W. (2005). Does L/M
+cone opponency disappear in human periphery?
+Perception, 34, 951–959. [PubMed]
+Murray, I. J., Parry, N. R., & McKeefry, D. J. (2006).
+Cone opponency in the near peripheral retina. Visual
+Neuroscience, 23, 503–507. [PubMed]
+Noorlander, C., Koenderink, J. J., den Ouden, R. J., &
+Edens, B. W. (1983). Sensitivity to spatiotemporal
+colour contrast in the peripheral visual field. Vision
+Research, 23, 1–11. [PubMed]
+Reid, R. C., & Shapley, R. M. (1992). Spatial structure of
+cone inputs to receptive fields in primate lateral
+geniculate nucleus. Nature, 356, 716–718. [PubMed]
+Reid, R. C., & Shapley, R. M. (2002). Space and time
+maps of cone photoreceptor signals in macaque
+lateral geniculate nucleus. Journal of Neuroscience,
+22, 6158–6175. [PubMed] [Article]
+Smith, V. C, & Pokorny, J. (1975). Spectral sensitivity
+of the foveal cone photopigments between 400 and
+500 nm. Vision Research, 15, 161–171. [PubMed]
+Solomon, S. G., Lee, B. B., White, A. J., Rüttiger, L., &
+Martin, P. R. (2005). Chromatic organization of
+ganglion cell receptive fields in the peripheral retina.
+Journal of Neuroscience, 25, 4527–4539. [PubMed]
+[Article]
+
+Journal of Vision (2009) 9(4):26, 1–12
+
+Hansen, Pracejus, & Gegenfurtner
+
+Stromeyer, C. F., 3rd, Lee, J., & Eskew, R. T., Jr. (1992).
+Peripheral chromatic sensitivity for flashes: A postreceptoral red–green asymmetry. Vision Research, 32,
+1865–1873. [PubMed]
+Tootell, R. B., Switkes, E., Silverman, M. S., & Hamilton,
+S. L. (1988). Functional anatomy of macaque striate
+cortex. II. Retinotopic organization. Journal of Neuroscience, 8, 1531–1568. [PubMed] [Article]
+Vakrou, C., Whitaker, D., McGraw, P. V., & McKeefry, D.
+(2005). Functional evidence for cone-specific connectivity in the human retina. The Journal of
+Physiology, 566, 93–102. [PubMed] [Article]
+van Esch, J. A., Koldenhof, E. E., van Doorn, A. J., &
+Koenderink, J. J. (1984). Spectral sensitivity and
+wavelength discrimination of the human peripheral
+visual field. Journal of the Optical Society of America
+A, Optics and Image Science, 1, 443–450. [PubMed]
+Virsu, V., & Rovamo, J. (1979).Visual resolution, contrast
+sensitivity, and the cortical magnification factor. Experimental Brain Research, 37, 475–494. [PubMed]
+Wachtler, T., Sejnowski, T. J., & Albright, T. D. (2003).
+Representation of color stimuli in awake macaque
+
+12
+
+primary visual cortex. Neuron, 37, 681–691. [PubMed]
+[Article]
+Wässle, H., Grünert, U., Martin, P. R., & Boycott, B. B.
+(1994). Immunocytochemical characterization and
+spatial distribution of midget bipolar cells in the
+macaque monkey retina. Vision Research, 34,
+561–579. [PubMed]
+Wässle, H., Grünert, U., Röhrenbeck, J., & Boycott, B. B.
+(1989). Cortical magnification factor and the ganglion
+cell density of the primate retina. Nature, 341,
+643–646. [PubMed]
+Wyszecki, G., & Stiles, W. S. (1982). Color science
+concepts and methods, quantitative data and formulae. New York: Wiley.
+Zrenner, E., & Gouras, P. (1983). Cone opponency in
+tonic ganglion cells and its variation with eccentricity
+in rhesus monkey retina. In J. D. Mollon & L. T.
+Sharpe (Eds.), Colour vision: Physiology and psychophysics (pp. 211–223). London: Academic Press.
+
+
