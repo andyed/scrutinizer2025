@@ -504,6 +504,8 @@
         toggleChromaticPooling(enabled) {
             if (this.renderer) {
                 this.renderer.config.chromatic_pooling = enabled;
+                // Flag survives per-frame updateConfigFromMode() resets
+                this.renderer._chromaticPoolingOverride = enabled;
                 ipcRenderer.send('log:renderer', `[Scrutinizer] Chromatic pooling: ${enabled}`);
             }
         }

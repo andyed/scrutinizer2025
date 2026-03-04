@@ -407,6 +407,9 @@
                 // show_congestion is set by setShowCongestion() and must survive
                 // the per-frame config reset — it's a user toggle, not a mode property.
                 const savedShowCongestion = this.config.show_congestion;
+                // chromatic_pooling can be overridden by menu toggle or TEST_CHROMATIC_POOLING.
+                // Only preserve if explicitly overridden (flag set by toggleChromaticPooling).
+                const savedChromaticOverride = this._chromaticPoolingOverride;
 
                 // Default: High-Key (0)
                 const defaults = {
@@ -428,6 +431,7 @@
 
                 this.config = { ...defaults };
                 this.config.show_congestion = savedShowCongestion;
+                // Defer chromatic override restore until after mode config loads (below)
 
                 // Try registry-based lookup first
                 if (modesRegistry && modesRegistry.modes) {
@@ -459,6 +463,10 @@
 
                         // Store current mode metadata for export
                         this.currentMode = modeEntry;
+                        // Restore manual chromatic pooling override if set
+                        if (savedChromaticOverride !== undefined) {
+                            this.config.chromatic_pooling = savedChromaticOverride;
+                        }
                         return;
                     }
                 }
