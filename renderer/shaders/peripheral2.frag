@@ -147,6 +147,7 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         // → r = a * (exp(level * cortical_max / maxMip) - 1)
         // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
         float fovea_deg = 2.0;
+        float maxMipLevel = 4.0;
         float scale = u_cortical_max / maxMipLevel;
         c0 = u_cmf_a * (exp(1.0 * scale) - 1.0) / fovea_deg;
         c1 = u_cmf_a * (exp(2.0 * scale) - 1.0) / fovea_deg;
