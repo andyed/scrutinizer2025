@@ -203,7 +203,7 @@ This section provides a detailed breakdown of browser features introduced in v1.
 | **Input Latency Fixes** | `requestIdleCallback` for mutations | ❌ **Out** | Electron-specific optimization |
 | **Dual-Window Architecture** | Browser + HUD coordination | ❌ **Out** | Figma is single-window |
 | **Purkinje Darkening (Mode 1)** | Red -> Black shadows (Biological) | ✅ **Port shader** | Critical for "Simulation Mode". Ensure `processV4` divergence logic is ported. |
-| **Clean Desaturation (Mode 0)** | Red -> Grey (Usability) + Mustard Fix | ✅ **Port shader** | Fixes "Mustard" artifact. Use `smoothstep` for progressive fade. |
+| **Chromatic Pooling (Mode 0)** | Per-channel RG/YV attenuation (Usability) + Mustard Fix | ✅ **Port shader** | Spatial-frequency-dependent chromatic pooling. Use `smoothstep` for progressive fade. |
 | **Safe Global Vignette** | Contrast-based dimming (not black) | ✅ **Port shader** | Prevents "Tunnel Vision" on white Figma canvas. |
 
 ---

@@ -29,6 +29,19 @@
 - Schwartz (1980): w = log(z+a), cortical distance = ln(r+a) - ln(a), CMF = 1/(r+a)
 - FOVI code (coords.py): `log(radius+cmf_a) - log(cmf_a)` normalized by `log(fov/2+cmf_a) - log(cmf_a)`
 
+## Chromatic Pooling Review (2026-03-04)
+- See `chromatic-pooling-review.md` for detailed findings
+- castleCSF k_e values (0.059 RG, 0.004 YV) are DETECTION THRESHOLDS, not suprathreshold appearance
+- Fix implemented: suprathreshold power-law exponent (default 0.5), Red Kill Switch guarded
+- **EMERGING CONSENSUS: peripheral desaturation has been overstated**
+  - Rozman & Martinovic 2025: desaturation is NOT color-specific; same for luminance when matched for threshold distance
+  - Jiang et al. 2022: power-law exponents 0.39-0.84 (mean ~0.63); no chrom/achrom difference once equated
+  - Bowers et al. 2025: RG decay is non-exponential (biphasic); castleCSF over-predicts beyond 20 deg
+  - Tyler 2015: eccentricity-scaled stimuli appear vivid — loss is size-dependent
+  - Hansen et al. 2009: size-scaling preserves color appearance
+- **Rosenholtz/TTM framework**: pooling preserves mean chromaticity; only fine chromatic detail is lost
+- **Next steps**: make RG decay frequency-dependent (like YV already is); raise supra_exponent to 0.65
+
 ## Key Parameters
 - dog_e2: default 0.15 (High-Key), 0.12 (Biological) -- normalized units, not degrees
 - dog_sharpness: 0.0=biological (wide transitions), 1.0=sharp

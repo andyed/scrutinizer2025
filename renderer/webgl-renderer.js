@@ -95,6 +95,7 @@
                 this.rgDecayLocation = null;
                 this.yvDecayLocation = null;
                 this.yvFreqDecayLocation = null;
+                this.supraExponentLocation = null;
 
                 // Congestion overlay uniform location
                 this.showCongestionLocation = null;
@@ -126,6 +127,7 @@
                     rg_decay: 0.059,     // castleCSF k_e for RG (L-M)
                     yv_decay: 0.004,     // castleCSF k_e for YV S-(L+M)
                     yv_freq_decay: 0.008, // castleCSF k_ef for YV
+                    supra_exponent: 0.5, // Threshold→appearance compression (Jiang et al. 2022)
                     show_congestion: 0,  // 0=off, 1=congestion heatmap, 2=saliency vs congestion
                     congestion_pooling: false
                 };
@@ -225,6 +227,7 @@
                 this.rgDecayLocation = gl.getUniformLocation(this.program, "u_rg_decay");
                 this.yvDecayLocation = gl.getUniformLocation(this.program, "u_yv_decay");
                 this.yvFreqDecayLocation = gl.getUniformLocation(this.program, "u_yv_freq_decay");
+                this.supraExponentLocation = gl.getUniformLocation(this.program, "u_supra_exponent");
 
                 // Congestion overlay uniform lookup
                 this.showCongestionLocation = gl.getUniformLocation(this.program, "u_show_congestion");
@@ -460,6 +463,7 @@
                         this.config.rg_decay = p.rg_decay ?? defaults.rg_decay;
                         this.config.yv_decay = p.yv_decay ?? defaults.yv_decay;
                         this.config.yv_freq_decay = p.yv_freq_decay ?? defaults.yv_freq_decay;
+                        this.config.supra_exponent = p.supra_exponent ?? defaults.supra_exponent;
 
                         // Store current mode metadata for export
                         this.currentMode = modeEntry;
@@ -627,6 +631,7 @@
                 gl.uniform1f(this.rgDecayLocation, this.config.rg_decay);
                 gl.uniform1f(this.yvDecayLocation, this.config.yv_decay);
                 gl.uniform1f(this.yvFreqDecayLocation, this.config.yv_freq_decay);
+                gl.uniform1f(this.supraExponentLocation, this.config.supra_exponent);
                 gl.uniform1f(this.hasStructureLocation, hasStructure);
                 gl.uniform1f(this.enableSaliencyModulationLocation, enableSaliencyModulation);
                 gl.uniform1i(this.showCongestionLocation, this.config.show_congestion);

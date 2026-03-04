@@ -32,13 +32,14 @@ Storage and workflow for browser ↔ Figma visual parity checks.
 
 v1.9+ captures include chromatic pooling on/off comparisons for color-spectrum and dashboard pages. The capture script passes `TEST_CHROMATIC_POOLING=true|false` to override the mode default, producing paired images:
 
-- `color-spectrum_center_mode0_chromatic_on.png` — castleCSF per-channel RG/YV decay
-- `color-spectrum_center_mode0_chromatic_off.png` — legacy uniform desaturation
+- `color-spectrum_center_mode0_chromatic_on.png` — per-channel RG/YV chromatic pooling (castleCSF + suprathreshold correction)
+- `color-spectrum_center_mode0_chromatic_off.png` — legacy uniform chrominance reduction
 
 Key visual differences to verify:
-- Red elements desaturate faster with chromatic pooling ON (RG k_e=0.059)
-- Blue elements persist further into periphery (YV k_e=0.004)
-- Small colored text loses color faster than large colored regions (DoG band frequency dependence)
+- Red-green opponent signal attenuates faster than blue-yellow with chromatic pooling ON
+- Blue elements persist further into periphery (YV pathway tracks near-achromatic)
+- Small colored elements lose chromatic identity faster than large colored regions (spatial-frequency-dependent pooling)
+- Large colored regions retain mean chromaticity well into periphery (Rosenholtz TTM: color is pooled, not lost)
 
 ## Outputs
 - docs/golden/summary-<version>.json : per-file metrics and pass/fail

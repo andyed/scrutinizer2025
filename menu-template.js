@@ -254,6 +254,25 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/color-spectrum.html');
                                 }
                             }
+                        },
+                        { type: 'separator' },
+                        {
+                            label: 'Crowding (Letters)',
+                            click: () => {
+                                const win = BrowserWindow.getFocusedWindow();
+                                if (win && win.scrutinizerView) {
+                                    win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/crowding.html');
+                                }
+                            }
+                        },
+                        {
+                            label: 'Crowding (Stimulus-Specific)',
+                            click: () => {
+                                const win = BrowserWindow.getFocusedWindow();
+                                if (win && win.scrutinizerView) {
+                                    win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/crowding-stimulus.html');
+                                }
+                            }
                         }
                     ]
                 }

@@ -106,7 +106,7 @@ The biological architecture produces several emergent properties that Scrutinize
 | Biological Phenomenon | Cause | Scrutinizer Implementation |
 |----------------------|-------|---------------------------|
 | **Resolution loss** | Receptor pooling (100:1) | Approximate DoG band decomposition (MIP-derived, box/bilinear not Gaussian) with M-scaling rolloff; legacy: simple MIP pooling |
-| **Color blindness** | Rod dominance (no color) | Oklab desaturation + cyan tint |
+| **Chromatic pooling** | Reduced chromatic spatial resolution; mean chromaticity preserved over large regions (Rosenholtz TTM) | Per-channel RG/YV attenuation in DoG bands (castleCSF); legacy: uniform Oklab chrominance reduction + cyan tint |
 | **Crowding** | Receptive field overlap | Fractal Crowding (Tier 2.0) + vertical chop |
 | **Motion sensitivity** | Magnocellular pathway | Preserved contrast in periphery |
 | **Positional uncertainty** | Large receptive fields | Simplex noise displacement |
@@ -568,7 +568,8 @@ warpVector *= saliencyWarpMod;
 
 **V4 (Aesthetics) Modulation**:
 **V4 (Aesthetics) Modulation**:
-> **Update (v1.4.3)**: Saliency modulation was removed from the color/desaturation stage. Biological accuracy takes precedence: rods are colorblind regardless of how "salient" an object is. A bright red logo in the periphery is now strictly desaturated/darkened to match rod sensitivity, preventing it from artificially "popping" and competing with the fovea.
+> **Update (v1.4.3)**: Saliency modulation was removed from the color/chrominance stage. Rod-vision constraints apply regardless of saliency — rods are colorblind. A bright red logo in the periphery has its chrominance attenuated to match rod sensitivity, preventing it from artificially "popping" and competing with the fovea.
+> **Update (v1.9)**: Per-channel chromatic pooling (castleCSF) replaces uniform chrominance reduction when enabled. RG and YV opponent channels attenuate at different rates with eccentricity, and attenuation is spatial-frequency-dependent (small features lose chromatic identity faster than large regions). Suprathreshold compression (exponent 0.5) corrects for the historical over-estimation of peripheral color loss from threshold-based studies.
 
 **Effect**: Salient areas (logos, icons, UI elements) in the far periphery retain slightly more geometric stability and color, making them more recognizable for saccade guidance without compromising illegibility.
 
@@ -619,13 +620,20 @@ This creates colored fringes in the periphery, supporting illegibility without n
 
 ---
 
-## 9. Rod Vision: Oklab Color Space Desaturation
+## 9. Peripheral Color: Chromatic Pooling & Oklab Pipeline
 
-**New in v1.3:** Peripheral vision color processing has been upgraded from RGB to **Oklab**, a perceptually uniform color space designed for image processing.
+**v1.3:** Peripheral color processing upgraded from RGB to **Oklab** (perceptually uniform).
+**v1.9:** Per-channel RG/YV chromatic pooling replaces uniform chrominance reduction (see `docs/specs/chromatic_pooling.md`).
+
+### The Biological Reality
+
+Peripheral color is **pooled, not lost** (Rosenholtz TTM). The visual system averages chromaticity over increasingly large regions with eccentricity, preserving mean color while losing spatial chromatic detail. The RG (red-green) opponent channel — a foveal specialization — loses spatial resolution faster than YV (blue-yellow), which persists into the far periphery. This is a wiring constraint (sparse L-M midget cells beyond the fovea), not an optical one.
+
+Historical claims of peripheral "color blindness" overstated the effect by conflating detection thresholds with suprathreshold appearance. At typical display contrasts, large colored regions retain perceived saturation well into the periphery (Jiang, Shooner & Mullen 2022; Hansen, Pracejus & Gegenfurtner 2009).
 
 ### Why Oklab?
 
-RGB color space is not perceptually uniform - equal numeric changes in RGB values do not correspond to equal perceived color differences. When desaturating colors in RGB space, this can produce "muddy" artifacts, especially for saturated colors like reds and blues.
+RGB color space is not perceptually uniform — equal numeric changes in RGB values do not correspond to equal perceived color differences. Reducing chrominance in RGB space produces "muddy" artifacts, especially for saturated reds and blues.
 
 **Oklab** (Ottosson, 2020) is a perceptual color space where:
 - **L** (Lightness): Separates luminance from chrominance (0-1 range)
@@ -641,13 +649,13 @@ This separation directly maps to the biological visual system:
 #### JavaScript (CPU-side)
 **File:** `renderer/oklab-utils.js`, `renderer/image-processor.js`
 
-The blur worker uses Oklab for desaturating the multi-resolution pyramid:
+The blur worker uses Oklab for chrominance reduction in the multi-resolution pyramid:
 
 ```javascript
 // Convert RGB → Oklab
 const lab = rgbToOklab(r, g, b);
 
-// Desaturate by reducing chrominance toward zero
+// Reduce chrominance (legacy uniform path)
 lab.a *= (1 - desaturationAmount);
 lab.b *= (1 - desaturationAmount);
 
@@ -656,8 +664,8 @@ lab.b *= (1 - desaturationAmount);
 const rgb = oklabToRgb(lab.L, lab.a, lab.b);
 ```
 
-**Rod-sensitive desaturation (v1.4.3 "Usability Mode")**:
-To prevent "mustard" artifacts (where removing Red leaves Yellow) and simulate rod blindness to long wavelengths:
+**Rod-sensitive chrominance path (v1.4.3 "Usability Mode")**:
+To prevent "mustard" artifacts (where removing red leaves yellow) and simulate rod blindness to long wavelengths:
 
 ```javascript
 // Progressive Red Crush
@@ -831,7 +839,7 @@ The "Interpreter" stage determines *what* the final pixel looks like. This stage
 *   **Operation**: Applies color grading and pixel effects.
 *   **Customization Examples (Architectural Stress Tests)**:
     *These modes not only demonstrate visual possibilities but also serve as stress-tests for the pipeline's flexibility.*
-    -   **High-Key (Default)**: Standard peripheral bandwidth filtering with desaturation and ghosting.
+    -   **High-Key (Default)**: Standard peripheral bandwidth filtering with chromatic pooling and ghosting.
     -   **Biological (Purkinje Darkening)**: A rigorously accurate simulation of rod vision, where red objects fade to black shadows (Protanopia) and luminance drops significantly.
     -   **Frosted**: A low-contrast, milky aesthetic useful for simulating cataracts or foggy conditions.
     -   **Blueprint**: A "wireframe" mode that visualizes the underlying Gestalt structure (rhythm/mass) detected by the engine.

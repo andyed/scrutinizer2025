@@ -130,7 +130,7 @@ Higher visual areas process increasingly abstract features—color constancy, sh
 
 * **Zeki, S. (1980)**: ["The representation of colours in the cerebral cortex"](https://doi.org/10.1038/284412a0). *Nature*.
     * **The Discovery**: V4 contains neurons selective for color, independent of wavelength (color constancy).
-    * **Relevance**: Scrutinizer's Oklab-based desaturation in the periphery models the loss of P-pathway color information, while preserving M-pathway luminance contrast.
+    * **Relevance**: Scrutinizer's Oklab-based chromatic pooling in the periphery models the reduced chromatic spatial resolution of the P-pathway, while preserving M-pathway luminance contrast. Note: peripheral color is pooled (mean chromaticity preserved over large regions) rather than lost — the V4 stage attenuates opponent channels differentially (RG faster than YV) with spatial-frequency dependence.
 
 #### The "Controlled Hallucination"
 
@@ -151,7 +151,7 @@ For detailed shader parameters, see [`foveated-vision-model.md`](foveated-vision
 In the periphery, cone cells (color) are scarce, and rod cells (luminance) dominate. Rods have a peak sensitivity at **505nm (Cyan/Blue-Green)** and are blind to red light.
 
 - **Algorithm**: We calculate a "Rod Tint" vector based on the pixel's luminance using Oklab color space.
-- **Effect**: As eccentricity increases, colors desaturate towards a cyan-grey. Red objects lose contrast and vanish, while blue/green objects appear brighter ("Purkinje shift").
+- **Effect**: As eccentricity increases, chromatic spatial resolution decreases — the visual system pools color over larger regions. Red-green opponency attenuates faster than blue-yellow (L-M is a foveal specialization). In scotopic/mesopic conditions, rod dominance shifts perceived hue toward cyan-grey ("Purkinje shift"). Large colored regions retain mean chromaticity further into the periphery than small chromatic stimuli.
 
 > **Biological Basis**: Curcio (1990) photoreceptor distribution; rod spectral sensitivity peaks at 505nm.
 

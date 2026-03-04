@@ -119,6 +119,35 @@ const CAPTURE_TASKS = [
         ]
     },
 
+    // --- CROWDING (Letters) ---
+    // Four fixation points test crowded-vs-isolated letter identification
+    // at varying eccentricities. Scrutinizer's peripheral renderer should
+    // naturally produce the crowding effect without any JS simulation.
+    {
+        page: 'crowding',
+        fixations: ['center', 'crowded_row2', 'corner', 'isolated_row1'],
+        variants: [
+            ...DEBUG_VARIANTS
+        ],
+        coordinates: {
+            'center': { x: 600, y: 450 },
+            'crowded_row2': { x: 500, y: 222 },
+            'corner': { x: 40, y: 860 },
+            'isolated_row1': { x: 700, y: 564 }
+        }
+    },
+
+    // --- CROWDING (Stimulus-Specific) ---
+    // Orientation (Gabor), color grouping, and complexity conditions.
+    // Pelli & Tillman 2008, Rosenholtz et al. 2012.
+    {
+        page: 'crowding-stimulus',
+        fixations: ['center'],
+        variants: [
+            ...DEBUG_VARIANTS
+        ]
+    },
+
     // --- DASHBOARD (Chromatic Pooling A/B) ---
     // Real-world UI with colored elements: red buttons, blue links, green badges.
     // Shows how chromatic pooling affects practical UI perception.

@@ -48,10 +48,14 @@ uniform float u_fovi_color_sigma; // Gaussian color decay sigma (0.0 = disabled)
 uniform float u_desat_floor;      // Min desaturation multiplier in salient regions (1.0 = full desat, 0.85 = 15% cap)
 
 // Chromatic pooling — per-channel RG/YV eccentricity decay (castleCSF; Ashraf et al. 2024)
+// NOTE: castleCSF k_e values are *detection threshold* decay rates. Suprathreshold
+// color appearance decays more slowly — Jiang, Shooner & Mullen (2022) found power-law
+// exponent ~0.5 maps threshold sensitivity to perceived saturation at high contrasts.
 uniform float u_chromatic_pooling;  // 0.0=off (legacy uniform desat), 1.0=on
 uniform float u_rg_decay;           // RG (L-M) eccentricity decay k_e (default 0.059)
 uniform float u_yv_decay;           // YV S-(L+M) base decay k_e (default 0.004)
 uniform float u_yv_freq_decay;      // YV frequency-dependent decay k_ef (default 0.008)
+uniform float u_supra_exponent;     // Threshold→appearance compression (default 0.5; 1.0=raw threshold)
 
 // Congestion overlay (Rosenholtz et al. 2007)
 uniform int u_show_congestion;    // 0=off, 1=overlay, 2=solo
@@ -191,16 +195,22 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         float fovea_deg = 2.0;
         float ecc_deg = normEcc * fovea_deg;
 
+        // Threshold sensitivity → appearance compression (Jiang, Shooner & Mullen 2022)
+        // At high contrasts (saturated UI colors), contrast constancy holds better —
+        // power-law exponent ~0.5 maps detection threshold to perceived saturation.
+        // exponent=0.5: sqrt of threshold decay (gentler), exponent=1.0: raw threshold (harsh)
+        float supra = max(u_supra_exponent, 0.01);
+
         // RG: single attenuation for all bands (k_ef ≈ 0 for RG)
-        float rg_atten = pow(10.0, -u_rg_decay * ecc_deg);
+        float rg_atten = pow(pow(10.0, -u_rg_decay * ecc_deg), supra);
 
         // YV: per-band attenuation — band spatial frequency determines k_ef contribution
         // Band frequencies: band0≈4cpd, band1≈2cpd, band2≈1cpd, band3≈0.5cpd, residual≈0.25cpd
-        float yv_atten_band0 = pow(10.0, -(u_yv_decay + u_yv_freq_decay * 4.0) * ecc_deg);
-        float yv_atten_band1 = pow(10.0, -(u_yv_decay + u_yv_freq_decay * 2.0) * ecc_deg);
-        float yv_atten_band2 = pow(10.0, -(u_yv_decay + u_yv_freq_decay * 1.0) * ecc_deg);
-        float yv_atten_band3 = pow(10.0, -(u_yv_decay + u_yv_freq_decay * 0.5) * ecc_deg);
-        float yv_atten_res   = pow(10.0, -(u_yv_decay + u_yv_freq_decay * 0.25) * ecc_deg);
+        float yv_atten_band0 = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * 4.0) * ecc_deg), supra);
+        float yv_atten_band1 = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * 2.0) * ecc_deg), supra);
+        float yv_atten_band2 = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * 1.0) * ecc_deg), supra);
+        float yv_atten_band3 = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * 0.5) * ecc_deg), supra);
+        float yv_atten_res   = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * 0.25) * ecc_deg), supra);
 
         // BGRA → RGBA before Oklab round-trips (Electron capture quirk)
         // chromaticAttenuate() uses rgbToOklab() which assumes RGB channel order
@@ -804,12 +814,16 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             // Goal: Red buttons turn Grey (structural retention), not Black (invisible).
             
             // Red Kill Switch (Prevent Mustard)
-            float rednessFactor = max(0.0, lab.y);
-            if (rednessFactor > 0.0) {
-                 float peripheralFade = smoothstep(parafovea_radius, periphery_start + (fovea_radius * 2.0), dist);
-                 float desatStrength = peripheralFade * 0.95;
-                 lab.y = mix(lab.y, 0.0, desatStrength); // Kill a (Red)
-                 lab.z = mix(lab.z, 0.0, desatStrength); // Kill b (Yellow)
+            // Skip when chromatic pooling active — it already handles differential
+            // RG/YV decay per-band in sampleDoGReconstructed()
+            if (u_chromatic_pooling < 0.5) {
+                float rednessFactor = max(0.0, lab.y);
+                if (rednessFactor > 0.0) {
+                     float peripheralFade = smoothstep(parafovea_radius, periphery_start + (fovea_radius * 2.0), dist);
+                     float desatStrength = peripheralFade * 0.95;
+                     lab.y = mix(lab.y, 0.0, desatStrength); // Kill a (Red)
+                     lab.z = mix(lab.z, 0.0, desatStrength); // Kill b (Yellow)
+                }
             }
             
             // Standard Rod Color Mix (Visual consistency / Fog)

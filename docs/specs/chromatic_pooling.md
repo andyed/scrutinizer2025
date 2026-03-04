@@ -6,9 +6,9 @@ Dependencies: DoG band decomposition (v1.6, implemented), Oklab color pipeline (
 
 ## 1. Problem Statement
 
-### The Uniform Desaturation Assumption
+### The Uniform Chrominance Reduction Problem
 
-The current V4 pipeline desaturates all color equally with eccentricity. A single `desaturationFactor` ramps from 0 (fovea) to 1 (far periphery) and reduces Oklab chrominance uniformly:
+The current V4 pipeline reduces all chrominance equally with eccentricity. A single `desaturationFactor` ramps from 0 (fovea) to 1 (far periphery) and attenuates Oklab opponent channels uniformly:
 
 ```glsl
 // peripheral2.frag ~line 695
@@ -21,19 +21,19 @@ lab.z *= (1.0 - fade);  // b (blue-yellow)
 
 This is wrong in two ways:
 
-1. **Red-green and blue-yellow don't decay at the same rate.** L-M (red-green) opponency is a foveal specialization — it drops ~2x faster than achromatic sensitivity with eccentricity. S-(L+M) (blue-yellow) tracks close to achromatic, persisting far into the periphery. Treating them equally under-desaturates red-green and over-desaturates blue-yellow.
+1. **Red-green and blue-yellow don't decay at the same rate.** L-M (red-green) opponency is a foveal specialization — it drops ~2x faster than achromatic sensitivity with eccentricity. S-(L+M) (blue-yellow) tracks close to achromatic, persisting far into the periphery. Treating them equally over-attenuates blue-yellow and under-attenuates red-green.
 
-2. **The decay ignores feature size.** A small red letter and a large red hero background get the same desaturation at the same eccentricity. But peripheral color perception is strongly size-dependent (Abramov et al. 1991): large color fields are perceived with nearly foveal saturation out to 20+ degrees, while small chromatic stimuli lose color identity rapidly. The current shader desaturates a full-width colored banner the same as 12px colored text. That's perceptually wrong.
+2. **The decay ignores feature size.** A small red letter and a large red hero background get the same chrominance reduction at the same eccentricity. But peripheral color perception is strongly size-dependent (Abramov et al. 1991): large color fields retain mean chromaticity out to 20+ degrees — the visual system pools color over larger regions (Rosenholtz TTM), preserving average hue while losing spatial chromatic detail. Small chromatic stimuli lose color identity rapidly because they fall within a single pooling region. The current shader treats a full-width colored banner the same as 12px colored text.
 
 ### What This Causes
 
 | Scenario | Current (Uniform) | Proposed (Per-Channel + Size) |
 |----------|-------------------|-------------------------------|
-| Red button at 8° ecc | Loses ~50% saturation | Loses ~80% red-green (small stimulus) |
-| Blue background at 8° ecc | Loses ~50% saturation | Retains ~90% blue-yellow (large field) |
-| Teal sidebar at 15° ecc | Loses ~80% saturation | Blue-yellow persists, red-green gone |
-| Red text on white at 5° ecc | Slightly desaturated | Red chromatic identity mostly gone |
-| Large green hero at 5° ecc | Slightly desaturated | Green largely preserved (large field) |
+| Red button at 8° ecc | Loses ~50% chrominance | RG opponent attenuated ~50% (small stimulus) |
+| Blue background at 8° ecc | Loses ~50% chrominance | Retains ~90% YV signal (large field, pooled) |
+| Teal sidebar at 15° ecc | Loses ~80% chrominance | Blue-yellow persists, red-green attenuated |
+| Red text on white at 5° ecc | Slightly reduced | Red chromatic identity weakened (fine spatial detail) |
+| Large green hero at 5° ecc | Slightly reduced | Green largely preserved (mean chromaticity pooled over large region) |
 
 ### Biological Reality
 
@@ -221,21 +221,21 @@ vec4 chromaticAttenuate(vec4 color, float rg_atten, float yv_atten) {
 
 Expose in `modes.json` per-mode, alongside existing `dog_e2` and `dog_sharpness`.
 
-### Interaction with Existing Desaturation
+### Interaction with Existing V4 Chrominance Path
 
-The current rod-vision desaturation path (eigengrau tint, Purkinje shift) runs **after** V4 pooling. With chromatic pooling enabled:
+The rod-vision path (eigengrau tint, Purkinje shift) runs **after** V4 pooling. With chromatic pooling enabled:
 
-1. DoG reconstruction handles per-band, per-channel attenuation (the spatial-frequency-dependent part)
-2. The existing desaturation ramp handles the overall scotopic shift in the far periphery (rod dominance)
-3. The two effects compose naturally — chromatic pooling reduces chrominance in the mid-periphery; rod desaturation finishes the job in the far periphery
+1. DoG reconstruction handles per-band, per-channel attenuation (spatial-frequency-dependent chromatic pooling)
+2. The existing V4 ramp handles the overall scotopic shift in the far periphery (rod dominance)
+3. The two effects compose naturally — chromatic pooling attenuates opponent channels in the mid-periphery; the rod-vision path handles the far periphery where scotopic vision dominates
 
-When `u_chromatic_pooling = 0`, behavior is identical to current (uniform desaturation). This is a strict superset.
+When `u_chromatic_pooling = 0`, behavior is identical to legacy (uniform chrominance reduction). This is a strict superset.
 
 ## 4. What This Predicts
 
 With chromatic pooling enabled, the simulation should produce these perceptual effects:
 
-1. **A red "Buy Now" button at 10° eccentricity** — button shape preserved (DoG band3 persists), but the red is mostly gone (RG channel at 10° ≈ 25% sensitivity for a small stimulus). The button reads as a desaturated rectangle. You know WHERE to click but can't confirm the color.
+1. **A red "Buy Now" button at 10° eccentricity** — button shape preserved (DoG band3 persists), but the red-green opponent signal is attenuated (RG appearance at 10° ≈ 51% with suprathreshold correction). The button retains some redness but you may not be confident it's red vs. another warm color without foveating.
 
 2. **A blue hero background at 10°** — the blue is clearly visible (YV channel at 10° for the residual band ≈ 97% preserved). Large blue fields don't need foveal fixation to perceive.
 
@@ -259,9 +259,9 @@ At 1024px analysis resolution: ~1M fragments × 150 ops = 150M extra ops. On int
 
 2. **Screenshot comparison:** Capture golden images with chromatic pooling on/off. The difference image should show that RG chrominance is selectively removed in small features while YV chrominance persists in large ones.
 
-3. **Parameter sweep:** Vary `u_rg_decay` from 0.03 to 0.09 and `u_yv_decay` from 0.002 to 0.01. Verify the crossover behavior matches the published ratios (RG should desaturate 2-3× faster than YV).
+3. **Parameter sweep:** Vary `u_rg_decay` from 0.03 to 0.09 and `u_yv_decay` from 0.002 to 0.01. Verify the crossover behavior matches the published ratios (RG opponent should attenuate 2-3× faster than YV).
 
-4. **Suprathreshold caveat:** The castleCSF parameters are detection thresholds. At suprathreshold contrasts (real web content), perceived contrast follows a compressive function (Jiang, Shooner & Mullen 2022). The effective color loss may be less dramatic. Tuning may require damping the decay constants by 0.5-0.7× for a perceptually convincing result.
+4. **Suprathreshold correction (IMPLEMENTED):** The castleCSF parameters are detection thresholds — the minimum visible chromatic contrast. At suprathreshold contrasts (saturated web colors), perceived saturation follows a compressive power-law (Jiang, Shooner & Mullen 2022, exponent ~0.5). The `u_supra_exponent` uniform (default 0.5) applies this compression: `appearance_atten = pow(threshold_atten, supra)`. This is the key distinction between "how sensitive is the system" and "how colorful does it look" — peripheral color is pooled over larger regions with reduced chromatic spatial resolution, not simply desaturated (Rosenholtz TTM).
 
 ## 7. References
 

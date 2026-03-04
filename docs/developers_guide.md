@@ -228,7 +228,7 @@ The following table details the rendering characteristics of each built-in mode 
 | :--- | :--- | :--- |
 | **0: High-Key** | **LGN** | **Standard**: Structure Masking + Saliency Gating |
 | *(Usability)* | **V1** | **Slow Wave**: 0.1Hz sine warp (Type 1). |
-| | **V4** | **DoG Reconstruction** (E2=0.5): Preserves layout structure. **Clean Desaturation**: Red -> Grey (Mustard Fix). **High-Key**: Mixed with Eigengrau for usability. |
+| | **V4** | **DoG Reconstruction** (E2=0.5): Preserves layout structure. **Chromatic Pooling**: Per-channel RG/YV attenuation (castleCSF + suprathreshold correction). **High-Key**: Mixed with Eigengrau for usability. |
 | **1: Biological** | **LGN** | Standard |
 | *(Purkinje)* | **V1** | Same as Baseline |
 | | **V4** | **DoG Reconstruction** (E2=0.4, more aggressive): Preserves layout structure. **Purkinje Shift**: Red -> Black shadows. **Optical Vignette**: Contrast dimming at edges. |

@@ -19,7 +19,7 @@ planStatus:
 # Chromatic Pooling — Per-Channel RG/YV Eccentricity Decay
 
 ## Goals
-- Replace uniform Oklab desaturation with biologically accurate per-channel chromatic decay
+- Replace uniform Oklab chrominance reduction with biologically accurate per-channel chromatic pooling
 - RG (red-green, Oklab `a`) decays ~2.5× faster than achromatic with eccentricity (k_e=0.059)
 - YV (blue-yellow, Oklab `b`) persists far into periphery and is frequency-dependent (k_e=0.004, k_ef=0.008)
 - Leverage existing DoG band decomposition to solve size dependence (small red text loses color fast; large blue background retains it)
@@ -28,7 +28,7 @@ planStatus:
 
 ## Overview
 
-Current V4 pipeline applies a single `desaturationFactor` to both Oklab `a` and `b` channels. This is biologically incorrect — L-M (red-green) is a foveal specialization that collapses rapidly, while S-(L+M) (blue-yellow) persists much further. At 15° eccentricity, RG retains only 29% sensitivity while YV retains 79% (Bowers, Gegenfurtner & Goettker 2025).
+Current V4 pipeline applies a single `desaturationFactor` to both Oklab `a` and `b` channels. This is biologically incorrect — L-M (red-green) is a foveal specialization that loses spatial resolution rapidly, while S-(L+M) (blue-yellow) persists much further. At 15° eccentricity, RG threshold sensitivity retains only 29% while YV retains 79% (Bowers, Gegenfurtner & Goettker 2025) — and suprathreshold appearance is more forgiving still (Jiang, Shooner & Mullen 2022). Peripheral color is pooled over larger regions, not simply removed.
 
 The DoG band decomposition already sorts content by spatial frequency. Per-band chromatic attenuation gives us size-dependent color decay for free: a small red icon at 10° loses its red, but a large blue hero section keeps its blue.
 
@@ -91,15 +91,15 @@ if (u_chromatic_pooling > 0.5) {
 }
 ```
 
-**Important**: This replaces the luminance-only reconstruction path when enabled. The existing V4 uniform desaturation (lines 710-783) still runs downstream — need to decide whether chromatic pooling **replaces** V4 desaturation or **supplements** it.
+**Important**: This replaces the luminance-only reconstruction path when enabled. The existing V4 uniform chrominance reduction (lines 710-783) still runs downstream — need to decide whether chromatic pooling **replaces** V4 chrominance reduction or **supplements** it.
 
-**Decision**: When `chromatic_pooling` is enabled, skip the V4 desaturation pass (the per-band attenuation already handles color decay). Add a guard:
+**Decision**: When `chromatic_pooling` is enabled, skip the V4 uniform pass (the per-band attenuation already handles chromatic spatial resolution loss). Add a guard:
 
 ```glsl
 // In V4 desaturation section (~line 710):
 if (u_chromatic_pooling > 0.5) {
     // Chromatic attenuation already applied in DoG reconstruction
-    // Skip uniform desaturation — but still apply Purkinje/rod effects if mode 1
+    // Skip uniform chrominance reduction — but still apply Purkinje/rod effects if mode 1
 }
 ```
 
@@ -197,7 +197,7 @@ No new textures, no new passes, no CPU-side computation. Pure fragment shader co
 ## Acceptance Criteria
 - [ ] Red UI element at 10° eccentricity visibly loses red while blue element retains saturation
 - [ ] Large blue background persists at 15°+ eccentricity
-- [ ] Small red text at 5° is desaturated while large green nav bar retains color
+- [ ] Small red text at 5° loses chromatic identity while large green nav bar retains color (pooling preserves mean chromaticity)
 - [ ] Toggle on/off produces visible A/B difference
 - [ ] Mode 0 (High-Key) and Mode 1 (Biological) both work with chromatic pooling enabled
 - [ ] Mode 7 (Legacy) is unaffected (frozen baseline)
@@ -209,6 +209,22 @@ No new textures, no new passes, no CPU-side computation. Pure fragment shader co
 
 1. **ecc_deg conversion**: Currently `normEcc * 2.0` assumes fovea = 2° visual angle. Should we pass actual fovea_deg as a uniform for accuracy? (Low priority — 2° is standard.)
 
-2. **Interaction with saliency modulation**: When saliency modulation preserves detail in salient regions, should it also preserve color? Currently `u_desat_floor` gates the V4 desaturation — if we're skipping V4 desat, we need an equivalent gate on the chromatic attenuation. Probably: `rg_atten = mix(rg_atten, 1.0, saliency * u_desat_floor)`.
+2. **Interaction with saliency modulation**: When saliency modulation preserves detail in salient regions, should it also preserve color? Currently `u_desat_floor` gates the V4 chrominance path — if we're skipping V4 uniform path, we need an equivalent gate on the chromatic attenuation. Probably: `rg_atten = mix(rg_atten, 1.0, saliency * u_desat_floor)`.
 
 3. **Mode 6 (Log-Polar MIP)**: No DoG bands, so per-band chromatic attenuation doesn't apply. Could add a simpler uniform chromatic decay (just RG/YV split without per-band frequency dependence) as a separate path. Deferred — not needed for meeting.
+
+## Resolved Issues
+
+### Threshold vs Suprathreshold (Mar 4 2026)
+
+**Problem**: castleCSF k_e=0.059 is a *detection threshold* decay rate — the contrast at which you can just barely see a chromatic modulation. Applying this directly to suprathreshold color appearance (saturated UI colors) produces extreme red attenuation. A red button at 10° eccentricity became gray, which is perceptually wrong — you can still see it's red at suprathreshold contrasts, you just can't resolve fine red-green spatial detail.
+
+**Root cause**: Conflation of threshold sensitivity with appearance. Jiang, Shooner & Mullen (2022) measured the relationship directly and found a power-law with exponent ~0.5-0.63 for RG at high contrasts.
+
+**Fix**: Added `u_supra_exponent` uniform (default 0.5). All threshold attenuation values are raised to this power before application: `rg_atten = pow(threshold_atten, supra)`. At exponent 0.5, the effective decay at 10° becomes sqrt(0.257) = 0.507 instead of 0.257 — reds retain ~50% of their opponent signal rather than ~26%.
+
+### Red Kill Switch Double-Attenuation (Mar 4 2026)
+
+**Problem**: The "Red Kill Switch" in V4 (lines ~806-813 of peripheral2.frag) applies up to 95% attenuation to Oklab `a` (red-green) channel in the far periphery. When chromatic pooling was also active, red got hit twice: once in sampleDoGReconstructed() and again in the Red Kill Switch.
+
+**Fix**: Wrapped Red Kill Switch in `if (u_chromatic_pooling < 0.5)` guard, same pattern as the base V4 chrominance path.

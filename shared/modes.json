@@ -24,7 +24,8 @@
                 "chromatic_pooling": true,
                 "rg_decay": 0.059,
                 "yv_decay": 0.004,
-                "yv_freq_decay": 0.008
+                "yv_freq_decay": 0.008,
+                "supra_exponent": 0.5
             },
             "tests": [
                 "structure_masking",
@@ -59,7 +60,8 @@
                 "chromatic_pooling": true,
                 "rg_decay": 0.059,
                 "yv_decay": 0.004,
-                "yv_freq_decay": 0.008
+                "yv_freq_decay": 0.008,
+                "supra_exponent": 0.5
             },
             "tests": [
                 "purkinje_shift",
@@ -286,7 +288,8 @@
                 "chromatic_pooling": true,
                 "rg_decay": 0.059,
                 "yv_decay": 0.004,
-                "yv_freq_decay": 0.008
+                "yv_freq_decay": 0.008,
+                "supra_exponent": 0.5
             },
             "tests": [
                 "congestion_modulated_mip",
