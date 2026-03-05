@@ -28,13 +28,9 @@ The simulation is grounded in vision science: cortical magnification functions, 
 
 ## Advancing Vision Science with AI
 
-Scrutinizer is built with Claude Code as a research partner — not just a code generator, but a collaborator in literature review, parameter derivation, and cross-validation.
+Scrutinizer is built with AI coding tools (primarily Claude Code and Gemini) as research partners — assisting with literature review, parameter derivation, and cross-validation. The chromatic pooling model, for example, emerged from synthesizing across domains: castleCSF threshold data, suprathreshold appearance corrections, and per-band decay curves. No single paper specifies that pipeline.
 
-The chromatic pooling model is a concrete example. It was derived through iterative conversation: extracting RG and YV threshold parameters from the castleCSF contrast sensitivity model (Ashraf & Mantiuk 2024), applying suprathreshold appearance corrections from Jiang, Shooner & Mullen (2022), and mapping the result to per-band frequency-dependent decay curves. No single paper specifies that pipeline — it emerged from synthesizing across domains.
-
-This is not a claim that AI replaces domain expertise. Every architectural decision — whether to model the LGN as a gate rather than a distortion stage, whether [MIP-chain pooling](https://andyed.github.io/scrutinizer-www/blog/mip-chain-explainer.html) approximates cortical magnification adequately, whether crowding is the right next priority — draws on cognitive science training and familiarity with the literature. The AI accelerates the search, surfaces connections, and drafts implementations. The human evaluates whether the result is scientifically defensible.
-
-Every URL fetched, every paper consulted, and every conversation thread is captured in a structured research log. The question driving the methodology: can an AI-assisted workflow produce scientifically rigorous simulation, with full auditability of how each parameter was derived?
+AI accelerates the search and drafts implementations; the human evaluates whether the result is scientifically defensible. Architectural decisions — whether [MIP-chain pooling](https://andyed.github.io/scrutinizer-www/blog/mip-chain-explainer.html) approximates cortical magnification adequately, whether crowding is the right next priority — draw on domain expertise and familiarity with the literature. Every paper consulted and conversation thread is captured in a structured research log for auditability.
 
 ---
 
