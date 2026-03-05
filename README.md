@@ -142,7 +142,9 @@ npm run validate:scrutinizer    # Run Scrutinizer's JS implementation
 
 ## Calibration
 
-**The problem.** The simulation uses a hardcoded `fovea_deg = 2.0` that maps screen pixels to visual angle with a fixed ratio. On most displays at typical viewing distances, this underestimates actual eccentricity — viewport edges reach ~8–10° instead of the ~19–22° they subtend in practice. The result: peripheral attenuation is weaker than it should be.
+**The default.** The simulation uses `fovea_deg = 2.0` with `foveaRadius = 90px`, giving 45 px/°. On the reference hardware (14–16" MacBook Pro Retina at ~50cm), this is within 2% of the actual angular mapping. At screen corners the flat-screen linear approximation introduces ~9% underestimate — within the uncertainty of the underlying biological parameters.
+
+**The real limitation is display portability.** At different viewing distances or screen sizes, the fixed mapping diverges. At 70cm (desktop ergonomics), eccentricities are underestimated by ~30%. At 35cm (laptop on lap), overestimated by ~40%. The mapping is correct for one setup; it needs calibration for others.
 
 **Our tool.** The [Foveal Calibrator](https://andyed.github.io/scrutinizer-www/foveal-calibration.html) uses a Motion Silence staircase (Suchow & Alvarez, 2011) to measure perceived foveal extent. This gives a perceptually anchored radius but doesn't yet separate pixels-per-degree from comfort radius.
 
@@ -190,7 +192,7 @@ Contributions welcome. See the [Developer's Guide](docs/developers_guide.md) for
 
 These are research questions, not apologies. Each gap represents a measurable distance between the current model and the biology.
 
-1. **Calibration gap.** Hardcoded pixels-per-degree produces under-attenuated periphery on most displays. The viewport edges render at ~10° eccentricity when they should be ~20°. Simulation results are qualitatively correct but quantitatively compressed. *Fix path: [Project 1.3](docs/grad-student-projects.md) — px_per_deg/foveaRadius separation.*
+1. **Calibration portability.** The default 90px/2° mapping is accurate on the reference hardware (MBP Retina @ 50cm, <2% error). On other setups — different viewing distance, screen size, or scaling — the fixed mapping diverges (up to ±30–40%). If a user adjusts `foveaRadius` for comfort, they also shift the eccentricity mapping. *Fix path: [Project 1.3](docs/grad-student-projects.md) — split px_per_deg from foveaRadius.*
 
 2. **Approximate spatial pooling.** The [MIP chain](https://andyed.github.io/scrutinizer-www/blog/mip-chain-explainer.html) provides box/bilinear averaging, not Gaussian pooling. No texture synthesis is performed — pooling regions lose feature statistics rather than preserving summary statistics as the Texture Tiling Model predicts. Peripheral representations are therefore more degraded than biological peripheral vision. *Fix path: [Project 1.2](docs/grad-student-projects.md) — Portilla-Simoncelli or neural texture synthesis.*
 

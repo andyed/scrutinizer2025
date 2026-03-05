@@ -17,7 +17,7 @@ function getArg(name, def) {
 }
 
 // ── Viewport geometry ──
-const foveaRadius = parseInt(getArg('fovea-radius', '180'));
+const foveaRadius = parseInt(getArg('fovea-radius', '90'));
 const [vpW, vpH] = getArg('viewport', '1536x914').split('x').map(Number);
 const fovea_deg = 2.0;  // Hardcoded in shader
 
