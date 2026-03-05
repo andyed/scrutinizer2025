@@ -285,9 +285,29 @@ The Magnocellular pathway (motion/luminance) processes information faster than t
 ### Crowding & Peripheral Vision
 | Author | Year | Key Contribution |
 |--------|------|------------------|
+| Bouma | 1970 | Critical spacing law: ~0.4-0.5× eccentricity |
 | Pelli | 2008 | Crowding as cortical constraint |
+| Pelli & Tillman | 2008 | Uncrowded window; stimulus-specific crowding (orientation, color, complexity) |
 | Rosenholtz et al. | 2012 | Texture statistics / Mongrel theory |
 | Whitney & Leib | 2018 | Ensemble perception review |
+| Zhang et al. | 2015 | Crowding unlike ordinary masking |
+| Toet & Levi | 1992 | Radial/tangential asymmetry of crowding zones |
+
+### Peripheral Color Perception
+| Author | Year | Key Contribution |
+|--------|------|------------------|
+| Mullen | 1985 | CSF for RG and YV chromatic gratings; RG bandpass, YV lowpass |
+| Mullen & Kingdom | 2002 | Differential RG/YV opponency distribution across visual field |
+| Abramov, Gordon & Chan | 1991 | Perceptive fields for color: size-dependent color appearance in periphery. Large stimuli achieve fovea-like color to 20°. |
+| Hansen, Pracejus & Gegenfurtner | 2009 | Color perception in intermediate periphery (threshold data, not appearance) |
+| Ashraf et al. | 2024 | castleCSF: contrast sensitivity function of color, area, spatiotemporal frequency, luminance & eccentricity. Key parameters: RG k_e=0.059, YV k_e=0.004 |
+| Bowers, Gegenfurtner & Goettker | 2025 | Chromatic + achromatic CSF to 90° eccentricity. At 15°: RG≈29%, YV≈79% of 5° baseline. RG decay slows in far periphery. |
+| Jiang, Shooner & Mullen | 2022 | Suprathreshold chromatic contrast perception in periphery. Power-law compression: appearance decays less steeply than detection threshold. Exponent ~0.5. |
+| Gunther & Dalhaus | 2010 | RG color naming declines at ~40°, YV at ~45-50°. RG visual search impaired relative to YV at 45°. |
+| Zlatkova et al. | 2021 | Chromatic resolution acuity and spatial summation at 20°. Red-green asymmetry (green harder); postreceptoral origin. |
+| Newton & Eskew | 2003 | Chromatic detection and discrimination in periphery |
+
+*Note: The RG/YV asymmetry has a clean biological explanation. L-M (red-green) opponency depends on 1:1 midget ganglion cell wiring exclusive to the fovea — as dendritic fields grow with eccentricity, midget cells receive mixed L+M input and opponency collapses. S-(L+M) (blue-yellow) uses dedicated small bistratified ganglion cells with retina-wide coverage and no center-surround organization, so YV sensitivity tracks close to achromatic. This is a wiring constraint, not an optical one. See [`specs/implemented/chromatic_pooling.md`](specs/implemented/chromatic_pooling.md) for Scrutinizer's implementation.*
 
 ### Gaze-Contingent Research
 | Author | Year | Key Contribution |

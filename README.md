@@ -21,7 +21,7 @@ Every saccade is a micro-economic decision: commit the fovea to this target, for
 > [!TIP]
 > **For usability practitioners:** Scrutinizer works as a [Restricted Focus Viewer](https://pubmed.ncbi.nlm.nih.gov/12078741/) — a tool for evaluating peripheral discoverability, color reliance, and layout hierarchy without eye tracking hardware. Point your mouse where a user would fixate and ask: can the periphery guide the next saccade?
 
-The simulation is grounded in vision science: cortical magnification functions, contrast sensitivity models, and feature congestion scoring. It serves designers studying visual hierarchy, researchers conducting attention studies with mouse-contingent viewing (see [Restricted Focus Viewer](https://pubmed.ncbi.nlm.nih.gov/12078741/) lineage), and vision scientists validating peripheral models against rendered output.
+The simulation is grounded in vision science: cortical magnification functions, contrast sensitivity models, and feature congestion scoring. It serves designers studying visual hierarchy, researchers conducting attention studies with mouse-contingent viewing, and vision scientists validating peripheral models against rendered output.
 
 ![Progressive Grid](screenshots/onedotone_progressive_grid.png)
 
