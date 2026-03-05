@@ -18,6 +18,9 @@ Foveated rendering is a well-established technique in VR and game engines, where
 
 Every saccade is a micro-economic decision: commit the fovea to this target, forgo everything else for ~200ms. That makes foveal allocation the most constrained resource in the attention economy — and the one designers have the least visibility into. Information foraging theory (Pirolli & Card, 1999) models users as optimal foragers navigating information patches; Scrutinizer makes the cost structure of each fixation visible, showing what the periphery can and cannot evaluate before the eyes move.
 
+> [!TIP]
+> **For usability practitioners:** Scrutinizer works as a [Restricted Focus Viewer](https://pubmed.ncbi.nlm.nih.gov/12078741/) — a tool for evaluating peripheral discoverability, color reliance, and layout hierarchy without eye tracking hardware. Point your mouse where a user would fixate and ask: can the periphery guide the next saccade?
+
 The simulation is grounded in vision science: cortical magnification functions, contrast sensitivity models, and feature congestion scoring. It serves designers studying visual hierarchy, researchers conducting attention studies with mouse-contingent viewing (see [Restricted Focus Viewer](https://pubmed.ncbi.nlm.nih.gov/12078741/) lineage), and vision scientists validating peripheral models against rendered output.
 
 ![Progressive Grid](screenshots/onedotone_progressive_grid.png)
