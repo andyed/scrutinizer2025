@@ -287,8 +287,11 @@
         processFrame(buffer, width, height) {
             if (!this.renderer || !this.enabled) return;
 
-            // Saccadic suppression: skip heavy processing during rapid eye movement
-            if (this.gazeModel.getVelocity() > this.config.saccadicSuppressionThreshold) {
+            // Saccadic suppression: skip heavy processing during rapid eye movement.
+            // When saccadic blindness is enabled, let the render proceed — the shader
+            // shrinks the fovea instead of skipping the frame entirely.
+            if (this.gazeModel.getVelocity() > this.config.saccadicSuppressionThreshold
+                && !this.renderer.config.saccadic_blindness) {
                 return;
             }
 
