@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.9.0] - 2026-03-04
+
+### Added
+- **Per-Channel Chromatic Pooling (castleCSF)**: Replaces uniform chrominance reduction with biologically accurate per-channel decay in DoG band reconstruction. RG (red-green) attenuates ~2.5× faster than achromatic; YV (blue-yellow) persists into far periphery. Size-dependent preservation via per-band frequency-dependent YV decay. Suprathreshold correction (`u_supra_exponent = 0.5`) converts castleCSF detection thresholds to appearance (Jiang, Shooner & Mullen 2022). 5 new uniforms. Enabled on modes 0, 1, 9.
+- **Congestion-Gated Pooling (Mode 9)**: Modulates peripheral spatial pooling by local feature congestion — high-congestion regions get up to 2× MIP pooling boost via `coupledEccentricity × (1 + congestion)`. Tests Rosenholtz (2012) prediction that clutter and crowding share summary-statistic computation. Auto-starts congestion worker; recomputes on scroll/navigation. Tagged `experimental`.
+- **Saliency vs Congestion Split View**: Side-by-side heatmap rendering — saliency (indigo-white, "What pops out?") and congestion (blue-yellow-red, "How cluttered?") with labeled divider. Menu: Simulation → Utility → Congestion Report.
+- **scrutinizer-audit CLI + MCP Server**: Headless analysis pipeline (Playwright) reusing congestion-core.js scoring. CLI: positional URLs, sitemap parsing, desktop+mobile viewports, JSON/HTML output, CI fail-above gate. MCP: `analyze_url`, `analyze_urls`, `compare_pages` tools.
+- **Crowding Diagnostics**: Two reference pages (`crowding.html`, `crowding-stimulus.html`), simulation limitations doc, density-gated crowding spec.
+- **Golden captures**: Chromatic pooling on/off variants for color-spectrum (modes 0, 1) and dashboard pages.
+- **CMF MIP mapping unit tests**: Validate logarithmic CMF→MIP level conversion.
+
+### Fixed
+- **Suprathreshold chromatic correction**: castleCSF k_e values are detection thresholds, not appearance. Added power-law compression (exponent 0.5) — reds at 10° retain ~51% instead of ~26%.
+- **Red Kill Switch double-attenuation**: Guarded with `u_chromatic_pooling < 0.5` — prevents legacy mustard fix from compounding with per-band chromatic decay.
+- **Chromatic pooling override**: `_chromaticPoolingOverride` flag pattern prevents `updateConfigFromMode()` from clobbering manual toggle on every frame.
+- **CMF→MIP mapping**: Corrected to `ln(r+a) - ln(a)` with `cortical_max` normalization (commit 5be3b2b).
+
+### Changed
+- **Doc terminology scrub**: Replaced "desaturation" with "chromatic pooling" / "chrominance reduction" across 8 docs where describing biology. Peripheral color is pooled (mean chromaticity preserved), not lost.
+- **Hansen et al. 2009 citation correction**: Paper measures detection thresholds only, not suprathreshold appearance. Separated from Jiang et al. 2022 citation. PDF archived in `docs/research/`.
+
 ## [1.8.0] - 2026-03-03
 
 ### Added
