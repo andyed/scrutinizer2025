@@ -73,7 +73,7 @@ Scrutinizer's rendering pipeline maps biological mechanisms to GPU-accelerated s
 
 **Spatial decomposition.** The hardware [MIP chain](https://andyed.github.io/scrutinizer-www/blog/mip-chain-explainer.html) provides progressive spatial pooling at each eccentricity band. MIP levels are selected per-fragment based on cortical magnification, approximating the growth of receptive field size with distance from fixation. Band cutoff frequencies follow Rovamo & Virsu's linear M-scaling.
 
-**Cortical magnification.** Scrutinizer has modeled eccentricity-dependent falloff since v1.0 — the concept is foundational. The v1.6 implementation used a hand-tuned smoothstep that approximated the right shape but lacked analytical grounding. Comparing our curves against the [FOVI model](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html) (Blauch, Konkle & Alvarez, 2026) gave us the clean parameterization we were already targeting: *w = k · log(e + e₂)* (Schwartz 1980) with empirically fitted constants. The comparison also exposed a bug in our eccentricity mapping. The v1.7 pipeline uses FOVI's cortical magnification function directly.
+**Cortical magnification.** Scrutinizer has modeled eccentricity-dependent falloff since v1.0 — the concept is foundational. The v1.6 implementation used a hand-tuned smoothstep that approximated the right shape but lacked analytical grounding. Comparing our curves against the [FOVI model](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html) (Blauch, Konkle & Alvarez, 2026) gave us the clean parameterization we were already targeting: *w = k · log(e + e₂)* (Schwartz 1980) with empirically fitted constants. The comparison also exposed a bug in our eccentricity mapping. The v1.7 pipeline adopts the same Schwartz parameterization used by FOVI, calibrated against their published constants.
 
 **Chromatic attenuation.** Peripheral color is chromatically filtered, not lost — cone signals are pooled over widening regions, reducing chromatic contrast at spatial frequencies the periphery cannot resolve. The model derives [RG and YV channel decay rates](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html) from castleCSF threshold data with suprathreshold appearance correction.
 
@@ -87,7 +87,7 @@ Scrutinizer's rendering pipeline maps biological mechanisms to GPU-accelerated s
 
 ### Rendering Pipeline (v1.8)
 - **Foveal/peripheral simulation** — eccentricity-dependent spatial pooling and chromatic filtering bound to cursor position
-- **[FOVI cortical magnification](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html)** — analytically grounded eccentricity falloff (mode 6), alongside legacy (mode 7) and Gaussian desaturation (mode 8) for comparison
+- **[FOVI-informed cortical magnification](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html)** — eccentricity falloff derived from Schwartz (1980) parameterization, calibrated against the FOVI model (mode 6), alongside legacy (mode 7) and Gaussian desaturation (mode 8) for comparison
 - **[Feature Congestion](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html) pipeline** — real-time visual clutter scoring with ComplexityHUD overlay (Score / Stats / Spatial tabs)
 - **Congestion-gated pooling** (mode 9) — peripheral attenuation weighted by local visual complexity
 - **Saliency modulation** — allocates more peripheral bandwidth to salient regions (edges, contrast, high-importance areas)
@@ -129,7 +129,7 @@ npm run validate:python         # Run Python reference (requires uv + Python 3.1
 npm run validate:scrutinizer    # Run Scrutinizer's JS implementation
 ```
 
-**Attenuation table.** Per-eccentricity-band attenuation values are logged and compared against the FOVI cortical magnification function to verify the MIP-level selection produces the expected spatial frequency cutoffs.
+**Attenuation table.** Per-eccentricity-band attenuation values are logged and compared against the FOVI-derived cortical magnification curve to verify the MIP-level selection produces the expected spatial frequency cutoffs.
 
 **Methodology note.** Following the cross-validation approach advocated by Bowers et al. (2025), each pipeline stage is tested against its reference independently before integration. The simulation does not claim biological accuracy — it claims fidelity to the cited models, which are themselves approximations.
 
