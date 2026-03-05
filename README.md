@@ -30,7 +30,7 @@ The simulation is grounded in vision science: cortical magnification functions, 
 
 Scrutinizer is built with AI coding tools (primarily Claude Code and Gemini) as research partners. AI accelerates literature synthesis and drafts implementations; the human evaluates whether the result is scientifically defensible. So far the approach is working — the [chromatic pooling model](https://andyed.github.io/scrutinizer-www/blog/mip-chain-explainer.html), for example, required synthesizing castleCSF threshold data, suprathreshold appearance corrections, and per-band decay curves across domains no single paper covers. Key papers and conversation threads are captured in a research log for auditability.
 
-The project's `CLAUDE.md` is committed to the repository — it encodes domain constraints, shader conventions, and validation requirements so that AI sessions start with the right context. A custom science agent handles literature lookup, parameter cross-referencing, and model validation against published data.
+The `.claude/` directory is committed to the repository. A [vision-scientist agent](.claude/agent-memory/vision-scientist/) carries persistent memory of review findings, parameter derivations, and open questions across sessions. A [release skill](.claude/skills/release/) automates the build-sign-notarize-ship pipeline.
 
 ---
 
