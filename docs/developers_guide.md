@@ -323,12 +323,21 @@ col *= mix(1.0, lumaRatio, contrastPreservation);
 
 ### Performance Optimizations
 
-#### 1. Saccadic Blindness (Saccadic Suppression)
+#### 1. Saccadic Suppression (Performance Skip)
 **Problem**: Processing heavy visual effects (saliency maps, texture uploads) during rapid eye movement (saccades) causes frame drops, making the foveal "snap" feel laggy when the eye stops.
 
 **Solution**: We implement **Saccadic Suppression** in `scrutinizer.js`.
-*   **Mechanism**: We track mouse velocity. If `velocity > 2.5 px/ms`, we skip expensive operations (texture uploads, saliency updates).
-*   **Result**: The system remains responsive during movement. The foveal image may briefly pause/blur (simulating biological saccadic masking), but the critical "fixation" moment is processed instantly.
+*   **Mechanism**: We track mouse velocity via `GazeModel`. If `velocity > 2.5 px/ms`, we skip the entire `processFrame()` render cycle.
+*   **Exception**: When **Saccadic Blindness** is enabled (menu toggle), the performance skip is bypassed so the shader can render the fovea-shrink effect at high velocities.
+*   **Result**: The system remains responsive during movement. The foveal image may briefly pause (simulating biological saccadic masking), but the critical "fixation" moment is processed instantly.
+
+#### 1b. Saccadic Blindness (v1.9 — Shader Feature)
+**Problem**: The performance skip above produces a frozen frame during fast movement, but doesn't simulate the biological reality: during a saccade, foveal processing is actively suppressed.
+
+**Solution**: The shader shrinks `fovea_radius` and `parafovea_radius` proportionally to velocity via `smoothstep(4.0, 10.0, u_velocity)`. At 10+ px/ms, the fovea collapses to near-zero — the entire viewport renders as periphery.
+*   **Menu**: Simulation → Saccadic Blindness (checkbox, off by default)
+*   **Files**: `peripheral2.frag`, `peripheral.frag` (uniform + fovea shrink), `webgl-renderer.js` (uniform binding), `scrutinizer.js` (`toggleSaccadicBlindness()` + suppression bypass)
+*   **Limitation**: Mouse velocity is a noisy proxy for saccadic state. Real saccades are ballistic (200-500°/s, 30-80ms). The velocity thresholds are tuned for visual effect, not biological fidelity.
 
 #### 2. Web Worker Saliency
 **Problem**: Computing saliency maps (pixel-by-pixel color analysis) on the main thread blocks the UI, causing stutter even during slow movements.
