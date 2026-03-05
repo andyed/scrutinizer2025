@@ -368,7 +368,11 @@ vec3 linearSrgbToOklab(vec3 rgb) {
     float l = 0.4122214708 * rgb.r + 0.5363325363 * rgb.g + 0.0514459929 * rgb.b;
     float m = 0.2119034982 * rgb.r + 0.6806995451 * rgb.g + 0.1073969566 * rgb.b;
     float s = 0.0883024619 * rgb.r + 0.2817188376 * rgb.g + 0.6299787005 * rgb.b;
-    float l_ = pow(l, 1.0 / 3.0); float m_ = pow(m, 1.0 / 3.0); float s_ = pow(s, 1.0 / 3.0);
+    // Sign-preserving cube root: pow(x, 1/3) is undefined for x<0 in GLSL ES 3.0.
+    // Band differences (mip_k - mip_{k+1}) produce negative LMS values.
+    float l_ = sign(l) * pow(abs(l), 1.0 / 3.0);
+    float m_ = sign(m) * pow(abs(m), 1.0 / 3.0);
+    float s_ = sign(s) * pow(abs(s), 1.0 / 3.0);
     return vec3(
         0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
         1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
@@ -758,7 +762,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     float effectFactor = v1.distortionStrength; 
     float bypassTransition = smoothstep(fovea_radius * 0.5, fovea_radius * 0.7, dist);
 
-    if (config.v4_style_id <= 1 || config.v4_style_id == 7) { // Research Modes: 0=Usability, 1=Biological(Purkinje), 7=Gaussian Desaturation
+    if (config.v4_style_id <= 1) { // Research Modes: 0=Usability, 1=Biological(Purkinje)
     
         // === SHARED BIOLOGICAL PIPELINE ===
         float noiseVal = (rand(uv) - 0.5);
@@ -791,19 +795,9 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         vec3 lab = rgbToOklab(col);
         
         // 3. Rod Desaturation Factor
-        float desaturationFactor;
-        if (config.v4_style_id == 7 && u_fovi_color_sigma > 0.01) {
-            // Gaussian exponential decay: models cone density falloff
-            // desatFactor = 0 at fovea edge, asymptotic toward 1 in periphery
-            float fovea_deg = 2.0;
-            float normEcc = max(0.0, eccentricity) / max(fovea_radius, 0.001);
-            float r_deg = normEcc * fovea_deg;
-            desaturationFactor = 1.0 - exp(-r_deg / max(u_fovi_color_sigma, 0.1));
-        } else {
-            // Smoothstep ramp (modes 0 & 1): S-curve between fovea and ramp end
-            float rampEnd = fovea_radius * config.lgn_ramp_end_mult;
-            desaturationFactor = smoothstep(fovea_radius, rampEnd, dist);
-        }
+        // Smoothstep ramp (modes 0 & 1): S-curve between fovea and ramp end
+        float rampEnd = fovea_radius * config.lgn_ramp_end_mult;
+        float desaturationFactor = smoothstep(fovea_radius, rampEnd, dist);
         desaturationFactor *= strengthMult;
         
         float fade = desaturationFactor * bypassTransition;
@@ -820,9 +814,8 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         
         // === DIVERGENCE: USABILITY VS BIOLOGY ===
         
-        if (config.v4_style_id == 0 || config.v4_style_id == 7) {
-            // === MODE 0/7: USABILITY (High-Key Ghosting) ===
-            // Style 7 uses same aesthetic, only desaturation curve differs (Gaussian vs smoothstep)
+        if (config.v4_style_id == 0) {
+            // === MODE 0: USABILITY (High-Key Ghosting) ===
             // Goal: Red buttons turn Grey (structural retention), not Black (invisible).
             
             // Red Kill Switch (Prevent Mustard)

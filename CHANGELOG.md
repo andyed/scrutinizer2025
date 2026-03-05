@@ -4,7 +4,7 @@
 
 ### Added
 - **Per-Channel Chromatic Pooling (castleCSF)**: Replaces uniform chrominance reduction with biologically accurate per-channel decay in DoG band reconstruction. RG (red-green) attenuates ~2.5× faster than achromatic; YV (blue-yellow) persists into far periphery. Both channels now have per-band frequency-dependent attenuation — large colored regions preserve hue further than small ones for both RG (k_ef=0.003) and YV (k_ef=0.008). Suprathreshold correction (`u_supra_exponent = 0.5`) converts castleCSF detection thresholds to appearance (Jiang, Shooner & Mullen 2022). 6 uniforms. Enabled on modes 0, 1, 9.
-- **Congestion-Gated Pooling (Mode 9)**: Modulates peripheral spatial pooling by local feature congestion — high-congestion regions get up to 2× MIP pooling boost via `coupledEccentricity × (1 + congestion)`. Tests Rosenholtz (2012) prediction that clutter and crowding share summary-statistic computation. Auto-starts congestion worker; recomputes on scroll/navigation. Tagged `experimental`.
+- **Chromatic pooling on Mode 9 (Congestion-Gated Pooling)**: Mode 9 now inherits full per-channel RG/YV chromatic pooling from Mode 0.
 - **Saliency vs Congestion Split View**: Side-by-side heatmap rendering — saliency (indigo-white, "What pops out?") and congestion (blue-yellow-red, "How cluttered?") with labeled divider. Menu: Simulation → Utility → Congestion Report.
 - **scrutinizer-audit CLI + MCP Server**: Headless analysis pipeline (Playwright) reusing congestion-core.js scoring. CLI: positional URLs, sitemap parsing, desktop+mobile viewports, JSON/HTML output, CI fail-above gate. MCP: `analyze_url`, `analyze_urls`, `compare_pages` tools.
 - **Crowding Diagnostics**: Two reference pages (`crowding.html`, `crowding-stimulus.html`), simulation limitations doc, density-gated crowding spec.
@@ -18,6 +18,9 @@
 - **Red Kill Switch gating**: Guarded with `u_chromatic_pooling < 0.5 || u_dog_enabled < 0.5` — per-band RG decay at correct eccentricity handles red suppression. Base desaturation always runs (complementary, not alternative).
 - **Chromatic pooling override**: `_chromaticPoolingOverride` flag pattern prevents `updateConfigFromMode()` from clobbering manual toggle on every frame.
 - **CMF→MIP mapping**: Corrected to `ln(r+a) - ln(a)` with `cortical_max` normalization (commit 5be3b2b).
+
+### Removed
+- **Mode 8 (Gaussian Desaturation)**: Removed. castleCSF per-channel pooling (v1.9.0) supersedes the Gaussian vs smoothstep desaturation comparison. The mode was also broken — missing `chromatic_pooling` in config caused triple desaturation stacking on saturated content. The Gaussian functional form (exp(-r/σ)) is wrong for RG decay: Bowers, Gegenfurtner & Goettker (2025) showed RG attenuation is biphasic (steep to ~15°, then shallower), not pure exponential. Gaussian color decay remains in Mode 6 (FOVI standalone) where it serves a different purpose.
 
 ### Changed
 - **Doc terminology scrub**: Replaced "desaturation" with "chromatic pooling" / "chrominance reduction" across 8 docs where describing biology. Peripheral color is pooled (mean chromaticity preserved), not lost.

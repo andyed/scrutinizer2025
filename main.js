@@ -723,8 +723,10 @@ function createScrutinizerWindow(startUrl) {
     // Determine initial bounds based on emulation state
     let initialWidth, initialHeight, initialResizable;
 
-    // Get saved desktop bounds
+    // Get saved desktop bounds (TEST_WIDTH/TEST_HEIGHT override for golden captures)
     const savedBounds = settingsManager.get('windowBounds') || { width: 1200, height: 900 };
+    if (process.env.TEST_WIDTH) savedBounds.width = parseInt(process.env.TEST_WIDTH, 10);
+    if (process.env.TEST_HEIGHT) savedBounds.height = parseInt(process.env.TEST_HEIGHT, 10);
 
     if (currentMobileEmulation) {
         // Resolve profile

@@ -31,6 +31,11 @@ const BASE_URL = process.env.BASE_URL || 'https://andyed.github.io/scrutinizer-w
 // Override with TEST_RADIUS env var for other screen geometries.
 const CAPTURE_FOVEA_RADIUS = process.env.TEST_RADIUS || '90';
 
+// Window size for captures — fixed at 1920×1080 for cross-machine reproducibility.
+// Override with CAPTURE_WIDTH/CAPTURE_HEIGHT env vars.
+const CAPTURE_WIDTH = process.env.CAPTURE_WIDTH || '1920';
+const CAPTURE_HEIGHT = process.env.CAPTURE_HEIGHT || '1080';
+
 // Configuration for all captures
 // fixation: 'center' | 'top_left' | 'sidebar'
 const FIXATION_COORDS = {
@@ -114,7 +119,6 @@ const CAPTURE_TASKS = [
             { id: 'mode1_purkinje', mode: '1', overlay: false },
             { id: 'mode6_fovi', mode: '6', overlay: false },
             { id: 'mode7_legacy', mode: '7', overlay: false },
-            { id: 'mode8_gaussian', mode: '8', overlay: false },
             // Chromatic pooling A/B: castleCSF per-channel RG/YV decay vs uniform desaturation
             // (Ashraf et al. 2024; Bowers, Gegenfurtner & Goettker 2025)
             { id: 'mode0_chromatic_on', mode: '0', overlay: false, chromaticPooling: true },
@@ -168,6 +172,7 @@ const CAPTURE_TASKS = [
 
 console.log(`\n🎯 Golden Capture Script (Automated)`);
 console.log(`   Version: v${version}`);
+console.log(`   Window: ${CAPTURE_WIDTH}×${CAPTURE_HEIGHT}`);
 console.log(`   Output: ${OUTPUT_DIR}\n`);
 
 if (!fs.existsSync(OUTPUT_DIR)) {
@@ -200,6 +205,8 @@ async function runCapture(task, fixation, variant = { id: 'standard', overlay: f
             TEST_URL: pageUrl,
             TEST_MODES: variant.mode || '0', // Use variant mode or default to '0'
             TEST_RADIUS: CAPTURE_FOVEA_RADIUS,
+            TEST_WIDTH: CAPTURE_WIDTH,
+            TEST_HEIGHT: CAPTURE_HEIGHT,
             TEST_FIXATION_X: fixationDef.x,
             TEST_FIXATION_Y: fixationDef.y,
             TEST_SELECTOR: selector || '', // Pass selector

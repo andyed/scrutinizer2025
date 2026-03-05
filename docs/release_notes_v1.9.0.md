@@ -9,8 +9,9 @@
 3. [Saccadic Blindness](#saccadic-blindness) — Foveal region shrinks during rapid mouse movement, simulating saccadic suppression.
 4. [Crowding Diagnostics](#crowding-diagnostics) — Reference pages and a simulation limitations doc exposing the density-independent crowding gap.
 5. [Saliency vs Congestion Split View](#saliency-vs-congestion-split-view) — Side-by-side heatmap comparison: "What pops out?" vs "How cluttered?"
-6. [Identified Simulation Gaps](#identified-simulation-gaps) — Two major gaps documented with specs and fix paths.
-7. [scrutinizer-audit — CLI + MCP Server](#scrutinizer-audit--cli--mcp-server) — Headless congestion scoring pipeline for CI and AI-assisted design review.
+6. [Mode 8 Removed](#mode-8-removed) — Gaussian Desaturation removed; superseded by castleCSF per-channel pooling.
+7. [Identified Simulation Gaps](#identified-simulation-gaps) — Two major gaps documented with specs and fix paths.
+8. [scrutinizer-audit — CLI + MCP Server](#scrutinizer-audit--cli--mcp-server) — Headless congestion scoring pipeline for CI and AI-assisted design review.
 
 ---
 
@@ -157,6 +158,20 @@ A page with a clean hero and a dense product grid illustrates the difference. Th
 | `webgl-renderer.js` | `show_congestion` uniform range extended to 0–2 |
 
 The ComplexityHUD stays visible alongside the split view, so you can read the numerical score while visually comparing spatial distribution.
+
+---
+
+## Mode 8 Removed
+
+**Mode 8 (Gaussian Desaturation)** has been removed from the mode registry, shader pipeline, and menu. Three reasons:
+
+1. **Superseded.** castleCSF per-channel chromatic pooling (this release) provides biologically grounded differential decay rates per chromatic channel per spatial frequency band. The Gaussian vs smoothstep comparison Mode 8 was designed for is no longer the relevant question.
+
+2. **Broken implementation.** Mode 8's config was missing `chromatic_pooling: true`, causing it to fall through to the legacy desaturation path + Red Kill Switch simultaneously — triple desaturation stacking on saturated content. Color-spectrum captures showed garbled text and banding artifacts.
+
+3. **Wrong functional form.** The Gaussian decay `exp(-r/σ)` assumes monotonic exponential RG falloff. Bowers, Gegenfurtner & Goettker (2025) showed RG attenuation is biphasic — steep decline to ~15° eccentricity, then a shallower tail. A single-parameter exponential cannot capture this shape.
+
+Gaussian color decay (`u_fovi_color_sigma`) remains in Mode 6 (FOVI standalone) where it models a different effect — FOVI's own peripheral color decay, orthogonal to the Scrutinizer DoG pipeline.
 
 ---
 

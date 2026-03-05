@@ -237,37 +237,6 @@
                 "biological_basis": "Scrutinizer v1.6 hand-tuned parameters"
             }
         },
-        "gaussian_desaturation": {
-            "id": 8,
-            "label": "Gaussian Desaturation (Experimental)",
-            "shortLabel": "Gauss",
-            "category": "research",
-            "description": "Identical to High-Key (mode 0) except desaturation uses Gaussian exponential decay (exp(-r/sigma)) instead of smoothstep ramp. Isolates one variable — curve shape — for perceptual comparison.",
-            "pipeline": {
-                "lgn_use_structure_mask": true,
-                "lgn_use_saliency_gate": true,
-                "lgn_ramp_end_mult": 2.0,
-                "v1_distortion_type": 1,
-                "v1_strength_mult": 1.0,
-                "v1_animate": false,
-                "v4_style_id": 7,
-                "dog_enabled": true,
-                "dog_e2": 0.15,
-                "dog_sharpness": 0.0,
-                "fovi_enabled": false,
-                "fovi_a": 2.78,
-                "fovi_color_sigma": 4.0
-            },
-            "tests": [
-                "gaussian_vs_smoothstep_desaturation",
-                "perceptual_matching"
-            ],
-            "architectural_purpose": "A/B comparison: Gaussian exp decay vs smoothstep ramp for peripheral desaturation. Same pipeline as mode 0, one variable isolated.",
-            "citations": {
-                "technique": "Gaussian exponential color decay exp(-r/sigma)",
-                "biological_basis": "Cone density falloff approximation (Curcio et al., 1990)"
-            }
-        },
         "congestion_pooling": {
             "id": 9,
             "label": "Congestion-Gated Pooling",

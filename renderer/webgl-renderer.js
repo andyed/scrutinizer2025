@@ -127,9 +127,9 @@
                     fovi_a: 2.78,
                     fovi_color_sigma: 0.0,
                     chromatic_pooling: false,
-                    rg_decay: 0.059,     // castleCSF k_e for RG (L-M)
+                    rg_decay: 0.072,     // Suprathreshold RG decay (Bowers 2025: 29% at 15°)
                     rg_freq_decay: 0.003, // RG frequency-dependent decay (suprathreshold spatial summation)
-                    yv_decay: 0.004,     // castleCSF k_e for YV S-(L+M)
+                    yv_decay: 0.014,     // Suprathreshold YV decay (Bowers 2025: 79% at 15°)
                     yv_freq_decay: 0.008, // castleCSF k_ef for YV
                     supra_exponent: 0.5, // Threshold→appearance compression (Jiang et al. 2022)
                     show_congestion: 0,  // 0=off, 1=congestion heatmap, 2=saliency vs congestion
