@@ -16,6 +16,8 @@ Scrutinizer simulates the information constraints imposed by retinal and early c
 
 Foveated rendering is a well-established technique in VR and game engines, where the goal is performance: degrade what the user won't notice to save GPU cycles. Scrutinizer inverts that goal. The degradation is the point — it represents the information the visual system actually has access to when navigating an interface. The question isn't "where can we cut corners?" but "what does the brain have to work with before the first saccade lands?"
 
+Every saccade is a micro-economic decision: commit the fovea to this target, forgo everything else for ~200ms. That makes foveal allocation the most constrained resource in the attention economy — and the one designers have the least visibility into. Information foraging theory (Pirolli & Card, 1999) models users as optimal foragers navigating information patches; Scrutinizer makes the cost structure of each fixation visible, showing what the periphery can and cannot evaluate before the eyes move.
+
 The simulation is grounded in vision science: cortical magnification functions, contrast sensitivity models, and feature congestion scoring. It serves designers studying visual hierarchy, researchers conducting attention studies with mouse-contingent viewing (see [Restricted Focus Viewer](https://pubmed.ncbi.nlm.nih.gov/12078741/) lineage), and vision scientists validating peripheral models against rendered output.
 
 ![Progressive Grid](screenshots/onedotone_progressive_grid.png)
