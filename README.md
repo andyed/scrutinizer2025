@@ -30,7 +30,7 @@ The simulation is grounded in vision science: cortical magnification functions, 
 
 Scrutinizer is built with AI coding tools (primarily Claude Code and Gemini) as research partners — assisting with literature review, parameter derivation, and cross-validation. The chromatic pooling model, for example, emerged from synthesizing across domains: castleCSF threshold data, suprathreshold appearance corrections, and per-band decay curves. No single paper specifies that pipeline.
 
-AI accelerates the search and drafts implementations; the human evaluates whether the result is scientifically defensible. Architectural decisions — whether [MIP-chain pooling](https://andyed.github.io/scrutinizer-www/blog/mip-chain-explainer.html) approximates cortical magnification adequately, whether crowding is the right next priority — draw on domain expertise and familiarity with the literature. Every paper consulted and conversation thread is captured in a structured research log for auditability.
+AI accelerates the search and drafts implementations; the human evaluates whether the result is scientifically defensible. Architectural decisions — whether [MIP-chain pooling](https://andyed.github.io/scrutinizer-www/blog/mip-chain-explainer.html) approximates cortical magnification adequately, whether crowding is the right next priority — draw on domain expertise and familiarity with the literature. Key papers and conversation threads are captured in a structured research log for auditability.
 
 ---
 
