@@ -151,8 +151,13 @@ Large color fields live in the residual and band3. Small chromatic details live 
 
 ```glsl
 vec4 sampleDoGReconstructedChromatic(vec2 uv, float eccentricity, float fovea_radius,
-                                      float dog_e2, float dog_sharpness) {
+                                      float dog_e2, float dog_sharpness, float visual_ecc) {
+    // Two eccentricity scales (decoupled since v1.9.1):
+    //   normEcc: from coupledEccentricity (V1 distortion-strength-scaled) — drives spatial band weights
+    //   chromNormEcc: from visual_ecc (true gaze distance) — drives chromatic decay
+    // Before decoupling, chromatic decay saw ~0.6° at 15° true eccentricity (nearly foveal).
     float normEcc = max(0.0, eccentricity) / max(fovea_radius, 0.001);
+    float chromNormEcc = max(0.0, visual_ecc) / max(fovea_radius, 0.001);
 
     // ── Existing: sample 5 MIP levels, compute bands ──
     vec4 mip0 = textureLod(u_texture, uv, 0.0);
@@ -166,16 +171,15 @@ vec4 sampleDoGReconstructedChromatic(vec2 uv, float eccentricity, float fovea_ra
     vec4 band2 = mip2 - mip3;
     vec4 band3 = mip3 - mip4;
 
-    // ── Existing: per-band luminance weights (M-scaling) ──
-    float w0 = 1.0 - smoothstep(...);  // unchanged
+    // ── Existing: per-band luminance weights (M-scaling, uses normEcc) ──
+    float w0 = 1.0 - smoothstep(...);  // unchanged — driven by coupledEccentricity
     float w1 = 1.0 - smoothstep(...);
     float w2 = 1.0 - smoothstep(...);
     float w3 = 1.0 - smoothstep(...);
 
-    // ── NEW: per-channel chromatic weights ──
-    // Convert eccentricity to approximate degrees
-    // (requires calibrated visual angle — until then, use normEcc × fovea_deg)
-    float ecc_deg = normEcc * 2.0;  // rough: fovea ≈ 2° radius
+    // ── Per-channel chromatic weights (uses chromNormEcc) ──
+    // Chromatic decay driven by true gaze eccentricity, not V1 distortion strength
+    float ecc_deg = chromNormEcc * 2.0;  // fovea ≈ 2° radius
 
     // RG attenuation: per-band, steep base + weak frequency dependence
     // castleCSF k_e = 0.059 (base), k_ef = 0.003 (suprathreshold spatial summation)
@@ -232,11 +236,14 @@ Expose in `modes.json` per-mode, alongside existing `dog_e2` and `dog_sharpness`
 
 The rod-vision path (eigengrau tint, Purkinje shift) runs **after** V4 pooling. With chromatic pooling enabled:
 
-1. DoG reconstruction handles per-band, per-channel attenuation (spatial-frequency-dependent chromatic pooling)
-2. The existing V4 ramp handles the overall scotopic shift in the far periphery (rod dominance)
-3. The two effects compose naturally — chromatic pooling attenuates opponent channels in the mid-periphery; the rod-vision path handles the far periphery where scotopic vision dominates
+1. DoG reconstruction handles per-band, per-channel attenuation using **true gaze eccentricity** (`visual_ecc`), decoupled from V1 distortion strength
+2. Base desaturation (uniform Oklab chrominance reduction) **always runs** — it provides the cone-density-driven chroma floor that the castleCSF threshold model alone undershoots at suprathreshold web-color contrasts. Per-band and base desat are complementary: per-band handles differential RG/YV decay, base desat ensures sufficient total chroma loss.
+3. The **Red Kill Switch is gated off** when chromatic pooling + DoG are active — per-band RG decay at correct eccentricity handles red-specific suppression without the blunt 95% kill
+4. The rod-vision path handles the far periphery where scotopic vision dominates (eigengrau tint, Purkinje shift)
 
-When `u_chromatic_pooling = 0`, behavior is identical to legacy (uniform chrominance reduction). This is a strict superset.
+Combined at corner (~10°): per-band (50% RG retention) × base desat (20% remaining) ≈ 10% residual warmth — perceptible but not salient.
+
+When `u_chromatic_pooling = 0`, behavior is identical to legacy (uniform chrominance reduction + Red Kill Switch). This is a strict superset.
 
 ## 4. What This Predicts
 

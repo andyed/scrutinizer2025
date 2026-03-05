@@ -7,7 +7,7 @@ class SettingsManager {
         this.settings = null;
         this.settingsFile = null;
         this.defaults = {
-            radius: 180,
+            radius: 90,  // ~2° foveal eccentricity on MBP Retina @ 20" (was 180, see docs/foveal-calibration-logic.md §7)
             blur: 10,
             intensity: 0.6,
             enabled: true, // Default to enabled
@@ -31,11 +31,11 @@ class SettingsManager {
                 // Merge defaults to ensure all keys exist
                 const mergedSettings = { ...this.defaults, ...userSettings };
 
-                // Migration: Reset radius to 180 (Large) if it's >= 240.
-                // This ensures users with previously saved "Extra Large" (300) or "Huge" (450)
-                // settings are reset to a reasonable default, as those sizes are now considered too large for default.
-                if (mergedSettings.radius >= 240) {
-                    mergedSettings.radius = 180;
+                // Migration: Clamp radius to [20, 200] range.
+                // Old defaults (180, 300, 450) were too large — 180px maps to ~4° on MBP Retina,
+                // compressing eccentricity and under-attenuating all peripheral models.
+                if (mergedSettings.radius > 200) {
+                    mergedSettings.radius = 90;
                 }
 
                 return mergedSettings;

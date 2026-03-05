@@ -510,6 +510,14 @@
             }
         }
 
+        toggleSaccadicBlindness(enabled) {
+            if (this.renderer) {
+                this.renderer.config.saccadic_blindness = enabled;
+                this.renderer._saccadicBlindnessOverride = enabled;
+                ipcRenderer.send('log:renderer', `[Scrutinizer] Saccadic blindness: ${enabled}`);
+            }
+        }
+
         // Delegate to VisualMemory
         setVisualMemoryLimit(limit) {
             ipcRenderer.send('log:renderer', `[Scrutinizer] setVisualMemoryLimit called with: ${limit}`);

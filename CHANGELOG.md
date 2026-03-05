@@ -8,12 +8,14 @@
 - **Saliency vs Congestion Split View**: Side-by-side heatmap rendering — saliency (indigo-white, "What pops out?") and congestion (blue-yellow-red, "How cluttered?") with labeled divider. Menu: Simulation → Utility → Congestion Report.
 - **scrutinizer-audit CLI + MCP Server**: Headless analysis pipeline (Playwright) reusing congestion-core.js scoring. CLI: positional URLs, sitemap parsing, desktop+mobile viewports, JSON/HTML output, CI fail-above gate. MCP: `analyze_url`, `analyze_urls`, `compare_pages` tools.
 - **Crowding Diagnostics**: Two reference pages (`crowding.html`, `crowding-stimulus.html`), simulation limitations doc, density-gated crowding spec.
+- **Saccadic Blindness**: Foveal/parafoveal regions shrink proportionally to mouse velocity (`smoothstep(4, 10, velocity)`), simulating saccadic suppression. Menu toggle, off by default. Both shaders (peripheral.frag, peripheral2.frag).
 - **Golden captures**: Chromatic pooling on/off variants for color-spectrum (modes 0, 1) and dashboard pages.
 - **CMF MIP mapping unit tests**: Validate logarithmic CMF→MIP level conversion.
 
 ### Fixed
+- **Chromatic eccentricity decoupling**: Per-band RG/YV decay now uses true gaze eccentricity (`visual_ecc`) instead of V1 distortion-coupled eccentricity. A pixel at 15° was previously seen as ~0.6° by the chromatic path — castleCSF decay was near-zero. Spatial band weights (w0-w3) still use `coupledEccentricity`.
 - **Suprathreshold chromatic correction**: castleCSF k_e values are detection thresholds, not appearance. Added power-law compression (exponent 0.5) — reds at 10° retain ~51% instead of ~26%.
-- **Red Kill Switch double-attenuation**: Guarded with `u_chromatic_pooling < 0.5` — prevents legacy mustard fix from compounding with per-band chromatic decay.
+- **Red Kill Switch gating**: Guarded with `u_chromatic_pooling < 0.5 || u_dog_enabled < 0.5` — per-band RG decay at correct eccentricity handles red suppression. Base desaturation always runs (complementary, not alternative).
 - **Chromatic pooling override**: `_chromaticPoolingOverride` flag pattern prevents `updateConfigFromMode()` from clobbering manual toggle on every frame.
 - **CMF→MIP mapping**: Corrected to `ln(r+a) - ln(a)` with `cortical_max` normalization (commit 5be3b2b).
 

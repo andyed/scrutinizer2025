@@ -51,6 +51,7 @@ uniform float u_desat_floor;      // Min desaturation multiplier in salient regi
 // NOTE: castleCSF k_e values are *detection threshold* decay rates. Suprathreshold
 // color appearance decays more slowly — Jiang, Shooner & Mullen (2022) found power-law
 // exponent ~0.5 maps threshold sensitivity to perceived saturation at high contrasts.
+uniform float u_saccadic_blindness; // 0.0=off, 1.0=suppress fovea during saccades
 uniform float u_chromatic_pooling;  // 0.0=off (legacy uniform desat), 1.0=on
 uniform float u_rg_decay;           // RG (L-M) eccentricity decay k_e (default 0.059)
 uniform float u_rg_freq_decay;      // RG frequency-dependent decay k_ef (default 0.003)
@@ -129,8 +130,9 @@ vec4 chromaticAttenuate(vec4 color, float rg_atten, float yv_atten);
 // Biology: retinal ganglion cells have center-surround RFs ≈ DoG filters.
 // Field size grows with eccentricity. At fovea: all bands. In periphery: only low-freq survives.
 vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
-                             float dog_e2, float dog_sharpness) {
-    float normEcc = max(0.0, eccentricity) / max(fovea_radius, 0.001);
+                             float dog_e2, float dog_sharpness, float visual_ecc) {
+    float normEcc = max(0.0, eccentricity) / max(fovea_radius, 0.001);           // spatial bands (V1 distortion-coupled)
+    float chromNormEcc = max(0.0, visual_ecc) / max(fovea_radius, 0.001);        // chromatic decay (true gaze eccentricity)
 
     // Sample 5 MIP levels (existing hardware chain)
     vec4 mip0 = textureLod(u_texture, uv, 0.0);
@@ -194,7 +196,7 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         // RG (L-M): steep base decay + weak freq dependence (suprathreshold spatial summation)
         // YV S-(L+M): slow base decay + strong freq dependence (coarse bands persist)
         float fovea_deg = 2.0;
-        float ecc_deg = normEcc * fovea_deg;
+        float ecc_deg = chromNormEcc * fovea_deg;
 
         // Threshold sensitivity → appearance compression (Jiang, Shooner & Mullen 2022)
         // At high contrasts (saturated UI colors), contrast constancy holds better —
@@ -719,7 +721,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     if (u_dog_enabled > 0.5) {
         pooledCol = sampleDoGReconstructed(
             v1.distortedUV, coupledEccentricity, fovea_radius,
-            u_dog_e2, u_dog_sharpness
+            u_dog_e2, u_dog_sharpness, eccentricity
         ).rgb;
     } else {
         pooledCol = sampleMIPPooledGrad(v1.distortedUV, duvdx, duvdy, coupledEccentricity, fovea_radius).rgb;
@@ -807,12 +809,14 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         float fade = desaturationFactor * bypassTransition;
         
         // Apply Base Desaturation (Chrominance only)
-        // Skip when chromatic pooling is active — per-band attenuation already
-        // handled differential RG/YV decay in sampleDoGReconstructed()
-        if (u_chromatic_pooling < 0.5) {
-            lab.y *= (1.0 - fade);
-            lab.z *= (1.0 - fade);
-        }
+        // Always runs: removes overall chroma with eccentricity (rod dominance).
+        // When chromatic pooling + DoG are active, sampleDoGReconstructed() applies
+        // differential RG/YV decay upstream — the two are complementary:
+        //   per-band: castleCSF threshold model (supra-corrected) → handles frequency-dependent differential
+        //   base desat: smoothstep/Gaussian ramp → ensures sufficient total chroma loss
+        // Combined at corner (~10°): per-band (50%) × base (20%) ≈ 10% residual warmth.
+        lab.y *= (1.0 - fade);
+        lab.z *= (1.0 - fade);
         
         // === DIVERGENCE: USABILITY VS BIOLOGY ===
         
@@ -822,9 +826,9 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             // Goal: Red buttons turn Grey (structural retention), not Black (invisible).
             
             // Red Kill Switch (Prevent Mustard)
-            // Skip when chromatic pooling active — it already handles differential
-            // RG/YV decay per-band in sampleDoGReconstructed()
-            if (u_chromatic_pooling < 0.5) {
+            // Per-band RG decay handles red suppression when chromatic pooling is active.
+            // Only apply this blunt kill when falling back to base desaturation.
+            if (u_chromatic_pooling < 0.5 || u_dog_enabled < 0.5) {
                 float rednessFactor = max(0.0, lab.y);
                 if (rednessFactor > 0.0) {
                      float peripheralFade = smoothstep(parafovea_radius, periphery_start + (fovea_radius * 2.0), dist);
@@ -965,8 +969,15 @@ void main() {
 
     float radius_norm = u_foveaRadius / u_resolution.y;
     float fovea_radius = radius_norm;
-    float parafovea_radius = radius_norm * 2.5; 
-    
+    float parafovea_radius = radius_norm * 2.5;
+
+    // Saccadic blindness: shrink foveal region during movement
+    float saccadeFactor = smoothstep(4.0, 10.0, u_velocity);
+    if (u_saccadic_blindness > 0.5) {
+        fovea_radius *= (1.0 - saccadeFactor);
+        parafovea_radius *= (1.0 - saccadeFactor);
+    }
+
     bool isParafovea = dist_stable > fovea_radius && dist_stable <= parafovea_radius;
     bool isFarPeriphery = dist_stable > parafovea_radius; 
     
@@ -1006,7 +1017,6 @@ void main() {
     
     V1_Signal v1 = processV1(uv, uv_corrected, lgn, config, dist_stable, fovea_radius, parafovea_radius, isFarPeriphery, isParafovea, memoryStrength);
     
-    float saccadeFactor = smoothstep(4.0, 10.0, u_velocity);
     vec3 finalRGB = processV4(uv, v1, lgn, config, dist, fovea_radius, parafovea_radius, saccadeFactor);
     
     vec4 color = vec4(finalRGB, 1.0);

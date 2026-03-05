@@ -257,6 +257,10 @@
             scrutinizer.toggleChromaticPooling(enabled);
         });
 
+        ipcRenderer.on('menu:toggle-saccadic-blindness', (e, enabled) => {
+            scrutinizer.toggleSaccadicBlindness(enabled);
+        });
+
         ipcRenderer.on('menu:set-aesthetic-mode', (event, mode) => {
             if (scrutinizer) scrutinizer.setAestheticMode(mode);
         });

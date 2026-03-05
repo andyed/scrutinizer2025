@@ -443,14 +443,41 @@ const midPeripheryRadius = degreesToPixels(20);  // True 20°
 - No manual configuration needed
 - Validates calibration quality
 
+**Architecture: Separate Calibration from Comfort**
+
+Currently `foveaRadius` controls both the clear-zone boundary (UX comfort) and the eccentricity denominator (scientific accuracy). Inflating it for comfort under-attenuates all downstream models (DoG, chromatic pooling, crowding). The clean split:
+
+| Parameter | Role | Source |
+|-----------|------|--------|
+| `px_per_deg` | Physical calibration — pixels per degree of visual angle | Blind spot method, camera, or screen geometry |
+| `foveaRadius` | Comfort clear zone — how large the unprocessed center feels | User preference (can be ≥ calibrated fovea) |
+| `ecc_deg` | True eccentricity in degrees — `dist_px / px_per_deg` | Derived from calibration, NOT from foveaRadius |
+
+This means a user can have a generous 180px clear zone without lying to the eccentricity models. The shader would compute `ecc_deg = dist_px / px_per_deg` (replacing `normEcc * fovea_deg`), with a separate mask for the comfort clear zone.
+
+**Reference: Foveal Size by Setup**
+
+| Setup | px/deg | Fovea radius (2°) | Viewport H-edge |
+|-------|--------|-------------------|-----------------|
+| 24" 1080p @ 60cm | 38 CSS px | 76 px | ~20° |
+| 16" MBP Retina @ 20" (50.8cm) | 44 CSS px | 89 px | ~19° |
+| 14" MBP Retina @ 20" | 44 CSS px | 89 px | ~16° |
+| 27" 4K @ 60cm (2x) | 38 CSS px | 76 px | ~22° |
+
 **Implementation:**
-- [x] Foveal calibration tool exists
+- [x] Foveal calibration tool exists (Motion Silence staircase, v1.3+)
+- [ ] Separate `px_per_deg` from `foveaRadius` in config and shader
 - [ ] Store pixels-per-degree in calibration data
+- [ ] Update shader: `ecc_deg = dist_px / px_per_deg` (replace `normEcc * fovea_deg` in 6 places)
+- [ ] Comfort clear zone as separate mask (uses `foveaRadius`, not `px_per_deg`)
 - [ ] Update renderer to use degree-based zones
 - [ ] Add validation (20-80 px/degree range check)
+- [ ] Blind spot calibration as second anchor point (~15° eccentricity)
 - [ ] Optional: Multi-monitor calibration support
 
 **Files to Modify:**
+- `renderer/shaders/peripheral2.frag` - Replace `fovea_deg` with `u_px_per_deg` uniform
+- `renderer/webgl-renderer.js` - New uniform, comfort zone separation
 - `renderer/scrutinizer.js` - Use calibrated visual angles
 - `scrutinizer-www/src/js/foveal-calibration.js` - Save px/degree ratio
 - `settings-manager.js` - Store calibration data

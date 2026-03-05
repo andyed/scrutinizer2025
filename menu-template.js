@@ -337,6 +337,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             checked: true,
                             click: (menuItem) => sendToOverlays('menu:toggle-chromatic-pooling', menuItem.checked)
                         },
+                        {
+                            label: 'Saccadic Blindness',
+                            type: 'checkbox',
+                            checked: false,
+                            click: (menuItem) => sendToOverlays('menu:toggle-saccadic-blindness', menuItem.checked)
+                        },
                         { type: 'separator' },
                         // === EXPERIMENTAL MODELS (alternative simulation pipelines) ===
                         {

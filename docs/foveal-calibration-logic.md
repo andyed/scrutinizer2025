@@ -59,6 +59,85 @@ The tool generates a session history graph displaying:
 
 ## 6. Robustness Mitigations (v1.3)
 
+## 7. Calibration Reference: Foveal Size by Hardware
+
+The fovea subtends a fixed angular diameter (~2°) regardless of screen. What changes is how many pixels that maps to, which depends on screen size, resolution, scaling factor, and viewing distance.
+
+**Formula:**
+```
+px_per_deg = (resolution_css / screen_width_cm) × 2 × D_cm × tan(0.5°)
+fovea_radius_px = px_per_deg × 2.0   (for 2° eccentricity at fovea edge)
+```
+
+Where `D_cm` is viewing distance in cm, `resolution_css` is CSS pixels (native ÷ devicePixelRatio).
+
+### MacBook Pro M3 (14-inch)
+
+| Parameter | Value |
+|-----------|-------|
+| Native resolution | 3024 × 1964 |
+| CSS resolution (2x) | 1512 × 982 |
+| Screen width | 12.1" (30.7cm) |
+| Typical viewing distance | 18-22" (46-56cm) |
+| px/deg @ 20" (50.8cm) | **44 CSS px** |
+| Fovea radius (2°) | **89 CSS px** |
+| Fovea diameter | 178 CSS px |
+| Horizontal half-field | ~16.8° |
+| Full screen diagonal | ~37° |
+
+### MacBook Pro M3 (16-inch)
+
+| Parameter | Value |
+|-----------|-------|
+| Native resolution | 3456 × 2234 |
+| CSS resolution (2x) | 1728 × 1117 |
+| Screen width | 13.6" (34.5cm) |
+| Typical viewing distance | 18-22" (46-56cm) |
+| px/deg @ 20" (50.8cm) | **44 CSS px** |
+| Fovea radius (2°) | **89 CSS px** |
+| Fovea diameter | 178 CSS px |
+| Horizontal half-field | ~18.8° |
+| Full screen diagonal | ~44° |
+
+### Desktop Reference (24" 1080p)
+
+| Parameter | Value |
+|-----------|-------|
+| Native resolution | 1920 × 1080 |
+| Screen width | 20.9" (53.1cm) |
+| Typical viewing distance | 22-26" (56-66cm) |
+| px/deg @ 24" (60cm) | **38 CSS px** |
+| Fovea radius (2°) | **76 CSS px** |
+| Fovea diameter | 152 CSS px |
+| Horizontal half-field | ~23.8° |
+| Full screen diagonal | ~48° |
+
+### Desktop Reference (27" 4K, 2x scaling)
+
+| Parameter | Value |
+|-----------|-------|
+| Native resolution | 3840 × 2160 |
+| CSS resolution (2x) | 1920 × 1080 |
+| Screen width | 23.5" (59.8cm) |
+| Typical viewing distance | 24-28" (60-70cm) |
+| px/deg @ 26" (66cm) | **37 CSS px** |
+| Fovea radius (2°) | **74 CSS px** |
+| Fovea diameter | 148 CSS px |
+| Horizontal half-field | ~24.3° |
+| Full screen diagonal | ~50° |
+
+### Current Default vs Reality
+
+The default `foveaRadius: 180px` maps to a ~4° eccentricity foveal boundary on both MBP models (vs anatomical 2°). This means:
+- The shader's clear zone is 2× too large
+- `normEcc` (used by DoG, chromatic pooling, crowding) is halved
+- Viewport edges reach ~9-11° instead of the real ~19-24°
+- All peripheral effects are under-attenuated
+
+See ROADMAP "Calibrated Visual Angles" for the planned fix: separating `px_per_deg` (calibration) from `foveaRadius` (comfort zone).
+
+---
+
 ### Pop-Out Prevention
 **Risk**: Cessation of motion might act as a "pop-out" cue if crosses stop in an aligned grid, creating a sudden regular pattern detectable even in periphery.
 

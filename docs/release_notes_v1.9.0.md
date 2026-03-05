@@ -6,10 +6,11 @@
 
 1. [Per-Channel Chromatic Pooling](#per-channel-chromatic-pooling-castlecsf) — Large colored regions preserve mean chromaticity; small features lose chromatic identity. Per-channel RG/YV decay with suprathreshold correction.
 2. [Congestion-Gated Pooling (Mode 9)](#congestion-gated-pooling-mode-9) — Local clutter modulates peripheral spatial pooling strength. Tests the TTM prediction that clutter and crowding share summary-statistic computation.
-3. [Crowding Diagnostics](#crowding-diagnostics) — Reference pages and a simulation limitations doc exposing the density-independent crowding gap.
-4. [Saliency vs Congestion Split View](#saliency-vs-congestion-split-view) — Side-by-side heatmap comparison: "What pops out?" vs "How cluttered?"
-5. [Identified Simulation Gaps](#identified-simulation-gaps) — Two major gaps documented with specs and fix paths.
-6. [scrutinizer-audit — CLI + MCP Server](#scrutinizer-audit--cli--mcp-server) — Headless congestion scoring pipeline for CI and AI-assisted design review.
+3. [Saccadic Blindness](#saccadic-blindness) — Foveal region shrinks during rapid mouse movement, simulating saccadic suppression.
+4. [Crowding Diagnostics](#crowding-diagnostics) — Reference pages and a simulation limitations doc exposing the density-independent crowding gap.
+5. [Saliency vs Congestion Split View](#saliency-vs-congestion-split-view) — Side-by-side heatmap comparison: "What pops out?" vs "How cluttered?"
+6. [Identified Simulation Gaps](#identified-simulation-gaps) — Two major gaps documented with specs and fix paths.
+7. [scrutinizer-audit — CLI + MCP Server](#scrutinizer-audit--cli--mcp-server) — Headless congestion scoring pipeline for CI and AI-assisted design review.
 
 ---
 
@@ -82,6 +83,24 @@ Mode 9 inherits the full Mode 0 pipeline (LGN gating, V1 distortion, DoG reconst
 ### Tagged: Experimental
 
 This is a hypothesis mode. The 1.0× congestion multiplier and linear boost curve are initial guesses. The prediction is testable: show observers gated vs. ungated peripheral renderings alongside ground-truth peripheral photographs and ask which simulation looks more realistic. Standard perceptual evaluation methods (forced-choice preference, similarity rating, image quality metrics like SSIM against gaze-contingent captures) would all work. If congestion gating consistently wins, it's doing real work. If observers can't tell the difference, congestion may not contribute additional pooling beyond what eccentricity already provides.
+
+---
+
+## Saccadic Blindness
+
+During a saccade (rapid eye movement), the visual system suppresses foveal processing — you don't perceive the blur of the world sweeping across your retina. Scrutinizer simulates this by shrinking the foveal and parafoveal regions proportionally to mouse velocity.
+
+```glsl
+float saccadeFactor = smoothstep(4.0, 10.0, u_velocity);  // px/ms
+fovea_radius *= (1.0 - saccadeFactor);
+parafovea_radius *= (1.0 - saccadeFactor);
+```
+
+At velocities below 4 px/ms (normal tracking), the fovea is full-size. Between 4-10 px/ms, the fovea shrinks linearly. Above 10 px/ms (fast flick), the fovea collapses to near-zero — the entire viewport renders as periphery.
+
+**Menu path:** Simulation → Saccadic Blindness (checkbox, off by default)
+
+The feature is disabled by default because mouse velocity is a noisy proxy for saccadic state. Real saccades are ballistic (200-500°/s, 30-80ms) with distinct kinematics. Mouse movement is continuous and user-controlled. The simulation is directionally correct but the velocity thresholds are tuned for visual effect, not biological fidelity. Future: integrate with eye tracker input via the GazeModel module, where saccade detection uses acceleration profiles rather than velocity thresholds.
 
 ---
 
@@ -280,7 +299,8 @@ No new dependencies in the main Electron app.
 | **CLI** | `cli/scrutinizer-audit.js`, `cli/lib/analyzer.js`, `cli/lib/crawler.js`, `cli/lib/reporter.js`, `cli/lib/sitemap-parser.js`, `cli/lib/url-resolver.js`, `cli/lib/viewport-profiles.js`, `cli/lib/scroll-strategy.js`, `cli/package.json` |
 | **MCP Server** | `cli/mcp/server.js` |
 | **Split View** | `renderer/shaders/peripheral2.frag`, `renderer/scrutinizer.js`, `renderer/webgl-renderer.js`, `menu-template.js` |
-| **Chromatic Pooling** | `renderer/shaders/peripheral2.frag` (+`chromaticAttenuate`, per-band RG/YV decay), `renderer/webgl-renderer.js` (6 uniforms), `shared/modes.json`, `menu-template.js`, `main.js`, `renderer/scrutinizer.js`, `renderer/overlay.js` |
+| **Chromatic Pooling** | `renderer/shaders/peripheral2.frag` (+`chromaticAttenuate`, per-band RG/YV decay, decoupled `visual_ecc` for chromatic eccentricity), `renderer/webgl-renderer.js` (6 uniforms), `shared/modes.json`, `menu-template.js`, `main.js`, `renderer/scrutinizer.js`, `renderer/overlay.js` |
+| **Saccadic Blindness** | `renderer/shaders/peripheral2.frag` (+`u_saccadic_blindness`, fovea shrink), `renderer/shaders/peripheral.frag` (same), `renderer/webgl-renderer.js` (uniform), `renderer/scrutinizer.js` (+`toggleSaccadicBlindness`), `renderer/overlay.js` (IPC handler), `menu-template.js` (checkbox) |
 | **Crowding Diagnostics** | `scripts/capture-golden.js` (crowding capture tasks), `menu-template.js` (reference page menu items), `docs/simulation-limitations.md`, `docs/specs/density_gated_crowding.md` |
 | **Reference Pages** | `scrutinizer-www/src/reference-pages/crowding.html`, `scrutinizer-www/src/reference-pages/crowding-stimulus.html` |
 | **Validation** | `scripts/extract-congestion.js` (updated to use shared edge density + composite score), `scripts/capture-golden.js` (chromatic pooling on/off variants) |

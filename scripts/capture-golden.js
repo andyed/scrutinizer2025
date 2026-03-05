@@ -26,6 +26,11 @@ const OUTPUT_DIR = path.join(__dirname, '..', 'tests', 'golden-captures', `v${ve
 // Override with BASE_URL env var for local development.
 const BASE_URL = process.env.BASE_URL || 'https://andyed.github.io/scrutinizer-www/reference-pages';
 
+// Foveal radius for captures — calibrated to ~2° eccentricity on MBP Retina @ 20".
+// See docs/foveal-calibration-logic.md §7 for derivation.
+// Override with TEST_RADIUS env var for other screen geometries.
+const CAPTURE_FOVEA_RADIUS = process.env.TEST_RADIUS || '90';
+
 // Configuration for all captures
 // fixation: 'center' | 'top_left' | 'sidebar'
 const FIXATION_COORDS = {
@@ -194,6 +199,7 @@ async function runCapture(task, fixation, variant = { id: 'standard', overlay: f
             TEST_MODE: 'true',
             TEST_URL: pageUrl,
             TEST_MODES: variant.mode || '0', // Use variant mode or default to '0'
+            TEST_RADIUS: CAPTURE_FOVEA_RADIUS,
             TEST_FIXATION_X: fixationDef.x,
             TEST_FIXATION_Y: fixationDef.y,
             TEST_SELECTOR: selector || '', // Pass selector

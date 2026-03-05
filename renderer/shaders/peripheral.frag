@@ -22,6 +22,7 @@ uniform float u_has_structure;
 uniform float u_enable_saliency_modulation;
 uniform float u_time; // Time in seconds for animation
 uniform float u_velocity;         // Mouse velocity in px/ms
+uniform float u_saccadic_blindness; // 0.0=off, 1.0=suppress fovea during saccades
 uniform float u_blurRadius;       // Simulated Pupil Aperture (0.0 = Sharp, 10.0 = Blurry)
 uniform float u_mongrel_mode;     // 0.0 = Noise, 1.0 = Shatter
 
@@ -920,7 +921,14 @@ void main() {
     float radius_norm = u_foveaRadius / u_resolution.y;
     float fovea_radius = radius_norm;
     float parafovea_radius = radius_norm * 2.5; // Macula: 0-5° (2.5x fovea)
-    
+
+    // Saccadic blindness: shrink foveal region during movement
+    float saccadeFactor = smoothstep(4.0, 10.0, u_velocity);
+    if (u_saccadic_blindness > 0.5) {
+        fovea_radius *= (1.0 - saccadeFactor);
+        parafovea_radius *= (1.0 - saccadeFactor);
+    }
+
     bool isParafovea = dist_stable > fovea_radius && dist_stable <= parafovea_radius;
     bool isFarPeriphery = dist_stable > parafovea_radius; 
     
@@ -980,7 +988,6 @@ void main() {
     V1_Signal v1 = processV1(uv, uv_corrected, lgn, config, dist_stable, fovea_radius, parafovea_radius, isFarPeriphery, isParafovea, memoryStrength);
     
     // 3. V4: Aesthetics
-    float saccadeFactor = smoothstep(4.0, 10.0, u_velocity);
     vec3 finalRGB = processV4(uv, v1, lgn, config, dist, fovea_radius, parafovea_radius, saccadeFactor);
     
     // === PARAFOVEAL ENHANCEMENTS (Pivot) ===

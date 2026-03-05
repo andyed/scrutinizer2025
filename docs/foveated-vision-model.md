@@ -706,6 +706,11 @@ vec3 oklabToRgb(vec3 lab);
 **Per-channel chromatic pooling (v1.9+, `u_chromatic_pooling = 1`):**
 ```glsl
 // In DoG band reconstruction — per-band, per-channel attenuation
+// Chromatic decay uses visual_ecc (true gaze eccentricity), NOT coupledEccentricity
+// (V1 distortion-strength-scaled). Spatial band weights still use coupledEccentricity.
+float chromNormEcc = max(0.0, visual_ecc) / max(fovea_radius, 0.001);
+float ecc_deg = chromNormEcc * 2.0;  // fovea ≈ 2° radius
+
 // RG: frequency-independent steep decay (castleCSF k_e = 0.059)
 float rg_atten = pow(pow(10.0, -u_rg_decay * ecc_deg), supra);
 
@@ -724,12 +729,16 @@ vec4 chromaticAttenuate(vec4 color, float rg_atten, float yv_atten) {
 }
 ```
 
-**Legacy uniform path (`u_chromatic_pooling = 0`):**
+**Base desaturation (always active):**
 ```glsl
 // Convert to Oklab
 vec3 lab = rgbToOklab(col);
 
 // Uniform chrominance reduction — both channels attenuated equally
+// Runs regardless of chromatic pooling — complementary, not alternative.
+// Per-band handles frequency-dependent differential (RG faster than YV).
+// Base desat ensures sufficient total chroma loss (rod dominance).
+// Combined at corner (~10°): per-band (50%) × base (20%) ≈ 10% residual.
 lab.y *= (1.0 - desaturationFactor); // a component
 lab.z *= (1.0 - desaturationFactor); // b component
 
@@ -737,7 +746,7 @@ lab.z *= (1.0 - desaturationFactor); // b component
 vec3 desaturatedColor = oklabToRgb(lab);
 ```
 
-When chromatic pooling is active, the V4 uniform desaturation path and the Red Kill Switch are bypassed — per-band attenuation already handles differential RG/YV decay.
+When chromatic pooling is active, the Red Kill Switch is bypassed (per-band RG decay at correct eccentricity handles red-specific suppression). Base desaturation always runs — it provides the overall cone-density-driven chroma floor that the castleCSF threshold model alone undershoots at suprathreshold contrasts.
 
 **Eigengrau tinting** in Oklab space:
 ```glsl

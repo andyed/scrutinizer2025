@@ -100,6 +100,9 @@
                 // Congestion overlay uniform location
                 this.showCongestionLocation = null;
 
+                // Saccadic blindness (suppress fovea during movement)
+                this.saccadicBlindnessLocation = null;
+
                 // Congestion-gated pooling (hypothesis mode)
                 this.congestionPoolingLocation = null;
 
@@ -130,7 +133,8 @@
                     yv_freq_decay: 0.008, // castleCSF k_ef for YV
                     supra_exponent: 0.5, // Threshold→appearance compression (Jiang et al. 2022)
                     show_congestion: 0,  // 0=off, 1=congestion heatmap, 2=saliency vs congestion
-                    congestion_pooling: false
+                    congestion_pooling: false,
+                    saccadic_blindness: false
                 };
 
                 this.init(vsSource, fsSource);
@@ -233,6 +237,9 @@
 
                 // Congestion overlay uniform lookup
                 this.showCongestionLocation = gl.getUniformLocation(this.program, "u_show_congestion");
+
+                // Saccadic blindness uniform lookup
+                this.saccadicBlindnessLocation = gl.getUniformLocation(this.program, "u_saccadic_blindness");
 
                 // Congestion-gated pooling uniform lookup
                 this.congestionPoolingLocation = gl.getUniformLocation(this.program, "u_congestion_pooling");
@@ -415,6 +422,7 @@
                 // chromatic_pooling can be overridden by menu toggle or TEST_CHROMATIC_POOLING.
                 // Only preserve if explicitly overridden (flag set by toggleChromaticPooling).
                 const savedChromaticOverride = this._chromaticPoolingOverride;
+                const savedSaccadicBlindness = this._saccadicBlindnessOverride;
 
                 // Default: High-Key (0)
                 const defaults = {
@@ -473,6 +481,9 @@
                         // Restore manual chromatic pooling override if set
                         if (savedChromaticOverride !== undefined) {
                             this.config.chromatic_pooling = savedChromaticOverride;
+                        }
+                        if (savedSaccadicBlindness !== undefined) {
+                            this.config.saccadic_blindness = savedSaccadicBlindness;
                         }
                         return;
                     }
@@ -639,6 +650,7 @@
                 gl.uniform1f(this.hasStructureLocation, hasStructure);
                 gl.uniform1f(this.enableSaliencyModulationLocation, enableSaliencyModulation);
                 gl.uniform1i(this.showCongestionLocation, this.config.show_congestion);
+                gl.uniform1f(this.saccadicBlindnessLocation, this.config.saccadic_blindness ? 1.0 : 0.0);
                 gl.uniform1f(this.congestionPoolingLocation, this.config.congestion_pooling ? 1.0 : 0.0);
 
                 if (Math.random() < 0.01) {
