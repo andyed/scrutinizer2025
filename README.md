@@ -26,15 +26,11 @@ The simulation is grounded in vision science: cortical magnification functions, 
 
 ---
 
-## Advancing Vision Science with AI
+## An Experiment in AI-Assisted Vision Science
 
-Scrutinizer is built with Claude Code as a research partner — not just a code generator, but a collaborator in literature review, parameter derivation, and cross-validation.
+Scrutinizer is built with AI coding tools (primarily Claude Code and Gemini) as research partners. AI accelerates literature synthesis and drafts implementations; the human evaluates whether the result is scientifically defensible. So far the approach is working — the [chromatic pooling model](https://andyed.github.io/scrutinizer-www/blog/mip-chain-explainer.html), for example, required synthesizing castleCSF threshold data, suprathreshold appearance corrections, and per-band decay curves across domains no single paper covers. Key papers and conversation threads are captured in a research log for auditability.
 
-The chromatic pooling model is a concrete example. It was derived through iterative conversation: extracting RG and YV threshold parameters from the castleCSF contrast sensitivity model (Ashraf & Mantiuk 2024), applying suprathreshold appearance corrections from Jiang, Shooner & Mullen (2022), and mapping the result to per-band frequency-dependent decay curves. No single paper specifies that pipeline — it emerged from synthesizing across domains.
-
-This is not a claim that AI replaces domain expertise. Every architectural decision — whether to model the LGN as a gate rather than a distortion stage, whether MIP-chain pooling approximates cortical magnification adequately, whether crowding is the right next priority — draws on cognitive science training and familiarity with the literature. The AI accelerates the search, surfaces connections, and drafts implementations. The human evaluates whether the result is scientifically defensible.
-
-Every URL fetched, every paper consulted, and every conversation thread is captured in a structured research log. The question driving the methodology: can an AI-assisted workflow produce scientifically rigorous simulation, with full auditability of how each parameter was derived?
+The `.claude/` directory is committed to the repository. A [vision-scientist agent](.claude/agent-memory/vision-scientist/) carries persistent memory of review findings, parameter derivations, and open questions across sessions. A [release skill](.claude/skills/release/) automates the build-sign-notarize-ship pipeline.
 
 ---
 
@@ -77,13 +73,13 @@ Scrutinizer's rendering pipeline maps biological mechanisms to GPU-accelerated s
   └─────────────────────────────────────────────┘
 ```
 
-**Spatial decomposition.** The hardware MIP chain provides progressive spatial pooling at each eccentricity band. MIP levels are selected per-fragment based on cortical magnification, approximating the growth of receptive field size with distance from fixation. Band cutoff frequencies follow Rovamo & Virsu's linear M-scaling.
+**Spatial decomposition.** The hardware [MIP chain](https://andyed.github.io/scrutinizer-www/blog/mip-chain-explainer.html) provides progressive spatial pooling at each eccentricity band. MIP levels are selected per-fragment based on cortical magnification, approximating the growth of receptive field size with distance from fixation. Band cutoff frequencies follow Rovamo & Virsu's linear M-scaling.
 
-**Cortical magnification.** Scrutinizer has modeled eccentricity-dependent falloff since v1.0 — the concept is foundational. The v1.6 implementation used a hand-tuned smoothstep that approximated the right shape but lacked analytical grounding. Comparing our curves against the FOVI model (Blauch, Konkle & Alvarez, 2026) gave us the clean parameterization we were already targeting: *w = k · log(e + e₂)* (Schwartz 1980) with empirically fitted constants. The comparison also exposed a bug in our eccentricity mapping. The v1.7 pipeline uses FOVI's cortical magnification function directly.
+**Cortical magnification.** Scrutinizer has modeled eccentricity-dependent falloff since v1.0 — the concept is foundational. The v1.6 implementation used a hand-tuned smoothstep that approximated the right shape but lacked analytical grounding. Comparing our curves against the [FOVI model](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html) (Blauch, Konkle & Alvarez, 2026) gave us the clean parameterization we were already targeting: *w = k · log(e + e₂)* (Schwartz 1980) with empirically fitted constants. The comparison also exposed a bug in our eccentricity mapping. The v1.7 pipeline adopts the same Schwartz parameterization used by FOVI, calibrated against their published constants.
 
-**Chromatic attenuation.** Peripheral color is chromatically filtered, not lost — cone signals are pooled over widening regions, reducing chromatic contrast at spatial frequencies the periphery cannot resolve. The model derives RG and YV channel decay rates from castleCSF threshold data with suprathreshold appearance correction.
+**Chromatic attenuation.** Peripheral color is chromatically filtered, not lost — cone signals are pooled over widening regions, reducing chromatic contrast at spatial frequencies the periphery cannot resolve. The model derives [RG and YV channel decay rates](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html) from castleCSF threshold data with suprathreshold appearance correction.
 
-**Feature Congestion.** A real-time implementation of Rosenholtz, Li & Nakano's (2007) visual clutter metric, computed in Oklab color space. Local variance (σ=2.5) across color, orientation, and luminance contrast channels produces a 0–100 complexity score. Validated against the Python reference implementation (Spearman ρ=0.93). See [congestion-journey.md](docs/congestion-journey.md).
+**Feature Congestion.** A real-time implementation of Rosenholtz, Li & Nakano's (2007) visual clutter metric, computed in Oklab color space. Local variance (σ=2.5) across color, orientation, and luminance contrast channels produces a [0–100 complexity score](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html). Validated against the Python reference implementation (Spearman ρ=0.93). See [congestion-journey.md](docs/congestion-journey.md).
 
 **Calibration.** A Motion Silence staircase (Suchow & Alvarez, 2011) measures the eccentricity at which the user detects peripheral motion, establishing a perceptual anchor for the simulation parameters. See [Foveal Calibration Logic](docs/foveal-calibration-logic.md).
 
@@ -93,8 +89,8 @@ Scrutinizer's rendering pipeline maps biological mechanisms to GPU-accelerated s
 
 ### Rendering Pipeline (v1.8)
 - **Foveal/peripheral simulation** — eccentricity-dependent spatial pooling and chromatic filtering bound to cursor position
-- **FOVI cortical magnification** — analytically grounded eccentricity falloff (mode 6), alongside legacy (mode 7) and Gaussian desaturation (mode 8) for comparison
-- **Feature Congestion pipeline** — real-time visual clutter scoring with ComplexityHUD overlay (Score / Stats / Spatial tabs)
+- **[Analytical cortical magnification](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html)** — eccentricity falloff using the Schwartz (1980) log-mapping parameterization (mode 6), alongside legacy (mode 7) and Gaussian desaturation (mode 8) for comparison
+- **[Feature Congestion](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html) pipeline** — real-time visual clutter scoring with ComplexityHUD overlay (Score / Stats / Spatial tabs)
 - **Congestion-gated pooling** (mode 9) — peripheral attenuation weighted by local visual complexity
 - **Saliency modulation** — allocates more peripheral bandwidth to salient regions (edges, contrast, high-importance areas)
 - **Structure map analysis** — layout detection (text rhythm, density, semantic type) feeding the rendering pipeline
@@ -128,14 +124,14 @@ npm run capture-golden          # Generate reference captures
 npm run golden-compare          # Compare current output against references
 ```
 
-**Feature Congestion validation.** The JavaScript implementation is cross-validated against the Python reference (Rosenholtz lab toolbox) on matched test images. Spearman rank correlation ρ=0.93. Both pipelines can be run:
+**[Feature Congestion](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html) validation.** The JavaScript implementation is cross-validated against the Python reference (Rosenholtz lab toolbox) on matched test images. Spearman rank correlation ρ=0.93. Both pipelines can be run:
 
 ```bash
 npm run validate:python         # Run Python reference (requires uv + Python 3.12)
 npm run validate:scrutinizer    # Run Scrutinizer's JS implementation
 ```
 
-**Attenuation table.** Per-eccentricity-band attenuation values are logged and compared against the FOVI cortical magnification function to verify the MIP-level selection produces the expected spatial frequency cutoffs.
+**Attenuation table.** Per-eccentricity-band attenuation values are logged and compared against the FOVI-derived cortical magnification curve to verify the MIP-level selection produces the expected spatial frequency cutoffs.
 
 **Methodology note.** Following the cross-validation approach advocated by Bowers et al. (2025), each pipeline stage is tested against its reference independently before integration. The simulation does not claim biological accuracy — it claims fidelity to the cited models, which are themselves approximations.
 
@@ -193,11 +189,11 @@ These are research questions, not apologies. Each gap represents a measurable di
 
 1. **Calibration gap.** Hardcoded pixels-per-degree produces under-attenuated periphery on most displays. The viewport edges render at ~10° eccentricity when they should be ~20°. Simulation results are qualitatively correct but quantitatively compressed. *Fix path: [Project 1.3](docs/grad-student-projects.md) — px_per_deg/foveaRadius separation.*
 
-2. **Approximate spatial pooling.** The MIP chain provides box/bilinear averaging, not Gaussian pooling. No texture synthesis is performed — pooling regions lose feature statistics rather than preserving summary statistics as the Texture Tiling Model predicts. Peripheral representations are therefore more degraded than biological peripheral vision. *Fix path: [Project 1.2](docs/grad-student-projects.md) — Portilla-Simoncelli or neural texture synthesis.*
+2. **Approximate spatial pooling.** The [MIP chain](https://andyed.github.io/scrutinizer-www/blog/mip-chain-explainer.html) provides box/bilinear averaging, not Gaussian pooling. No texture synthesis is performed — pooling regions lose feature statistics rather than preserving summary statistics as the Texture Tiling Model predicts. Peripheral representations are therefore more degraded than biological peripheral vision. *Fix path: [Project 1.2](docs/grad-student-projects.md) — Portilla-Simoncelli or neural texture synthesis.*
 
 3. **Sequential chromatic-spatial pipeline.** MIP averaging dilutes chroma before the chromatic attenuation stage applies per-channel decay. The biological system processes spatial and chromatic channels in parallel (parvocellular vs. magnocellular pathways). The result: chromatic contrast in mid-periphery may be more attenuated than predicted. *Fix path: dual-pathway architecture spec in [ROADMAP](ROADMAP.md).*
 
-4. **No transsaccadic integration.** The simulation applies continuous degradation — moving the cursor reveals the page progressively, but there's no model of how the brain accumulates information across fixations. This overstates the disruption of peripheral vision in sustained viewing. This is a deliberate design constraint: the simulation shows retinal input, not perceptual output. *See: [simulation-limitations.md](docs/simulation-limitations.md).*
+4. **No transsaccadic integration.** There is no model of how the brain accumulates information across fixations. The [Visual Memory modes](docs/simulation-limitations.md) (Limited, Extended, Fixation Buffer) approximate accumulation by preserving previously foveated regions, but this is a display-level effect — it retains rendered pixels, not the summary statistics or object representations that transsaccadic memory actually maintains. *See: [simulation-limitations.md](docs/simulation-limitations.md).*
 
 5. **Mouse-contingent, not gaze-contingent.** Cursor-tracking latency is ~200ms vs. ~10ms for research-grade eye trackers. Mouse position approximates but does not replicate gaze fixation — users learn to "park" the cursor differently than they fixate. *Fix path: [Project 3.3](docs/grad-student-projects.md) — Tobii/Pupil Labs integration.*
 
@@ -304,8 +300,10 @@ claude mcp add scrutinizer-audit -- node cli/mcp/server.js
 - [Biological Model](docs/foveated-vision-model.md) — receptor-to-cortex narrative, shader stage mapping
 - [Scientific Literature Review](docs/scientific_literature_review.md) — full research foundations
 - [Feature Congestion Journey](docs/congestion-journey.md) — implementation and validation log
-- [FOVI & Cortical Magnification](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html) — blog post on the v1.7 CMF integration
+- [How GPU MIP Chains Simulate Peripheral Vision](https://andyed.github.io/scrutinizer-www/blog/mip-chain-explainer.html) — blog post explaining the spatial decomposition pipeline
+- [FOVI & Cortical Magnification](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html) — blog post on the v1.7 CMF integration and chromatic attenuation
 - [Feature Congestion Scoring](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html) — blog post on the clutter metric
+- [v1.8: Scientific Accuracy Audit](https://andyed.github.io/scrutinizer-www/blog/2026-03-03-v1.8.html) — blog post on M-scaling corrections and Feature Congestion launch
 - [Foveal Calibration Logic](docs/foveal-calibration-logic.md) — psychophysics of the calibration tool
 - [Simulation Limitations](docs/simulation-limitations.md) — detailed gap analysis
 - [Developer's Guide](docs/developers_guide.md) — architecture, extension patterns, adding custom modes
