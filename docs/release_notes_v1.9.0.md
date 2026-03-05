@@ -137,7 +137,7 @@ Mode 9 inherits the full Mode 0 pipeline (LGN gating, V1 distortion, DoG reconst
 
 ### Tagged: Experimental
 
-This is a hypothesis mode. The 1.0× congestion multiplier and linear boost curve are initial guesses. The prediction is testable: if congestion-gated pooling produces screenshots that are harder to distinguish from biological peripheral vision (e.g., via a 2AFC preference task against ungated pooling), the boost is doing real work. If observers can't tell the difference, congestion may not contribute additional pooling beyond what eccentricity already provides.
+This is a hypothesis mode. The 1.0× congestion multiplier and linear boost curve are initial guesses. The prediction is testable: show observers gated vs. ungated peripheral renderings alongside ground-truth peripheral photographs and ask which simulation looks more realistic. Standard perceptual evaluation methods (forced-choice preference, similarity rating, image quality metrics like SSIM against gaze-contingent captures) would all work. If congestion gating consistently wins, it's doing real work. If observers can't tell the difference, congestion may not contribute additional pooling beyond what eccentricity already provides.
 
 ---
 
