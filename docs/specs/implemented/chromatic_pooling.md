@@ -1,7 +1,8 @@
 # Per-Channel Chromatic Pooling Across Eccentricity
 
 Date: 2026-03-03
-Status: PLANNED
+Status: IMPLEMENTED (v1.9.0)
+Commits: a9051e3, aad22cf, 276e8de
 Dependencies: DoG band decomposition (v1.6, implemented), Oklab color pipeline (v1.4+, implemented)
 
 ## 1. Problem Statement

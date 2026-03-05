@@ -97,13 +97,15 @@ The simulation presents a continuously degraded periphery that updates every fra
 
 ---
 
-## 4. Chromatic Pooling Incomplete
+## 4. Chromatic Pooling — First-Order Approximation
 
-**Status**: Partially implemented (castleCSF per-channel decay in DoG bands)
-**Documented in**: `specs/chromatic_pooling.md`
+**Status**: Implemented (v1.9.0) — per-channel RG/YV decay with size-dependent attenuation via DoG bands
+**Documented in**: `specs/implemented/chromatic_pooling.md`
 **Exposed by**: `reference-pages/color-spectrum.html`
 
-L-M (red-green) sensitivity decays ~2.5× faster than achromatic with eccentricity, while S-cone (blue-yellow) persists much further. The DoG band decomposition now models per-channel attenuation, but size-dependent color preservation (large colored fields retain hue further than small stimuli) is not yet implemented.
+L-M (red-green) sensitivity decays ~2.5× faster than achromatic with eccentricity, while S-cone (blue-yellow) persists much further. The DoG band decomposition models per-channel attenuation with frequency-dependent YV rates (band0 at 4cpd attenuates faster than residual at 0.25cpd), giving size-dependent color preservation: large color fields retain hue further than small chromatic details.
+
+**Remaining gaps:** The DoG bands provide discrete spatial frequency buckets, not continuous perceptive-field scaling (Abramov et al. 1991). True size-dependent color preservation would integrate chromaticity over Bouma-scaled regions that grow with eccentricity — closer to TTM summary statistics than band-filtered attenuation. The current approach is a good first-order approximation but may under-preserve color for medium-sized stimuli that straddle band boundaries.
 
 ---
 

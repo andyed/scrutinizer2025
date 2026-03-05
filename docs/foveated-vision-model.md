@@ -107,7 +107,7 @@ The biological architecture produces several emergent properties that Scrutinize
 |----------------------|-------|---------------------------|
 | **Resolution loss** | Receptor pooling (100:1) | Approximate DoG band decomposition (MIP-derived, box/bilinear not Gaussian) with M-scaling rolloff; legacy: simple MIP pooling |
 | **Chromatic pooling** | Reduced chromatic spatial resolution; mean chromaticity preserved over large regions (Rosenholtz TTM) | Per-channel RG/YV attenuation in DoG bands (castleCSF); legacy: uniform Oklab chrominance reduction + cyan tint |
-| **Crowding** | Receptive field overlap | Fractal Crowding (Tier 2.0) + vertical chop |
+| **Crowding** | Receptive field overlap | Fractal Crowding (Tier 2.0) + vertical chop. **Known gap:** distortion is eccentricity-only, not density-dependent — isolated and flanked targets degrade equally (see `docs/simulation-limitations.md`, `docs/specs/density_gated_crowding.md`) |
 | **Motion sensitivity** | Magnocellular pathway | Preserved contrast in periphery |
 | **Positional uncertainty** | Large receptive fields | Simplex noise displacement |
 
@@ -287,6 +287,16 @@ The non-uniform spacing is biologically correct: coarse structure (bands 2–3) 
 - Band differences (mip_k − mip_{k+1}) can be negative. The shader clamps the final reconstruction to [0,1] to prevent out-of-range artifacts.
 
 **Result**: Parafoveal text shows a "frosted glass" quality—letter shapes and word boundaries remain visible but unreadable—rather than the uniform fog of simple MIP pooling. This better matches the subjective experience of peripheral vision.
+
+### 5.2 Known Limitation: Density-Independent Crowding
+
+The V1 Lateral Smash (domain warping) and MIP pooling are both purely eccentricity-dependent. An isolated letter and a densely flanked letter at the same eccentricity receive identical displacement and pooling. In biological vision, the isolated letter remains identifiable while the flanked letter does not (Bouma 1970; Pelli & Tillman 2008).
+
+The structure map carries a density channel (`structure.g`) through the LGN signal, but it's currently used only for the whitespace gate (`density < 0.1 → suppressionFactor = 0`), not for scaling V1 distortion strength. A planned fix gates V1 strength with a sigmoid transfer on density — dense content gets full Lateral Smash, isolated elements get reduced distortion (floor at 0.3 for residual acuity loss).
+
+- **Diagnostic pages:** `reference-pages/crowding.html` (crowded-vs-isolated letters), `reference-pages/crowding-stimulus.html` (orientation, color grouping, complexity)
+- **Spec:** [`docs/specs/density_gated_crowding.md`](specs/density_gated_crowding.md)
+- **Full gap analysis:** [`docs/simulation-limitations.md`](simulation-limitations.md)
 
 ---
 
@@ -587,7 +597,7 @@ To mitigate "breathing" artifacts on full-motion video, the Saliency Map is used
 
 1. **Multi-scale Saliency**: Combine detection at multiple blur levels
 2. **Inhibition of Return**: Reduce saliency in recently-viewed areas
-3. **Parafoveal Band Modulation**: ✅ (v1.8.0) eccentricityScale ramps 0.0→0.15 through parafovea via smoothstep; MIP blend widened to 0.5× fovea_radius. Future: per-channel chromatic pooling and oriented DoG bands for further parafoveal refinement
+3. **Parafoveal Band Modulation**: ✅ (v1.8.0) eccentricityScale ramps 0.0→0.15 through parafovea via smoothstep; MIP blend widened to 0.5× fovea_radius. ✅ (v1.9.0) Per-channel chromatic pooling implemented. Future: oriented DoG bands for further parafoveal refinement
 4. **Far Periphery Distortion Boost**: ✅ (Implemented in Browser & Figma v1.4.x) A linear increase in distortion strength (2.5x slope) beyond the transition zone creates more distinct peripheral filtering at the far edges of the screen, preventing the effect from plateauing.
 
 ## Technical Details
@@ -623,7 +633,7 @@ This creates colored fringes in the periphery, supporting illegibility without n
 ## 9. Peripheral Color: Chromatic Pooling & Oklab Pipeline
 
 **v1.3:** Peripheral color processing upgraded from RGB to **Oklab** (perceptually uniform).
-**v1.9:** Per-channel RG/YV chromatic pooling replaces uniform chrominance reduction (see `docs/specs/chromatic_pooling.md`).
+**v1.9:** Per-channel RG/YV chromatic pooling replaces uniform chrominance reduction (see [`docs/specs/implemented/chromatic_pooling.md`](specs/implemented/chromatic_pooling.md)).
 
 ### The Biological Reality
 
@@ -693,18 +703,41 @@ vec3 rgbToOklab(vec3 srgb);
 vec3 oklabToRgb(vec3 lab);
 ```
 
-**High-Key mode** (v4_style_id == 0):
+**Per-channel chromatic pooling (v1.9+, `u_chromatic_pooling = 1`):**
+```glsl
+// In DoG band reconstruction — per-band, per-channel attenuation
+// RG: frequency-independent steep decay (castleCSF k_e = 0.059)
+float rg_atten = pow(pow(10.0, -u_rg_decay * ecc_deg), supra);
+
+// YV: per-band frequency-dependent decay — large color fields persist
+float yv_atten_band0 = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * 4.0) * ecc_deg), supra);
+// ... band1 (×2.0), band2 (×1.0), band3 (×0.5), residual (×0.25)
+
+// Each band: split into Oklab luminance + chrominance, attenuate independently
+result += chromaticAttenuate(band_k, rg_atten, yv_atten_band_k) * w_k;
+
+vec4 chromaticAttenuate(vec4 color, float rg_atten, float yv_atten) {
+    vec3 lab = rgbToOklab(color.rgb);
+    lab.y *= rg_atten;   // a channel (red-green)
+    lab.z *= yv_atten;   // b channel (blue-yellow)
+    return vec4(oklabToRgb(lab), color.a);
+}
+```
+
+**Legacy uniform path (`u_chromatic_pooling = 0`):**
 ```glsl
 // Convert to Oklab
 vec3 lab = rgbToOklab(col);
 
-// Desaturate by reducing chrominance
+// Uniform chrominance reduction — both channels attenuated equally
 lab.y *= (1.0 - desaturationFactor); // a component
 lab.z *= (1.0 - desaturationFactor); // b component
 
 // Convert back to RGB
 vec3 desaturatedColor = oklabToRgb(lab);
 ```
+
+When chromatic pooling is active, the V4 uniform desaturation path and the Red Kill Switch are bypassed — per-band attenuation already handles differential RG/YV decay.
 
 **Eigengrau tinting** in Oklab space:
 ```glsl
