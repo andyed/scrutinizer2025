@@ -187,12 +187,12 @@ Full spec: [`docs/specs/implemented/chromatic_pooling.md`](specs/implemented/chr
 
 ### What It Does
 
-Replaces the uniform Oklab chrominance reduction with per-channel chromatic pooling in the DoG band reconstruction. Peripheral color is pooled over larger regions, not simply lost (Rosenholtz TTM) — the shader now models the differential rate at which chromatic spatial resolution declines across the three post-receptoral channels:
+Peripheral color is **pooled, not lost** (Rosenholtz TTM). The visual system averages chromaticity over progressively larger regions with eccentricity — a large colored panel retains its mean hue far into the periphery, while small colored text loses chromatic identity because it falls within a single pooling region. The previous uniform chrominance reduction missed both of these effects: it treated a full-width banner and 14px text identically, and it attenuated red-green and blue-yellow at the same rate.
 
-- **L-M (Red-Green):** Decays ~2.5× faster than achromatic (castleCSF k_e = 0.059). Frequency-independent — it's a midget ganglion cell wiring constraint, not an optical limit. 50% loss at ~5°, 90% at ~17°.
-- **S-(L+M) (Blue-Yellow):** Tracks close to achromatic (k_e = 0.004), persisting far into the periphery. Frequency-dependent — large blue fields retain color much further than small ones.
+The new pipeline models two biological asymmetries:
 
-Because the DoG bands already decompose content by spatial scale, per-band YV attenuation rates give size-dependent color preservation for free: a full-width colored banner retains its hue further into the periphery than 14px colored text. No explicit stimulus-size measurement needed.
+- **Size-dependent preservation:** The DoG bands already decompose content by spatial scale. Large color fields live in low-frequency bands where chromatic pooling preserves mean chromaticity. Small colored features live in high-frequency bands where chromatic spatial resolution is genuinely reduced. Per-band attenuation gives size-dependent color preservation for free — no explicit stimulus-size measurement needed.
+- **Channel-dependent rates:** L-M (red-green) is a foveal specialization — midget ganglion cell wiring thins rapidly outside the fovea (castleCSF k_e = 0.059, frequency-independent). S-(L+M) (blue-yellow) tracks close to achromatic (k_e = 0.004), persisting far into the periphery with frequency-dependent attenuation (fine blue detail fades before coarse blue regions).
 
 ### Suprathreshold Correction
 
@@ -200,11 +200,12 @@ The castleCSF parameters are detection thresholds — the minimum visible chroma
 
 ### What This Produces
 
-| Scenario | Before (Uniform) | After (Per-Channel) |
+| Scenario | Before (Uniform) | After (Per-Channel Pooling) |
 |----------|-------------------|---------------------|
-| Red button at 8° | ~50% chrominance | RG attenuated ~50% (small stimulus, fast RG decay) |
-| Blue background at 8° | ~50% chrominance | ~90% YV retained (large field, slow YV decay) |
-| Teal sidebar at 15° | ~80% chrominance | Blue-yellow persists, red-green gone — shifts toward blue |
+| Large blue background at 8° | ~50% color reduction | **~90% color preserved** — large field, low-freq band, slow YV decay |
+| Full-width green nav bar at 10° | ~60% color reduction | **~80% preserved** — mean chromaticity pooled over large region |
+| Small red button at 8° | ~50% color reduction | **~50% RG remaining** — small stimulus in high-freq band, fast RG decay |
+| Teal sidebar at 15° | ~80% color reduction | Blue-yellow persists, red-green faded — perceived hue shifts toward blue |
 
 ### Implementation
 
