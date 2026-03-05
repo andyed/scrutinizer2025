@@ -53,6 +53,7 @@ uniform float u_desat_floor;      // Min desaturation multiplier in salient regi
 // exponent ~0.5 maps threshold sensitivity to perceived saturation at high contrasts.
 uniform float u_chromatic_pooling;  // 0.0=off (legacy uniform desat), 1.0=on
 uniform float u_rg_decay;           // RG (L-M) eccentricity decay k_e (default 0.059)
+uniform float u_rg_freq_decay;      // RG frequency-dependent decay k_ef (default 0.003)
 uniform float u_yv_decay;           // YV S-(L+M) base decay k_e (default 0.004)
 uniform float u_yv_freq_decay;      // YV frequency-dependent decay k_ef (default 0.008)
 uniform float u_supra_exponent;     // Threshold→appearance compression (default 0.5; 1.0=raw threshold)
@@ -190,8 +191,8 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
 
     if (u_chromatic_pooling > 0.5) {
         // Per-band chromatic attenuation (castleCSF; Ashraf et al. 2024)
-        // RG (L-M): frequency-independent steep decay — wiring constraint, not optical
-        // YV S-(L+M): frequency-dependent, slow for coarse bands, faster for fine
+        // RG (L-M): steep base decay + weak freq dependence (suprathreshold spatial summation)
+        // YV S-(L+M): slow base decay + strong freq dependence (coarse bands persist)
         float fovea_deg = 2.0;
         float ecc_deg = normEcc * fovea_deg;
 
@@ -201,11 +202,18 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         // exponent=0.5: sqrt of threshold decay (gentler), exponent=1.0: raw threshold (harsh)
         float supra = max(u_supra_exponent, 0.01);
 
-        // RG: single attenuation for all bands (k_ef ≈ 0 for RG)
-        float rg_atten = pow(pow(10.0, -u_rg_decay * ecc_deg), supra);
+        // RG: per-band attenuation — large red regions preserve hue further than small red details
+        // castleCSF reports k_ef ≈ 0 for RG at threshold, but suprathreshold spatial summation
+        // means larger stimuli integrate over more receptive fields → better color constancy.
+        // u_rg_freq_decay defaults to 0.003 (conservative — ~1/3 of YV's 0.008).
+        // Band frequencies: band0≈4cpd, band1≈2cpd, band2≈1cpd, band3≈0.5cpd, residual≈0.25cpd
+        float rg_atten_band0 = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * 4.0) * ecc_deg), supra);
+        float rg_atten_band1 = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * 2.0) * ecc_deg), supra);
+        float rg_atten_band2 = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * 1.0) * ecc_deg), supra);
+        float rg_atten_band3 = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * 0.5) * ecc_deg), supra);
+        float rg_atten_res   = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * 0.25) * ecc_deg), supra);
 
         // YV: per-band attenuation — band spatial frequency determines k_ef contribution
-        // Band frequencies: band0≈4cpd, band1≈2cpd, band2≈1cpd, band3≈0.5cpd, residual≈0.25cpd
         float yv_atten_band0 = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * 4.0) * ecc_deg), supra);
         float yv_atten_band1 = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * 2.0) * ecc_deg), supra);
         float yv_atten_band2 = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * 1.0) * ecc_deg), supra);
@@ -221,11 +229,11 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         band3 = band3.bgra;
 
         // Reconstruct with per-band Oklab chromatic attenuation
-        result = chromaticAttenuate(mip4, rg_atten, yv_atten_res);
-        result += chromaticAttenuate(band3, rg_atten, yv_atten_band3) * w3;
-        result += chromaticAttenuate(band2, rg_atten, yv_atten_band2) * w2;
-        result += chromaticAttenuate(band1, rg_atten, yv_atten_band1) * w1;
-        result += chromaticAttenuate(band0, rg_atten, yv_atten_band0) * w0;
+        result = chromaticAttenuate(mip4, rg_atten_res, yv_atten_res);
+        result += chromaticAttenuate(band3, rg_atten_band3, yv_atten_band3) * w3;
+        result += chromaticAttenuate(band2, rg_atten_band2, yv_atten_band2) * w2;
+        result += chromaticAttenuate(band1, rg_atten_band1, yv_atten_band1) * w1;
+        result += chromaticAttenuate(band0, rg_atten_band0, yv_atten_band0) * w0;
         result = clamp(result, 0.0, 1.0);
         // Already in RGBA — skip the swap below
     } else {

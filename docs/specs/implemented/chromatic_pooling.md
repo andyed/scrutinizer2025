@@ -45,7 +45,8 @@ The three post-receptoral channels have fundamentally different eccentricity pro
 - As dendritic fields grow with eccentricity, midget cells receive mixed L and M input → opponency collapses
 - 50% sensitivity loss at ~5° (temporal field)
 - 90% loss by ~17°
-- Falloff is essentially independent of spatial frequency (castleCSF: k_ef ≈ 0)
+- At detection threshold, falloff is essentially independent of spatial frequency (castleCSF: k_ef ≈ 0)
+- At suprathreshold contrasts, larger stimuli benefit from spatial summation over more receptive fields → weak frequency dependence (k_ef = 0.003)
 - This is a wiring problem, not an optical one
 
 **S-(L+M) (Blue-Yellow) — Retina-Wide**
@@ -84,7 +85,7 @@ S(ecc, ρ) = S_foveal × 10^(-(k_e + ρ × k_ef) × ecc)
 | Parameter | Achromatic | Red-Green (L-M) | Blue-Yellow S-(L+M) |
 |-----------|:----------:|:---------------:|:-------------------:|
 | k_e (base decay) | 0.024 | **0.059** | 0.004 |
-| k_ef (freq-dependent) | 0.019 | ~0 | 0.008 |
+| k_ef (freq-dependent) | 0.019 | ~0 (threshold); **0.003** (suprathreshold) | 0.008 |
 
 The RG channel decays 2.5× faster than achromatic and **15× faster** than YV at low spatial frequencies.
 
@@ -92,14 +93,14 @@ The RG channel decays 2.5× faster than achromatic and **15× faster** than YV a
 
 | Channel | At 0.5 cpd | At 1 cpd | At 2 cpd | At 4 cpd |
 |---------|:----------:|:--------:|:--------:|:--------:|
-| **RG** 50% | 5.1° | 5.1° | 5.1° | 5.1° |
-| **RG** 90% loss | 16.9° | 16.9° | 16.9° | 16.9° |
+| **RG** 50% | 5.0° | 4.9° | 4.6° | 4.2° |
+| **RG** 90% loss | 16.5° | 16.1° | 15.4° | 14.1° |
 | **YV** 50% | 39.6° | 25.9° | 15.3° | 8.4° |
 | **YV** 90% loss | 131° | 85.9° | 50.8° | 27.9° |
 | **Ach** 50% | 9.0° | 7.0° | 4.9° | 3.0° |
 | **Ach** 90% loss | 29.9° | 23.3° | 16.2° | 10.0° |
 
-RG eccentricity decay is frequency-independent — it's a ganglion cell wiring constraint, not a spatial resolution limit. YV decay is strongly frequency-dependent — large blue-yellow patterns persist far into the periphery, while small ones don't. This is the size effect.
+Both channels have frequency-dependent decay, but at different rates. YV decay is strongly frequency-dependent (k_ef = 0.008) — large blue-yellow patterns persist far into the periphery while small ones fade. RG has a weaker frequency dependence (k_ef = 0.003) — castleCSF reports k_ef ≈ 0 at detection threshold, but suprathreshold spatial summation means larger red-green stimuli integrate over more receptive fields, yielding better color constancy than small ones. This gives size-dependent color preservation for both channels.
 
 ### Empirical Confirmation (Bowers, Gegenfurtner & Goettker 2025)
 
@@ -124,8 +125,8 @@ band_k_output = luminance(band_k) + chromatic_RG(band_k) × w_rg(ecc) + chromati
 ```
 
 Where:
-- `w_rg(ecc)` = RG attenuation, frequency-independent (fast decay)
-- `w_yv(ecc, k)` = YV attenuation, band-dependent (slow for coarse bands, faster for fine)
+- `w_rg(ecc, k)` = RG attenuation, band-dependent (fast base decay, weak frequency dependence k_ef=0.003)
+- `w_yv(ecc, k)` = YV attenuation, band-dependent (slow base decay, strong frequency dependence k_ef=0.008)
 
 The achromatic (luminance) component of each band keeps the existing M-scaling rolloff unchanged. Only the chrominance gets the new differential treatment.
 
@@ -176,9 +177,13 @@ vec4 sampleDoGReconstructedChromatic(vec2 uv, float eccentricity, float fovea_ra
     // (requires calibrated visual angle — until then, use normEcc × fovea_deg)
     float ecc_deg = normEcc * 2.0;  // rough: fovea ≈ 2° radius
 
-    // RG attenuation: frequency-independent, steep
-    // castleCSF: k_e = 0.059, so atten = 10^(-0.059 * ecc_deg)
-    float rg_atten = pow(10.0, -0.059 * ecc_deg);
+    // RG attenuation: per-band, steep base + weak frequency dependence
+    // castleCSF k_e = 0.059 (base), k_ef = 0.003 (suprathreshold spatial summation)
+    float rg_atten_band0 = pow(10.0, -(0.059 + 0.003 * 4.0) * ecc_deg);  // 4cpd
+    float rg_atten_band1 = pow(10.0, -(0.059 + 0.003 * 2.0) * ecc_deg);  // 2cpd
+    float rg_atten_band2 = pow(10.0, -(0.059 + 0.003 * 1.0) * ecc_deg);  // 1cpd
+    float rg_atten_band3 = pow(10.0, -(0.059 + 0.003 * 0.5) * ecc_deg);  // 0.5cpd
+    float rg_atten_res   = pow(10.0, -(0.059 + 0.003 * 0.25) * ecc_deg); // 0.25cpd
 
     // YV attenuation: frequency-dependent, shallow
     // Map bands to approximate spatial frequencies (cpd)
@@ -193,11 +198,11 @@ vec4 sampleDoGReconstructedChromatic(vec2 uv, float eccentricity, float fovea_ra
     // For each band: split into luminance + chrominance in Oklab,
     // attenuate a (RG) and b (YV) independently, recombine
 
-    vec4 result = chromaticAttenuate(mip4, rg_atten, yv_atten_res);  // residual
-    result += chromaticAttenuate(band3, rg_atten, yv_atten_band3) * w3;
-    result += chromaticAttenuate(band2, rg_atten, yv_atten_band2) * w2;
-    result += chromaticAttenuate(band1, rg_atten, yv_atten_band1) * w1;
-    result += chromaticAttenuate(band0, rg_atten, yv_atten_band0) * w0;
+    vec4 result = chromaticAttenuate(mip4, rg_atten_res, yv_atten_res);  // residual
+    result += chromaticAttenuate(band3, rg_atten_band3, yv_atten_band3) * w3;
+    result += chromaticAttenuate(band2, rg_atten_band2, yv_atten_band2) * w2;
+    result += chromaticAttenuate(band1, rg_atten_band1, yv_atten_band1) * w1;
+    result += chromaticAttenuate(band0, rg_atten_band0, yv_atten_band0) * w0;
 
     return clamp(result, 0.0, 1.0);
 }
@@ -216,7 +221,8 @@ vec4 chromaticAttenuate(vec4 color, float rg_atten, float yv_atten) {
 | Uniform | Type | Default | Purpose |
 |---------|------|---------|---------|
 | `u_chromatic_pooling` | float | 0.0 | 0=off (legacy uniform desat), 1=on (per-channel per-band) |
-| `u_rg_decay` | float | 0.059 | RG eccentricity decay constant (castleCSF k_e) |
+| `u_rg_decay` | float | 0.059 | RG base eccentricity decay (castleCSF k_e) |
+| `u_rg_freq_decay` | float | 0.003 | RG frequency-dependent decay (suprathreshold spatial summation) |
 | `u_yv_decay` | float | 0.004 | YV base eccentricity decay (castleCSF k_e) |
 | `u_yv_freq_decay` | float | 0.008 | YV frequency-dependent decay (castleCSF k_ef) |
 

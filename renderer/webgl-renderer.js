@@ -125,6 +125,7 @@
                     fovi_color_sigma: 0.0,
                     chromatic_pooling: false,
                     rg_decay: 0.059,     // castleCSF k_e for RG (L-M)
+                    rg_freq_decay: 0.003, // RG frequency-dependent decay (suprathreshold spatial summation)
                     yv_decay: 0.004,     // castleCSF k_e for YV S-(L+M)
                     yv_freq_decay: 0.008, // castleCSF k_ef for YV
                     supra_exponent: 0.5, // Threshold→appearance compression (Jiang et al. 2022)
@@ -225,6 +226,7 @@
                 // Chromatic pooling uniform lookup
                 this.chromaticPoolingLocation = gl.getUniformLocation(this.program, "u_chromatic_pooling");
                 this.rgDecayLocation = gl.getUniformLocation(this.program, "u_rg_decay");
+                this.rgFreqDecayLocation = gl.getUniformLocation(this.program, "u_rg_freq_decay");
                 this.yvDecayLocation = gl.getUniformLocation(this.program, "u_yv_decay");
                 this.yvFreqDecayLocation = gl.getUniformLocation(this.program, "u_yv_freq_decay");
                 this.supraExponentLocation = gl.getUniformLocation(this.program, "u_supra_exponent");
@@ -461,6 +463,7 @@
                         this.config.congestion_pooling = p.congestion_pooling ?? defaults.congestion_pooling;
                         this.config.chromatic_pooling = p.chromatic_pooling ?? defaults.chromatic_pooling;
                         this.config.rg_decay = p.rg_decay ?? defaults.rg_decay;
+                        this.config.rg_freq_decay = p.rg_freq_decay ?? defaults.rg_freq_decay;
                         this.config.yv_decay = p.yv_decay ?? defaults.yv_decay;
                         this.config.yv_freq_decay = p.yv_freq_decay ?? defaults.yv_freq_decay;
                         this.config.supra_exponent = p.supra_exponent ?? defaults.supra_exponent;
@@ -629,6 +632,7 @@
                 gl.uniform1f(this.desatFloorLocation, this.config.desat_floor ?? 1.0);
                 gl.uniform1f(this.chromaticPoolingLocation, this.config.chromatic_pooling ? 1.0 : 0.0);
                 gl.uniform1f(this.rgDecayLocation, this.config.rg_decay);
+                gl.uniform1f(this.rgFreqDecayLocation, this.config.rg_freq_decay);
                 gl.uniform1f(this.yvDecayLocation, this.config.yv_decay);
                 gl.uniform1f(this.yvFreqDecayLocation, this.config.yv_freq_decay);
                 gl.uniform1f(this.supraExponentLocation, this.config.supra_exponent);

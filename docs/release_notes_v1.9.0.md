@@ -24,11 +24,13 @@ Peripheral color is **pooled, not lost** (Rosenholtz TTM). The visual system ave
 The new pipeline models two biological asymmetries:
 
 - **Size-dependent preservation:** The DoG bands already decompose content by spatial scale. Large color fields live in low-frequency bands where chromatic pooling preserves mean chromaticity. Small colored features live in high-frequency bands where chromatic spatial resolution is genuinely reduced. Per-band attenuation gives size-dependent color preservation for free — no explicit stimulus-size measurement needed.
-- **Channel-dependent rates:** L-M (red-green) is a foveal specialization — midget ganglion cell wiring thins rapidly outside the fovea (castleCSF k_e = 0.059, frequency-independent). S-(L+M) (blue-yellow) tracks close to achromatic (k_e = 0.004), persisting far into the periphery with frequency-dependent attenuation (fine blue detail fades before coarse blue regions).
+- **Channel-dependent rates:** L-M (red-green) is a foveal specialization — midget ganglion cell wiring thins rapidly outside the fovea (castleCSF k_e = 0.059). S-(L+M) (blue-yellow) tracks close to achromatic (k_e = 0.004), persisting far into the periphery. Both channels have frequency-dependent per-band attenuation — YV strongly (k_ef = 0.008), RG weakly (k_ef = 0.003). castleCSF reports k_ef ≈ 0 for RG at detection threshold, but suprathreshold spatial summation means larger red-green stimuli integrate over more receptive fields, yielding better color constancy than small ones.
 
 ### Suprathreshold Correction
 
 The castleCSF parameters are detection thresholds — the minimum visible chromatic contrast. Web colors are well above threshold. A follow-up commit added `u_supra_exponent` (default 0.5) applying power-law compression (Jiang, Shooner & Mullen 2022) to convert threshold sensitivity to perceived appearance. At 10° eccentricity, RG retains ~51% appearance instead of ~26% raw threshold.
+
+**Needs calibration data:** The current exponent (0.5) is conservative. Jiang et al. report individual exponents ranging 0.39–0.84 with a mean of ~0.63. Raising `u_supra_exponent` to 0.6–0.65 would preserve more peripheral saturation, which the literature supports. This is a tuning decision — the parameter is exposed as a uniform for exactly this reason — but ground-truth calibration against gaze-contingent photographs or perceptual matching data would pin it down properly.
 
 ### What This Produces
 
@@ -41,7 +43,7 @@ The castleCSF parameters are detection thresholds — the minimum visible chroma
 
 ### Implementation
 
-5 new uniforms: `u_chromatic_pooling`, `u_rg_decay`, `u_yv_decay`, `u_yv_freq_decay`, `u_supra_exponent`. The `chromaticAttenuate()` helper splits each DoG band into Oklab luminance + chrominance, attenuates `a` (RG) and `b` (YV) independently, recombines. When chromatic pooling is active, the legacy V4 uniform chrominance path and Red Kill Switch are bypassed.
+6 uniforms: `u_chromatic_pooling`, `u_rg_decay`, `u_rg_freq_decay`, `u_yv_decay`, `u_yv_freq_decay`, `u_supra_exponent`. The `chromaticAttenuate()` helper splits each DoG band into Oklab luminance + chrominance, attenuates `a` (RG) and `b` (YV) independently per band, recombines. Both channels now have per-band frequency-dependent attenuation — YV strongly (k_ef=0.008), RG weakly (k_ef=0.003). When chromatic pooling is active, the legacy V4 uniform chrominance path and Red Kill Switch are bypassed.
 
 Enabled on modes 0 (High-Key), 1 (Biological), 9 (Congestion). Menu toggle: Behavior → Chromatic Pooling (RG/YV).
 
@@ -143,7 +145,7 @@ The ComplexityHUD stays visible alongside the split view, so you can read the nu
 
 Two major gaps exposed and documented this cycle, both with specs and reference pages for validation:
 
-1. **Size-dependent color preservation.** Chromatic pooling (this release) models per-channel decay rates but does not yet model size-dependent chromatic preservation within a single channel. Large color fields retain hue further into the periphery than small ones (Abramov et al. 1991) — the DoG band decomposition provides the spatial-frequency axis to drive this, but per-band YV attenuation is a first-order approximation. Full perceptive-field scaling remains future work.
+1. **Size-dependent color preservation.** Chromatic pooling (this release) models per-channel, per-band decay rates — both RG and YV channels now have frequency-dependent attenuation, so large colored regions preserve hue further than small ones for both channels (Abramov et al. 1991). The DoG bands provide discrete spatial frequency buckets, not continuous perceptive-field scaling. Full perceptive-field integration (Bouma-scaled pooling regions) remains future work.
 
 2. **Density-independent crowding.** The V1 Lateral Smash displaces pixels based on eccentricity alone — an isolated letter and a densely flanked letter at the same eccentricity receive identical distortion. In biological vision, the isolated letter remains identifiable (Bouma 1970). The structure map carries a density channel that could gate V1 strength, but it's unused. Spec: [`docs/specs/density_gated_crowding.md`](specs/density_gated_crowding.md). Reference pages: `crowding.html`, `crowding-stimulus.html`. See also: `docs/simulation-limitations.md`.
 
@@ -278,7 +280,7 @@ No new dependencies in the main Electron app.
 | **CLI** | `cli/scrutinizer-audit.js`, `cli/lib/analyzer.js`, `cli/lib/crawler.js`, `cli/lib/reporter.js`, `cli/lib/sitemap-parser.js`, `cli/lib/url-resolver.js`, `cli/lib/viewport-profiles.js`, `cli/lib/scroll-strategy.js`, `cli/package.json` |
 | **MCP Server** | `cli/mcp/server.js` |
 | **Split View** | `renderer/shaders/peripheral2.frag`, `renderer/scrutinizer.js`, `renderer/webgl-renderer.js`, `menu-template.js` |
-| **Chromatic Pooling** | `renderer/shaders/peripheral2.frag` (+`chromaticAttenuate`, per-band RG/YV decay), `renderer/webgl-renderer.js` (5 uniforms), `shared/modes.json`, `menu-template.js`, `main.js`, `renderer/scrutinizer.js`, `renderer/overlay.js` |
+| **Chromatic Pooling** | `renderer/shaders/peripheral2.frag` (+`chromaticAttenuate`, per-band RG/YV decay), `renderer/webgl-renderer.js` (6 uniforms), `shared/modes.json`, `menu-template.js`, `main.js`, `renderer/scrutinizer.js`, `renderer/overlay.js` |
 | **Crowding Diagnostics** | `scripts/capture-golden.js` (crowding capture tasks), `menu-template.js` (reference page menu items), `docs/simulation-limitations.md`, `docs/specs/density_gated_crowding.md` |
 | **Reference Pages** | `scrutinizer-www/src/reference-pages/crowding.html`, `scrutinizer-www/src/reference-pages/crowding-stimulus.html` |
 | **Validation** | `scripts/extract-congestion.js` (updated to use shared edge density + composite score), `scripts/capture-golden.js` (chromatic pooling on/off variants) |

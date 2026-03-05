@@ -40,7 +40,23 @@
   - Tyler 2015: eccentricity-scaled stimuli appear vivid — loss is size-dependent
   - Hansen et al. 2009: THRESHOLD study only — shows cone opponency persists to 50 deg with large stimuli, but does NOT measure suprathreshold appearance. Overcited in our docs for saturation retention.
 - **Rosenholtz/TTM framework**: pooling preserves mean chromaticity; only fine chromatic detail is lost
-- **Next steps**: make RG decay frequency-dependent (like YV already is); raise supra_exponent to 0.65
+- **RESOLVED (2026-03-04)**: RG decay is now frequency-dependent (u_rg_freq_decay = 0.003, ~1/3 of YV's 0.008). Both channels have per-band attenuation — large red regions preserve hue further than small red features. Size-dependent color preservation now works for both RG and YV.
+- **Open**: consider raising supra_exponent from 0.5 to 0.65 (Jiang et al. mean ~0.63)
+
+## Visual Verification Duty
+
+After any shader or pipeline change that affects rendering output, the vision-scientist agent should:
+
+1. **Request golden capture regeneration** (`npm run capture-golden`)
+2. **Generate before/after comparisons** (`node scripts/generate-chromatic-comparison.js` or similar)
+3. **Review comparison images** — verify the visual output matches biological predictions:
+   - Does the change produce the expected perceptual effect?
+   - Are there artifacts (banding, color shifts, dead zones)?
+   - Does the fovea remain clean (no chromatic distortion at fixation)?
+   - Do the on/off pairs show the predicted asymmetry?
+4. **Flag discrepancies** between claimed behavior and observed output
+
+Comparison images live in `docs/golden/chromatic-comparison/`. The script (`scripts/generate-chromatic-comparison.js`) uses pngjs bitmap compositing — no external dependencies.
 
 ## Key Parameters
 - dog_e2: default 0.15 (High-Key), 0.12 (Biological) -- normalized units, not degrees

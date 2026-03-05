@@ -23,6 +23,7 @@
                 "fovi_color_sigma": 0.0,
                 "chromatic_pooling": true,
                 "rg_decay": 0.059,
+                "rg_freq_decay": 0.003,
                 "yv_decay": 0.004,
                 "yv_freq_decay": 0.008,
                 "supra_exponent": 0.5
@@ -59,6 +60,7 @@
                 "fovi_color_sigma": 0.0,
                 "chromatic_pooling": true,
                 "rg_decay": 0.059,
+                "rg_freq_decay": 0.003,
                 "yv_decay": 0.004,
                 "yv_freq_decay": 0.008,
                 "supra_exponent": 0.5
@@ -287,6 +289,7 @@
                 "congestion_pooling": true,
                 "chromatic_pooling": true,
                 "rg_decay": 0.059,
+                "rg_freq_decay": 0.003,
                 "yv_decay": 0.004,
                 "yv_freq_decay": 0.008,
                 "supra_exponent": 0.5
