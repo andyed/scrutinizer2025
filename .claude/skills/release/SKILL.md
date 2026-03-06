@@ -113,8 +113,17 @@ Run each step sequentially. After each step, verify before proceeding. **STOP on
 - Return to scrutinizer2025 working directory after
 
 ### 13. Verify auto-update
-- Remind user to check that `latest-mac.yml` in GitHub release assets has correct version and sha512
-- On a machine running the previous version, electron-updater should detect the update
+- Confirm `latest-mac.yml` is in the release assets:
+  ```bash
+  gh release view v{VERSION} --json assets --jq '.assets[].name' | grep latest-mac.yml
+  ```
+  **If missing, upload it:** `gh release upload v{VERSION} dist/latest-mac.yml --clobber`
+- Verify the yml content matches the built artifacts:
+  ```bash
+  gh release download v{VERSION} --pattern latest-mac.yml --output - | head -5
+  ```
+  Version field must say `{VERSION}` and file entries must list the DMG and ZIP with sha512 hashes.
+- On a machine running the previous version, electron-updater should detect the update via Check for Updates
 
 ## Silent Update Steps (`silent`)
 

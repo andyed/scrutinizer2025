@@ -33,6 +33,9 @@ tests/validation/results-*/
 # Golden captures — bulk regression screenshots, too large for git.
 # Key illustrative captures live in docs/golden/ instead (curated per release).
 tests/golden-captures/
+# Research papers (PDFs, too large for git)
+docs/research/
+
 # LaTeX build artifacts
 docs/arxiv-paper/*.aux
 docs/arxiv-paper/*.bbl

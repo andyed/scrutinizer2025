@@ -187,7 +187,7 @@ Two major gaps exposed and documented this cycle, both with specs and reference 
 
 ### Rendering Pipeline
 - **Density-gated crowding** — Sigmoid density gate on V1 strength so dense content gets full Lateral Smash while isolated elements are spared. Spec written, pending team review on density signal approach. Spec: [`docs/specs/density_gated_crowding.md`](specs/density_gated_crowding.md)
-- **Oriented DoG bands (Oblique Effect)** — Cardinal edges persist ~50% further than oblique ones. Spec: `docs/specs/oriented_dog_bands.md`
+- **Oriented DoG bands (Oblique Effect)** — Cardinal edges persist ~50% further than oblique ones. Spec: [`docs/specs/oriented_dog_bands.md`](specs/oriented_dog_bands.md)
 
 ### scrutinizer-audit
 - **HTML report template** — Lighthouse-style visual report with per-page score cards

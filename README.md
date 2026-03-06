@@ -315,6 +315,14 @@ claude mcp add scrutinizer-audit -- node cli/mcp/server.js
 
 ---
 
+## Acknowledgments
+
+- **[face-api.js](https://github.com/vladmandic/face-api)** (v1.7.15, Vladimir Mandic) — TinyFaceDetector powers the face channel in the saliency pipeline. MIT license.
+- **[Rosenholtz Lab](https://persci.mit.edu/people/rosenholtz/)** — Feature Congestion metric, Texture Tiling Model, and peripheral vision research that grounds this project.
+- **[FOVI](https://arxiv.org/abs/2602.03766)** (Blauch, Alvarez & Konkle) — cortical magnification parameterization adopted in v1.7.
+- **[castleCSF](https://doi.org/10.1167/jov.24.4.5)** (Ashraf et al.) — per-channel chromatic contrast sensitivity functions.
+- **[arXiv](https://arxiv.org/)** — open preprint infrastructure. Multiple foundational papers for this project (FOVI, cognitive trace inference, castleCSF) were accessible because researchers posted preprints. ArXiv is another way of simulating higher-order cognition: making the state of knowledge available without waiting for journal gatekeeping.
+
 ## License
 
 Copyright (c) 2012–2026, Andy Edmonds. All rights reserved.
