@@ -23,9 +23,14 @@ Every saccade is a micro-economic decision: commit the fovea to this target, for
 
 The simulation is grounded in vision science: cortical magnification functions, contrast sensitivity models, and feature congestion scoring. It serves designers studying visual hierarchy, researchers conducting attention studies with mouse-contingent viewing, and vision scientists validating peripheral models against rendered output.
 
-![Progressive Grid](screenshots/onedotone_progressive_grid.png)
+![Dashboard with foveated rendering](screenshots/v19_dashboard.png)
 
-*Fourteen fixation steps from far periphery to fovea. Spatial pooling narrows, chromatic detail returns, and semantic content resolves — the mechanics of a single glance.*
+*A dashboard viewed through Scrutinizer's v1.9 pipeline. The cursor (fixation point) is at center — spatial resolution falls off with eccentricity via DoG band decomposition, red-green chromatic detail fades before blue-yellow (castleCSF), and peripheral structure degrades proportional to local congestion.*
+
+| Congestion Overlay | Chromatic Pooling | Article Page |
+|:--:|:--:|:--:|
+| ![Congestion](screenshots/v19_dashboard_congestion.png) | ![Chromatic](screenshots/v19_chromatic_pooling.png) | ![Article](screenshots/v19_article.png) |
+| Feature Congestion heatmap (Rosenholtz 2007) | castleCSF per-channel RG/YV decay | Blog article with peripheral rendering |
 
 ---
 

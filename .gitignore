@@ -36,6 +36,9 @@ tests/golden-captures/
 # Research papers (PDFs, too large for git)
 docs/research/
 
+# Private correspondence
+docs/meeting-prep-*.md
+
 # LaTeX build artifacts
 docs/arxiv-paper/*.aux
 docs/arxiv-paper/*.bbl
