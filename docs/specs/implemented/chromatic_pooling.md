@@ -89,6 +89,8 @@ S(ecc, ρ) = S_foveal × 10^(-(k_e + ρ × k_ef) × ecc)
 
 The RG channel decays 2.5× faster than achromatic and **15× faster** than YV at low spatial frequencies.
 
+**Note:** These are *detection threshold* parameters. The implementation defaults use suprathreshold-corrected values derived from Bowers et al. (2025) appearance measurements: `u_rg_decay = 0.072` (from 29% at 15°), `u_yv_decay = 0.014` (from 79% at 15°). See §3 Uniforms table.
+
 ### Derived Half-Life Eccentricities
 
 | Channel | At 0.5 cpd | At 1 cpd | At 2 cpd | At 4 cpd |
@@ -182,21 +184,23 @@ vec4 sampleDoGReconstructedChromatic(vec2 uv, float eccentricity, float fovea_ra
     float ecc_deg = chromNormEcc * 2.0;  // fovea ≈ 2° radius
 
     // RG attenuation: per-band, steep base + weak frequency dependence
-    // castleCSF k_e = 0.059 (base), k_ef = 0.003 (suprathreshold spatial summation)
-    float rg_atten_band0 = pow(10.0, -(0.059 + 0.003 * 4.0) * ecc_deg);  // 4cpd
-    float rg_atten_band1 = pow(10.0, -(0.059 + 0.003 * 2.0) * ecc_deg);  // 2cpd
-    float rg_atten_band2 = pow(10.0, -(0.059 + 0.003 * 1.0) * ecc_deg);  // 1cpd
-    float rg_atten_band3 = pow(10.0, -(0.059 + 0.003 * 0.5) * ecc_deg);  // 0.5cpd
-    float rg_atten_res   = pow(10.0, -(0.059 + 0.003 * 0.25) * ecc_deg); // 0.25cpd
+    // u_rg_decay default = 0.072 (suprathreshold, Bowers 2025: 29% at 15°)
+    // u_rg_freq_decay default = 0.003 (suprathreshold spatial summation)
+    float rg_atten_band0 = pow(10.0, -(u_rg_decay + u_rg_freq_decay * 4.0) * ecc_deg);  // 4cpd
+    float rg_atten_band1 = pow(10.0, -(u_rg_decay + u_rg_freq_decay * 2.0) * ecc_deg);  // 2cpd
+    float rg_atten_band2 = pow(10.0, -(u_rg_decay + u_rg_freq_decay * 1.0) * ecc_deg);  // 1cpd
+    float rg_atten_band3 = pow(10.0, -(u_rg_decay + u_rg_freq_decay * 0.5) * ecc_deg);  // 0.5cpd
+    float rg_atten_res   = pow(10.0, -(u_rg_decay + u_rg_freq_decay * 0.25) * ecc_deg); // 0.25cpd
 
     // YV attenuation: frequency-dependent, shallow
-    // Map bands to approximate spatial frequencies (cpd)
+    // u_yv_decay default = 0.014 (suprathreshold, Bowers 2025: 79% at 15°)
+    // u_yv_freq_decay default = 0.008 (castleCSF k_ef)
     // band0 ~ 4cpd, band1 ~ 2cpd, band2 ~ 1cpd, band3 ~ 0.5cpd, residual ~ 0.25cpd
-    float yv_atten_band0 = pow(10.0, -(0.004 + 0.008 * 4.0) * ecc_deg);
-    float yv_atten_band1 = pow(10.0, -(0.004 + 0.008 * 2.0) * ecc_deg);
-    float yv_atten_band2 = pow(10.0, -(0.004 + 0.008 * 1.0) * ecc_deg);
-    float yv_atten_band3 = pow(10.0, -(0.004 + 0.008 * 0.5) * ecc_deg);
-    float yv_atten_res   = pow(10.0, -(0.004 + 0.008 * 0.25) * ecc_deg);
+    float yv_atten_band0 = pow(10.0, -(u_yv_decay + u_yv_freq_decay * 4.0) * ecc_deg);
+    float yv_atten_band1 = pow(10.0, -(u_yv_decay + u_yv_freq_decay * 2.0) * ecc_deg);
+    float yv_atten_band2 = pow(10.0, -(u_yv_decay + u_yv_freq_decay * 1.0) * ecc_deg);
+    float yv_atten_band3 = pow(10.0, -(u_yv_decay + u_yv_freq_decay * 0.5) * ecc_deg);
+    float yv_atten_res   = pow(10.0, -(u_yv_decay + u_yv_freq_decay * 0.25) * ecc_deg);
 
     // ── Per-band chromatic decomposition + selective attenuation ──
     // For each band: split into luminance + chrominance in Oklab,
@@ -225,25 +229,36 @@ vec4 chromaticAttenuate(vec4 color, float rg_atten, float yv_atten) {
 | Uniform | Type | Default | Purpose |
 |---------|------|---------|---------|
 | `u_chromatic_pooling` | float | 0.0 | 0=off (legacy uniform desat), 1=on (per-channel per-band) |
-| `u_rg_decay` | float | 0.059 | RG base eccentricity decay (castleCSF k_e) |
+| `u_rg_decay` | float | 0.072 | RG base eccentricity decay (suprathreshold; Bowers 2025) |
 | `u_rg_freq_decay` | float | 0.003 | RG frequency-dependent decay (suprathreshold spatial summation) |
-| `u_yv_decay` | float | 0.004 | YV base eccentricity decay (castleCSF k_e) |
+| `u_yv_decay` | float | 0.014 | YV base eccentricity decay (suprathreshold; Bowers 2025) |
 | `u_yv_freq_decay` | float | 0.008 | YV frequency-dependent decay (castleCSF k_ef) |
 
 Expose in `modes.json` per-mode, alongside existing `dog_e2` and `dog_sharpness`.
 
-### Interaction with Existing V4 Chrominance Path
+### Interaction with V4 Base Desaturation
 
-The rod-vision path (eigengrau tint, Purkinje shift) runs **after** V4 pooling. With chromatic pooling enabled:
+Two independent biological mechanisms reduce peripheral chrominance. The shader models them as separate pipeline stages that multiply:
 
-1. DoG reconstruction handles per-band, per-channel attenuation using **true gaze eccentricity** (`visual_ecc`), decoupled from V1 distortion strength
-2. Base desaturation (uniform Oklab chrominance reduction) **always runs** — it provides the cone-density-driven chroma floor that the castleCSF threshold model alone undershoots at suprathreshold web-color contrasts. Per-band and base desat are complementary: per-band handles differential RG/YV decay, base desat ensures sufficient total chroma loss.
-3. The **Red Kill Switch is gated off** when chromatic pooling + DoG are active — per-band RG decay at correct eccentricity handles red-specific suppression without the blunt 95% kill
-4. The rod-vision path handles the far periphery where scotopic vision dominates (eigengrau tint, Purkinje shift)
+1. **Opponent channel resolution loss** (per-band chromatic pooling, in `sampleDoGReconstructed`). Midget ganglion cells lose 1:1 L/M wiring with eccentricity → L-M opponency collapses. S-cone bistratified cells have retina-wide coverage → S-(L+M) barely fades. This is a spatial resolution problem in the opponent channels — modeled by castleCSF decay constants per band.
 
-Combined at corner (~10°): per-band (50% RG retention) × base desat (20% remaining) ≈ 10% residual warmth — perceptible but not salient.
+2. **Cone-to-rod population shift** (base desaturation, in V4 pipeline). Rods outnumber cones increasingly with eccentricity. Rod signals are achromatic. Even if the remaining cones could resolve chrominance perfectly, there are fewer of them relative to rods — overall chromatic signal strength drops. This is a photoreceptor density problem — modeled by the smoothstep ramp on Oklab `a` and `b`.
 
-When `u_chromatic_pooling = 0`, behavior is identical to legacy (uniform chrominance reduction + Red Kill Switch). This is a strict superset.
+These multiply because they're independent: a peripheral pixel can have both degraded opponent-channel resolution (per-band) AND reduced cone contribution (base desat). At 10° with suprathreshold defaults (k_rg=0.072, k_yv=0.014):
+
+| Stage | RG | YV |
+|-------|:--:|:--:|
+| Per-band (castleCSF) | ~42% | ~86% |
+| Base desat (cone/rod) | ~80% | ~80% |
+| **Combined** | **~34%** | **~69%** |
+
+The RG/YV asymmetry comes entirely from per-band. Base desat is channel-uniform — it reduces overall saturation without changing the RG/YV ratio. This means the per-band stage determines the *shape* of peripheral color (blue shift, warm fade) and base desat controls the *floor* (how much total chrominance remains).
+
+**Red Kill Switch** is gated off when chromatic pooling is active — per-band RG decay handles red suppression without the blunt 95% kill.
+
+**Rod-vision path** (eigengrau tint, Purkinje shift) runs after V4 pooling and handles the far periphery where scotopic vision dominates.
+
+When `u_chromatic_pooling = 0`, behavior is identical to legacy (uniform chrominance reduction + Red Kill Switch).
 
 ## 4. What This Predicts
 

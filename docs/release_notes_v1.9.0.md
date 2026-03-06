@@ -163,15 +163,13 @@ The ComplexityHUD stays visible alongside the split view, so you can read the nu
 
 ## Mode 8 Removed
 
-**Mode 8 (Gaussian Desaturation)** has been removed from the mode registry, shader pipeline, and menu. Three reasons:
+**Mode 8 (Gaussian Desaturation)** has been removed from the mode registry, shader pipeline, and menu.
 
-1. **Superseded.** castleCSF per-channel chromatic pooling (this release) provides biologically grounded differential decay rates per chromatic channel per spatial frequency band. The Gaussian vs smoothstep comparison Mode 8 was designed for is no longer the relevant question.
+**Why it existed:** The base desaturation uses a smoothstep ramp — a sigmoid S-curve that transitions abruptly near its endpoints. Mode 8 tested whether a Gaussian `exp(-r²/σ²)` would produce a more natural-looking transition, especially at the boundary between desaturated periphery and full-color fovea. A reasonable question: does the mathematical shape of the falloff curve matter?
 
-2. **Broken implementation.** Mode 8's config was missing `chromatic_pooling: true`, causing it to fall through to the legacy desaturation path + Red Kill Switch simultaneously — triple desaturation stacking on saturated content. Color-spectrum captures showed garbled text and banding artifacts.
+**Why it's gone:** castleCSF per-channel chromatic pooling made the question obsolete. The relevant variable isn't *curve shape* (smoothstep vs Gaussian) — it's *which opponent channels decay at which rates*. A perfectly shaped uniform curve still treats red-green and blue-yellow identically, which is the bigger error. Additionally, the implementation was broken (missing `chromatic_pooling: true` caused triple desaturation stacking), and Bowers et al. (2025) showed RG attenuation is biphasic, which a single-parameter exponential can't capture anyway.
 
-3. **Wrong functional form.** The Gaussian decay `exp(-r/σ)` assumes monotonic exponential RG falloff. Bowers, Gegenfurtner & Goettker (2025) showed RG attenuation is biphasic — steep decline to ~15° eccentricity, then a shallower tail. A single-parameter exponential cannot capture this shape.
-
-Gaussian color decay (`u_fovi_color_sigma`) remains in Mode 6 (FOVI standalone) where it models a different effect — FOVI's own peripheral color decay, orthogonal to the Scrutinizer DoG pipeline.
+Gaussian color decay (`u_fovi_color_sigma`) remains in Mode 6 (FOVI standalone) where it models FOVI's own peripheral color decay, orthogonal to the DoG pipeline.
 
 ---
 
