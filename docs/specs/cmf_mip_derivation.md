@@ -149,8 +149,8 @@ c3 = u_cmf_a * (exp(4.0 * scale) - 1.0) / fovea_deg;
 const foveaDeg = 2.0;
 const halfDiag = Math.sqrt(width * width + height * height) / 2;
 const rMaxDeg = (halfDiag / foveaRadius) * foveaDeg;
-const corticalMax = this.config.fovi_enabled
-    ? Math.log(rMaxDeg + this.config.fovi_a) - Math.log(this.config.fovi_a)
+const corticalMax = this.config.cmf_enabled
+    ? Math.log(rMaxDeg + this.config.cmf_a) - Math.log(this.config.cmf_a)
     : 4.0 * Math.LN2;  // legacy: reproduces old log₂ behavior (cortical_max = maxMip * ln(2))
 gl.uniform1f(this.corticalMaxLocation, corticalMax);
 ```
@@ -158,14 +158,14 @@ gl.uniform1f(this.corticalMaxLocation, corticalMax);
 Log on change:
 ```javascript
 if (!this._lastCorticalMax || Math.abs(corticalMax - this._lastCorticalMax) > 0.01) {
-    console.log(`[WebGLRenderer] CMF cortical_max=${corticalMax.toFixed(3)} (r_max=${rMaxDeg.toFixed(1)}° a=${this.config.fovi_a} fovea=${foveaRadius}px ${width}×${height})`);
+    console.log(`[WebGLRenderer] CMF cortical_max=${corticalMax.toFixed(3)} (r_max=${rMaxDeg.toFixed(1)}° a=${this.config.cmf_a} fovea=${foveaRadius}px ${width}×${height})`);
     this._lastCorticalMax = corticalMax;
 }
 ```
 
 ### Modes: `shared/modes.json`
 
-Update FOVI mode description (line 172):
+Update CMF mode description (line 172):
 ```
 "Cortical magnification from Blauch, Alvarez & Konkle (2026): mipLevel = maxMip × [ln(r+a) - ln(a)] / [ln(r_max+a) - ln(a)]. a=2.78°, r_max derived from screen geometry."
 ```
@@ -176,11 +176,11 @@ Update FOVI mode description (line 172):
 |------|--------|
 | `renderer/shaders/peripheral2.frag` | Add `u_cortical_max` uniform; rewrite 2 MIP equations + 4 DoG cutoffs |
 | `renderer/webgl-renderer.js` | Add location, compute `cortical_max`, upload, log on change |
-| `shared/modes.json` | Fix FOVI mode description |
+| `shared/modes.json` | Fix CMF mode description |
 
 ## Backward Compatibility
 
-For legacy modes (`fovi_enabled: false`), set `cortical_max = maxMipLevel × ln(2) = 4.0 × 0.693 = 2.773`. This makes the corrected equation reduce to the old `log₂` behavior:
+For legacy modes (`cmf_enabled: false`), set `cortical_max = maxMipLevel × ln(2) = 4.0 × 0.693 = 2.773`. This makes the corrected equation reduce to the old `log₂` behavior:
 
 ```
 maxMipLevel × [ln(r+a) - ln(a)] / (maxMipLevel × ln(2))

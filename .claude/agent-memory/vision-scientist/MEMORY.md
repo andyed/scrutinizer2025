@@ -1,5 +1,27 @@
 # Vision Scientist Agent Memory
 
+## What Scrutinizer Does (v1.9.1)
+
+Scrutinizer simulates what your visual system actually does to the 95% of your screen you're not looking at.
+
+**The core problem:** Your brain presents you with a seamless, full-color, high-resolution visual field. This is a lie. Only the central ~2° — roughly a thumbnail at arm's length — gets full-resolution, full-color processing. Everything else is progressively degraded by your visual system before you ever "see" it. Designers build interfaces as if every pixel gets equal treatment. They don't.
+
+**What the shader does, per pixel, per frame:**
+
+1. **Where are you looking?** The cursor stands in for gaze. Every pixel's eccentricity (angular distance from fixation) is computed in degrees of visual angle, calibrated to actual screen geometry and viewing distance.
+
+2. **Spatial resolution falls off logarithmically.** Cortical magnification — the fraction of visual cortex allocated per degree of visual field — follows a log curve: `M(r) = 1/(r + a)`, where `a ≈ 2.78°`. This means resolution drops fast in the first 5°, then tapers. The shader maps this to MIP levels: higher eccentricity → sample from a blurrier version of the page. A Difference-of-Gaussians decomposition splits the image into spatial frequency bands (fine detail, medium structure, coarse layout), each dropping out at its own eccentricity threshold derived from the same magnification function.
+
+3. **Color sensitivity falls off — but not uniformly.** The red-green opponent channel attenuates ~2.5× faster than luminance with eccentricity. Blue-yellow persists further. This isn't desaturation — it's selective chromatic pooling. Large colored regions hold their hue longer than small ones because the pooling regions grow with eccentricity. The decay rates come from contrast sensitivity measurements (castleCSF), corrected from detection thresholds to suprathreshold appearance.
+
+4. **Structure modulates everything.** A real-time content analysis pass identifies text blocks, images, whitespace, and visual rhythm in the page. Dense, structured regions (navigation bars, text columns) get different treatment than open space. Salient elements — high-contrast, isolated, or semantically distinct — resist peripheral degradation, modeling how pop-out features survive peripheral processing.
+
+5. **Feature congestion scores clutter.** Local variance in color, orientation, and luminance contrast produces a per-region complexity score (Rosenholtz 2007). High-congestion regions can drive stronger peripheral pooling — testing the prediction that visual clutter and peripheral crowding share the same mechanism.
+
+**What it's not:** A blur filter. A privacy screen. An accessibility checker (though it informs accessibility). It's a real-time perceptual simulation grounded in visual neuroscience — cortical magnification, opponent-channel processing, receptive field pooling, and summary statistics — running at 60fps as a transparent overlay on live web content.
+
+**Why it matters:** If you can't read that sidebar label through Scrutinizer, your users' visual systems can't resolve it either. The simulation makes the invisible degradation visible, giving designers and researchers a tool for reasoning about what the periphery actually delivers to perception.
+
 ## Scrutinizer Project Architecture
 - Foveated vision renderer in WebGL (fragment shader: `renderer/shaders/peripheral2.frag`)
 - Neuro-architecture pipeline: LGN (gating) -> V1 (geometry/distortion) -> V4 (aesthetics)

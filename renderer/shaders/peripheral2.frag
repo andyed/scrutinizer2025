@@ -41,10 +41,10 @@ uniform float u_dog_e2;          // M-scaling E2 (half-resolution eccentricity)
 uniform float u_dog_sharpness;   // Band rolloff sharpness (0=biological, 1=sharp)
 
 // FOVI (Cortical Magnification) uniforms — Blauch, Alvarez & Konkle (2026)
-uniform float u_fovi_enabled;     // 0.0 = legacy linear, 1.0 = CMF logarithmic
+uniform float u_cmf_enabled;     // 0.0 = legacy linear, 1.0 = CMF logarithmic
 uniform float u_cmf_a;            // Cortical magnification constant (default 2.78)
 uniform float u_cortical_max;     // ln(r_max+a) - ln(a), precomputed on JS side
-uniform float u_fovi_color_sigma; // Gaussian color decay sigma (0.0 = disabled)
+uniform float u_cmf_color_sigma; // Gaussian color decay sigma (0.0 = disabled)
 uniform float u_desat_floor;      // Min desaturation multiplier in salient regions (1.0 = full desat, 0.85 = 15% cap)
 
 // Chromatic pooling — per-channel RG/YV eccentricity decay (castleCSF; Ashraf et al. 2024)
@@ -158,7 +158,7 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     // biologically correct: you see WHERE a button is, not its label.
     float c0, c1, c2, c3;
     float e2 = max(dog_e2, 0.01);
-    if (u_fovi_enabled > 0.5) {
+    if (u_cmf_enabled > 0.5) {
         // CMF-derived: invert mipLevel = maxMip * log1p(r/a) / cortical_max
         // → r = a * (exp(level * cortical_max / maxMip) - 1)
         // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
@@ -258,7 +258,7 @@ vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
     float maxMipLevel = 4.0;
 
     float mipLevel;
-    if (u_fovi_enabled > 0.5) {
+    if (u_cmf_enabled > 0.5) {
         // Cortical distance: d(r) = log(1 + r/a), numerically stable form
         // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
         float fovea_deg = 2.0;
@@ -285,7 +285,7 @@ vec4 sampleMIPPooledGrad(vec2 uv, vec2 duvdx, vec2 duvdy, float eccentricity, fl
     float maxMipLevel = 4.0;
 
     float mipLevel;
-    if (u_fovi_enabled > 0.5) {
+    if (u_cmf_enabled > 0.5) {
         // Cortical distance: d(r) = log(1 + r/a), numerically stable form
         // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
         float fovea_deg = 2.0;
@@ -434,7 +434,7 @@ struct ModeConfig {
     int  v4_style_id;
     float lgn_ramp_end_mult;
     bool v1_animate;
-    bool fovi_enabled;
+    bool cmf_enabled;
 };
 
 struct LGN_Signal {
@@ -900,11 +900,11 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         return mix(col, finalColor, effectFactor * bypassTransition);
 
     } else if (config.v4_style_id == 6) { // FOVI: Gaussian color decay (rod-cone transition)
-        if (u_fovi_color_sigma > 0.01) {
+        if (u_cmf_color_sigma > 0.01) {
             float fovea_deg = 2.0;
             float normEcc = max(0.0, eccentricity) / max(fovea_radius, 0.001);
             float r_deg = normEcc * fovea_deg;
-            float decay = exp(-r_deg / max(u_fovi_color_sigma, 0.1));
+            float decay = exp(-r_deg / max(u_cmf_color_sigma, 0.1));
             float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
             col = mix(vec3(lum), col, decay);
         }
@@ -982,7 +982,7 @@ void main() {
     config.v4_style_id = u_v4_style_id;
     config.lgn_ramp_end_mult = u_lgn_ramp_end_mult;
     config.v1_animate = u_v1_animate > 0.5;
-    config.fovi_enabled = u_fovi_enabled > 0.5;
+    config.cmf_enabled = u_cmf_enabled > 0.5;
 
     if (config.v4_style_id == 5) {
         config.lgn_use_structure_mask = false;

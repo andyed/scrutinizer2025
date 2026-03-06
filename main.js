@@ -1560,8 +1560,8 @@ function runIntegrationTest() {
                             // Reuse save logic
                             const fs = require('fs');
                             const p = require('path');
-                            // Dynamic path based on package version
-                            const packageVersion = require('./package.json').version;
+                            // Dynamic path based on package version (strip patch: 1.9.1 → 1.9)
+                            const packageVersion = require('./package.json').version.replace(/\.\d+$/, '');
                             const screenshotsDir = p.join(__dirname, 'tests', 'golden-captures', `v${packageVersion}`);
                             if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir, { recursive: true });
 

@@ -20,9 +20,11 @@
 - **CMF→MIP mapping**: Corrected to `ln(r+a) - ln(a)` with `cortical_max` normalization (commit 5be3b2b).
 
 ### Removed
-- **Mode 8 (Gaussian Desaturation)**: Removed. castleCSF per-channel pooling (v1.9.0) supersedes the Gaussian vs smoothstep desaturation comparison. The mode was also broken — missing `chromatic_pooling` in config caused triple desaturation stacking on saturated content. The Gaussian functional form (exp(-r/σ)) is wrong for RG decay: Bowers, Gegenfurtner & Goettker (2025) showed RG attenuation is biphasic (steep to ~15°, then shallower), not pure exponential. Gaussian color decay remains in Mode 6 (FOVI standalone) where it serves a different purpose.
+- **Mode 8 (Gaussian Desaturation)**: Removed. castleCSF per-channel pooling (v1.9.0) supersedes the Gaussian vs smoothstep desaturation comparison. The mode was also broken — missing `chromatic_pooling` in config caused triple desaturation stacking on saturated content. The Gaussian functional form (exp(-r/σ)) is wrong for RG decay: Bowers, Gegenfurtner & Goettker (2025) showed RG attenuation is biphasic (steep to ~15°, then shallower), not pure exponential. Gaussian color decay remains in Mode 6 (CMF standalone) where it serves a different purpose.
 
 ### Changed
+- **Rename `fovi_*` → `cmf_*`**: Config keys, shader uniforms, and JS variables renamed from `fovi_` prefix to `cmf_`. "FOVI" is the name of a specific model; the feature is cortical magnification function (CMF) — not FOVI-specific.
+- **CMF log path default for Modes 0 and 1**: Research modes now use logarithmic MIP scaling via CMF instead of legacy linear `normalizedEcc * 2.5`. Mode 7 retains `cmf_enabled: false` as frozen comparison baseline.
 - **Doc terminology scrub**: Replaced "desaturation" with "chromatic pooling" / "chrominance reduction" across 8 docs where describing biology. Peripheral color is pooled (mean chromaticity preserved), not lost.
 - **Hansen et al. 2009 citation correction**: Paper measures detection thresholds only, not suprathreshold appearance. Separated from Jiang et al. 2022 citation. PDF archived in `docs/research/`.
 
@@ -61,15 +63,15 @@
 
 ### Added
 - **FOVI Cortical Magnification Function**: Added FOVI's CMF (Blauch, Alvarez & Konkle, 2026, arxiv:2602.03766) as a switchable MIP-sampling mode. This implements one component of FOVI — the spatial resolution falloff — not the full kNN sensor manifold or neural network pipeline.
-    - New uniforms: `u_fovi_enabled`, `u_cmf_a`, `u_fovi_color_sigma`.
+    - New uniforms: `u_cmf_enabled`, `u_cmf_a`, `u_cmf_color_sigma`.
     - When enabled: logarithmic MIP scaling via CMF (log2((r_deg + a) / a)) and CMF-derived DoG band cutoffs.
-    - Modes 0 & 1 retain legacy pipeline (`fovi_enabled: false`) — FOVI's CMF models cortical magnification only, not the full peripheral detail loss (crowding, RF growth, contrast sensitivity). Existing parameters already approximate the combined perceptual effect.
+    - Modes 0 & 1 retain legacy pipeline (`cmf_enabled: false`) — FOVI's CMF models cortical magnification only, not the full peripheral detail loss (crowding, RF growth, contrast sensitivity). Existing parameters already approximate the combined perceptual effect.
 - **Mode 6: FOVI (Cortical Magnification)**: FOVI's CMF as a standalone MIP-sampling mode, orthogonal to Scrutinizer pipeline.
     - Single CMF-driven MIP blur (no DoG band decomposition).
     - Gaussian color decay (V4 style 6) is Scrutinizer's own addition for perceptual comparison — not from FOVI, which is purely spatial.
     - No LGN gating or V1 distortion — clean comparison baseline.
 - **Mode 7: Legacy v1.6 (Comparison)**: Frozen v1.6 pipeline snapshot for A/B dogfooding.
-    - Linear MIP scaling, hand-tuned DoG cutoffs, `fovi_enabled: false`.
+    - Linear MIP scaling, hand-tuned DoG cutoffs, `cmf_enabled: false`.
     - Identical to pre-v1.7 mode 0 behavior.
 - **Mode 8: Gaussian Desaturation (Experimental)**: Controlled experiment isolating desaturation curve shape.
     - Identical pipeline to mode 0 (same DoG, LGN gating, V1 distortion, MIP).
@@ -78,7 +80,7 @@
     - Sigma (4.0 default) maps to effective cone density falloff distance in degrees.
 
 ### Changed
-- modes.json metadata version bumped to 2.0.0 (new `fovi_*` pipeline params).
+- modes.json metadata version bumped to 2.0.0 (new `cmf_*` pipeline params).
 
 ## [1.6.0] - 2026-02-28
 

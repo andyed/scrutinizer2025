@@ -83,11 +83,11 @@
                 this.dogE2Location = null;
                 this.dogSharpnessLocation = null;
 
-                // FOVI (Cortical Magnification) uniform locations
-                this.foviEnabledLocation = null;
+                // Cortical Magnification Function (CMF) uniform locations
+                this.cmfEnabledLocation = null;
                 this.cmfALocation = null;
                 this.corticalMaxLocation = null;
-                this.foviColorSigmaLocation = null;
+                this.cmfColorSigmaLocation = null;
                 this.desatFloorLocation = null;
 
                 // Chromatic pooling (castleCSF per-channel decay)
@@ -123,9 +123,9 @@
                     dog_enabled: false,
                     dog_e2: 0.5,
                     dog_sharpness: 0.0,
-                    fovi_enabled: false,
-                    fovi_a: 2.78,
-                    fovi_color_sigma: 0.0,
+                    cmf_enabled: false,
+                    cmf_a: 2.78,
+                    cmf_color_sigma: 0.0,
                     chromatic_pooling: false,
                     rg_decay: 0.072,     // Suprathreshold RG decay (Bowers 2025: 29% at 15°)
                     rg_freq_decay: 0.003, // RG frequency-dependent decay (suprathreshold spatial summation)
@@ -220,11 +220,11 @@
                 this.dogE2Location = gl.getUniformLocation(this.program, "u_dog_e2");
                 this.dogSharpnessLocation = gl.getUniformLocation(this.program, "u_dog_sharpness");
 
-                // FOVI (Cortical Magnification) uniform lookups
-                this.foviEnabledLocation = gl.getUniformLocation(this.program, "u_fovi_enabled");
+                // Cortical Magnification Function (CMF) uniform lookups
+                this.cmfEnabledLocation = gl.getUniformLocation(this.program, "u_cmf_enabled");
                 this.cmfALocation = gl.getUniformLocation(this.program, "u_cmf_a");
                 this.corticalMaxLocation = gl.getUniformLocation(this.program, "u_cortical_max");
-                this.foviColorSigmaLocation = gl.getUniformLocation(this.program, "u_fovi_color_sigma");
+                this.cmfColorSigmaLocation = gl.getUniformLocation(this.program, "u_cmf_color_sigma");
                 this.desatFloorLocation = gl.getUniformLocation(this.program, "u_desat_floor");
 
                 // Chromatic pooling uniform lookup
@@ -436,9 +436,9 @@
                     dog_enabled: false,
                     dog_e2: 0.5,
                     dog_sharpness: 0.0,
-                    fovi_enabled: false,
-                    fovi_a: 2.78,
-                    fovi_color_sigma: 0.0,
+                    cmf_enabled: false,
+                    cmf_a: 2.78,
+                    cmf_color_sigma: 0.0,
                     congestion_pooling: false
                 };
 
@@ -465,9 +465,9 @@
                         this.config.dog_enabled = p.dog_enabled ?? defaults.dog_enabled;
                         this.config.dog_e2 = p.dog_e2 ?? defaults.dog_e2;
                         this.config.dog_sharpness = p.dog_sharpness ?? defaults.dog_sharpness;
-                        this.config.fovi_enabled = p.fovi_enabled ?? defaults.fovi_enabled;
-                        this.config.fovi_a = p.fovi_a ?? defaults.fovi_a;
-                        this.config.fovi_color_sigma = p.fovi_color_sigma ?? defaults.fovi_color_sigma;
+                        this.config.cmf_enabled = p.cmf_enabled ?? defaults.cmf_enabled;
+                        this.config.cmf_a = p.cmf_a ?? defaults.cmf_a;
+                        this.config.cmf_color_sigma = p.cmf_color_sigma ?? defaults.cmf_color_sigma;
                         this.config.congestion_pooling = p.congestion_pooling ?? defaults.congestion_pooling;
                         this.config.chromatic_pooling = p.chromatic_pooling ?? defaults.chromatic_pooling;
                         this.config.rg_decay = p.rg_decay ?? defaults.rg_decay;
@@ -617,7 +617,7 @@
                 const foveaDeg = 2.0;
                 const halfDiag = Math.sqrt(width * width + height * height) / 2;
                 const rMaxDeg = (halfDiag / foveaRadius) * foveaDeg;
-                const cmfA = this.config.fovi_a || 2.78;
+                const cmfA = this.config.cmf_a || 2.78;
                 const corticalMax = Math.log1p(rMaxDeg / cmfA);
 
                 if (!this._lastCorticalMax || Math.abs(corticalMax - this._lastCorticalMax) > 0.01) {
@@ -636,10 +636,10 @@
                 gl.uniform1f(this.dogEnabledLocation, this.config.dog_enabled ? 1.0 : 0.0);
                 gl.uniform1f(this.dogE2Location, this.config.dog_e2);
                 gl.uniform1f(this.dogSharpnessLocation, this.config.dog_sharpness);
-                gl.uniform1f(this.foviEnabledLocation, this.config.fovi_enabled ? 1.0 : 0.0);
-                gl.uniform1f(this.cmfALocation, this.config.fovi_a);
+                gl.uniform1f(this.cmfEnabledLocation, this.config.cmf_enabled ? 1.0 : 0.0);
+                gl.uniform1f(this.cmfALocation, this.config.cmf_a);
                 gl.uniform1f(this.corticalMaxLocation, corticalMax);
-                gl.uniform1f(this.foviColorSigmaLocation, this.config.fovi_color_sigma);
+                gl.uniform1f(this.cmfColorSigmaLocation, this.config.cmf_color_sigma);
                 gl.uniform1f(this.desatFloorLocation, this.config.desat_floor ?? 1.0);
                 gl.uniform1f(this.chromaticPoolingLocation, this.config.chromatic_pooling ? 1.0 : 0.0);
                 gl.uniform1f(this.rgDecayLocation, this.config.rg_decay);

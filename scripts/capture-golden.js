@@ -13,11 +13,12 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-// Get version from args or package.json
+// Get version from args or package.json (strip patch for folder: 1.9.1 → 1.9)
 const versionArg = process.argv.find(arg => arg.startsWith('v='));
-const version = versionArg
+const fullVersion = versionArg
     ? versionArg.split('=')[1]
     : require('../package.json').version;
+const version = fullVersion.replace(/\.\d+$/, '');
 
 const OUTPUT_DIR = path.join(__dirname, '..', 'tests', 'golden-captures', `v${version}`);
 
@@ -117,7 +118,7 @@ const CAPTURE_TASKS = [
         variants: [
             { id: 'mode0_smoothstep', mode: '0', overlay: false },
             { id: 'mode1_purkinje', mode: '1', overlay: false },
-            { id: 'mode6_fovi', mode: '6', overlay: false },
+            { id: 'mode6_cmf', mode: '6', overlay: false },
             { id: 'mode7_legacy', mode: '7', overlay: false },
             // Chromatic pooling A/B: castleCSF per-channel RG/YV decay vs uniform desaturation
             // (Ashraf et al. 2024; Bowers, Gegenfurtner & Goettker 2025)

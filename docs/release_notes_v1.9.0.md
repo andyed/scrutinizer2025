@@ -169,7 +169,7 @@ The ComplexityHUD stays visible alongside the split view, so you can read the nu
 
 **Why it's gone:** castleCSF per-channel chromatic pooling made the question obsolete. The relevant variable isn't *curve shape* (smoothstep vs Gaussian) — it's *which opponent channels decay at which rates*. A perfectly shaped uniform curve still treats red-green and blue-yellow identically, which is the bigger error. Additionally, the implementation was broken (missing `chromatic_pooling: true` caused triple desaturation stacking), and Bowers et al. (2025) showed RG attenuation is biphasic, which a single-parameter exponential can't capture anyway.
 
-Gaussian color decay (`u_fovi_color_sigma`) remains in Mode 6 (FOVI standalone) where it models FOVI's own peripheral color decay, orthogonal to the DoG pipeline.
+Gaussian color decay (`u_cmf_color_sigma`) remains in Mode 6 (CMF standalone) where it models peripheral color decay, orthogonal to the DoG pipeline.
 
 ---
 
