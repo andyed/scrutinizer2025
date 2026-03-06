@@ -51,7 +51,7 @@
 
 % ============================================================
 \begin{abstract}
-Gaze-contingent tools used in HCI research---BubbleView, ViewSer, ScreenMasker---simulate peripheral vision with Gaussian blur, uniformly destroying the spatial structure that real peripheral vision preserves. They also operate on static images, not live interactive content. We present Scrutinizer, an open-source foveated rendering system that applies biologically-grounded peripheral filtering to live web pages at 60\,fps. A ${\sim}$1200-line GLSL shader implements a pipeline mapped to the visual pathway (retinal ganglion cells~$\rightarrow$ LGN~$\rightarrow$ V1~$\rightarrow$ V4), using Difference-of-Gaussians band decomposition on the hardware MIP chain for frequency-selective attenuation---high-frequency detail falls off first while low-frequency structure persists, approximating cortical magnification~\citep{rovamo1979}. V4 color processing now models differential chromatic decay: per-channel attenuation of RG and YV opponent signals using castleCSF contrast sensitivity functions~\citep{ashraf2024}, with suprathreshold correction~\citep{jiang2022}. A Feature Congestion scoring pipeline~\citep{rosenholtz2007} measures local visual clutter and gates peripheral pooling strength. The modular architecture maps each JavaScript module to a biological subsystem, enabling researchers to swap components independently (e.g., mouse gaze proxy~$\rightarrow$ eye tracker) and compare peripheral filtering strategies side-by-side---including a MIP-level adaptation of FOVI's cortical magnification curve~\citep{blauch2026} as a switchable mode. Open source (MIT), $>$130 unit tests.
+Gaze-contingent tools used in HCI research---BubbleView, ViewSer, ScreenMasker---simulate peripheral vision with Gaussian blur, uniformly destroying the spatial structure that real peripheral vision preserves. They also operate on static images, not live interactive content. We present Scrutinizer, an open-source foveated rendering system that applies biologically-grounded peripheral filtering to live web pages at 60\,fps. A ${\sim}$1200-line GLSL shader implements a pipeline mapped to the visual pathway (retinal ganglion cells~$\rightarrow$ LGN~$\rightarrow$ V1~$\rightarrow$ V4), using Difference-of-Gaussians band decomposition on the hardware MIP chain for frequency-selective attenuation---high-frequency detail falls off first while low-frequency structure persists, approximating cortical magnification~\citep{rovamo1979}. V4 color processing now models differential chromatic decay: per-channel attenuation of RG and YV opponent signals using castleCSF contrast sensitivity functions~\citep{ashraf2024}, with suprathreshold correction~\citep{jiang2022}. A Feature Congestion scoring pipeline~\citep{rosenholtz2007} measures local visual clutter and gates peripheral pooling strength. The modular architecture maps each JavaScript module to a biological subsystem, enabling researchers to swap components independently (e.g., mouse gaze proxy~$\rightarrow$ eye tracker) and compare peripheral filtering strategies side-by-side---including a MIP-level adaptation of FOVI's cortical magnification curve~\citep{blauch2026} as a switchable mode. Open source (MIT), $>$120 unit tests.
 \end{abstract}
 
 % ============================================================
@@ -59,7 +59,7 @@ Gaze-contingent tools used in HCI research---BubbleView, ViewSer, ScreenMasker--
 
 Peripheral vision is not blurry---it is \emph{differently encoded}. The retina compresses ${\sim}10^7$ photoreceptor signals into ${\sim}10^6$ optic nerve fibers~\citep{curcio1990}, with ganglion cell receptive fields growing with eccentricity~\citep{dacey1993}---effectively preserving low-frequency structure while filtering high-frequency detail. This is compute demand management: limited bandwidth allocated to information most likely to guide the next saccade.
 
-Existing gaze-contingent tools---BubbleView~\citep{kim2017}, ViewSer~\citep{lagun2011}, ScreenMasker~\citep{orlov2016}---apply Gaussian blur as a peripheral proxy, uniformly destroying spatial structure and preventing layout-level judgments that real peripheral vision supports. These tools also operate on static images, not live interactive content (Table~\ref{tab:comparison}).\footnote{An earlier Scrutinizer prototype~\citep{edmonds2007} demonstrated mouse-contingent Gaussian blur on live web pages using Adobe AIR (2007), establishing real-time fidelity as the key technical challenge. Modern GPU APIs now make biologically-grounded filtering practical at 60\,fps.}
+Existing gaze-contingent tools---BubbleView~\citep{kim2017}, ViewSer~\citep{lagun2011}, ScreenMasker~\citep{orlov2016}---apply Gaussian blur as a peripheral proxy, uniformly destroying spatial structure and preventing layout-level judgments that real peripheral vision supports. These tools also operate on static images, not live interactive content (Table~\ref{tab:comparison}).\footnote{An earlier Scrutinizer prototype~\citep{edmonds2007} demonstrated mouse-contingent Gaussian blur on live web pages using Adobe AIR (2007), establishing real-time fidelity as the key technical challenge. Modern GPU APIs now make biologically-grounded filtering practical at 60\,fps---but the gold standard remains out of reach. \citet{rosenholtz2012}'s texture-synthesis ``mongrels'' are the most perceptually accurate peripheral model, and \citet{walton2021} showed they outperform blur for foveated rendering, yet synthesizing them requires iterative optimization (${\sim}$seconds per frame) that no current GPU pipeline can deliver in real time. Scrutinizer's DoG bands are a pragmatic middle ground: frequency-selective attenuation preserves more peripheral structure than blur, at a fraction of the cost of full texture statistics.}
 
 Scrutinizer contributes \textbf{(1)} a DoG band decomposition exploiting the GPU MIP chain for frequency-selective peripheral filtering at near-zero cost (5 \texttt{textureLod} calls), \textbf{(2)} a DOM structure extractor that harvests web accessibility annotations (ARIA roles, semantic HTML, computed styles) as top-down priors for the saliency pipeline---a computational analog of attentional modulation, without requiring a vision model, \textbf{(3)} a modular architecture (Table~\ref{tab:architecture}) with five branch points where researchers swap implementations without modifying the core shader, and \textbf{(4)} a side-by-side comparison with a MIP-level adaptation of FOVI's cortical magnification curve~\citep{blauch2026}: Scrutinizer's effective cutoff falls 3.5--4.6$\times$ lower at matched eccentricities, illustrating the combined effect of crowding, saliency gating, and color processing that FOVI delegates to downstream neural networks.
 
@@ -88,7 +88,7 @@ FOVI~\citeyearpar{blauch2026} & \checkmark & CMF & -- & -- & \checkmark \\
 % ============================================================
 \section{Architecture: Biology $\rightarrow$ Computation}
 
-The pipeline is a single-pass fragment shader (${\sim}$1200~LOC, GLSL~ES~3.0) with 40 uniforms organized into biological stages, fed by four JavaScript modules (Table~\ref{tab:architecture}).
+The pipeline is a single-pass fragment shader (${\sim}$1200~LOC, GLSL~ES~3.0) with 47 uniforms organized into biological stages, fed by four JavaScript modules (Table~\ref{tab:architecture}).
 
 \begin{table}[t]
 \centering
@@ -119,11 +119,11 @@ Retinal ganglion cells have center-surround receptive fields modeled as DoG filt
 \end{equation}
 \vspace{-4pt}
 
-Four bands span 1--2\,px (serifs) to 8--16\,px (buttons), each weighted by a smoothstep rolloff with cutoffs following a geometric progression ($0.3, 0.6, 1.2, 2.4 \times E_2$), approximating cortical magnification~\citep{rovamo1979}. The DC residual always passes through. Result: peripheral text shows letter shapes (low-frequency visible, identity unreadable) rather than uniform fog. Cost: 5 \texttt{textureLod} calls vs.\ 1, but near-zero practical overhead---higher MIP levels are cheaper, already cached, and arithmetic is trivial.
+Four bands span 1--2\,px (serifs) to 8--16\,px (buttons), each weighted by a smoothstep rolloff with cutoffs following a geometric progression ($0.3, 0.6, 1.2, 2.4 \times E_2$), approximating cortical magnification~\citep{rovamo1979}. The DC residual (overall brightness and color at the coarsest MIP level) always passes through---even far-peripheral vision preserves mean luminance. Result: peripheral text shows letter shapes (low-frequency visible, identity unreadable) rather than uniform fog. Cost: 5 \texttt{textureLod} calls vs.\ 1, but near-zero practical overhead---higher MIP levels are cheaper, already cached, and arithmetic is trivial.
 
 \subsection{Saliency-Driven Bandwidth Allocation}
 
-The LGN's synaptic inputs are predominantly modulatory, with a substantial fraction from V1 feedback~\citep{sherman2002}; spatial attention enhances LGN gain~\citep{mcalonan2008}. We model this as saliency gating via a dedicated Web Worker that fuses three channels into a single GPU texture:
+The LGN gates what reaches cortex: its synaptic inputs are predominantly modulatory, with a substantial fraction from V1 feedback~\citep{sherman2002}. \citet{mcalonan2008} showed that spatial attention enhances LGN gain at attended locations---meaning the thalamus selectively boosts peripheral signals that match attentional priorities before they reach V1. We model this as saliency gating via a dedicated Web Worker that fuses three channels into a single GPU texture:
 
 \textbf{Bottom-up:} Oklab opponent-channel DoG (color saliency) and face detection via face-api.js~\citep{faceapijs} (TinyFaceDetector, 190\,KB).
 
@@ -135,27 +135,46 @@ High-saliency regions receive up to 70\% of rendering bandwidth. To keep the pip
 
 Crowding is feature binding failure, not blur~\citep{pelli2008}. We approximate its visual effect via simplex noise domain warping and grid-based feature scrambling; this does not implement the summary statistic model of~\citet{rosenholtz2012} but produces qualitatively similar identity loss. The V1 distortion is currently eccentricity-only---crowding strength does not scale with local structure density. A density gate (sigmoid on the structure channel) would modulate V1 strength by local element count, closing the gap between Bouma's spacing rule~\citep{bouma1970} and the density-dependent crowding observed by~\citet{pellitillman2008}.
 
-V4 color processing operates in two paths, selected by \texttt{u\_chromatic\_pooling}. The legacy path ($= 0$) applies Oklab desaturation~\citep{ottosson2020} toward an eigengrau destination with a blue shift ($b{=}{-}0.05$ in Oklab), modeling the scotopic Purkinje effect. The per-channel path ($= 1$, default since v1.9) attenuates RG and YV opponent signals independently in Oklab $a$ and $b$ channels using castleCSF contrast sensitivity functions~\citep{ashraf2024}. The DoG band decomposition provides the size axis: each band's center frequency maps to a spatial frequency, and castleCSF returns a per-channel sensitivity at that frequency and eccentricity. Because red-green (L-M) sensitivity declines 4--5$\times$ faster than blue-yellow (S-(L+M))~\citep{mullen2002}, the Oklab $a$ channel is attenuated more aggressively than $b$---preserving blue-green structure into the periphery while red-green fades first. A suprathreshold correction (power-law exponent 0.5) prevents the threshold-based castleCSF from over-attenuating visible texture~\citep{jiang2022}. This yields 6 uniforms total: RG/YV sensitivity at three spatial frequency tiers (fine, medium, coarse). A lateral R/B channel offset simulates longitudinal chromatic aberration.
+V4 color processing attenuates RG and YV opponent signals independently in Oklab~\citep{ottosson2020} $a$ and $b$ channels using castleCSF contrast sensitivity functions~\citep{ashraf2024}. The DoG band decomposition provides the size axis: each band's center frequency maps to a spatial frequency, and castleCSF returns a per-channel sensitivity at that frequency and eccentricity. Because red-green (L-M) sensitivity declines 4--5$\times$ faster than blue-yellow (S-(L+M))~\citep{mullen2002}, the Oklab $a$ channel is attenuated more aggressively than $b$---preserving blue-green structure into the periphery while red-green fades first. A suprathreshold correction (power-law exponent 0.5) prevents the threshold-based castleCSF from over-attenuating visible texture~\citep{jiang2022}. This yields 6 uniforms total: RG/YV sensitivity at three spatial frequency tiers (fine, medium, coarse). A lateral R/B channel offset simulates longitudinal chromatic aberration.
 
 \subsection{Foveal Calibration}
 
-The foveal radius---the boundary between high-fidelity central rendering and peripheral filtering---must match each user's actual foveal extent on their display. Without calibration, a 180\,px default subtends different visual angles on a 13'' laptop at 50\,cm versus a 27'' monitor at 70\,cm. We prototype a psychophysical staircase procedure using the Motion Silence Illusion: rotating crosses that appear static in peripheral vision due to crowding~\citep{pelli2008}. The staircase converges on the eccentricity at which users can no longer detect motion onset, with reaction-time weighting to penalize guesses. The result is a pixel radius stored per user. The current implementation does not convert pixels to degrees of visual angle---doing so requires viewing distance, which the Virtual Chinrest~\citep{li2020} estimates via blind-spot geometry ($\pm$3.25\,cm) and which EasyEyes tracks continuously via webcam face landmarks. Integrating either through the Gaze Input branch point would close the pixel-to-degree gap.
+The foveal radius---the boundary between high-fidelity central rendering and peripheral filtering---must match each user's actual foveal extent on their display. Without calibration, a 90\,px default subtends different visual angles on a 13'' laptop at 50\,cm versus a 27'' monitor at 70\,cm; the plausible range spans roughly 60--200\,px depending on display size, resolution, and viewing distance. For research use, expert calibration of viewing geometry (display DPI, viewing distance, pixels-per-degree) is essential---the system exposes these as configuration parameters. Table~\ref{tab:fov} shows concrete examples.
+
+\begin{table}[h]
+\centering
+\caption{Field of view by display geometry.}\vspace{-2pt}
+\label{tab:fov}
+\footnotesize
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Display} & \textbf{Distance} & \textbf{H-FOV} & \textbf{V-FOV} & \textbf{px/deg} \\
+\midrule
+MacBook Pro 14'' & 50\,cm & 34$^{\circ}$ & 22$^{\circ}$ & 44 CSS \\
+27'' desktop (1440p) & 70\,cm & 46$^{\circ}$ & 28$^{\circ}$ & 37 CSS \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For scanpath replay, these parameters determine the mapping between degrees of visual angle in recorded eye-tracking data and pixel coordinates on the target display.
+
+As a proof of concept, we prototype a self-service psychophysical staircase using the Motion Silence Illusion: rotating crosses that appear static in peripheral vision due to crowding~\citep{pelli2008}. The staircase converges on the eccentricity at which users can no longer detect motion onset, with reaction-time weighting to penalize guesses. The result is a pixel radius stored per user. The current implementation does not convert pixels to degrees of visual angle---doing so requires viewing distance, which the Virtual Chinrest~\citep{li2020} estimates via blind-spot geometry ($\pm$3.25\,cm) and which EasyEyes tracks continuously via webcam face landmarks. Integrating either through the Gaze Input branch point would close the pixel-to-degree gap.
 
 \subsection{Extensibility Branch Points}
 
 The architecture exposes five branch points where researchers substitute implementations without modifying the core pipeline (Table~\ref{tab:branch}).
 
-\begin{table}[h]
+\begin{table*}[t]
 \vspace{-2pt}
 \centering
 \caption{Extensibility branch points.}\vspace{-2pt}
 \label{tab:branch}
 \footnotesize
-\begin{tabular}{@{}p{1.3cm}p{2.1cm}p{3.2cm}@{}}
+\begin{tabular}{@{}p{2.0cm}p{4.5cm}p{7.5cm}@{}}
 \toprule
 \textbf{Branch} & \textbf{Interface} & \textbf{Swap examples} \\
 \midrule
-Gaze input & \texttt{update(x,y)} $\rightarrow$ pos, vel, fixation & Tobii SDK, WebGazer.js, scanpath replay \\
+Gaze input & \texttt{update(x,y)} $\rightarrow$ pos, vel, fixation & Eye tracker SDK, WebGazer.js, scanpath replay from published datasets \\
 Saliency & bitmap $\rightarrow$ heatmap texture & Itti-Koch, DeepGaze~II, ONNX model \\
 Crowding & integer uniform selects V1 type & Portilla-Simoncelli, oriented DoG, density-gated V1 strength \\
 Clutter scoring & PNG $\rightarrow$ congestion + edge density $\rightarrow$ composite & Custom $\sigma$, multi-viewport, CI gating \\
@@ -163,7 +182,7 @@ Structure & DOM blocks $\rightarrow$ RGBA texture & CV segmentation, semantic em
 Pipeline & JSON registry & Zero-code new profiles \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 \subsection{Cortical Magnification: FOVI Comparison}
 
@@ -177,7 +196,7 @@ One known limitation: \citet{bowers2025} show that red-green sensitivity decline
 
 Visual clutter---the excess of features competing for attentional resources---degrades peripheral target identification independently of eccentricity~\citep{rosenholtz2007}. We implement a Feature Congestion pipeline that scores local clutter from the rendered page and feeds the result back into the peripheral filtering pipeline.
 
-\textbf{Scoring pipeline.} The congestion scorer operates on a captured PNG and computes two channels: (1)~Oklab color variance within a Gaussian kernel ($\sigma{=}2.5$\,px), measuring local chromatic heterogeneity, and (2)~Sobel edge density at the same scale. Both channels are reduced to their 90th-percentile values ($\text{congestion}_{p90}$, $\text{edge}_{p90}$), and a composite score is computed as $\sqrt{\text{congestion}_{p90} \times 0.7 + \text{edge}_{p90} \times 0.3} \times 100$. The weighting, percentile reduction, and square-root scaling are engineering heuristics, not derived from biological first principles---they were curve-fit to rank-order agreement with~\citet{rosenholtz2007}'s original Feature Congestion metric, achieving Spearman $\rho = 0.93$ at 768\,px viewport width.
+\textbf{Scoring pipeline.} The congestion scorer operates on a captured PNG and computes two channels: (1)~Oklab color variance within a Gaussian kernel ($\sigma{=}2.5$\,px), measuring local chromatic heterogeneity, and (2)~Sobel edge density at the same scale. Both channels are reduced to their 90th-percentile values ($\text{congestion}_{p90}$, $\text{edge}_{p90}$), and a composite score is computed as $\sqrt{\text{congestion}_{p90} \times 0.7 + \text{edge}_{p90} \times 0.3} \times 100$. The weighting, percentile reduction, and square-root scaling are engineering heuristics, not derived from biological first principles---they were curve-fit to rank-order agreement with~\citet{rosenholtz2007}'s original Feature Congestion metric, achieving Spearman $\rho = 0.93$ at 768\,px viewport width with fixed $\sigma{=}2.5$ (dropping to $\rho = 0.60$ with the default adaptive kernel).
 
 \textbf{Congestion-gated pooling (Mode~9).} The composite clutter map is uploaded as a GPU texture. In the V4 color stage, local congestion modulates peripheral pooling strength by a factor of $1.0$--$2.0\times$: high-clutter regions receive stronger peripheral attenuation, approximating the attentional cost of cluttered displays. A split-view overlay shows saliency and congestion side-by-side for diagnostic comparison.
 
@@ -200,7 +219,7 @@ The modular architecture enables both: the agent reasons per biological module r
 \section{Status \& Future Work}
 
 \textbf{Implemented (v1.9.0):}
-DoG band decomposition; saliency bandwidth allocation; noise crowding and grid scrambling; foveal calibration; mobile emulation; FOVI CMF adaptation as switchable mode; $>$130 tests; golden capture regression. Per-channel chromatic pooling via castleCSF~\citep{ashraf2024} with 6 uniforms and suprathreshold correction~\citep{jiang2022}. Feature Congestion scoring pipeline~\citep{rosenholtz2007} with ComplexityHUD overlay and congestion-gated pooling (Mode~9). Linear M-scaling~\citep{rovamo1979} replacing geometric cutoffs. Parafoveal blur band with smoothstep ramp. \texttt{scrutinizer-audit} CLI and MCP server for headless scoring. Crowding reference pages and simulation limitations documentation. A declarative mode registry (\texttt{modes.json}) defines 10 pipeline configurations---7 research modes and 3 presentation modes---each specifying LGN gating, V1 distortion type, V4 style, and magnification model as a JSON object, enabling zero-code A/B comparisons between pipeline variants.
+DoG band decomposition; saliency bandwidth allocation; noise crowding and grid scrambling; foveal calibration; mobile emulation; FOVI CMF adaptation as switchable mode; $>$120 tests; golden capture regression. Per-channel chromatic pooling via castleCSF~\citep{ashraf2024} with 6 uniforms and suprathreshold correction~\citep{jiang2022}. Feature Congestion scoring pipeline~\citep{rosenholtz2007} with ComplexityHUD overlay and congestion-gated pooling (Mode~9). Linear M-scaling~\citep{rovamo1979} replacing geometric cutoffs. Parafoveal blur band with smoothstep ramp. \texttt{scrutinizer-audit} CLI and MCP server for headless scoring. Crowding reference pages and simulation limitations documentation. A declarative mode registry (\texttt{modes.json}) defines 9 pipeline configurations---5 research modes, 3 presentation modes, and 1 experimental mode (congestion-gated pooling)---each specifying LGN gating, V1 distortion type, V4 style, and magnification model as a JSON object, enabling zero-code A/B comparisons between pipeline variants.
 
 \textbf{Simulation limitations.}
 Two architectural gaps are identified and documented. (1)~\emph{Density-independent crowding:} the V1 distortion stage scales with eccentricity only; local element density does not modulate crowding strength, missing the density-dependent effects demonstrated by~\citet{pellitillman2008}. (2)~\emph{Discrete-band chromatic pooling:} the DoG bands approximate continuous perceptive-field scaling with 3--4 discrete frequency buckets; the step boundaries create visible transitions that a continuous integration over the cortical magnification function would smooth.

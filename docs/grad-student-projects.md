@@ -10,10 +10,11 @@ The modular pipeline (GazeModel, VisualMemory, ContentAnalysis, pipeline orchest
 - **8 aesthetic modes** with granular pipeline configuration (LGN gating → V1 distortion → V4 rendering)
 - **`scrutinizer-audit` CLI**: Headless Playwright-based batch scoring with sitemap support, CI gating (`--fail-above`), and before/after comparison
 - **MCP server**: Exposes `analyze_url`, `analyze_urls`, `compare_pages` tools for AI-assisted design review via Model Context Protocol
+- **Scanpath replay** (spec: `docs/scanpath-replay-spec.md`): Common `ScanpathData` format with importers for 5 published eye-tracking datasets (UEyes, RecGaze, MIT1003, FixaTons, OneStop), `ScanpathPlayer` as a drop-in `GazeModel` replacement with minimum-jerk saccade interpolation, CLI replay with video recording, and 4 validation experiments
 
 **IRB/Ethics note**: Projects marked with 👁 in the selection guide involve human participants and require IRB/ethics board approval before data collection. At most institutions this takes 1–3 months and is a hard prerequisite — factor it into semester timelines. Projects 2.2 and 2.3 involving remote participants (MTurk) may need separate protocol review.
 
-**Shared instrumentation prerequisite**: Projects 2.1, 2.2, and 2.3 all require behavioral recording and GazeModel instrumentation. Rather than building this independently three times, a shared instrumentation layer (fixation logging, scan path metrics, event stream) should be built first — treat it as a foundational sprint similar to how 1.3 is foundational for vision-science projects.
+**Shared instrumentation prerequisite**: Projects 2.1, 2.2, and 2.3 all require behavioral recording and GazeModel instrumentation. The **Scanpath Replay** infrastructure (`docs/scanpath-replay-spec.md`) provides this: `ScanpathData` format with fixation timing, `ScanpathPlayer` as a drop-in GazeModel replacement, coordinate normalization utilities, and CLI replay with video recording. Treat Phase 1–2 of the scanpath spec (common format + ScanpathPlayer) as the foundational sprint, similar to how 1.3 is foundational for vision-science projects.
 
 **References caveat**: The reference lists in this document were AI-generated and skew toward canonical, highly-cited papers. They lack recent work (2020–2025) that may have partially addressed these research questions, and contain no methodological references for proposed psychophysical experiments. A supervising PI should validate references against current literature before a student begins work.
 
@@ -92,18 +93,21 @@ Scrutinizer currently works in pixel units. Real peripheral vision research requ
 
 **Status**: IoR is now implemented in VisualMemory (v1.7+) as a fixation-history mask with configurable decay — recently fixated regions are suppressed. The remaining work is saccadic dynamics proper.
 
-The current GazeModel tracks velocity and detects fixations, but doesn't model saccadic dynamics beyond simple suppression. This project adds biologically plausible saccade generation: realistic main sequence (amplitude-velocity relationship), corrective saccades, express saccades, and microsaccadic drift during fixations.
+The current GazeModel tracks velocity and detects fixations, but doesn't model saccadic dynamics beyond simple suppression. This project adds biologically plausible saccade generation: corrective saccades, express saccades, and microsaccadic drift during fixations.
 
-**Research question**: Does biologically plausible saccade modeling (main sequence, corrective saccades) combined with the existing IoR change user scanning patterns on information-dense pages?
+**Note**: The **ScanpathPlayer** (`docs/scanpath-replay-spec.md`) already implements minimum-jerk saccade interpolation (Flash & Hogan 1985) and main sequence duration estimation (Bahill et al. 1975) for replaying published datasets. This project extends that foundation with *generative* saccade models — corrective saccades, express saccades, microsaccadic drift — that produce biologically plausible behavior rather than replaying recorded data. The ScanpathPlayer's velocity reporting and saccadic state detection provide the baseline against which generative models are compared.
+
+**Research question**: Does biologically plausible saccade modeling (corrective saccades, microsaccadic drift) combined with the existing IoR change user scanning patterns on information-dense pages?
 
 **Deliverables**:
-- Extended GazeModel with main sequence parameters (amplitude-velocity-duration relationship)
-- Corrective saccade generation for near-target fixation refinement
+- Extended GazeModel with corrective saccade generation for near-target fixation refinement
 - Microsaccadic drift during fixation (subtle jitter that refreshes visual processing)
+- Express saccade pathway for high-salience targets
 - Behavioral study: compare scanning efficiency across saccade model fidelity levels (requires IRB approval)
+- Validation: replay published scanpaths (UEyes, MIT1003) through generative model and compare trajectory statistics against recorded data
 - GazeModel is independently swappable — drop-in replacement
 
-**Key references**: Rayner (1998), Klein (2000) IOR review, Bahill et al. (1975) main sequence
+**Key references**: Rayner (1998), Klein (2000) IOR review, Bahill et al. (1975) main sequence, Flash & Hogan (1985) minimum-jerk
 
 ---
 
@@ -115,9 +119,12 @@ The current GazeModel tracks velocity and detects fixations, but doesn't model s
 
 Scrutinizer v1.8 ships a congestion-gated pooling mode where high-congestion regions receive more aggressive peripheral simplification — matching the biological observation that cluttered regions are already pooled by peripheral vision. But does spatially-varying rendering actually change user behavior compared to uniform rendering? This is an A/B study using the existing infrastructure; no new engineering is needed.
 
+**Scanpath replay integration**: Validation Experiment C in the scanpath replay spec (`docs/scanpath-replay-spec.md`) provides automated perceptual metrics (SSIM in high-congestion vs. low-congestion regions) that can serve as pilot data before running the behavioral study. Run Experiment C first to confirm that the rendering difference is perceptually meaningful, then use those results to power-analyze the human study. The scanpath replay CLI can also generate side-by-side video comparisons (congestion-gated vs. highkey mode replaying UEyes scanpaths) for study materials and presentations.
+
 **Research question**: Does congestion-modulated peripheral rendering improve information foraging efficiency (fewer fixations, shorter scan paths) on heterogeneous pages compared to uniform peripheral rendering?
 
 **Deliverables**:
+- Automated perceptual comparison (Experiment C from scanpath spec) as pilot validation
 - Experiment design: N participants × M pages (spanning low-to-high congestion) × 2 conditions (uniform vs. congestion-gated)
 - Pre-score all stimulus pages with `scrutinizer-audit` to select pages spanning the congestion range
 - Behavioral measures: fixation count, scan path length, task completion time, revisitation rate
@@ -138,14 +145,17 @@ Scrutinizer v1.8 ships a congestion-gated pooling mode where high-congestion reg
 
 Build a recording system that captures the sequence of fixations and generates visual artifacts showing how the page appeared at each fixation point. Multi-zone capture strategy: fovea at full resolution, parafovea at 75%, near periphery at 50%, with zone reuse for close fixations.
 
-**Scoping note**: As listed, this project includes a recording system, interactive HTML export with scrubber, animated export pipeline (GIF/WebM), layered PSD output, *and* a comparison study against Tobii eye-tracking. Each is non-trivial; the comparison study alone requires participant recruitment, IRB approval, and statistical analysis. A realistic single-semester scope is the recording system + one export format. The comparison study is a separate semester or thesis chapter.
+**Scanpath replay integration**: The scanpath replay infrastructure (`docs/scanpath-replay-spec.md`) provides the recording format (`ScanpathData`), coordinate normalization, and CLI video recording (`scrutinizer-audit replay --video`). This project builds *on top of* that foundation: the recording system writes `ScanpathData` (same format used by UEyes/MIT1003 importers), and the CLI video recorder handles the animated export. The remaining work is the interactive HTML scrubber, multi-zone capture strategy, and the comparison study.
+
+**Scoping note**: With the scanpath replay foundation in place, the recording system and animated export are substantially de-risked. A realistic single-semester scope is the multi-zone capture + interactive HTML scrubber. The comparison study is a separate semester or thesis chapter.
 
 **Research question**: Can fixation sequence recordings with peripheral context replace or supplement eye-tracking for remote UX evaluation?
 
 **Deliverables**:
-- Recording system (start/stop, `.scrutinizer` archive format)
+- Recording system writing `ScanpathData` format (start/stop, `.scrutinizer` archive)
+- Multi-zone capture at fixation points (fovea full-res, parafovea 75%, near periphery 50%)
 - Interactive HTML export with scrubber and saccade path overlay
-- Animated export (GIF/WebM) for shareable attention flow demos
+- Animated export via `scrutinizer-audit replay --video` (uses existing CLI)
 - Comparison study: Scrutinizer recordings vs. Tobii eye-tracking for the same pages
 
 **Output formats** (phased):
@@ -356,14 +366,16 @@ The `scrutinizer-audit` CLI can score hundreds of pages per hour. This project r
 
 Scrutinizer's saliency worker uses a custom center-surround + face detection + structure-aware model, and the congestion worker implements Rosenholtz Feature Congestion at fixed σ=2.5. But many saliency models exist (Itti-Koch, DeepGaze II, GBVS, SAM), and the congestion implementation uses a single-scale Gaussian where the original uses multi-scale steerable pyramids. This project creates a modular backend where different models can be hot-swapped, and their outputs compared against human attention data.
 
+**Scanpath replay integration**: Validation Experiment D in the scanpath replay spec (`docs/scanpath-replay-spec.md`) provides the evaluation framework for this project. It computes AUC-Judd, NSS, and Information Gain for Scrutinizer's saliency map against UEyes fixation data, decomposed by channel (Oklab DoG, face detection, DOM structure). This project extends Experiment D to compare *multiple* saliency backends against the same fixation ground truth — the scanpath replay infrastructure provides the fixation data, coordinate conversion, and per-frame extraction harness. Start by running Experiment D with the current model to establish a baseline, then swap in alternative backends.
+
 The dual-worker architecture already defines clean input/output contracts (PNG buffer → heatmap texture). The CLI enables batch evaluation across page sets, and the side-by-side shader comparison mode can be extended to show any two model outputs.
 
 **Deliverables**:
 - Saliency model interface (input: frame, output: heatmap)
 - 3+ saliency implementations (current, Itti-Koch reimpl, DeepGaze via ONNX)
 - Multi-scale congestion comparison: current single-scale σ=2.5 vs. steerable pyramid approximation
-- Evaluation harness: compare model predictions vs. mouse-trajectory ground truth
-- Batch evaluation: run model comparison across 50+ pages via CLI
+- Evaluation harness: extend Experiment D to compare model predictions vs. UEyes/MIT1003 fixation ground truth (AUC-Judd, NSS, IG)
+- Batch evaluation: run model comparison across 50+ pages via CLI with scanpath replay
 - Performance profiling per model (latency, accuracy, GPU cost)
 
 ---
@@ -412,6 +424,7 @@ Move the WebGL rendering context to a Web Worker using OffscreenCanvas, decoupli
 - **Vision science track**: 1.3 (Calibrated Angles) → 1.1 (Oriented DoG) → 1.2 (Mongrel)
 - **HCI/UX track**: 2.1 (Fixation Recording) → 2.3 (Cognitive Load) → 2.2 (Crowdsourced)
 - **Design track**: 3.1 (Design Critique Eval) → 3.5 (AI-Assisted Design) → 3.2 (Goal-Directed Gating)
+- **Validation track**: Scanpath Replay Phases 1-2 (`docs/scanpath-replay-spec.md`) → 4.1 (Saliency Comparison via Experiment D) → 1.5 (Congestion-Gated Eval via Experiment C) — no IRB for the automated experiments, uses published datasets, builds toward behavioral studies
 - **Accessibility track**: 1.3 (Calibrated Angles) → 2.4 (Accessibility Testing)
 - **Low-barrier entry**: 3.6 (Clutter Census) — no IRB, no participants, uses existing CLI. Good for a semester project or as a warm-up before a thesis-scale study
 - **Congestion track**: 3.6 (Clutter Census) → 1.5 (Congestion-Gated Eval) → 2.3 (Cognitive Load)
