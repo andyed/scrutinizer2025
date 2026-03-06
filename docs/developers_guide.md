@@ -49,7 +49,7 @@ overlay.js
 - Each module maps to a distinct biological subsystem (oculomotor, working memory, pre-cortical)
 - Modules communicate via the orchestrator, not directly with each other
 - `scrutinizer.js` exposes backward-compatible property proxies (e.g., `this.velocity` delegates to `this.gazeModel.velocity`) so existing callers (`overlay.js`, test harnesses) don't need changes
-- Each module is independently testable — see `tests/unit/` for 138 tests across pure-function modules
+- Each module is independently testable — see `tests/unit/` for 120 tests across pure-function modules
 
 **Swapping a module:** To replace the gaze input (e.g., eye tracker instead of mouse), implement the same interface as `GazeModel` (`update(mouseX, mouseY, timestamp)`, `getPosition()`, `getVelocity()`, `isSaccade()`) and inject it in the orchestrator constructor.
 

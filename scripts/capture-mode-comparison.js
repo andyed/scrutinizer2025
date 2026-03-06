@@ -24,7 +24,7 @@ const MODES = [
   { id: 'mode0_smoothstep', mode: '0', label: 'Mode 0 — Smoothstep (High-Key)' },
   { id: 'mode6_logpolar',   mode: '6', label: 'Mode 6 — Log-Polar MIP (Blauch 2026)' },
   { id: 'mode7_legacy',     mode: '7', label: 'Mode 7 — Legacy v1.6' },
-  { id: 'mode8_gaussian',   mode: '8', label: 'Mode 8 — Gaussian Desaturation' },
+  { id: 'mode9_congestion', mode: '9', label: 'Mode 9 — Congestion-Gated Pooling' },
 ];
 
 console.log(`\n🎯 Mode Comparison Capture`);

@@ -90,9 +90,9 @@ Scrutinizer's rendering pipeline maps biological mechanisms to GPU-accelerated s
 
 ## Features
 
-### Rendering Pipeline (v1.8)
+### Rendering Pipeline (v1.9)
 - **Foveal/peripheral simulation** — eccentricity-dependent spatial pooling and chromatic filtering bound to cursor position
-- **[Analytical cortical magnification](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html)** — eccentricity falloff using the Schwartz (1980) log-mapping parameterization (mode 6), alongside legacy (mode 7) and Gaussian desaturation (mode 8) for comparison
+- **[Analytical cortical magnification](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html)** — eccentricity falloff using the Schwartz (1980) log-mapping parameterization (mode 6), alongside legacy (mode 7) for comparison
 - **[Feature Congestion](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html) pipeline** — real-time visual clutter scoring with ComplexityHUD overlay (Score / Stats / Spatial tabs)
 - **Congestion-gated pooling** (mode 9) — peripheral attenuation weighted by local visual complexity
 - **Saliency modulation** — allocates more peripheral bandwidth to salient regions (edges, contrast, high-importance areas)

@@ -128,11 +128,10 @@ Where `D_cm` is viewing distance in cm, `resolution_css` is CSS pixels (native �
 
 ### Current Default vs Reality
 
-The default `foveaRadius: 180px` maps to a ~4° eccentricity foveal boundary on both MBP models (vs anatomical 2°). This means:
-- The shader's clear zone is 2× too large
-- `normEcc` (used by DoG, chromatic pooling, crowding) is halved
-- Viewport edges reach ~9-11° instead of the real ~19-24°
-- All peripheral effects are under-attenuated
+The default `foveaRadius: 90px` maps to a ~2° eccentricity foveal boundary on both MBP models, matching the anatomical fovea. This means:
+- `normEcc` (used by DoG, chromatic pooling, crowding) scales correctly from the foveal edge
+- Viewport edges reach ~19-24° eccentricity
+- Peripheral effects are appropriately attenuated
 
 See ROADMAP "Calibrated Visual Angles" for the planned fix: separating `px_per_deg` (calibration) from `foveaRadius` (comfort zone).
 
