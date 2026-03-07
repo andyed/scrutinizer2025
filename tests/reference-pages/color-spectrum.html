@@ -87,6 +87,29 @@
             background: linear-gradient(to right, #000, #fff);
         }
 
+        /* --- Size-graded patches: same hue at decreasing widths --- */
+        .size-row {
+            height: 70px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            background: #222;
+            flex-wrap: wrap;
+        }
+        .size-row .label {
+            font-size: 10px;
+            color: #888;
+            width: 60px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+        .size-swatch {
+            height: 100%;
+            flex-shrink: 0;
+            border-radius: 2px;
+        }
+
         /* --- Rod sensitivity curve overlay --- */
         .rod-curve {
             position: absolute;
@@ -200,6 +223,65 @@
             <div class="patch light-text" style="background: hsl(240, 100%, 25%)"></div>
             <div class="patch light-text" style="background: hsl(270, 100%, 25%)"></div>
             <div class="patch light-text" style="background: hsl(300, 100%, 25%)"></div>
+        </div>
+
+        <!-- Size-graded patches: same hue at decreasing widths.
+             Larger patches survive peripheral pooling; smaller ones lose chromatic identity.
+             Tests the spatial frequency dependence in u_rg_freq_decay / u_yv_freq_decay.
+             RG (red/green) should lose identity at larger sizes than BY (blue/yellow). -->
+        <div class="size-row">
+            <span class="label">Red (RG)</span>
+            <div class="size-swatch" style="width:120px; background:hsl(0,100%,50%)"></div>
+            <div class="size-swatch" style="width:80px; background:hsl(0,100%,50%)"></div>
+            <div class="size-swatch" style="width:48px; background:hsl(0,100%,50%)"></div>
+            <div class="size-swatch" style="width:28px; background:hsl(0,100%,50%)"></div>
+            <div class="size-swatch" style="width:16px; background:hsl(0,100%,50%)"></div>
+            <div class="size-swatch" style="width:8px; background:hsl(0,100%,50%)"></div>
+            <div class="size-swatch" style="width:4px; background:hsl(0,100%,50%)"></div>
+            <span class="label">Green (RG)</span>
+            <div class="size-swatch" style="width:120px; background:hsl(120,100%,45%)"></div>
+            <div class="size-swatch" style="width:80px; background:hsl(120,100%,45%)"></div>
+            <div class="size-swatch" style="width:48px; background:hsl(120,100%,45%)"></div>
+            <div class="size-swatch" style="width:28px; background:hsl(120,100%,45%)"></div>
+            <div class="size-swatch" style="width:16px; background:hsl(120,100%,45%)"></div>
+            <div class="size-swatch" style="width:8px; background:hsl(120,100%,45%)"></div>
+            <div class="size-swatch" style="width:4px; background:hsl(120,100%,45%)"></div>
+        </div>
+        <div class="size-row">
+            <span class="label">Blue (BY)</span>
+            <div class="size-swatch" style="width:120px; background:hsl(240,100%,50%)"></div>
+            <div class="size-swatch" style="width:80px; background:hsl(240,100%,50%)"></div>
+            <div class="size-swatch" style="width:48px; background:hsl(240,100%,50%)"></div>
+            <div class="size-swatch" style="width:28px; background:hsl(240,100%,50%)"></div>
+            <div class="size-swatch" style="width:16px; background:hsl(240,100%,50%)"></div>
+            <div class="size-swatch" style="width:8px; background:hsl(240,100%,50%)"></div>
+            <div class="size-swatch" style="width:4px; background:hsl(240,100%,50%)"></div>
+            <span class="label">Yellow (BY)</span>
+            <div class="size-swatch" style="width:120px; background:hsl(60,100%,50%)"></div>
+            <div class="size-swatch" style="width:80px; background:hsl(60,100%,50%)"></div>
+            <div class="size-swatch" style="width:48px; background:hsl(60,100%,50%)"></div>
+            <div class="size-swatch" style="width:28px; background:hsl(60,100%,50%)"></div>
+            <div class="size-swatch" style="width:16px; background:hsl(60,100%,50%)"></div>
+            <div class="size-swatch" style="width:8px; background:hsl(60,100%,50%)"></div>
+            <div class="size-swatch" style="width:4px; background:hsl(60,100%,50%)"></div>
+        </div>
+        <div class="size-row">
+            <span class="label">Cyan ★</span>
+            <div class="size-swatch" style="width:120px; background:hsl(180,100%,50%)"></div>
+            <div class="size-swatch" style="width:80px; background:hsl(180,100%,50%)"></div>
+            <div class="size-swatch" style="width:48px; background:hsl(180,100%,50%)"></div>
+            <div class="size-swatch" style="width:28px; background:hsl(180,100%,50%)"></div>
+            <div class="size-swatch" style="width:16px; background:hsl(180,100%,50%)"></div>
+            <div class="size-swatch" style="width:8px; background:hsl(180,100%,50%)"></div>
+            <div class="size-swatch" style="width:4px; background:hsl(180,100%,50%)"></div>
+            <span class="label">Magenta</span>
+            <div class="size-swatch" style="width:120px; background:hsl(300,100%,50%)"></div>
+            <div class="size-swatch" style="width:80px; background:hsl(300,100%,50%)"></div>
+            <div class="size-swatch" style="width:48px; background:hsl(300,100%,50%)"></div>
+            <div class="size-swatch" style="width:28px; background:hsl(300,100%,50%)"></div>
+            <div class="size-swatch" style="width:16px; background:hsl(300,100%,50%)"></div>
+            <div class="size-swatch" style="width:8px; background:hsl(300,100%,50%)"></div>
+            <div class="size-swatch" style="width:4px; background:hsl(300,100%,50%)"></div>
         </div>
 
         <!-- Achromatic gray ramp — reference for pure luminance (no hue to lose) -->
