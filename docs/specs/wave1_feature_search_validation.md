@@ -24,7 +24,7 @@ Parameters from `shared/modes.json` (castleCSF Chromatic Pooling mode):
 | `rg_freq_decay` (k_ef) | 0.003 | Conservative estimate (~1/3 of YV) |
 | `yv_decay` (k_e) | 0.014 | Bowers et al. 2025, suprathreshold |
 | `yv_freq_decay` (k_ef) | 0.008 | castleCSF spatial frequency interaction |
-| `supra_exponent` | 0.5 | Jiang, Shooner & Mullen 2022 |
+| `supra_exponent` | 0.5 | Jiang, Shooner & Mullen 2022 (foveal measurement, extrapolated to periphery) |
 
 Eccentricity mapping at `fovea_radius=90px`, `fovea_deg=2.0`:
 
@@ -52,7 +52,7 @@ Both channels decrease monotonically. The BY/RG ratio grows with eccentricity �
 
 ### Prediction B: Larger targets retain color further into periphery
 
-Dot size determines dominant spatial frequency: `freq_cpd ≈ ppd / (2 * diameter_px)` where `ppd ≈ 45` at the default calibration. The `k_ef * freq` term in the exponent means higher spatial frequency (smaller dots) decay faster.
+Dot size determines characteristic spatial scale: `freq_cpd ≈ ppd / (2 * diameter_px)` where `ppd ≈ 45` at the default calibration. This is the half-period of a square wave at the dot diameter — an upper-bound approximation. A filled disc's actual energy (Airy/jinc function) peaks at DC with non-DC energy broadly distributed below `1.22/diameter`, roughly 0.5-0.8x the estimate here. The difference is negligible for RG (small `k_ef`) and ~1.5% for BY at ring 5. The `k_ef * freq` term in the exponent means higher spatial frequency (smaller dots) decay faster.
 
 Predicted retention at ring 5 (12.44 deg) by dot size:
 
@@ -66,13 +66,24 @@ Predicted retention at ring 5 (12.44 deg) by dot size:
 
 The size effect is small for RG (33.6% to 34.9%) because `rg_freq_decay` is low (0.003). For BY, the spread is larger (69.7% to 77.5%) because `yv_freq_decay` is nearly 3x higher (0.008). This means dot size matters more for blue/yellow detection boundaries than for red/green.
 
-### Prediction C: Green tracks RG curve, not BY
+### Prediction C: Green tracks RG more than BY, but with a BY residual
 
-In Oklab color space, green maps primarily to negative values on the `a` axis — the same L-M opponent channel as red (positive `a`). Green's chromatic signal is carried by L-M cone differencing, not S-(L+M). The shader applies `rg_decay` to the `a` channel and `yv_decay` to the `b` channel regardless of sign.
+In Oklab color space, green maps primarily to negative values on the `a` axis — the same L-M opponent channel as red (positive `a`). The shader applies `rg_decay` to the `a` channel and `yv_decay` to the `b` channel regardless of sign.
 
-A green target (Oklab `a ≈ -0.08`, `b ≈ 0.05`) loses its dominant chromatic signal at the RG rate, not the BY rate. At ring 5, a green dot should retain only ~34% of its chromatic contrast — indistinguishable from the RG prediction for red, and far below the 73% prediction for yellow/blue.
+However, green carries significant energy on both axes: `a = -0.144`, `b = +0.108` (ratio `|a|/|b| = 1.33`). This means ~43% of green's chroma is on the `b` (BY) axis.
 
-This is a non-obvious prediction: people intuitively group green with blue (cool colors), but opponent color processing groups green with red (L-M channel). The shader's per-channel Oklab attenuation makes this testable.
+**Composite chroma prediction at ring 5 (12.44 deg):**
+
+| Color | a (orig) | a (ring 5) | b (orig) | b (ring 5) | Composite chroma retention |
+|-------|---------|-----------|---------|-----------|---------------------------|
+| Red | +0.152 | +0.052 | +0.067 | +0.049 | 42.9% |
+| Green | -0.144 | -0.049 | +0.108 | +0.079 | 51.6% |
+| Blue | -0.004 | -0.001 | -0.173 | -0.126 | 73.0% |
+| Yellow | -0.026 | -0.009 | +0.143 | +0.104 | 73.2% |
+
+Green retains 51.6% composite chroma vs red's 42.9% — an 8.7pp gap. Green does track closer to RG than BY (which retains ~73%), but the surviving green signal at high eccentricity is dominated by its `b` component (the part that decays slowly). Green won't just desaturate — it will shift toward yellow-green as the `a` component collapses while `b` persists.
+
+This is a non-obvious prediction: people intuitively group green with blue (cool colors), but opponent color processing groups green with red (L-M channel). The shader's per-channel Oklab attenuation makes this testable — green's total chroma loss should be intermediate between pure-RG (red) and pure-BY (blue/yellow), but closer to RG.
 
 ### Prediction D: Saliency map peak tracks chromatic contrast
 
@@ -111,19 +122,29 @@ Estimated: ~50 lines added to existing file.
 
 Luminance-matched targets and their Oklab chromatic profiles:
 
-| Color | RGB | Oklab a | Oklab b | Primary channel |
-|-------|-----|---------|---------|-----------------|
-| Red | rgb(200, 70, 70) | +0.08 | +0.04 | RG (a-axis) |
-| Green | rgb(70, 180, 70) | -0.08 | +0.05 | RG (a-axis) |
-| Blue | rgb(70, 100, 210) | -0.02 | -0.10 | BY (b-axis) |
-| Yellow | rgb(210, 190, 60) | -0.01 | +0.12 | BY (b-axis) |
-| Gray | luminance-matched per target | 0.00 | 0.00 | — |
+| Color | RGB | Oklab L | Oklab a | Oklab b | Primary channel |
+|-------|-----|---------|---------|---------|-----------------|
+| Red | rgb(200, 70, 70) | 0.575 | +0.152 | +0.067 | RG (a-axis, 69% of chroma) |
+| Green | rgb(70, 180, 70) | 0.683 | -0.144 | +0.108 | RG (a-axis, 57% of chroma) |
+| Blue | rgb(70, 100, 210) | 0.541 | -0.004 | -0.173 | BY (b-axis, 98% of chroma) |
+| Yellow | rgb(210, 190, 60) | 0.796 | -0.026 | +0.143 | BY (b-axis, 98% of chroma) |
+| Gray | luminance-matched per target | varies | 0.000 | 0.000 | — |
+
+**Luminance note:** Current `color-search.html` luminance-matches targets using BT.601 coefficients (`0.299R + 0.587G + 0.114B`), not Oklab L. This introduces a lightness confound: yellow (L=0.796) vs blue (L=0.541) differ by 0.255 in Oklab lightness from their respective gray distractors. Cross-color comparisons should account for this. A future improvement would match targets in Oklab L space.
+
+**Baseline capture:** Each color/size combination should also be captured without Scrutinizer active (unfiltered) to verify the input stimulus has the expected Oklab values before the shader transforms them.
 
 ## 3. Comparison Methodology
 
 ### Step 1: Generate model predictions (JSON)
 
-Extend `scripts/chromatic-attenuation-table.js` to accept `--json` flag and output structured predictions:
+Extend `scripts/chromatic-attenuation-table.js` to accept `--json` flag and output structured predictions.
+
+**Stale parameters:** The script currently hardcodes `rg_decay=0.059, yv_decay=0.004` (pre-Bowers values). Must update to read from `shared/modes.json` or accept `--mode=castleCSF` to use current parameters (0.072/0.014).
+
+**Bowers derivation note:** The `k_e` values (0.072 RG, 0.014 YV) were fit to Bowers et al. (2025) suprathreshold data, but the fit uses a different baseline normalization than Bowers' published table (which normalizes to 5 deg). At 15 deg with `supra=1.0`, the threshold model gives RG=7.5% vs Bowers' 29% — a gap explained by the suprathreshold correction (`supra=0.5` gives 27.4%, close to Bowers). The validation should compare model appearance (supra=0.5) against Bowers' suprathreshold measurements, not raw threshold.
+
+Output format:
 
 ```json
 {
@@ -139,7 +160,13 @@ Extend `scripts/chromatic-attenuation-table.js` to accept `--json` flag and outp
 
 Use `scripts/capture-golden.js` pattern — launch Scrutinizer pointed at `color-search.html?mode=static&color=red&size=24`, capture screenshot at center fixation. Repeat for each color/size combination. Output to `tests/golden-captures/validation/color-search/`.
 
-Capture matrix: 4 colors x 5 sizes = 20 screenshots.
+**Capture requirements:**
+- PNG format only (JPEG chroma subsampling at 4:2:0 would smear color across 2x2 blocks, invalidating delta-C measurements)
+- sRGB color profile (macOS P3 displays may apply gamut mapping via ColorSync — force `--color-profile=srgb` or equivalent)
+- Log actual `fovea_radius` used and verify it matches prediction parameters (90px)
+- Capture both filtered (Scrutinizer active) and unfiltered (baseline) for each condition
+
+Capture matrix: 4 colors x 5 sizes x 2 conditions (filtered/baseline) = 40 screenshots.
 
 ### Step 3: Analyze screenshots
 
@@ -177,12 +204,10 @@ New script `scripts/validate-color-search.js` (~100 lines):
 
 ## 4. Implementation Plan
 
-All code changes are future work — this commit is the spec only.
-
 | File | Action | Lines | Description |
 |------|--------|-------|-------------|
 | `tests/reference-pages/color-search.html` | Modify | ~50 | URL params, yellow target, static mode |
-| `scripts/chromatic-attenuation-table.js` | Modify | ~30 | `--json` output for color-search rings |
+| `scripts/chromatic-attenuation-table.js` | Modify | ~30 | Update params from modes.json, `--json` output for color-search rings |
 | `scripts/analyze-color-search.js` | Create | ~150 | Pixel sampling and Oklab delta-C analysis |
 | `scripts/validate-color-search.js` | Create | ~100 | Orchestrator, correlation, markdown report |
 | `tests/validation/published-data/*.json` | Create | ~15 KB | Digitized published psychometric data |
@@ -198,7 +223,7 @@ No saliency worker changes needed. Delta-C computation from screenshots is suffi
 
 ### Tier 2 (should pass)
 - RG/BY retention ratio matches Bowers et al. (2025) within 20% at comparable eccentricities
-- Green target tracks RG decay curve (within 10% of red), not BY curve
+- Green composite chroma retention closer to red (within 15pp) than to blue/yellow (see Prediction C worked example: 51.6% vs red's 42.9% vs blue's 73.0%)
 - Rendered delta-C matches `chromatic-attenuation-table.js` predictions within 15% (verifies shader fidelity)
 
 ### Tier 3 (stretch)
