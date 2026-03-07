@@ -484,7 +484,7 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     
     // Minecraft/Wireframe Override: We want structural distortion (blocks) to start immediately
     // in the parafovea to create a strong "tech" aesthetic.
-    if (config.v4_style_id == 4 || config.v4_style_id == 3 || config.v4_style_id == 8) {
+    if (config.v4_style_id == 4 || config.v4_style_id == 8) {
         eccentricityScale = 1.0;
     }
     
@@ -902,34 +902,86 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         vec3 frosted = mix(col, vec3(0.9), 0.3);
         return mix(col, frosted, effectFactor * 0.7 * bypassTransition);
         
-    } else if (config.v4_style_id == 3) { // Wireframe (Gestalt)
-        // === QUANTIZED WIREFRAME (Gestalt) ===
-        // V1 is now forced to Type 3 (Pixelate), so v1.distortedUV is already blocky.
-        
-        // 1. Detect Edges on the PIXELATED UVs
-        // This naturally finds the edges between the V1 blocks.
-        float edge = sobel(v1.distortedUV);
-        
-        // 2. Compute Edge Intensity
-        // Crisp lines
-        float edgeIntensity = smoothstep(0.05, 0.1, edge);
-        
-        // 3. Aesthetic Coloring
-        // User requested NO desaturation.
-        // We use the original (blurred) color as the base.
-        vec3 baseColor = col;
-        
-        // Lines: Cyan/White
-        // Modulate line brightness by saliency
-        // Sample saliency using the distorted UVs to match the blocks
-        float s = texture(u_saliencyMap, v1.distortedUV).r; 
-        vec3 lineCol = mix(vec3(0.0, 0.4, 0.6), vec3(0.5, 0.9, 1.0), s);
-        
-        // Overlay lines on top of base color
-        // We add the lines to the base color (Screen/Add blend) or Mix?
-        // Mix ensures visibility.
-        return mix(baseColor, lineCol, edgeIntensity);
-        
+    } else if (config.v4_style_id == 3) { // Blueprint (ARIA Wireframe)
+        vec4 structure = texture(u_structureMap, v1.distortedUV);
+        float type = structure.b;
+        float density = structure.g;
+        float roleEncoded = structure.a;
+        int roleId = int(roleEncoded * 12.0 + 0.5);
+
+        vec4 salTex = texture(u_saliencyMap, v1.distortedUV);
+        float saliency = salTex.r;
+        float congestion = salTex.g;
+
+        bool hasStructure = (density > 0.05 || type < 0.95);
+
+        // Edge detection on structure map for bounding box outlines
+        vec2 ps = 1.0 / u_resolution;
+        float dL = texture(u_structureMap, v1.distortedUV + vec2(-ps.x, 0.0)).g;
+        float dR = texture(u_structureMap, v1.distortedUV + vec2( ps.x, 0.0)).g;
+        float dT = texture(u_structureMap, v1.distortedUV + vec2(0.0, -ps.y)).g;
+        float dB = texture(u_structureMap, v1.distortedUV + vec2(0.0,  ps.y)).g;
+        float structEdge = abs(dL - dR) + abs(dT - dB);
+
+        float tL = texture(u_structureMap, v1.distortedUV + vec2(-ps.x, 0.0)).b;
+        float tR = texture(u_structureMap, v1.distortedUV + vec2( ps.x, 0.0)).b;
+        float tT = texture(u_structureMap, v1.distortedUV + vec2(0.0, -ps.y)).b;
+        float tB = texture(u_structureMap, v1.distortedUV + vec2(0.0,  ps.y)).b;
+        float typeEdge = abs(tL - tR) + abs(tT - tB);
+
+        float isEdge = smoothstep(0.02, 0.08, max(structEdge, typeEdge));
+
+        // Role-based color palette
+        vec3 roleColor;
+        if (roleId == 1) roleColor = vec3(0.2, 0.8, 0.4);       // button: green
+        else if (roleId == 2) roleColor = vec3(0.3, 0.6, 1.0);   // link: blue
+        else if (roleId == 3) roleColor = vec3(1.0, 0.8, 0.2);   // input: yellow
+        else if (roleId == 4) roleColor = vec3(1.0, 0.4, 0.4);   // heading: red
+        else if (roleId == 5) roleColor = vec3(0.6, 0.4, 1.0);   // nav: purple
+        else if (roleId == 6) roleColor = vec3(1.0, 0.6, 0.2);   // media: orange
+        else if (roleId == 7) roleColor = vec3(0.4, 0.8, 0.8);   // list: teal
+        else if (roleId == 8) roleColor = vec3(0.8, 0.4, 0.8);   // menu: magenta
+        else if (roleId == 9) roleColor = vec3(0.9, 0.9, 0.3);   // checkbox: yellow
+        else if (roleId == 10) roleColor = vec3(1.0, 0.3, 0.6);  // dialog: pink
+        else if (roleId == 11) roleColor = vec3(0.5, 0.7, 1.0);  // header: light blue
+        else if (roleId == 12) roleColor = vec3(0.5, 0.6, 0.7);  // footer: gray-blue
+        else {
+            if (type > 0.8) roleColor = vec3(0.6, 0.8, 1.0);      // text: cyan
+            else if (type > 0.3) roleColor = vec3(1.0, 0.6, 0.2); // media: orange
+            else roleColor = vec3(0.2, 0.8, 0.4);                  // UI: green
+        }
+
+        // Blueprint background: desaturated page content bleeds through for orientation.
+        // Congestion controls the tint darkness — high congestion = more opaque blueprint,
+        // low congestion = more of the original page visible.
+        vec3 pageGhost = col * 0.25 + vec3(0.04, 0.06, 0.12);
+        vec3 bgColor = mix(pageGhost, vec3(0.06, 0.09, 0.18), congestion * 0.7);
+        vec2 gridUV = v1.distortedUV * u_resolution;
+        float gridMajor = step(0.97, max(fract(gridUV.x / 100.0), fract(gridUV.y / 100.0)));
+        float gridMinor = step(0.985, max(fract(gridUV.x / 20.0), fract(gridUV.y / 20.0)));
+        bgColor += vec3(0.03) * gridMinor + vec3(0.06) * gridMajor;
+
+        // Compose wireframe — congestion drives fill intensity (wider range: 5%–40%)
+        vec3 wireframe = bgColor;
+        if (hasStructure) {
+            wireframe = mix(wireframe, roleColor, 0.05 + congestion * 0.35);
+            wireframe += roleColor * saliency * 0.15;
+        }
+        wireframe = mix(wireframe, roleColor * (0.6 + saliency * 0.4), isEdge);
+
+        // Fine image edges (subtle)
+        float imageEdge = sobel(v1.distortedUV);
+        float fineEdge = smoothstep(0.05, 0.15, imageEdge);
+        wireframe = mix(wireframe, mix(vec3(0.15, 0.25, 0.4), roleColor * 0.5, density), fineEdge * 0.3);
+
+        // Fovea/periphery transition
+        float blueprintFade = smoothstep(fovea_radius * 0.3, fovea_radius * 1.2, dist);
+        vec3 fovealBlend = col;
+        if (hasStructure && blueprintFade < 0.5) {
+            fovealBlend = mix(col, roleColor, isEdge * 0.3);
+        }
+        return mix(fovealBlend, wireframe, blueprintFade);
+
     } else if (config.v4_style_id == 4) { // Minecraft (Block Pooling)
             // Pixelation is handled in V1 (now with larger blocks).
             
@@ -1173,9 +1225,9 @@ void main() {
         else config.v1_distortion_type = 1; // Shatter
     }
     
-    // Force Pixelate (Type 3) for Wireframe (Style 3) to get "rectangular closed shapes"
+    // Blueprint mode: no geometric distortion
     if (config.v4_style_id == 3) {
-        config.v1_distortion_type = 3;
+        config.v1_distortion_type = 2; // No distortion for Blueprint
     }
 
     // --- PIPELINE EXECUTION ---

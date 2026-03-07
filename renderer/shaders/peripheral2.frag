@@ -580,7 +580,7 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     float eccentricityScale = mix(0.0, 0.15, parafoveaRamp);
     eccentricityScale = mix(eccentricityScale, 1.0, boundaryProgress);
     
-    if (config.v4_style_id == 4 || config.v4_style_id == 3 || config.v4_style_id == 8) {
+    if (config.v4_style_id == 4 || config.v4_style_id == 8) {
         eccentricityScale = 1.0;
     }
     
@@ -958,14 +958,89 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         vec3 frosted = mix(col, vec3(0.9), 0.3);
         return mix(col, frosted, effectFactor * 0.7 * bypassTransition);
         
-    } else if (config.v4_style_id == 3) { // Wireframe
-        float edge = sobel(v1.distortedUV);
-        float edgeIntensity = smoothstep(0.05, 0.1, edge);
-        vec3 baseColor = col;
-        float s = texture(u_saliencyMap, v1.distortedUV).r; 
-        vec3 lineCol = mix(vec3(0.0, 0.4, 0.6), vec3(0.5, 0.9, 1.0), s);
-        return mix(baseColor, lineCol, edgeIntensity);
-        
+    } else if (config.v4_style_id == 3) { // Blueprint (ARIA Wireframe)
+        vec4 structure = texture(u_structureMap, v1.distortedUV);
+        float type = structure.b;
+        float density = structure.g;
+        float roleEncoded = structure.a;
+        int roleId = int(roleEncoded * 12.0 + 0.5);
+
+        vec4 salTex = texture(u_saliencyMap, v1.distortedUV);
+        float saliency = salTex.r;
+        float congestion = (u_hasCongestionMap > 0.5)
+            ? texture(u_congestionMap, v1.distortedUV).r
+            : salTex.g;
+
+        bool hasStructure = (density > 0.05 || type < 0.95);
+
+        // Edge detection on structure map for bounding box outlines
+        vec2 ps = 1.0 / u_resolution;
+        float dL = texture(u_structureMap, v1.distortedUV + vec2(-ps.x, 0.0)).g;
+        float dR = texture(u_structureMap, v1.distortedUV + vec2( ps.x, 0.0)).g;
+        float dT = texture(u_structureMap, v1.distortedUV + vec2(0.0, -ps.y)).g;
+        float dB = texture(u_structureMap, v1.distortedUV + vec2(0.0,  ps.y)).g;
+        float structEdge = abs(dL - dR) + abs(dT - dB);
+
+        float tL = texture(u_structureMap, v1.distortedUV + vec2(-ps.x, 0.0)).b;
+        float tR = texture(u_structureMap, v1.distortedUV + vec2( ps.x, 0.0)).b;
+        float tT = texture(u_structureMap, v1.distortedUV + vec2(0.0, -ps.y)).b;
+        float tB = texture(u_structureMap, v1.distortedUV + vec2(0.0,  ps.y)).b;
+        float typeEdge = abs(tL - tR) + abs(tT - tB);
+
+        float isEdge = smoothstep(0.02, 0.08, max(structEdge, typeEdge));
+
+        // Role-based color palette
+        vec3 roleColor;
+        if (roleId == 1) roleColor = vec3(0.2, 0.8, 0.4);       // button: green
+        else if (roleId == 2) roleColor = vec3(0.3, 0.6, 1.0);   // link: blue
+        else if (roleId == 3) roleColor = vec3(1.0, 0.8, 0.2);   // input: yellow
+        else if (roleId == 4) roleColor = vec3(1.0, 0.4, 0.4);   // heading: red
+        else if (roleId == 5) roleColor = vec3(0.6, 0.4, 1.0);   // nav: purple
+        else if (roleId == 6) roleColor = vec3(1.0, 0.6, 0.2);   // media: orange
+        else if (roleId == 7) roleColor = vec3(0.4, 0.8, 0.8);   // list: teal
+        else if (roleId == 8) roleColor = vec3(0.8, 0.4, 0.8);   // menu: magenta
+        else if (roleId == 9) roleColor = vec3(0.9, 0.9, 0.3);   // checkbox: yellow
+        else if (roleId == 10) roleColor = vec3(1.0, 0.3, 0.6);  // dialog: pink
+        else if (roleId == 11) roleColor = vec3(0.5, 0.7, 1.0);  // header: light blue
+        else if (roleId == 12) roleColor = vec3(0.5, 0.6, 0.7);  // footer: gray-blue
+        else {
+            // Fallback: use type channel for unknown roles
+            if (type > 0.8) roleColor = vec3(0.6, 0.8, 1.0);      // text: cyan
+            else if (type > 0.3) roleColor = vec3(1.0, 0.6, 0.2); // media: orange
+            else roleColor = vec3(0.2, 0.8, 0.4);                  // UI: green
+        }
+
+        // Blueprint background: desaturated page content bleeds through for orientation.
+        // Congestion controls the tint darkness — high congestion = more opaque blueprint,
+        // low congestion = more of the original page visible.
+        vec3 pageGhost = col * 0.25 + vec3(0.04, 0.06, 0.12);
+        vec3 bgColor = mix(pageGhost, vec3(0.06, 0.09, 0.18), congestion * 0.7);
+        vec2 gridUV = v1.distortedUV * u_resolution;
+        float gridMajor = step(0.97, max(fract(gridUV.x / 100.0), fract(gridUV.y / 100.0)));
+        float gridMinor = step(0.985, max(fract(gridUV.x / 20.0), fract(gridUV.y / 20.0)));
+        bgColor += vec3(0.03) * gridMinor + vec3(0.06) * gridMajor;
+
+        // Compose wireframe — congestion drives fill intensity (wider range: 5%–40%)
+        vec3 wireframe = bgColor;
+        if (hasStructure) {
+            wireframe = mix(wireframe, roleColor, 0.05 + congestion * 0.35);
+            wireframe += roleColor * saliency * 0.15;
+        }
+        wireframe = mix(wireframe, roleColor * (0.6 + saliency * 0.4), isEdge);
+
+        // Fine image edges (subtle)
+        float imageEdge = sobel(v1.distortedUV);
+        float fineEdge = smoothstep(0.05, 0.15, imageEdge);
+        wireframe = mix(wireframe, mix(vec3(0.15, 0.25, 0.4), roleColor * 0.5, density), fineEdge * 0.3);
+
+        // Fovea/periphery transition
+        float blueprintFade = smoothstep(fovea_radius * 0.3, fovea_radius * 1.2, dist);
+        vec3 fovealBlend = col;
+        if (hasStructure && blueprintFade < 0.5) {
+            fovealBlend = mix(col, roleColor, isEdge * 0.3);
+        }
+        return mix(fovealBlend, wireframe, blueprintFade);
+
     } else if (config.v4_style_id == 4) { // Minecraft (Block Pooling)
             // Channel-independent neighbor color averaging in Oklab space.
             // Similar colors merge between blocks while distinct boundaries persist.
@@ -1291,7 +1366,7 @@ void main() {
     }
     
     if (config.v4_style_id == 3) {
-        config.v1_distortion_type = 3;
+        config.v1_distortion_type = 2; // No distortion for Blueprint
     }
 
     float memoryStrength = 0.0;

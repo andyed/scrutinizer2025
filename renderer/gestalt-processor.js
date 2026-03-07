@@ -140,6 +140,7 @@ class GestaltProcessor {
             let totalDensity = 0;
             let hasInteractive = false;
             let lineHeightSum = 0;
+            let primaryRole = 0;
 
             for (const b of cluster) {
                 minX = Math.min(minX, b.x);
@@ -152,6 +153,11 @@ class GestaltProcessor {
                 // Type 0.0 is UI/Interactive. Type 1.0 is Text.
                 // If we detect interaction, the whole group becomes interactive (Fitts's Law target).
                 if (b.type < 0.9) hasInteractive = true;
+
+                // Preserve most specific ARIA role through merge (highest ID wins)
+                if (b.ariaRole && b.ariaRole > primaryRole) {
+                    primaryRole = b.ariaRole;
+                }
             }
 
             return {
@@ -164,7 +170,8 @@ class GestaltProcessor {
                 type: hasInteractive ? 0.0 : 1.0,
                 // Average density boosted by "Group Strength" (more items = more dense)
                 density: Math.min(1.0, (totalDensity / cluster.length) * 1.2),
-                lineHeight: lineHeightSum / cluster.length // Average rhythm
+                lineHeight: lineHeightSum / cluster.length, // Average rhythm
+                ariaRole: primaryRole
             };
         });
     }

@@ -100,10 +100,10 @@
         },
         "blueprint": {
             "id": 3,
-            "label": "Wireframe (Gestalt)",
+            "label": "Blueprint (ARIA Wireframe)",
             "shortLabel": "Blueprint",
             "category": "presentation",
-            "description": "Visualization mode that reveals underlying Gestalt structure (rhythm, mass) detected by the Structure Map. No geometric distortion - uses edge detection on structure texture.",
+            "description": "Reverse-engineers wireframes from live web pages by combining ARIA roles, congestion, saliency, and DOM structure. Shows typed annotations (buttons, inputs, headings, nav) as color-coded bounding boxes on a blueprint background. Fovea shows original content; periphery transitions to full wireframe.",
             "pipeline": {
                 "lgn_use_structure_mask": true,
                 "lgn_use_saliency_gate": true,
@@ -114,14 +114,17 @@
                 "v4_style_id": 3
             },
             "tests": [
-                "edge_detection",
-                "structure_map_visualization",
+                "aria_role_classification",
+                "structure_map_alpha_encoding",
+                "role_colored_wireframe",
+                "blueprint_grid",
+                "fovea_periphery_transition",
                 "v1_bypass"
             ],
-            "architectural_purpose": "Stress-test for V1 bypass while V4 renders from texture data",
+            "architectural_purpose": "ARIA-typed wireframe visualization — structure map alpha channel encodes role IDs (0–12), shader renders color-coded bounding boxes",
             "citations": {
-                "technique": "Sobel edge detection on structure map",
-                "design_basis": "Gestalt principles of visual grouping"
+                "technique": "ARIA role classification + Sobel edge detection on structure map",
+                "design_basis": "WAI-ARIA semantic roles, Gestalt grouping principles"
             }
         },
         "minecraft": {

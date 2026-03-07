@@ -543,6 +543,7 @@
 
         setAestheticMode(mode) {
             this.aestheticMode = Number(mode);
+            this.contentAnalysis.setAestheticMode(this.aestheticMode);
             const msg = `[Scrutinizer] Aesthetic Mode set to: ${this.aestheticMode}`;
             console.log(msg);
             ipcRenderer.send('log:renderer', msg);

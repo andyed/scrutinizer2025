@@ -9,6 +9,44 @@ class DomAdapter {
     }
 
     /**
+     * Classify an element's ARIA/semantic role into a numeric ID (0–12).
+     * Used by Blueprint mode to color-code bounding boxes by role type.
+     */
+    classifyRole(el) {
+        const tag = el.tagName?.toLowerCase();
+        const role = el.getAttribute?.('role');
+        const type = el.getAttribute?.('type');
+
+        // Explicit ARIA roles take priority
+        if (role === 'button') return 1;
+        if (role === 'link') return 2;
+        if (role === 'searchbox' || role === 'combobox') return 3;
+        if (role === 'heading') return 4;
+        if (role === 'navigation' || role === 'menubar') return 5;
+        if (role === 'list' || role === 'listbox') return 7;
+        if (role === 'menu' || role === 'menuitem' || role === 'tab' || role === 'tablist') return 8;
+        if (role === 'checkbox' || role === 'radio' || role === 'switch') return 9;
+        if (role === 'dialog' || role === 'alertdialog') return 10;
+        if (role === 'banner' || role === 'toolbar') return 11;
+        if (role === 'contentinfo') return 12;
+
+        // Tag-based fallback
+        if (tag === 'button' || (tag === 'input' && (type === 'submit' || type === 'reset' || type === 'button'))) return 1;
+        if (tag === 'a') return 2;
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return 3;
+        if (/^h[1-6]$/.test(tag)) return 4;
+        if (tag === 'nav') return 5;
+        if (tag === 'img' || tag === 'svg' || tag === 'video' || tag === 'canvas' || tag === 'picture') return 6;
+        if (tag === 'ul' || tag === 'ol') return 7;
+        if (tag === 'menu') return 8;
+        if (tag === 'dialog') return 10;
+        if (tag === 'header') return 11;
+        if (tag === 'footer') return 12;
+
+        return 0;
+    }
+
+    /**
      * Scan the DOM and return a list of StructureBlocks.
      * @param {HTMLElement} root - Root element to scan (usually document.body)
      * @param {number} scrollX - Current scroll X
@@ -79,6 +117,9 @@ class DomAdapter {
                     styleCache.set(parent, styleData);
                 }
 
+                // Classify role from parent element (headings, nav text, etc.)
+                const ariaRole = this.classifyRole(parent);
+
                 // Add blocks for each line rect
                 for (let i = 0; i < rects.length; i++) {
                     const rect = rects[i];
@@ -94,7 +135,8 @@ class DomAdapter {
                         h: rect.height * zoom,
                         type: 1.0, // Text
                         density: styleData.density,
-                        lineHeight: styleData.lineHeight * zoom
+                        lineHeight: styleData.lineHeight * zoom,
+                        ariaRole
                     });
                 }
             }
@@ -117,7 +159,8 @@ class DomAdapter {
                     h: rect.height * zoom,
                     type: 0.5, // Media
                     density: 0.8,
-                    lineHeight: 0
+                    lineHeight: 0,
+                    ariaRole: 6
                 });
             }
         }
@@ -159,7 +202,35 @@ class DomAdapter {
                     h: rect.height * zoom,
                     type: 0.0, // UI
                     density: 1.0,
-                    lineHeight: 0
+                    lineHeight: 0,
+                    ariaRole: this.classifyRole(el)
+                });
+            }
+        }
+
+        // 4. Landmark elements — large bounding boxes for zone visualization (Blueprint mode)
+        const landmarkElements = root.querySelectorAll([
+            'header', 'footer', 'nav', 'main', 'aside',
+            '[role="banner"]', '[role="contentinfo"]', '[role="navigation"]',
+            '[role="main"]', '[role="complementary"]'
+        ].join(', '));
+
+        for (const el of landmarkElements) {
+            const rect = el.getBoundingClientRect();
+            if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+                continue;
+            }
+
+            if (rect.width > 0 && rect.height > 0) {
+                blocks.push({
+                    x: rect.left * zoom,
+                    y: rect.top * zoom,
+                    w: rect.width * zoom,
+                    h: rect.height * zoom,
+                    type: 0.0,
+                    density: 0.3,
+                    lineHeight: 0,
+                    ariaRole: this.classifyRole(el)
                 });
             }
         }

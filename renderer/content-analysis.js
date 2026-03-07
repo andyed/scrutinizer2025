@@ -36,6 +36,7 @@
             this.hasStructure = false;
             this.lastBlocks = null;
             this.lastGroupedBlocks = null;
+            this.currentMode = 0;
 
             // ── Saliency Map (Visual attention heatmap) ──────────────
             // Target canvas: raw worker output. Current canvas: smoothed for GPU.
@@ -331,6 +332,14 @@
         // ── Structure Map ────────────────────────────────────────────
 
         /**
+         * Set the current aesthetic mode ID (used to skip Gestalt for Blueprint).
+         * @param {number} modeId - v4_style_id from modes.json
+         */
+        setAestheticMode(modeId) {
+            this.currentMode = modeId;
+        }
+
+        /**
          * Handle incoming structure update from DOM analysis (via IPC).
          * @param {Array} blocks - Raw DOM blocks from content script
          * @param {WebGLRenderer} renderer - For uploading texture
@@ -351,6 +360,8 @@
             this.lastGroupedBlocks = groupedBlocks;
 
             // Draw blocks onto structure texture
+            // Gestalt merge preserves ariaRole (max role wins), so all modes
+            // use grouped blocks for proper closure.
             const dpr = window.devicePixelRatio || 1;
             for (const block of groupedBlocks) {
                 this.structureMap.drawBlock(
@@ -361,9 +372,12 @@
                     block.type,
                     block.density,
                     block.lineHeight,
-                    block.color
+                    block.ariaRole || 0
                 );
             }
+
+            // Flush ImageData buffer to canvas before GPU upload
+            this.structureMap.flush();
 
             // Upload to GPU
             renderer.uploadStructureMap(this.structureMap.getCanvas());
