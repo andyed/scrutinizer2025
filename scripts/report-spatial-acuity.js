@@ -86,6 +86,9 @@ function buildBandRetentionChart() {
 
   let svg = `<div class="chart-box">
   <h3>Model: DoG Band Retention (achromatic)</h3>
+  <p class="chart-desc">Each curve shows one DoG frequency band's predicted retention vs eccentricity.
+  The sigmoid cutoffs create a staircase: 4 cpd dies at ~2°, 2 cpd at ~4°, 1 cpd at ~6°, 0.5 cpd at ~9°.
+  The residual (0.25 cpd) survives everywhere — coarse structure is always preserved.</p>
   <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <g transform="translate(${m.left},${m.top})">`;
 
@@ -128,6 +131,10 @@ function buildRovamoComparisonChart() {
 
   let svg = `<div class="chart-box">
   <h3>Rovamo & Virsu 1979 vs Model</h3>
+  <p class="chart-desc">Dashed: human contrast sensitivity from Rovamo & Virsu (1979), showing smooth decay per frequency.
+  Solid: our DoG band model, which approximates this with steep sigmoids. The discrete 5-band approximation
+  can't reproduce the smooth published curves — it snaps from 100% to 0% within one ring step.
+  This is a known limitation of the band architecture, not an error in the cutoff positions.</p>
   <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <g transform="translate(${m.left},${m.top})">`;
 
@@ -190,6 +197,10 @@ function buildMeasuredContrastChart() {
 
   let svg = `<div class="chart-box">
   <h3>Measured: Cross-Condition Retention (filtered/baseline)</h3>
+  <p class="chart-desc">Each point compares the same grating with and without Scrutinizer's filter at each ring.
+  A ratio below 100% means the filter reduced contrast at that frequency and eccentricity.
+  4 cpd (red) shows the steepest drop — the filter removes fine detail in the periphery, as intended.
+  0.25 cpd (purple) stays near 100% — coarse structure passes through unchanged.</p>
   <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <g transform="translate(${m.left},${m.top})">`;
 
@@ -251,6 +262,9 @@ function buildFreqVsRetentionChart() {
 
   let svg = `<div class="chart-box">
   <h3>Frequency vs Avg Cross-Condition Retention</h3>
+  <p class="chart-desc">Averaging across all rings: higher spatial frequencies are attenuated more by the filter.
+  This is the frequency-dependent decay we expect from M-scaling — the filter preferentially
+  removes detail that would be invisible in peripheral vision anyway.</p>
   <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <g transform="translate(${m.left},${m.top})">`;
 
@@ -298,6 +312,10 @@ const html = `<!DOCTYPE html>
   .tier-card h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #888; margin-bottom: 8px; }
   .tier-card .score { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
   .tier-card .score .of { font-size: 16px; color: #666; font-weight: 400; }
+  .intro { font-size: 13px; line-height: 1.7; color: #999; margin-bottom: 24px; max-width: 800px; }
+  .intro strong { color: #bbb; font-weight: 600; }
+  .section-desc { font-size: 12px; line-height: 1.6; color: #888; margin-bottom: 12px; max-width: 720px; }
+  .chart-desc { font-size: 11px; line-height: 1.5; color: #777; margin-top: -8px; margin-bottom: 12px; }
   .tier-card.all-pass { border-color: #2d6a3080; }
   .tier-card.all-pass .score { color: #4ade80; }
   .tier-card.has-fail { border-color: #a0602080; }
@@ -343,6 +361,16 @@ const html = `<!DOCTYPE html>
   <span>${new Date().toISOString().split('T')[0]}</span>
 </div>
 
+<div class="intro">
+  <strong>What this tests:</strong> Scrutinizer's Mode 0 uses a 5-band Difference-of-Gaussians (DoG) decomposition
+  to approximate how spatial resolution degrades with eccentricity. Each band targets a spatial frequency
+  (0.25–4 cpd) and is attenuated by an M-scaling sigmoid derived from Rovamo & Virsu (1979).
+  Higher frequencies are cut at smaller eccentricities — matching the cortical magnification principle
+  that peripheral neurons pool over larger receptive fields, losing fine detail first.
+  We validate these predictions against sine-wave grating screenshots processed through Scrutinizer,
+  and compare the M-scaling cutoff positions against published human contrast sensitivity data.
+</div>
+
 <div class="scorecard">
 ${[1, 2, 3].map(t => {
   const items = tiers[t] || [];
@@ -381,8 +409,24 @@ ${[1, 2, 3].map(t => {
   const items = tiers[t] || [];
   if (items.length === 0) return '';
   const label = t === 1 ? 'Must Pass' : t === 2 ? 'Should Pass' : 'Stretch';
-  return `<div class="results">
+  const descs = {
+    1: `<p class="section-desc"><strong>Observation:</strong> Does the filter preserve frequency ordering (higher freq attenuated more)
+    and monotonic eccentricity decay? Model predictions should hold by construction. Measured grating contrast
+    should decrease with eccentricity when processed through Scrutinizer. <em>Note: foveal-relative measurements
+    fail at low frequencies (0.25–0.5 cpd) because the foveal patch is too small for a full grating cycle.
+    Cross-condition retention is the more robust metric.</em></p>`,
+    2: `<p class="section-desc"><strong>Observation:</strong> Do the M-scaling cutoff positions match the expected values from Rovamo & Virsu (1979)?
+    E2 = 0.15 for the DoG decomposition means band0 (4 cpd) cuts at 0.15 normalized eccentricity,
+    band1 at 0.45, band2 at 1.05, band3 at 2.25. We also check that chromatic decay respects
+    the achromatic ≥ BY ≥ RG ordering from castleCSF.</p>`,
+    3: `<p class="section-desc"><strong>Observation:</strong> Does the model's eccentricity-dependent sensitivity profile correlate with
+    published human CSF data? This is a stretch goal because the 5-band DoG approximation produces
+    step-function cutoffs, while human CSF decays smoothly. A composite (summed-band) comparison
+    would be more appropriate than per-band correlation against a continuous curve.</p>`,
+  };
+  return `<div class="results" style="margin-bottom:16px">
   <h3>Tier ${t}: ${label}</h3>
+  ${descs[t] || ''}
   ${items.map(i => `<div class="result-row">
     <span class="badge ${i.status.toLowerCase()}">${i.status}</span>
     <span class="result-text">${i.text}</span>
