@@ -46,6 +46,7 @@ uniform float u_cmf_enabled;     // 0.0 = legacy linear, 1.0 = CMF logarithmic
 uniform float u_cmf_a;            // Cortical magnification constant (default 2.78)
 uniform float u_cortical_max;     // ln(r_max+a) - ln(a), precomputed on JS side
 uniform float u_cmf_color_sigma; // Gaussian color decay sigma (0.0 = disabled)
+uniform float u_ecc_scaling;     // Pooling growth rate (Brown et al. 2023, Bouma scaling, default 0.75)
 uniform float u_desat_floor;      // Min desaturation multiplier in salient regions (1.0 = full desat, 0.85 = 15% cap)
 
 // Chromatic pooling — per-channel RG/YV eccentricity decay (castleCSF; Ashraf et al. 2024)
@@ -65,6 +66,11 @@ uniform int u_show_congestion;    // 0=off, 1=overlay, 2=solo
 
 // Congestion-gated pooling (hypothesis mode)
 uniform float u_congestion_pooling; // 0.0=off, 1.0=on
+
+// Density-gated crowding (Bouma 1970 approximation)
+// Dense content (text clusters) gets full V1 distortion; sparse content (isolated elements) is spared.
+uniform float u_crowding_density_threshold; // Density below this = minimal crowding (default 0.2)
+uniform float u_crowding_density_steepness; // Sigmoid sharpness (default 10.0)
 
 // High-resolution congestion map (from dedicated congestion worker)
 // R=congestion, G=edgeDensity — higher quality than u_saliencyMap.gb at 256px
@@ -177,7 +183,8 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
         float fovea_deg = 2.0;
         float maxMipLevel = 4.0;
-        float scale = u_cortical_max / maxMipLevel;
+        // Scale inversely with ecc_scaling so bands stay consistent with MIP levels
+        float scale = u_cortical_max / maxMipLevel / (u_ecc_scaling / 0.75);
         c0 = u_cmf_a * (exp(1.0 * scale) - 1.0) / fovea_deg;
         c1 = u_cmf_a * (exp(2.0 * scale) - 1.0) / fovea_deg;
         c2 = u_cmf_a * (exp(3.0 * scale) - 1.0) / fovea_deg;
@@ -275,7 +282,10 @@ float computeMipLevel(float eccentricity, float fovea_radius) {
         // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
         float r_deg = normalizedEcc * 2.0;
         float cortical_dist = log(1.0 + r_deg / u_cmf_a);
-        return clamp(maxMipLevel * cortical_dist / u_cortical_max, 0.0, maxMipLevel);
+        // ecc_scaling modulates pooling zone growth rate (Brown et al. 2023).
+        // Normalized so 0.75 (their default) = no change from base CMF curve.
+        float eccScale = u_ecc_scaling / 0.75;
+        return clamp(maxMipLevel * cortical_dist / u_cortical_max * eccScale, 0.0, maxMipLevel);
     }
     return clamp(normalizedEcc * 2.5, 0.0, maxMipLevel);
 }
@@ -585,13 +595,20 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     }
     
     float strength = lgn.suppressionFactor * config.v1_strength_mult * eccentricityScale;
-    
+
+    // Density-gated crowding: dense content gets full V1 distortion,
+    // sparse/isolated elements get reduced distortion (Bouma 1970).
+    // Floor at 0.3 — isolated elements still lose acuity, just not full crowding.
+    float densityCrowding = 1.0 / (1.0 + exp(-u_crowding_density_steepness * (lgn.density - u_crowding_density_threshold)));
+    float crowdingFactor = mix(0.3, 1.0, densityCrowding);
+    strength *= crowdingFactor;
+
     if (u_useMask < 1.5) {
         strength *= (1.0 - memoryStrength);
     }
-    
+
     signal.distortionStrength = strength;
-    
+
     if (config.v4_style_id == 5) {
         // Double Vision Mode
         float waveSpeed = 0.5; 

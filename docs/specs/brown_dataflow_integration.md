@@ -74,7 +74,7 @@ It preserves the spatial layout — every pixel still has a unique UV. True log-
 
 #### D1b. Default the CMF Log Path for Modes 0 and 1
 
-**Status:** Currently only Mode 6 (`log_polar_mip`) sets `cmf_enabled: true` in `shared/modes.json:194`. Modes 0 (`highkey`, line 21) and 1 (`biological`, line 58) both set `cmf_enabled: false`, so they use the legacy linear path `normalizedEcc * 2.5` at `peripheral2.frag:269`.
+**Status:** SHIPPED. Modes 0, 1, 4, 6, and 8 all use `cmf_enabled: true`.
 
 **Problem:** The linear path produces MIP levels that grow linearly with eccentricity. Cortical magnification follows a logarithmic curve. The discrepancy is most visible at mid-periphery (5-10 degrees): linear scaling over-blurs relative to biological acuity falloff, while slightly under-blurring at far periphery.
 
@@ -98,6 +98,8 @@ It preserves the spatial layout — every pixel still has a unique UV. True log-
 ---
 
 #### D1c. Add `u_ecc_scaling` Uniform
+
+**Status:** SHIPPED. Uniform added to `peripheral2.frag`, wired in `webgl-renderer.js`, defaults set in all CMF-enabled modes.
 
 **What:** Brown et al. parameterize pooling zone growth as `scaling × eccentricity` where `scaling = 0.75` (their default, derived from Bouma's law). Expose this as a tunable uniform that scales MIP output, allowing per-mode control of how aggressively blur increases with eccentricity.
 
@@ -310,8 +312,8 @@ Main thread (60fps)     Web Workers (async, ~2-3 Hz)
 | # | Deliverable | Effort | Impact | Ship target |
 |---|-------------|--------|--------|-------------|
 | 1a | D1a: MIP-vs-warp clarification | None (spec only) | High (correctness of mental model) | Done |
-| 1b | D1b: CMF default for Modes 0/1 | Trivial (2 JSON fields) | High (all research modes use log CMF) | v1.10 |
-| 1c | D1c: `u_ecc_scaling` uniform | Low (1 uniform, 4 line changes) | Medium (Bouma tuning knob) | v1.10 |
+| 1b | D1b: CMF default for Modes 0/1 | Trivial (2 JSON fields) | High (all research modes use log CMF) | SHIPPED |
+| 1c | D1c: `u_ecc_scaling` uniform | Low (1 uniform, 4 line changes) | Medium (Bouma tuning knob) | SHIPPED |
 | 1d | D1d: Log-polar UV warp | High (new render pass) | Low until D5/Tier 3 | Deferred |
 | 2 | D3: Ground truth generation | Low | High (paper) | Pre-submission |
 | 3 | D2: End-stopped detection | Medium | Medium (crowding fidelity) | v1.11 |

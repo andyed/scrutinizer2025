@@ -27,6 +27,9 @@ uniform float u_blurRadius;       // Simulated Pupil Aperture (0.0 = Sharp, 10.0
 uniform float u_mongrel_mode;     // 0.0 = Noise, 1.0 = Shatter
 uniform float u_crowding_radial_bias; // Radial:tangential crowding ratio (default 2.0)
 
+// Density-gated crowding (Bouma 1970 approximation)
+uniform float u_crowding_density_threshold; // Density below this = minimal crowding (default 0.2)
+uniform float u_crowding_density_steepness; // Sigmoid sharpness (default 10.0)
 
 // === GRANULAR CONFIGURATION UNIFORMS ===
 uniform float u_lgn_use_structure_mask;
@@ -489,7 +492,13 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     }
     
     float strength = lgn.suppressionFactor * config.v1_strength_mult * eccentricityScale;
-    
+
+    // Density-gated crowding: dense content gets full V1 distortion,
+    // sparse/isolated elements get reduced distortion (Bouma 1970).
+    float densityCrowding = 1.0 / (1.0 + exp(-u_crowding_density_steepness * (lgn.density - u_crowding_density_threshold)));
+    float crowdingFactor = mix(0.3, 1.0, densityCrowding);
+    strength *= crowdingFactor;
+
     // VISUAL MEMORY MODULATION
     // If this area is remembered (memoryStrength > 0), we must reduce distortion
     // to ensure the underlying geometry aligns with the clear overlay.

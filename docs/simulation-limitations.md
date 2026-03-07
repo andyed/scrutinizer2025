@@ -6,7 +6,7 @@ Known gaps between Scrutinizer's peripheral rendering and biological peripheral 
 
 ## 1. Crowding Is Not Density-Dependent
 
-**Status**: Active limitation
+**Status**: Addressed (v1.9.1) — density-gated crowding sigmoid shipped. Isolated elements now receive reduced V1 distortion (floor 0.3×) while dense content gets full crowding.
 **Exposed by**: `reference-pages/crowding.html`
 **Severity**: High — crowding is arguably the dominant bottleneck in peripheral object recognition (Pelli & Tillman 2008), more limiting than acuity loss.
 

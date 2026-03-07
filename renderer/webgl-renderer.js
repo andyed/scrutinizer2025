@@ -89,6 +89,7 @@
                 this.cmfALocation = null;
                 this.corticalMaxLocation = null;
                 this.cmfColorSigmaLocation = null;
+                this.eccScalingLocation = null;
                 this.desatFloorLocation = null;
 
                 // Chromatic pooling (castleCSF per-channel decay)
@@ -106,6 +107,10 @@
 
                 // Congestion-gated pooling (hypothesis mode)
                 this.congestionPoolingLocation = null;
+
+                // Density-gated crowding (Bouma 1970)
+                this.crowdingDensityThresholdLocation = null;
+                this.crowdingDensitySteepnessLocation = null;
 
                 // High-res congestion map (from dedicated congestion worker)
                 this.congestionMapLocation = null;
@@ -227,6 +232,7 @@
                 this.cmfALocation = gl.getUniformLocation(this.program, "u_cmf_a");
                 this.corticalMaxLocation = gl.getUniformLocation(this.program, "u_cortical_max");
                 this.cmfColorSigmaLocation = gl.getUniformLocation(this.program, "u_cmf_color_sigma");
+                this.eccScalingLocation = gl.getUniformLocation(this.program, "u_ecc_scaling");
                 this.desatFloorLocation = gl.getUniformLocation(this.program, "u_desat_floor");
 
                 // Chromatic pooling uniform lookup
@@ -245,6 +251,10 @@
 
                 // Congestion-gated pooling uniform lookup
                 this.congestionPoolingLocation = gl.getUniformLocation(this.program, "u_congestion_pooling");
+
+                // Density-gated crowding uniform lookups
+                this.crowdingDensityThresholdLocation = gl.getUniformLocation(this.program, "u_crowding_density_threshold");
+                this.crowdingDensitySteepnessLocation = gl.getUniformLocation(this.program, "u_crowding_density_steepness");
 
                 // High-res congestion map uniform lookups
                 this.congestionMapLocation = gl.getUniformLocation(this.program, "u_congestionMap");
@@ -647,6 +657,7 @@
                 gl.uniform1f(this.cmfALocation, this.config.cmf_a);
                 gl.uniform1f(this.corticalMaxLocation, corticalMax);
                 gl.uniform1f(this.cmfColorSigmaLocation, this.config.cmf_color_sigma);
+                gl.uniform1f(this.eccScalingLocation, this.config.ecc_scaling ?? 0.75);
                 gl.uniform1f(this.desatFloorLocation, this.config.desat_floor ?? 1.0);
                 gl.uniform1f(this.chromaticPoolingLocation, this.config.chromatic_pooling ? 1.0 : 0.0);
                 gl.uniform1f(this.rgDecayLocation, this.config.rg_decay);
@@ -659,6 +670,8 @@
                 gl.uniform1i(this.showCongestionLocation, this.config.show_congestion);
                 gl.uniform1f(this.saccadicBlindnessLocation, this.config.saccadic_blindness ? 1.0 : 0.0);
                 gl.uniform1f(this.congestionPoolingLocation, this.config.congestion_pooling ? 1.0 : 0.0);
+                gl.uniform1f(this.crowdingDensityThresholdLocation, this.config.crowding_density_threshold ?? 0.6);
+                gl.uniform1f(this.crowdingDensitySteepnessLocation, this.config.crowding_density_steepness ?? 20.0);
 
                 if (Math.random() < 0.01) {
                     // console.log(`[WebGL] Render Mode: ${ mongrelMode }, Res: ${ width }x${ height }, Mouse: ${ mouseX },${ mouseY } `);

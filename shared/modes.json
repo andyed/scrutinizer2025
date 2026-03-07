@@ -21,12 +21,15 @@
                 "cmf_enabled": true,
                 "cmf_a": 2.78,
                 "cmf_color_sigma": 0.0,
+                "ecc_scaling": 0.75,
                 "chromatic_pooling": true,
                 "rg_decay": 0.072,
                 "rg_freq_decay": 0.003,
                 "yv_decay": 0.014,
                 "yv_freq_decay": 0.008,
-                "supra_exponent": 0.5
+                "supra_exponent": 0.5,
+                "crowding_density_threshold": 0.6,
+                "crowding_density_steepness": 20.0
             },
             "tests": [
                 "structure_masking",
@@ -58,12 +61,15 @@
                 "cmf_enabled": true,
                 "cmf_a": 2.78,
                 "cmf_color_sigma": 0.0,
+                "ecc_scaling": 0.75,
                 "chromatic_pooling": true,
                 "rg_decay": 0.072,
                 "rg_freq_decay": 0.003,
                 "yv_decay": 0.014,
                 "yv_freq_decay": 0.008,
-                "supra_exponent": 0.5
+                "supra_exponent": 0.5,
+                "crowding_density_threshold": 0.6,
+                "crowding_density_steepness": 20.0
             },
             "tests": [
                 "purkinje_shift",
@@ -143,7 +149,8 @@
                 "v4_style_id": 4,
                 "cmf_enabled": true,
                 "cmf_a": 2.78,
-                "cmf_color_sigma": 0.0
+                "cmf_color_sigma": 0.0,
+                "ecc_scaling": 0.75
             },
             "tests": [
                 "cmf_block_sizing",
@@ -172,7 +179,8 @@
                 "v4_style_id": 8,
                 "cmf_enabled": true,
                 "cmf_a": 2.78,
-                "cmf_color_sigma": 0.0
+                "cmf_color_sigma": 0.0,
+                "ecc_scaling": 0.75
             },
             "tests": [
                 "polar_sector_quantization",
@@ -228,7 +236,8 @@
                 "dog_enabled": false,
                 "cmf_enabled": true,
                 "cmf_a": 2.78,
-                "cmf_color_sigma": 4.0
+                "cmf_color_sigma": 4.0,
+                "ecc_scaling": 0.75
             },
             "tests": [
                 "cmf_logarithmic_scaling",
@@ -296,7 +305,9 @@
                 "rg_freq_decay": 0.003,
                 "yv_decay": 0.014,
                 "yv_freq_decay": 0.008,
-                "supra_exponent": 0.5
+                "supra_exponent": 0.5,
+                "crowding_density_threshold": 0.6,
+                "crowding_density_steepness": 20.0
             },
             "tests": [
                 "congestion_modulated_mip",

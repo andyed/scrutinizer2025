@@ -292,7 +292,7 @@ The non-uniform spacing is biologically correct: coarse structure (bands 2–3) 
 
 The V1 Lateral Smash (domain warping) and MIP pooling are both purely eccentricity-dependent. An isolated letter and a densely flanked letter at the same eccentricity receive identical displacement and pooling. In biological vision, the isolated letter remains identifiable while the flanked letter does not (Bouma 1970; Pelli & Tillman 2008).
 
-The structure map carries a density channel (`structure.g`) through the LGN signal, but it's currently used only for the whitespace gate (`density < 0.1 → suppressionFactor = 0`), not for scaling V1 distortion strength. A planned fix gates V1 strength with a sigmoid transfer on density — dense content gets full Lateral Smash, isolated elements get reduced distortion (floor at 0.3 for residual acuity loss).
+The structure map carries a density channel (`structure.g`) through the LGN signal, but it's currently used only for the whitespace gate (`density < 0.1 → suppressionFactor = 0`), not for scaling V1 distortion strength. A sigmoid gate now modulates V1 strength with a sigmoid transfer on density — dense content gets full Lateral Smash, isolated elements get reduced distortion (floor at 0.3 for residual acuity loss). Shipped in v1.9.1 with threshold=0.6, steepness=20.0.
 
 - **Diagnostic pages:** `reference-pages/crowding.html` (crowded-vs-isolated letters), `reference-pages/crowding-stimulus.html` (orientation, color grouping, complexity)
 - **Spec:** [`docs/specs/density_gated_crowding.md`](specs/density_gated_crowding.md)

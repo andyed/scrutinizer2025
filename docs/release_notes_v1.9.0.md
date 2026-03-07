@@ -127,7 +127,7 @@ Two new reference pages published to GitHub Pages for testing crowding behavior:
 
 ### Density-Gated Crowding Spec
 
-`docs/specs/density_gated_crowding.md` proposes feeding the structure map's density channel into V1 strength via a sigmoid transfer function. Dense content (text clusters) gets full Lateral Smash distortion; isolated elements get reduced distortion (floor at 0.3 for residual acuity loss). Includes three options for density signal strength for team review. Status: planned, deferred pending feedback.
+`docs/specs/density_gated_crowding.md` proposes feeding the structure map's density channel into V1 strength via a sigmoid transfer function. Dense content (text clusters) gets full Lateral Smash distortion; isolated elements get reduced distortion (floor at 0.3 for residual acuity loss). Includes three options for density signal strength for team review. Status: shipped (v1.9.1). Threshold=0.6, steepness=20.0, calibrated against structure map density values from crowding.html reference page.
 
 ---
 
