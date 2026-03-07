@@ -121,10 +121,10 @@ PolarSector computePolarSector(vec2 uv, float parafovea_radius) {
     s.r = length(diff_scaled);
     s.angle = atan(diff_scaled.y, diff_scaled.x);
 
-    // CMF-density ring spacing: ef=1.03 with bias=2.0 produces ring widths
-    // that track Minecraft's CMF block sizes (4–64px) across eccentricity.
+    // CMF-density ring spacing: ef=1.007 with bias=2.0 gives ring width ≈ r × 1.4%.
+    // Tracks CMF block sizes: ~8px at mipLevel 1, ~16px at mipLevel 2.
     float r0 = parafovea_radius;
-    float ef = 1.03;
+    float ef = 1.007;
     float bias = u_crowding_radial_bias;
     float n_cont = log(max(s.r, r0) / r0) / log(ef);
     float n_biased = n_cont / bias;
@@ -1018,7 +1018,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         float aspect = u_resolution.x / u_resolution.y;
 
         // Radial/tangential neighbor sampling
-        float ef = 1.03;
+        float ef = 1.007;
         float bias = u_crowding_radial_bias;
         float ring_inner_prev = ps.ring_inner / pow(ef, bias);
         float ring_center_inner = (ring_inner_prev + ps.ring_inner) * 0.5;
@@ -1068,10 +1068,10 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         blended.y = mix(labCenter.y, neighborAvg.y, t * 0.6);
         blended.z = mix(labCenter.z, neighborAvg.z, t * 0.25);
 
-        // Per-channel chromatic decay
+        // Per-channel chromatic decay — tightened ranges for desktop viewing
         float ecc_deg = normEcc * 2.0;
-        blended.y *= (1.0 - smoothstep(1.0, 28.0, ecc_deg) * 0.7);
-        blended.z *= (1.0 - smoothstep(5.0, 45.0, ecc_deg) * 0.35);
+        blended.y *= (1.0 - smoothstep(1.0, 12.0, ecc_deg) * 0.7);
+        blended.z *= (1.0 - smoothstep(3.0, 20.0, ecc_deg) * 0.35);
 
         vec3 result = oklabToRgb(blended);
 

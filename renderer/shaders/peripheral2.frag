@@ -310,11 +310,11 @@ PolarSector computePolarSector(vec2 uv, float parafovea_radius) {
     s.r = length(diff_scaled);
     s.angle = atan(diff_scaled.y, diff_scaled.x);
 
-    // CMF-density ring spacing: ef=1.03 with bias=2.0 produces ring widths
-    // that track Minecraft's CMF block sizes (4–64px) across eccentricity.
-    // At parafovea (r≈0.1): ringWidth ≈ 6px. At far periphery (r≈0.8): ≈49px.
+    // CMF-density ring spacing: ef=1.007 with bias=2.0 gives ring width ≈ r × 1.4%.
+    // This tracks CMF block sizes: ~8px at mipLevel 1, ~16px at mipLevel 2.
+    // ef=1.03 was 4× too coarse in the far periphery (65px vs CMF's 16px).
     float r0 = parafovea_radius;
-    float ef = 1.03;
+    float ef = 1.007;
     float bias = u_crowding_radial_bias;
     float n_cont = log(max(s.r, r0) / r0) / log(ef);
     float n_biased = n_cont / bias;
@@ -1012,8 +1012,8 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             // dissolve while blue-yellow persists at the same eccentricity.
             float normEcc = max(0.0, dist - fovea_radius) / max(fovea_radius, 0.001);
             float ecc_deg = normEcc * 2.0;
-            float rgFade = smoothstep(1.0, 28.0, ecc_deg) * 0.7;  // a: 70% max
-            float yvFade = smoothstep(5.0, 45.0, ecc_deg) * 0.35; // b: 35% max
+            float rgFade = smoothstep(1.0, 12.0, ecc_deg) * 0.7;  // a: 70% max
+            float yvFade = smoothstep(3.0, 20.0, ecc_deg) * 0.35; // b: 35% max
             blended.y *= (1.0 - rgFade); // a channel (red-green) fades first
             blended.z *= (1.0 - yvFade); // b channel (blue-yellow) persists
 
@@ -1098,7 +1098,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
 
         // --- RADIAL/TANGENTIAL NEIGHBOR SAMPLING ---
         // 2 radial (inner/outer ring centers) + 2 tangential (adjacent spokes)
-        float ef = 1.03;
+        float ef = 1.007;
         float bias = u_crowding_radial_bias;
         float ring_inner_prev = ps.ring_inner / pow(ef, bias);
         float ring_center_inner = (ring_inner_prev + ps.ring_inner) * 0.5;
@@ -1127,19 +1127,35 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         offTR.x *= u_fovea_aspect_ratio;
         vec2 uvTR = vec2((ps.mouse_c + offTR).x / aspect, (ps.mouse_c + offTR).y);
 
-        // MIP-level-aware sampling: use textureLod at a MIP level matching the
-        // sector's ring width in pixels. Single-point sampling (MIP 0) misses
-        // thin features (e.g. toolbars, logos) when the sector center lands on
-        // empty space. Hardware MIP averaging catches them.
+        // Multi-sample radial grid: 3 samples across the ring's radial extent
+        // (inner third, center, outer third), each at MIP matching 1/3 of the
+        // ring width. Thin horizontal features (toolbars, logos) that occupy
+        // only part of the ring can't be missed — at least one sample hits them.
         float ringWidthUV = ps.ring_outer - ps.ring_inner;
         float ringWidthPx = ringWidthUV * u_resolution.y;
-        // Let MIP level match the actual sector size — no artificial cap at 4.
-        // A 2336px texture has MIP levels up to ~11; sectors need MIP 5-6 to
-        // average their full area and catch thin features like toolbars.
         float maxMip = floor(log2(max(u_resolution.x, u_resolution.y)));
-        float sectorMip = clamp(log2(max(ringWidthPx, 1.0)), 0.0, maxMip);
+        float subMip = clamp(log2(max(ringWidthPx / 3.0, 1.0)), 0.0, maxMip);
 
-        vec3 labCenter = rgbToOklab(sampleSourceLod(v1.distortedUV, sectorMip).rgb);
+        // 3 radial positions: centers of inner, middle, outer thirds
+        float rInner = ps.ring_inner + ringWidthUV * (1.0 / 6.0);
+        float rOuter = ps.ring_outer - ringWidthUV * (1.0 / 6.0);
+
+        // Convert inner/outer radial positions to UV (same polar→UV pattern)
+        vec2 offInner = rInner * vec2(cos(ps.spoke_center), sin(ps.spoke_center));
+        offInner.x *= u_fovea_aspect_ratio;
+        vec2 uvInner = vec2((ps.mouse_c + offInner).x / aspect, (ps.mouse_c + offInner).y);
+
+        vec2 offOuter = rOuter * vec2(cos(ps.spoke_center), sin(ps.spoke_center));
+        offOuter.x *= u_fovea_aspect_ratio;
+        vec2 uvOuter = vec2((ps.mouse_c + offOuter).x / aspect, (ps.mouse_c + offOuter).y);
+
+        // Average 3 radial sub-samples for center color
+        vec3 labCenter = (rgbToOklab(sampleSourceLod(uvInner, subMip).rgb)
+                        + rgbToOklab(sampleSourceLod(v1.distortedUV, subMip).rgb)
+                        + rgbToOklab(sampleSourceLod(uvOuter, subMip).rgb)) / 3.0;
+
+        // Neighbors: single sample at sector-wide MIP (they're for blending, not display)
+        float sectorMip = clamp(log2(max(ringWidthPx, 1.0)), 0.0, maxMip);
         vec3 neighborAvg = (rgbToOklab(sampleSourceLod(uvRI, sectorMip).rgb)
                           + rgbToOklab(sampleSourceLod(uvRO, sectorMip).rgb)
                           + rgbToOklab(sampleSourceLod(uvTL, sectorMip).rgb)
@@ -1153,11 +1169,14 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         blended.y = mix(labCenter.y, neighborAvg.y, t * 0.6);   // a (RG)
         blended.z = mix(labCenter.z, neighborAvg.z, t * 0.25);  // b (YV)
 
-        // Per-channel chromatic decay (same as Minecraft style 4)
+        // Per-channel chromatic decay.
+        // The smoothstep ranges (1→28°, 5→45°) from Minecraft style 4 were designed
+        // for wide visual fields but barely engage on a desktop screen (~15° max ecc).
+        // Tighten to match the actual ecc_deg range so desaturation is visible.
         float normEcc = max(0.0, dist - fovea_radius) / max(fovea_radius, 0.001);
         float ecc_deg = normEcc * 2.0;
-        blended.y *= (1.0 - smoothstep(1.0, 28.0, ecc_deg) * 0.7);
-        blended.z *= (1.0 - smoothstep(5.0, 45.0, ecc_deg) * 0.35);
+        blended.y *= (1.0 - smoothstep(1.0, 12.0, ecc_deg) * 0.7);
+        blended.z *= (1.0 - smoothstep(3.0, 20.0, ecc_deg) * 0.35);
 
         vec3 result = oklabToRgb(blended);
 
