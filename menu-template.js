@@ -287,6 +287,16 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     label: 'Behavior',
                     submenu: [
                         {
+                            label: 'Toggle Effects On/Off',
+                            accelerator: 'CmdOrCtrl+E',
+                            click: () => {
+                                // Emit the same IPC that toolbar eye button uses
+                                const { ipcMain } = require('electron');
+                                ipcMain.emit('toolbar:toggle-fovea', { sender: null });
+                            }
+                        },
+                        { type: 'separator' },
+                        {
                             label: 'Visual Memory',
                             submenu: [
                                 {

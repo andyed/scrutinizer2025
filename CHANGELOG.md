@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.0.0] - 2026-03-07
+
+### Added
+- **Minecraft Mode (Mode 4)**: CMF-driven block quantization (4-64px) with per-channel Oklab neighbor averaging. Fovea-relative grid, RG boundaries merge while YV stays sharp.
+- **Minecraft Eyeball (Mode 8)**: Polar variant — wedge-shaped sectors sized by CMF, radially elongated ~2:1 approximating TTM-predicted pooling geometry. Same Oklab chromatic decay.
+- **Blueprint Mode (Mode 3)**: ARIA-typed wireframe from live DOM. Structure map alpha encodes role IDs (0–12), shader renders color-coded bounding boxes. Fovea shows original content, periphery transitions to blueprint wireframe.
+- **Density-Gated Crowding**: Sigmoid gate on structure map density modulates V1 distortion strength. Dense content gets full crowding; isolated elements spared (0.3× floor). Threshold=0.6, steepness=20.0.
+- **Eccentricity Scaling**: `u_ecc_scaling` uniform (default 0.75, Brown et al. 2023) modulates pooling growth rate across all CMF-enabled modes.
+- **Toggle Effects On/Off**: Simulation → Behavior → Toggle Effects (Cmd+E). Provides menu access to the toolbar eye button toggle.
+
+### Changed
+- **Chromatic decay recalibrated**: RG decay 0.059→0.072, YV decay 0.004→0.014 (Bowers et al. 2025 suprathreshold measurements).
+- **Mode count**: 9→10 modes (4 research, 4 presentation, 1 experimental).
+
+### Fixed
+- **Toolbar URL overflow**: Long URLs now truncate with ellipsis instead of pushing the eye toggle off-screen.
+- **Toolbar icon alignment**: Eye toggle and version label vertically centered in 40px toolbar.
+
+### Docs
+- Arxiv paper synced with shipped features; new Open Questions section.
+- 6 stale doc status lines updated (Planned→Shipped).
+
 ## [1.9.0] - 2026-03-04
 
 ### Added

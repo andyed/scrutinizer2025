@@ -22,12 +22,12 @@ body {
 .toolbar {
     display: flex;
     align-items: center;
-    height: 100vh;
-    /* View height will be small, so fill it */
+    height: 40px; /* Match TOOLBAR_HEIGHT in main.js */
     padding: 0 10px;
     gap: 10px;
     box-sizing: border-box;
     border-bottom: 1px solid var(--border-color);
+    overflow: hidden;
 }
 
 button {
@@ -66,13 +66,16 @@ button:disabled {
 
 .url-container {
     flex: 1;
+    min-width: 0; /* Allow flex child to shrink below content size */
     position: relative;
     display: flex;
     align-items: center;
+    overflow: hidden;
 }
 
 #url-trigger {
     width: 100%;
+    height: auto; /* Override generic button 32px height */
     background-color: var(--input-bg);
     border: 1px solid transparent;
     border-radius: 4px;
@@ -98,13 +101,19 @@ button:disabled {
     background-color: var(--active-bg);
 }
 
+.menu-controls {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
 /* Fovea Toggle Button */
 #fovea-toggle-btn {
     color: #666;
     /* Disabled state: Grey */
     transition: color 0.2s, text-shadow 0.2s;
     font-size: 18px;
-    /* Adjust icon size */
+    flex-shrink: 0; /* Never collapse when URL is long */
 }
 
 #fovea-toggle-btn.active {

@@ -1,5 +1,19 @@
 # Scrutinizer Roadmap
 
+## ✅ Completed Features (v2.0)
+
+### v2.0: Explainer Modes & Density-Gated Crowding
+**Date:** 2026-03-07
+
+- [x] **Minecraft Mode (Block Pooling)** — CMF pipeline as discrete block geometry (4-64px)
+- [x] **Minecraft Eyeball (Polar Pooling)** — Polar sectors sized by CMF, ~2:1 radial elongation
+- [x] **Blueprint Mode (ARIA Wireframe)** — Role-colored bounding boxes from live DOM
+- [x] **Density-Gated Crowding** — Sigmoid on structure density modulates V1 strength
+- [x] **Chromatic Decay Recalibration** — Bowers et al. 2025 suprathreshold values
+- [x] **Eccentricity Scaling** — `u_ecc_scaling` uniform (Brown et al. 2023)
+- [x] **Toggle Effects menu item** — Cmd+E in Behavior menu
+- [x] **Toolbar URL overflow fix**
+
 ## ✅ Completed Features (v1.0-v1.5)
 
 ### v1.5: Mobile Emulation & Usability
