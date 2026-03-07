@@ -36,6 +36,7 @@ const CONFIG = {
     useFoveatedBlur: true, // when true, use multi-resolution foveated blur
     chromaticAberration: true, // Enable chromatic aberration
     mongrelMode: 0.0, // 0.0 = Noise/Fractal Crowding (Tier 2.0), 1.0 = Shatter/Slow Wave
+    crowdingRadialBias: 2.0, // Radial:tangential crowding ratio (Toet & Levi 1992)
 
     // DoG peripheral reconstruction (V4 MIP replacement)
     dogEnabled: false,      // false = legacy MIP pooling, true = DoG band reconstruction

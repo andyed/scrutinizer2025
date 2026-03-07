@@ -561,7 +561,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     click: () => { sendToOverlays('menu:set-aesthetic-mode', 3); app.emit('aesthetic-mode-changed', 3); }
                                 },
                                 {
-                                    label: 'Cyberpunk (Neon)',
+                                    label: 'Minecraft (Block Pooling)',
                                     type: 'radio',
                                     checked: currentAestheticMode === 4,
                                     click: () => { sendToOverlays('menu:set-aesthetic-mode', 4); app.emit('aesthetic-mode-changed', 4); }

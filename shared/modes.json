@@ -124,12 +124,12 @@
                 "design_basis": "Gestalt principles of visual grouping"
             }
         },
-        "cyberpunk": {
+        "minecraft": {
             "id": 4,
-            "label": "Cyberpunk (Neon)",
-            "shortLabel": "Cyberpunk",
+            "label": "Minecraft (Block Pooling)",
+            "shortLabel": "Minecraft",
             "category": "presentation",
-            "description": "Exaggerated glitch aesthetic with massive block pixelation (up to 1200px), neon contrast boost, and halftone textures. Tests variable quantization at extreme scales.",
+            "description": "Blocks sized to CMF MIP level at each eccentricity (4-64px), fovea-relative grid, channel-independent neighbor color averaging in Oklab. RG boundaries merge between blocks while YV boundaries stay sharper — the same castleCSF pooling rates, visible as discrete geometry.",
             "pipeline": {
                 "lgn_use_structure_mask": true,
                 "lgn_use_saliency_gate": true,
@@ -137,17 +137,20 @@
                 "v1_distortion_type": 3,
                 "v1_strength_mult": 1.0,
                 "v1_animate": false,
-                "v4_style_id": 4
+                "v4_style_id": 4,
+                "cmf_enabled": true,
+                "cmf_a": 2.78,
+                "cmf_color_sigma": 0.0
             },
             "tests": [
-                "variable_quantization",
-                "extreme_block_size",
-                "saliency_driven_pixelation"
+                "cmf_block_sizing",
+                "fovea_relative_grid",
+                "neighbor_color_averaging"
             ],
-            "architectural_purpose": "Stress-test for V1 pixelation at 1200px blocks without coordinate collapse",
+            "architectural_purpose": "Demonstrates customizing the baseline simulation — same CMF math, visible as block geometry",
             "citations": {
-                "technique": "Saliency-guided variable block quantization",
-                "aesthetic_basis": "Cyberpunk visual language, blocky futurism"
+                "technique": "CMF-driven block quantization with Oklab neighbor averaging",
+                "design_basis": "Cortical magnification (Schwartz 1980), castleCSF chromatic pooling rates"
             }
         },
         "double_vision": {

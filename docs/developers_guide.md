@@ -134,7 +134,7 @@ The shader uses a modular architecture inspired by the human visual system to or
         *   **Noise (0)**: Fluid, continuous distortion with animation. Used by Double Vision mode.
         *   **Shatter (1)**: Slow wave distortion (legacy "Mongrel Approximation"). Used by default modes.
         *   **None (2)**: No geometric change. Used by Blueprint mode.
-        *   **Pixelate (3)**: Blocky, saliency-guided quantization. Used by Cyberpunk/Wireframe.
+        *   **Pixelate (3)**: CMF-driven block quantization. Used by Minecraft/Wireframe.
 
 3.  **Stage 3: V4 (Aesthetics & Style)**
     *   **Role**: The "Interpreter". Handles color, pooling, and stylistic rendering.
@@ -149,7 +149,7 @@ In Scrutinizer, an "Aesthetic Mode" is not just a visual filter—it is a **func
 
 *   **Double Vision (Mode 5)** is a test for **Stream Integration**. By bypassing LGN gating (`lgn_use_structure_mask = false`), it proves the pipeline can handle raw, ungated input without breaking.
 *   **Blueprint (Mode 3)** is a test for **Edge Detection**. It forces V1 to use pixelated UVs (`Type 3`) and tests if V4 can run a Sobel filter on that distorted coordinate space.
-*   **Cyberpunk (Mode 4)** is a test for **Variable Quantization**. It pushes the V1 block size logic to extreme limits (1200px) to verify that the coordinate system doesn't collapse at high scales.
+*   **Minecraft (Mode 4)** is a test for **CMF Block Sizing**. Blocks sized to MIP level at each eccentricity (4-64px) with channel-independent neighbor averaging in Oklab. Demonstrates customizing the baseline — same CMF math, visible as block geometry.
 
 **Guideline:** If you need to "hack" the shader to achieve a specific look, **do it**. If the hack persists, it likely means the V1 or V4 stage needs a new official capability (like a new `distortion_type` or `uniform`). Use the mode to drive the architecture, not the other way around.
 
@@ -238,9 +238,9 @@ The following table details the rendering characteristics of each built-in mode 
 | **3: Wireframe** | **LGN** | Standard |
 | | **V1** | **Quantized**: Pixelated UVs (Type 3). |
 | | **V4** | **Gestalt**: Sobel Edge Detection on Distorted UVs (Cyan/White). |
-| **4: Cyberpunk** | **LGN** | Standard |
-| | **V1** | **Massive Pixelate**: Up to 1200px blocks (Type 3). |
-| | **V4** | **Neon**: Progressive Contrast (1.0→2.5) + Halftone Texture. |
+| **4: Minecraft** | **LGN** | Standard |
+| | **V1** | **CMF Block Sizing**: Blocks sized to MIP level (4-64px), fovea-relative grid (Type 3). |
+| | **V4** | **Block Pooling**: Channel-independent neighbor averaging in Oklab + grid lines. |
 | **5: Double Vision** | **LGN** | **Bypassed**: No Gating (Stream Integration). |
 | | **V1** | **Flowing Wave**: High-amplitude animated sine wave (Type 0). |
 | | **V4** | **Vibrant**: Saturation Boost + Subtle Fractal Noise. |
@@ -672,7 +672,7 @@ TEST_URL=https://www.figma.com TEST_MODES=0,3 npm start
   - `1`: Lab Mode
   - `2`: Frosted Glass
   - `3`: Blueprint
-  - `4`: Cyberpunk (Neon + Blocky)
+  - `4`: Minecraft (Block Pooling)
   - `5`: Trippy (Psychedelic + Curvy)
 - `TEST_RADIUS`: Override foveal radius (pixels)
 - `TEST_INTENSITY`: Override peripheral intensity (0.0-1.0)
@@ -1084,7 +1084,7 @@ Scrutinizer supports a custom SVG overlay system for drawing debug information, 
 4.  **Filters**: Avoid applying filters (like Drop Shadows) to moving groups. Rasterizing filters on moving elements is extremely expensive. Apply filters to static elements only.
 
 ### Future Roadmap
-We plan to support "Per-Mode Overlays" (e.g., a Cyberpunk hud for Mode 4, a Wireframe grid for Mode 3). See `ROADMAP.md`.
+We plan to support "Per-Mode Overlays" (e.g., a Minecraft block overlay for Mode 4, a Wireframe grid for Mode 3). See `ROADMAP.md`.
 
 
 ### Related Projects

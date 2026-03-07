@@ -421,7 +421,7 @@
             const frameMode3 = captureFrame();
             saveScreenshot('test9_mode3');
 
-            // Render Mode 4 (Cyberpunk)
+            // Render Mode 4 (Minecraft)
             renderer.render(
                 width, height, width / 2, height / 2, 150, 1.33,
                 0.8, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -477,9 +477,9 @@
             const diff0vs4 = compareFrames(frameMode0, frameMode4);
 
             if (diff0vs3 < 0.05) throw new Error(`Test 9 Failed: Blueprint mode too similar to Default (diff: ${diff0vs3})`);
-            if (diff0vs4 < 0.05) throw new Error(`Test 9 Failed: Cyberpunk mode too similar to Default (diff: ${diff0vs4})`);
+            if (diff0vs4 < 0.05) throw new Error(`Test 9 Failed: Minecraft mode too similar to Default (diff: ${diff0vs4})`);
 
-            ipcRenderer.send('log', `Test 9 Passed: Aesthetic Modes Verified (Blueprint Diff: ${(diff0vs3 * 100).toFixed(2)}%, Cyberpunk Diff: ${(diff0vs4 * 100).toFixed(2)}%)`);
+            ipcRenderer.send('log', `Test 9 Passed: Aesthetic Modes Verified (Blueprint Diff: ${(diff0vs3 * 100).toFixed(2)}%, Minecraft Diff: ${(diff0vs4 * 100).toFixed(2)}%)`);
 
             // --- TEST 10: Visual Memory Persistence ---
             ipcRenderer.send('log', 'Starting Test 10: Visual Memory Persistence');

@@ -24,6 +24,7 @@ uniform float u_time; // Time in seconds for animation
 uniform float u_velocity;         // Mouse velocity in px/ms
 uniform float u_blurRadius;       // Simulated Pupil Aperture
 uniform float u_mongrel_mode;     // 0.0 = Noise, 1.0 = Shatter
+uniform float u_crowding_radial_bias; // Radial:tangential crowding ratio (default 2.0)
 
 
 // === GRANULAR CONFIGURATION UNIFORMS ===
@@ -251,23 +252,25 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     return result;
 }
 
-// === LEGACY: Simple MIP pooling (used when DoG disabled) ===
-vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
+// === CMF MIP LEVEL COMPUTATION ===
+// Shared by MIP pooling, Minecraft block sizing, and any eccentricity→resolution mapping.
+// Returns 0.0 at fovea, up to maxMipLevel (4.0) in far periphery.
+float computeMipLevel(float eccentricity, float fovea_radius) {
     float normalizedEcc = max(0.0, eccentricity) / fovea_radius;
-    float mipScaling = 2.5;
     float maxMipLevel = 4.0;
-
-    float mipLevel;
     if (u_cmf_enabled > 0.5) {
         // Cortical distance: d(r) = log(1 + r/a), numerically stable form
         // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
-        float fovea_deg = 2.0;
-        float r_deg = normalizedEcc * fovea_deg;
+        float r_deg = normalizedEcc * 2.0;
         float cortical_dist = log(1.0 + r_deg / u_cmf_a);
-        mipLevel = clamp(maxMipLevel * cortical_dist / u_cortical_max, 0.0, maxMipLevel);
-    } else {
-        mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
+        return clamp(maxMipLevel * cortical_dist / u_cortical_max, 0.0, maxMipLevel);
     }
+    return clamp(normalizedEcc * 2.5, 0.0, maxMipLevel);
+}
+
+// === LEGACY: Simple MIP pooling (used when DoG disabled) ===
+vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
+    float mipLevel = computeMipLevel(eccentricity, fovea_radius);
 
     vec4 col = textureLod(u_texture, uv, mipLevel);
 
@@ -280,21 +283,7 @@ vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
 
 // === GRADIENT-AWARE MIP POOLING ===
 vec4 sampleMIPPooledGrad(vec2 uv, vec2 duvdx, vec2 duvdy, float eccentricity, float fovea_radius) {
-    float normalizedEcc = max(0.0, eccentricity) / fovea_radius;
-    float mipScaling = 2.5;
-    float maxMipLevel = 4.0;
-
-    float mipLevel;
-    if (u_cmf_enabled > 0.5) {
-        // Cortical distance: d(r) = log(1 + r/a), numerically stable form
-        // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
-        float fovea_deg = 2.0;
-        float r_deg = normalizedEcc * fovea_deg;
-        float cortical_dist = log(1.0 + r_deg / u_cmf_a);
-        mipLevel = clamp(maxMipLevel * cortical_dist / u_cortical_max, 0.0, maxMipLevel);
-    } else {
-        mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
-    }
+    float mipLevel = computeMipLevel(eccentricity, fovea_radius);
 
     vec4 col = textureGrad(u_texture, uv, duvdx * pow(2.0, mipLevel), duvdy * pow(2.0, mipLevel));
 
@@ -506,7 +495,7 @@ LGN_Signal processLGN(vec2 uv, ModeConfig config, float dist, float fovea_radius
 }
 
 // --- STAGE 2: V1 (Geometry & Distortion) ---
-V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float parafovea_radius, bool isFarPeriphery, bool isParafovea, float memoryStrength) {
+V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig config, float dist, vec2 delta_dir, float fovea_radius, float parafovea_radius, bool isFarPeriphery, bool isParafovea, float memoryStrength) {
     V1_Signal signal;
     signal.distortedUV = uv;
     signal.distortionStrength = 0.0;
@@ -621,77 +610,78 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         }
         
     } else if (config.v1_distortion_type == 0) {
-        // === TIER 2.0: FRACTAL CROWDING (Noise Mode) ===
+        // === RADIAL/TANGENTIAL ANISOTROPIC CROWDING ===
+        // Crowding ~2:1 stronger radially (Toet & Levi 1992, Pelli et al. 2004).
+        // Independent noise per axis to avoid correlation artifacts.
+
         vec2 uv_corrected_local = vec2(uv.x * u_fovea_aspect_ratio, uv.y);
-        // FIX: Removed animation time component.
-        float t = 0.0; 
-        
+
         float zoneA = smoothstep(fovea_radius, parafovea_radius, dist);
         float zoneB = smoothstep(parafovea_radius, parafovea_radius * 2.0, dist);
-        
-        // Static noise
-        float n1 = snoise(uv_corrected_local * 800.0);
-        float n2 = snoise(uv_corrected_local * 1600.0);
-        
-        float fractalNoise = n1 + (n2 * 0.5 * zoneB);
+
+        // Radial/tangential basis from fovea
+        vec2 radDir = delta_dir;
+        vec2 tanDir = vec2(-delta_dir.y, delta_dir.x);
+
+        // Independent noise for each axis (offset seed decorrelates tangential)
+        float nR1 = snoise(uv_corrected_local * 800.0);
+        float nR2 = snoise(uv_corrected_local * 1600.0);
+        float radialNoise = nR1 + (nR2 * 0.5 * zoneB);
+
+        float nT1 = snoise(uv_corrected_local * 800.0 + vec2(43.17, 71.91));
+        float nT2 = snoise(uv_corrected_local * 1600.0 + vec2(43.17, 71.91));
+        float tangentialNoise = nT1 + (nT2 * 0.5 * zoneB);
+
         float warpAmp = mix(0.006, 0.024, zoneB);
-        vec2 finalWarp = vec2(fractalNoise) * warpAmp;
-        
-        float hBias = mix(6.0, 16.0, zoneB);
-        finalWarp.x *= hBias;
-        
-        float shear = sin(uv.x * 200.0) * 0.003;
-        // Static chop
-        float chop = snoise(vec2(uv.x * 400.0, uv.y * 50.0)) * 0.020;
-        float verticalDistortion = mix(shear, chop, zoneB);
-        finalWarp.y += verticalDistortion;
-        
+
+        float radialDisp = radialNoise * warpAmp * u_crowding_radial_bias;
+        float tangentialDisp = tangentialNoise * warpAmp;
+
+        // Project back to UV space (undo aspect corrections on direction vectors)
+        float aspect = u_resolution.x / u_resolution.y;
+        float xScale = u_fovea_aspect_ratio / aspect;
+        vec2 radDir_uv = vec2(radDir.x * xScale, radDir.y);
+        vec2 tanDir_uv = vec2(tanDir.x * xScale, tanDir.y);
+
+        vec2 finalWarp = radDir_uv * radialDisp + tanDir_uv * tangentialDisp;
+
+        // Secondary distortion (shear/chop) projected tangentially
+        float shearNoise = sin(uv.x * 200.0) * 0.003;
+        float chopNoise = snoise(vec2(uv.x * 400.0, uv.y * 50.0)) * 0.020;
+        float verticalDistortion = mix(shearNoise, chopNoise, zoneB);
+        finalWarp += tanDir_uv * verticalDistortion;
+
         float effectiveStrength = max(strength, zoneB * 0.8);
         signal.displacement = finalWarp * effectiveStrength * u_intensity;
         signal.distortedUV = uv + signal.displacement;
         signal.distortionStrength = effectiveStrength;
 
     } else if (config.v1_distortion_type == 3) {
-        // === PIXELATE (Saliency-Guided) ===
-        float combinedMetric = max(lgn.saliency, lgn.density);
-        float steppedMetric = floor(combinedMetric * 4.0) / 4.0;
-        
-        float targetMaxBlock = 192.0;
-        float targetMinBlock = 32.0; 
-        
-        if (config.v4_style_id == 4) {
-            targetMaxBlock = 1200.0; 
-            targetMinBlock = 160.0;  
-        }
-        
-        float limitBlockSize = mix(targetMaxBlock, targetMinBlock, steppedMetric);
-        float logMax = log2(limitBlockSize);
-        float logCurrent = strength * logMax;
-        float currentBlockSize = exp2(floor(logCurrent));
-        
-        currentBlockSize = max(1.0, currentBlockSize);
-        
-        vec2 pixelSize = vec2(currentBlockSize) / u_resolution;
-        vec2 quantizedUV = floor(uv / pixelSize) * pixelSize + pixelSize * 0.5;
-        
-        float motionGate = smoothstep(0.1, 5.0, u_velocity); 
-        
-        if (strength > 0.5 && steppedMetric < 0.5 && motionGate > 0.01) {
-            float blockNoise = rand(quantizedUV + vec2(floor(u_time * 10.0))); 
-            float threshold = 0.92 + (1.0 - motionGate) * 0.08; 
-            
-            if (blockNoise > threshold) { 
-                float shift = (blockNoise - threshold) * 2.0; 
-                quantizedUV.x += shift * 0.2 * strength * motionGate; 
-            }
-        }
-        
-        if (strength < 0.01) {
+        // === MINECRAFT: CMF-driven block sizing ===
+        // Block size = exp2(floor(mipLevel) + 2) → discrete steps: 4, 8, 16, 32, 64px.
+        // Makes the CMF resolution curve visible as geometry — blocks grow
+        // logarithmically from gaze outward.
+        // Blocks blend in at parafovea edge to avoid distracting grid shift on mouse move.
+        float mipLevel = computeMipLevel(max(0.0, dist - fovea_radius), fovea_radius);
+
+        // No blocks inside parafovea — blend in from parafovea edge outward
+        float blockBlend = smoothstep(parafovea_radius, parafovea_radius * 1.5, dist);
+
+        if (blockBlend < 0.001) {
             signal.distortedUV = uv;
+            signal.distortionStrength = 0.0;
         } else {
-            signal.distortedUV = quantizedUV;
+            float blockPx = exp2(floor(mipLevel) + 2.0); // 4, 8, 16, 32, 64
+            vec2 pixelSize = vec2(blockPx) / u_resolution;
+
+            // Fixed screen-space grid — blocks don't shift with cursor movement.
+            // Peripheral vision is extremely sensitive to coherent motion; a
+            // fovea-relative grid causes visible jitter on every mouse move.
+            vec2 quantizedUV = floor(uv / pixelSize) * pixelSize + pixelSize * 0.5;
+
+            signal.distortedUV = mix(uv, quantizedUV, blockBlend);
+            signal.distortionStrength = strength;
         }
-        signal.distortionStrength = strength;
     }
     
     return signal;
@@ -735,6 +725,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     // now 0.5 (~75px) so MIP pooling doesn't step in abruptly
     float baseBlend = smoothstep(0.0, fovea_radius * 0.5, eccentricity);
     float blendFactor = baseBlend * u_intensity;
+
     vec3 col = mix(foveaCol, pooledCol, blendFactor);
     
     // === MAGNOCELLULAR PATHWAY: Luminance Contrast Preservation ===
@@ -877,18 +868,66 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         vec3 lineCol = mix(vec3(0.0, 0.4, 0.6), vec3(0.5, 0.9, 1.0), s);
         return mix(baseColor, lineCol, edgeIntensity);
         
-    } else if (config.v4_style_id == 4) { // Cyberpunk
-            float cleanFactor = smoothstep(0.4, 0.8, effectFactor);
-            float luma = dot(col, vec3(0.299, 0.587, 0.114));
-            vec3 saturated = mix(vec3(luma), col, 1.8); 
-            float contrastRamp = smoothstep(fovea_radius, parafovea_radius * 2.0, dist);
-            float contrastAmount = mix(1.0, 2.5, contrastRamp); 
-            vec3 contrasted = (saturated - 0.5) * contrastAmount + 0.5;
-            vec2 pixelUV = uv * u_resolution;
-            float dotPattern = sin(pixelUV.x * 0.5) * sin(pixelUV.y * 0.5); 
-            vec3 textured = contrasted * (0.95 + 0.05 * dotPattern);
-            vec3 finalColor = clamp(textured, 0.0, 1.0);
-            return mix(col, finalColor, cleanFactor * bypassTransition);
+    } else if (config.v4_style_id == 4) { // Minecraft (Block Pooling)
+            // Channel-independent neighbor color averaging in Oklab space.
+            // Similar colors merge between blocks while distinct boundaries persist.
+            // Blend strengths per channel reflect castleCSF chromatic pooling rates:
+            //   L (luminance): moderate — spatial pooling
+            //   a (RG): strongest — L-M opponent channel attenuates ~2.5× faster
+            //   b (YV): weakest — S-(L+M) persists further into periphery
+            // Effect blends in at parafovea edge (matching V1 block onset).
+            float blockBlend = smoothstep(parafovea_radius, parafovea_radius * 1.5, dist);
+
+            if (blockBlend < 0.001) {
+                return col;
+            }
+
+            float mipLevel = computeMipLevel(max(0.0, dist - fovea_radius), fovea_radius);
+            float blockPx = exp2(floor(mipLevel) + 2.0);
+            vec2 pixelSize = vec2(blockPx) / u_resolution;
+
+            // Sample 4 cardinal neighbors at block-center offsets
+            vec3 labCenter = rgbToOklab(col);
+            vec3 labN = rgbToOklab(sampleSourceGrad(v1.distortedUV + vec2(0.0, pixelSize.y), dFdx(uv), dFdy(uv)).rgb);
+            vec3 labS = rgbToOklab(sampleSourceGrad(v1.distortedUV - vec2(0.0, pixelSize.y), dFdx(uv), dFdy(uv)).rgb);
+            vec3 labE = rgbToOklab(sampleSourceGrad(v1.distortedUV + vec2(pixelSize.x, 0.0), dFdx(uv), dFdy(uv)).rgb);
+            vec3 labW = rgbToOklab(sampleSourceGrad(v1.distortedUV - vec2(pixelSize.x, 0.0), dFdx(uv), dFdy(uv)).rgb);
+            vec3 neighborAvg = (labN + labS + labE + labW) * 0.25;
+
+            // Per-channel blend: 0 at parafovea → max at far periphery
+            float t = clamp(mipLevel / 4.0, 0.0, 1.0);
+            float blendL  = t * 0.4;  // luminance: moderate spatial pooling
+            float blendA  = t * 0.6;  // RG: strongest — foveal specialization collapses
+            float blendB  = t * 0.25; // YV: weakest — persists into periphery
+
+            vec3 blended;
+            blended.x = mix(labCenter.x, neighborAvg.x, blendL);
+            blended.y = mix(labCenter.y, neighborAvg.y, blendA);
+            blended.z = mix(labCenter.z, neighborAvg.z, blendB);
+
+            // Per-channel chromatic decay directly in Oklab — a and b channels
+            // ARE the L-M and S-(L+M) opponent axes. No RGB decomposition needed.
+            // Suprathreshold ramps (Shooner, Jiang & Mullen 2022; Hansen et al. 2009):
+            //   RG (a): foveal specialization, steep early onset, caps at 70%
+            //   YV (b): NOT foveal-specific, slow onset, caps at 35%
+            // Per-channel caps make the differential visible: red-green boundaries
+            // dissolve while blue-yellow persists at the same eccentricity.
+            float normEcc = max(0.0, dist - fovea_radius) / max(fovea_radius, 0.001);
+            float ecc_deg = normEcc * 2.0;
+            float rgFade = smoothstep(1.0, 28.0, ecc_deg) * 0.7;  // a: 70% max
+            float yvFade = smoothstep(5.0, 45.0, ecc_deg) * 0.35; // b: 35% max
+            blended.y *= (1.0 - rgFade); // a channel (red-green) fades first
+            blended.z *= (1.0 - yvFade); // b channel (blue-yellow) persists
+
+            vec3 result = oklabToRgb(blended);
+
+            // Subtle grid line darkening (6%) for block visibility
+            vec2 blockFrac = fract(uv / pixelSize);
+            float edgeDist = min(min(blockFrac.x, 1.0 - blockFrac.x), min(blockFrac.y, 1.0 - blockFrac.y));
+            float gridLine = 1.0 - 0.06 * (1.0 - smoothstep(0.0, 0.08, edgeDist));
+            result *= gridLine;
+
+            return mix(col, result, blockBlend * effectFactor * bypassTransition);
             
     } else if (config.v4_style_id == 5) { // Double Vision
         float luma = dot(col, vec3(0.299, 0.587, 0.114));
@@ -1007,8 +1046,11 @@ void main() {
     }
 
     LGN_Signal lgn = processLGN(uv, config, dist, fovea_radius);
-    
-    V1_Signal v1 = processV1(uv, uv_corrected, lgn, config, dist_stable, fovea_radius, parafovea_radius, isFarPeriphery, isParafovea, memoryStrength);
+
+    // Safe radial direction — fallback at fovea center (displacement is zero there anyway)
+    vec2 radial_dir = dist_stable > 0.001 ? delta_stable / dist_stable : vec2(0.0, 1.0);
+
+    V1_Signal v1 = processV1(uv, uv_corrected, lgn, config, dist_stable, radial_dir, fovea_radius, parafovea_radius, isFarPeriphery, isParafovea, memoryStrength);
     
     vec3 finalRGB = processV4(uv, v1, lgn, config, dist, fovea_radius, parafovea_radius, saccadeFactor);
     

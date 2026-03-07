@@ -23,6 +23,7 @@
 - **Mode 8 (Gaussian Desaturation)**: Removed. castleCSF per-channel pooling (v1.9.0) supersedes the Gaussian vs smoothstep desaturation comparison. The mode was also broken — missing `chromatic_pooling` in config caused triple desaturation stacking on saturated content. The Gaussian functional form (exp(-r/σ)) is wrong for RG decay: Bowers, Gegenfurtner & Goettker (2025) showed RG attenuation is biphasic (steep to ~15°, then shallower), not pure exponential. Gaussian color decay remains in Mode 6 (CMF standalone) where it serves a different purpose.
 
 ### Changed
+- **Mode 4: Cyberpunk → Minecraft (Block Pooling)**: Blocks sized to CMF MIP level (4-64px), fovea-relative grid, channel-independent neighbor color averaging in Oklab. Demonstrates customizing the baseline simulation — same CMF math, visible as block geometry.
 - **Rename `fovi_*` → `cmf_*`**: Config keys, shader uniforms, and JS variables renamed from `fovi_` prefix to `cmf_`. "FOVI" is the name of a specific model; the feature is cortical magnification function (CMF) — not FOVI-specific.
 - **CMF log path default for Modes 0 and 1**: Research modes now use logarithmic MIP scaling via CMF instead of legacy linear `normalizedEcc * 2.5`. Mode 7 retains `cmf_enabled: false` as frozen comparison baseline.
 - **Doc terminology scrub**: Replaced "desaturation" with "chromatic pooling" / "chrominance reduction" across 8 docs where describing biology. Peripheral color is pooled (mean chromaticity preserved), not lost.

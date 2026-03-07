@@ -111,7 +111,7 @@ Scrutinizer's rendering pipeline maps biological mechanisms to GPU-accelerated s
 - **Golden capture pipeline** — automated screenshot capture and SSIM/PSNR regression testing across versions
 
 ### Interface
-- **Extensibility modes** — modular shader pipeline supports custom visual effects (Frosted Glass, Wireframe, Cyberpunk, Double Vision are included as test cases; see [Developer's Guide](docs/developers_guide.md))
+- **Extensibility modes** — modular shader pipeline supports custom visual effects (Frosted Glass, Wireframe, Minecraft, Double Vision are included as test cases; see [Developer's Guide](docs/developers_guide.md))
 - **Simulation menu** — organized into Behavior (cognitive), Foveal (spatial), Peripheral (rendering), and Utility (debug) groups
 - **Eccentricity overlay** — boundary ring visualization for foveal/parafoveal/peripheral zones
 

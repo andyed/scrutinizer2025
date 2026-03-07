@@ -25,6 +25,7 @@ uniform float u_velocity;         // Mouse velocity in px/ms
 uniform float u_saccadic_blindness; // 0.0=off, 1.0=suppress fovea during saccades
 uniform float u_blurRadius;       // Simulated Pupil Aperture (0.0 = Sharp, 10.0 = Blurry)
 uniform float u_mongrel_mode;     // 0.0 = Noise, 1.0 = Shatter
+uniform float u_crowding_radial_bias; // Radial:tangential crowding ratio (default 2.0)
 
 
 // === GRANULAR CONFIGURATION UNIFORMS ===
@@ -313,7 +314,7 @@ struct ModeConfig {
     bool lgn_use_saliency_gate;  // Should high saliency be protected?
     int  v1_distortion_type;     // 0=Noise (Curves), 1=Shatter (Mongrel), 2=None
     float v1_strength_mult;      // Multiplier for distortion
-    int  v4_style_id;            // 0=HighKey, 1=Lab, 2=Frosted, 3=Blueprint, 4=Cyberpunk, 5=Double Vision
+    int  v4_style_id;            // 0=HighKey, 1=Lab, 2=Frosted, 3=Blueprint, 4=Minecraft, 5=Double Vision
     float lgn_ramp_end_mult;     // Multiplier for fovea_radius to determine ramp end
     bool v1_animate;             // Should distortion move over time?
 };
@@ -388,7 +389,7 @@ LGN_Signal processLGN(vec2 uv, ModeConfig config, float dist, float fovea_radius
 
 // --- STAGE 2: V1 (Geometry & Distortion) ---
 // --- STAGE 2: V1 (Geometry & Distortion) ---
-V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float parafovea_radius, bool isFarPeriphery, bool isParafovea, float memoryStrength) {
+V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig config, float dist, vec2 delta_dir, float fovea_radius, float parafovea_radius, bool isFarPeriphery, bool isParafovea, float memoryStrength) {
     V1_Signal signal;
     signal.distortedUV = uv;
     signal.distortionStrength = 0.0;
@@ -418,7 +419,7 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         eccentricityScale += deepDist * 2.5; // 2.5x linear increase
     }
     
-    // Cyberpunk/Wireframe Override: We want structural distortion (blocks) to start immediately
+    // Minecraft/Wireframe Override: We want structural distortion (blocks) to start immediately
     // in the parafovea to create a strong "tech" aesthetic.
     if (config.v4_style_id == 4 || config.v4_style_id == 3) {
         eccentricityScale = 1.0;
@@ -496,33 +497,34 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         signal.distortionStrength = strength;
         
     } else if (config.v1_distortion_type == 0) {
-        // === TIER 1.8.1: LATERAL SMASH (Anisotropic Crowding) ===
-        // "The Melter" v2 - Aggressive horizontal crowding.
-        
-        vec2 uv_corrected = vec2(uv.x * u_fovea_aspect_ratio, uv.y);
-        
-        // 1. Micro-Noise (Stroke Melting)
-        // INCREASED Frequency: 900.0 (was 800.0) to target thinner components.
-        // INCREASED Amplitude: 0.004 (was 0.002) to bridge gaps between letters.
-        // Gated by u_v1_animate to allow "Freezing" for tests/screenshots.
+        // === RADIAL/TANGENTIAL ANISOTROPIC CROWDING (Animated) ===
+        // Crowding ~2:1 stronger radially (Toet & Levi 1992, Pelli et al. 2004).
+        // Independent noise per axis to avoid correlation artifacts.
+
+        vec2 uv_corrected_anim = vec2(uv.x * u_fovea_aspect_ratio, uv.y);
         float t = u_time * u_v1_animate;
-        float micro = snoise(uv_corrected * 900.0 + vec2(t * 5.0)); 
-        
-        // 2. Macro-Noise (Word Shape Wobble)
-        float macro = snoise(uv_corrected * 20.0 + vec2(t * 0.1));
-        
-        // 3. Combine
-        // micro * 0.004 (high amp) + macro * 0.01 (structure)
-        vec2 warp = vec2(micro * 0.004 + macro * 0.01);
-        
-        // 4. Horizontal Bias (Lateral Smash)
-        // INCREASED: 6.0x (was 2.0x).
-        // This forces letters to slide into each other laterally.
-        warp.x *= 6.0;
-        
-        // 5. Apply Strength
+
+        vec2 radDir = delta_dir;
+        vec2 tanDir = vec2(-delta_dir.y, delta_dir.x);
+
+        // Independent radial and tangential noise (animated)
+        float microR = snoise(uv_corrected_anim * 900.0 + vec2(t * 5.0));
+        float macroR = snoise(uv_corrected_anim * 20.0 + vec2(t * 0.1));
+        float radialNoise = (microR * 0.004 + macroR * 0.01) * u_crowding_radial_bias;
+
+        float microT = snoise(uv_corrected_anim * 900.0 + vec2(t * 5.0, 43.17));
+        float macroT = snoise(uv_corrected_anim * 20.0 + vec2(t * 0.1, 71.91));
+        float tangentialNoise = microT * 0.004 + macroT * 0.01;
+
+        // Project back to UV space
+        float aspect = u_resolution.x / u_resolution.y;
+        float xScale = u_fovea_aspect_ratio / aspect;
+        vec2 radDir_uv = vec2(radDir.x * xScale, radDir.y);
+        vec2 tanDir_uv = vec2(tanDir.x * xScale, tanDir.y);
+
+        vec2 warp = radDir_uv * radialNoise + tanDir_uv * tangentialNoise;
+
         signal.displacement = warp * strength * u_intensity;
-        
         signal.distortedUV = uv + signal.displacement;
         signal.distortionStrength = strength;
     } else if (config.v1_distortion_type == 3) {
@@ -536,7 +538,7 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         float targetMaxBlock = 192.0;
         float targetMinBlock = 32.0; 
         
-        // Cyberpunk: 3-5x larger blocks as requested
+        // Minecraft: larger blocks
         if (config.v4_style_id == 4) {
             targetMaxBlock = 1200.0; // Massive blocks (was 800)
             targetMinBlock = 160.0;  // Big start (was 128)
@@ -845,7 +847,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         // Mix ensures visibility.
         return mix(baseColor, lineCol, edgeIntensity);
         
-    } else if (config.v4_style_id == 4) { // Cyberpunk (Neon)
+    } else if (config.v4_style_id == 4) { // Minecraft (Block Pooling)
             // Pixelation is handled in V1 (now with larger blocks).
             
             // Clean up Fovea
@@ -954,7 +956,7 @@ void main() {
     }
     
     // Override V1 type if Mongrel Mode uniform says so (Legacy Toggle Support)
-    // Only applies if we are in a "standard" mode (Shatter/Noise) to avoid breaking Cyberpunk/Blueprint
+    // Only applies if we are in a "standard" mode (Shatter/Noise) to avoid breaking Minecraft/Blueprint
     if (config.v4_style_id != 5 && config.v1_distortion_type != 2 && config.v1_distortion_type != 3) {
         if (u_mongrel_mode < 0.5) {
             config.v1_distortion_type = 0; // Noise
@@ -982,10 +984,13 @@ void main() {
     // Pass memoryStrength to LGN (we'll need to update the struct/function signature or just pass it)
     // Actually, let's just pass it to V1 directly since it's a geometric constraint.
     LGN_Signal lgn = processLGN(uv, config, dist, fovea_radius);
-    
+
+    // Safe radial direction — fallback at fovea center (displacement is zero there anyway)
+    vec2 radial_dir = dist_stable > 0.001 ? delta_stable / dist_stable : vec2(0.0, 1.0);
+
     // 2. V1: Geometry
     // Modulate V1 with memoryStrength to prevent "unremembering" (discontinuity)
-    V1_Signal v1 = processV1(uv, uv_corrected, lgn, config, dist_stable, fovea_radius, parafovea_radius, isFarPeriphery, isParafovea, memoryStrength);
+    V1_Signal v1 = processV1(uv, uv_corrected, lgn, config, dist_stable, radial_dir, fovea_radius, parafovea_radius, isFarPeriphery, isParafovea, memoryStrength);
     
     // 3. V4: Aesthetics
     vec3 finalRGB = processV4(uv, v1, lgn, config, dist, fovea_radius, parafovea_radius, saccadeFactor);
@@ -1039,7 +1044,7 @@ void main() {
         }
     }
     
-    // Force Debug OFF for Cyberpunk
+    // Force Debug OFF for Minecraft
     float debugLevel = u_debug_structure;
     if (config.v4_style_id == 4) debugLevel = 0.0;
     

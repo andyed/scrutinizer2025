@@ -77,6 +77,7 @@
                 this.v4StyleIdLocation = null;
                 this.lgnRampEndMultLocation = null;
                 this.v1AnimateLocation = null;
+                this.crowdingRadialBiasLocation = null;
 
                 // DoG uniform locations
                 this.dogEnabledLocation = null;
@@ -214,6 +215,7 @@
                 this.v4StyleIdLocation = gl.getUniformLocation(this.program, "u_v4_style_id");
                 this.lgnRampEndMultLocation = gl.getUniformLocation(this.program, "u_lgn_ramp_end_mult");
                 this.v1AnimateLocation = gl.getUniformLocation(this.program, "u_v1_animate");
+                this.crowdingRadialBiasLocation = gl.getUniformLocation(this.program, "u_crowding_radial_bias");
 
                 // DoG uniform lookups
                 this.dogEnabledLocation = gl.getUniformLocation(this.program, "u_dog_enabled");
@@ -500,7 +502,7 @@
                     this.config.v1_distortion_type = 2; // None
                     this.config.v4_style_id = 3;
                     this.config.lgn_ramp_end_mult = 2.0;
-                } else if (modeId > 3.5 && modeId < 4.5) { // Cyberpunk (4)
+                } else if (modeId > 3.5 && modeId < 4.5) { // Minecraft (4)
                     this.config.v1_distortion_type = 3; // Pixelate (Saliency-Guided)
                     this.config.v4_style_id = 4;
                     this.config.lgn_ramp_end_mult = 2.0;
@@ -633,6 +635,7 @@
                 gl.uniform1i(this.v4StyleIdLocation, this.config.v4_style_id);
                 gl.uniform1f(this.lgnRampEndMultLocation, this.config.lgn_ramp_end_mult);
                 gl.uniform1f(this.v1AnimateLocation, this.config.v1_animate ? 1.0 : 0.0);
+                gl.uniform1f(this.crowdingRadialBiasLocation, this.config.crowdingRadialBias ?? 2.0);
                 gl.uniform1f(this.dogEnabledLocation, this.config.dog_enabled ? 1.0 : 0.0);
                 gl.uniform1f(this.dogE2Location, this.config.dog_e2);
                 gl.uniform1f(this.dogSharpnessLocation, this.config.dog_sharpness);
