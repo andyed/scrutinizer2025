@@ -61,10 +61,10 @@ function spearmanR(x, y) {
   return 1 - (6 * d2) / (n * (n * n - 1));
 }
 
-// ── Check monotonic decrease ──
+// ── Check monotonic decrease (non-strict: allows ties from quantization) ──
 function isMonotonicallyDecreasing(values) {
   for (let i = 1; i < values.length; i++) {
-    if (values[i] >= values[i - 1]) return false;
+    if (values[i] > values[i - 1]) return false;
   }
   return true;
 }

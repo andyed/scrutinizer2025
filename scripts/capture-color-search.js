@@ -52,7 +52,7 @@ const CONDITIONS = [
 
 function runCapture(color, size, condition) {
   return new Promise((resolve, reject) => {
-    const pageUrl = `${BASE_URL}/color-search.html?color=${color}&size=${size}&mode=static&seed=${SEED}`;
+    const pageUrl = `${BASE_URL}/color-search.html?color=${color}&size=${size}&mode=bands&seed=${SEED}`;
     const filename = `${color}_${size}px_${condition.id}.png`;
 
     if (dryRun) {

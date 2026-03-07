@@ -479,7 +479,7 @@ function showResults() {
         `Overall: ${overallPct}% accuracy, ${overallRT}ms avg RT (correct trials) · ${colorSelect.value} targets`;
 }
 
-// === STATIC MODE (for automated screenshot capture) ===
+// === STATIC MODE (for automated screenshot capture — dots) ===
 function renderStatic() {
     introEl.style.display = 'none';
     resultsEl.style.display = 'none';
@@ -520,6 +520,58 @@ function renderStatic() {
     }
 }
 
+// === BANDS MODE (for automated validation — large color annuli) ===
+// Renders thick concentric rings of the target color at each eccentricity.
+// Large enough (60px wide) that Scrutinizer's blur doesn't destroy the signal.
+// Sample the center of each band to measure chromatic retention.
+const BAND_WIDTH = 60; // px — must be >> blur kernel radius
+
+function renderBands() {
+    introEl.style.display = 'none';
+    resultsEl.style.display = 'none';
+    arenaEl.style.display = 'block';
+    fixationEl.style.color = '#fff';
+    hudEl.textContent = 'Bands mode — concentric color annuli for validation';
+
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    const color = TARGET_COLORS[colorSelect.value];
+
+    // Render concentric rings as CSS border-only circles
+    for (let r = 0; r < RINGS.length; r++) {
+        const radius = RINGS[r];
+        const ring = document.createElement('div');
+        ring.style.position = 'absolute';
+        ring.style.left = (cx - radius) + 'px';
+        ring.style.top = (cy - radius) + 'px';
+        ring.style.width = (radius * 2) + 'px';
+        ring.style.height = (radius * 2) + 'px';
+        ring.style.borderRadius = '50%';
+        ring.style.border = BAND_WIDTH + 'px solid ' + color.rgb;
+        ring.style.boxSizing = 'content-box';
+        ring.style.marginLeft = -BAND_WIDTH + 'px';
+        ring.style.marginTop = -BAND_WIDTH + 'px';
+        ring.style.pointerEvents = 'none';
+        ring.dataset.ring = r;
+        ring.dataset.isTarget = '1';
+        arenaEl.appendChild(ring);
+    }
+
+    // Small gray reference patch at fovea center (inside fovea, no decay)
+    const ref = document.createElement('div');
+    ref.style.position = 'absolute';
+    ref.style.left = (cx - 30) + 'px';
+    ref.style.top = (cy - 30) + 'px';
+    ref.style.width = '60px';
+    ref.style.height = '60px';
+    ref.style.borderRadius = '50%';
+    ref.style.backgroundColor = color.rgb;
+    ref.style.pointerEvents = 'none';
+    ref.dataset.ring = '-1';
+    ref.dataset.isTarget = 'foveal-reference';
+    arenaEl.appendChild(ref);
+}
+
 // === EVENTS ===
 startBtn.addEventListener('click', startExperiment);
 restartBtn.addEventListener('click', startExperiment);
@@ -529,9 +581,11 @@ if (paramColor && TARGET_COLORS[paramColor]) colorSelect.value = paramColor;
 if (paramSize) sizeSelect.value = paramSize;
 if (paramSize) dotSize = parseInt(paramSize);
 
-// Auto-start static mode if requested
+// Auto-start capture modes if requested
 if (paramMode === 'static') {
     renderStatic();
+} else if (paramMode === 'bands') {
+    renderBands();
 }
 
 // Spacebar to skip to next trial (if stuck)
