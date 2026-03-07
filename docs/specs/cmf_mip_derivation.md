@@ -1,7 +1,7 @@
 # CMF → MIP Level Mapping: Bug Report
 
 Date: 2026-03-03
-Status: BUG — needs fix
+Status: SHIPPED (v1.8+, commit 5be3b2b; optimized to log1p form in a9051e3)
 Source: Feedback from Nicholas Blauch (FOVI co-author)
 
 ## Summary

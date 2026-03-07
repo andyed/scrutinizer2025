@@ -54,9 +54,9 @@ uniform float u_desat_floor;      // Min desaturation multiplier in salient regi
 // exponent ~0.5 maps threshold sensitivity to perceived saturation at high contrasts.
 uniform float u_saccadic_blindness; // 0.0=off, 1.0=suppress fovea during saccades
 uniform float u_chromatic_pooling;  // 0.0=off (legacy uniform desat), 1.0=on
-uniform float u_rg_decay;           // RG (L-M) eccentricity decay k_e (default 0.059)
+uniform float u_rg_decay;           // RG (L-M) eccentricity decay k_e (default 0.072, Bowers et al. 2025 suprathreshold)
 uniform float u_rg_freq_decay;      // RG frequency-dependent decay k_ef (default 0.003)
-uniform float u_yv_decay;           // YV S-(L+M) base decay k_e (default 0.004)
+uniform float u_yv_decay;           // YV S-(L+M) base decay k_e (default 0.014, Bowers et al. 2025 suprathreshold)
 uniform float u_yv_freq_decay;      // YV frequency-dependent decay k_ef (default 0.008)
 uniform float u_supra_exponent;     // Threshold→appearance compression (default 0.5; 1.0=raw threshold)
 

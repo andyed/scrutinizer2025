@@ -2,7 +2,7 @@
 
 Date: 2026-03-05
 Revised: 2026-03-05
-Status: REVISED — original approach failed, root cause identified, new path forward
+Status: Phase 1 (pow fix) SHIPPED v1.9.0; Phase 2 (decay recalibration) IN PROGRESS; Phase 3 (continuous size dependence) DEFERRED
 Dependencies: Per-channel chromatic pooling (v1.9.0, implemented), DoG band decomposition (v1.6, implemented)
 
 ## Problem
