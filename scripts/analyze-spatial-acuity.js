@@ -35,10 +35,49 @@ function parseFilename(name) {
   return { chromatic: m[1], freq: parseFloat(m[2]), condition: m[3] };
 }
 
-// ── Measure RMS contrast along a horizontal stripe through a ring ──
-// Sample a band of pixels through the ring center (right side, along horizontal axis)
-// and compute RMS contrast of the luminance profile.
-function measureRingContrast(png, ringIndex, dpr) {
+// ── Constants for analysis ──
+const FOVEA_RADIUS = 90;
+const FOVEA_DEG = 2.0;
+const PPD = FOVEA_RADIUS / FOVEA_DEG;
+
+// ── Frequency-specific contrast via matched filter (DFT at target freq) ──
+// Measures the amplitude of the grating signal at the expected frequency,
+// ignoring noise at other frequencies (unlike RMS which captures all noise).
+function measureGratingAmplitude(luminances, freq_cpd, dpr) {
+  const N = luminances.length;
+  if (N < 4) return { amplitude: 0, rms: 0, mean: BG_GRAY, samples: 0 };
+
+  const mean = luminances.reduce((a, b) => a + b, 0) / N;
+
+  // Grating frequency in pixels (at current DPR)
+  const freq_px = freq_cpd / (PPD * dpr); // cycles per pixel in screenshot
+
+  // Matched filter: compute DFT amplitude at target frequency
+  let cosSum = 0, sinSum = 0;
+  for (let i = 0; i < N; i++) {
+    const phase = 2 * Math.PI * freq_px * i;
+    cosSum += (luminances[i] - mean) * Math.cos(phase);
+    sinSum += (luminances[i] - mean) * Math.sin(phase);
+  }
+  const amplitude = 2 * Math.sqrt(cosSum * cosSum + sinSum * sinSum) / N;
+
+  // Also compute total RMS for comparison
+  const rms = Math.sqrt(luminances.reduce((s, l) => s + (l - mean) ** 2, 0) / N);
+
+  // Michelson contrast from amplitude: amplitude / mean
+  const contrast = mean > 0 ? amplitude / mean : 0;
+
+  return {
+    amplitude: Math.round(amplitude * 100000) / 100000,
+    rms: Math.round(rms * 100000) / 100000,
+    mean: Math.round(mean * 100) / 100,
+    contrast: Math.round(contrast * 100000) / 100000,
+    samples: N,
+  };
+}
+
+// ── Sample luminances along a horizontal line through a ring ──
+function sampleRingLuminances(png, ringIndex, dpr) {
   const cx = png.width / 2;
   const cy = png.height / 2;
   const innerCSS = RINGS[ringIndex];
@@ -46,9 +85,8 @@ function measureRingContrast(png, ringIndex, dpr) {
   const innerPx = innerCSS * dpr;
   const outerPx = outerCSS * dpr;
   const bandCenterPx = (innerPx + outerPx) / 2;
-  const halfBandPx = (outerPx - innerPx) / 4; // sample middle half of band
+  const halfBandPx = (outerPx - innerPx) / 4;
 
-  // Sample horizontal line through band center on the RIGHT side
   const y = Math.round(cy);
   const xStart = Math.round(cx + bandCenterPx - halfBandPx);
   const xEnd = Math.round(cx + bandCenterPx + halfBandPx);
@@ -57,32 +95,17 @@ function measureRingContrast(png, ringIndex, dpr) {
   for (let x = xStart; x <= xEnd; x++) {
     if (x < 0 || x >= png.width) continue;
     const idx = (y * png.width + x) * 4;
-    // Relative luminance (approximate)
     const lum = 0.2126 * png.data[idx] + 0.7152 * png.data[idx + 1] + 0.0722 * png.data[idx + 2];
     luminances.push(lum);
   }
-
-  if (luminances.length < 4) return { rms: 0, mean: BG_GRAY, samples: 0 };
-
-  const mean = luminances.reduce((a, b) => a + b, 0) / luminances.length;
-  const rms = Math.sqrt(luminances.reduce((s, l) => s + (l - mean) ** 2, 0) / luminances.length);
-
-  // Michelson contrast approximation: RMS / mean
-  const contrast = mean > 0 ? rms / mean : 0;
-
-  return {
-    rms: Math.round(rms * 100000) / 100000,
-    mean: Math.round(mean * 100) / 100,
-    contrast: Math.round(contrast * 100000) / 100000,
-    samples: luminances.length,
-  };
+  return luminances;
 }
 
-// ── Measure foveal reference (center of image) ──
-function measureFovealContrast(png, dpr) {
+// ── Sample foveal luminances ──
+function sampleFovealLuminances(png, dpr) {
   const cx = png.width / 2;
   const cy = png.height / 2;
-  const halfBandPx = (BAND_WIDTH / 2) * dpr * 0.5; // middle half of foveal patch
+  const halfBandPx = (BAND_WIDTH / 2) * dpr * 0.5;
 
   const y = Math.round(cy);
   const xStart = Math.round(cx - halfBandPx);
@@ -95,19 +118,17 @@ function measureFovealContrast(png, dpr) {
     const lum = 0.2126 * png.data[idx] + 0.7152 * png.data[idx + 1] + 0.0722 * png.data[idx + 2];
     luminances.push(lum);
   }
+  return luminances;
+}
 
-  if (luminances.length < 4) return { rms: 0, mean: BG_GRAY, samples: 0 };
+function measureRingContrast(png, ringIndex, dpr, freq_cpd) {
+  const luminances = sampleRingLuminances(png, ringIndex, dpr);
+  return measureGratingAmplitude(luminances, freq_cpd, dpr);
+}
 
-  const mean = luminances.reduce((a, b) => a + b, 0) / luminances.length;
-  const rms = Math.sqrt(luminances.reduce((s, l) => s + (l - mean) ** 2, 0) / luminances.length);
-  const contrast = mean > 0 ? rms / mean : 0;
-
-  return {
-    rms: Math.round(rms * 100000) / 100000,
-    mean: Math.round(mean * 100) / 100,
-    contrast: Math.round(contrast * 100000) / 100000,
-    samples: luminances.length,
-  };
+function measureFovealContrast(png, dpr, freq_cpd) {
+  const luminances = sampleFovealLuminances(png, dpr);
+  return measureGratingAmplitude(luminances, freq_cpd, dpr);
 }
 
 // ── For chromatic gratings, measure chroma contrast instead ──
@@ -178,12 +199,12 @@ function analyze() {
     const isChromatic = parsed.chromatic !== 'achromatic';
     const measureFn = isChromatic
       ? (ri) => measureRingChromaContrast(png, ri, dpr, parsed.chromatic)
-      : (ri) => measureRingContrast(png, ri, dpr);
+      : (ri) => measureRingContrast(png, ri, dpr, parsed.freq);
 
     // Foveal reference
     const foveal = isChromatic
-      ? { rms: 0, mean: 0, contrast: 0, samples: 0 } // TODO: chromatic foveal
-      : measureFovealContrast(png, dpr);
+      ? { rms: 0, mean: 0, contrast: 0, amplitude: 0, samples: 0 }
+      : measureFovealContrast(png, dpr, parsed.freq);
 
     results.push({
       file,
@@ -212,7 +233,9 @@ function analyze() {
     }
   }
 
-  // Compute retention: ring contrast / foveal contrast (per file group)
+  // Compute retention two ways:
+  // 1. Within-condition: ring contrast / foveal contrast (same screenshot)
+  // 2. Cross-condition: filtered ring / baseline ring (paired comparison)
   const groups = {};
   for (const r of results) {
     const key = `${r.chromatic}_${r.freq_cpd}_${r.condition}`;
@@ -220,11 +243,30 @@ function analyze() {
     groups[key].push(r);
   }
 
+  // Within-condition retention (foveal-relative)
   for (const entries of Object.values(groups)) {
     const foveal = entries.find(e => e.ring === 0);
     if (!foveal || foveal.contrast === 0) continue;
     for (const e of entries) {
       e.retention = Math.round((e.contrast / foveal.contrast) * 100000) / 100000;
+    }
+  }
+
+  // Cross-condition retention (filtered / baseline per ring)
+  const crossGroups = {};
+  for (const r of results) {
+    const key = `${r.chromatic}_${r.freq_cpd}`;
+    if (!crossGroups[key]) crossGroups[key] = [];
+    crossGroups[key].push(r);
+  }
+  for (const entries of Object.values(crossGroups)) {
+    const filtered = entries.filter(e => e.condition === 'filtered');
+    const baseline = entries.filter(e => e.condition === 'baseline');
+    for (const f of filtered) {
+      const b = baseline.find(e => e.ring === f.ring);
+      if (b && b.contrast > 0) {
+        f.cross_retention = Math.round((f.contrast / b.contrast) * 100000) / 100000;
+      }
     }
   }
 
@@ -235,8 +277,9 @@ function analyze() {
     for (const [key, entries] of Object.entries(groups)) {
       console.log(`--- ${key} ---`);
       for (const e of entries.sort((a, b) => a.ring - b.ring)) {
-        const ret = e.retention !== undefined ? `retention=${(e.retention * 100).toFixed(1)}%` : '';
-        console.log(`  ${e.label.padEnd(12)} (${String(e.dist_px).padStart(3)}px): contrast=${e.contrast.toFixed(5)}  rms=${e.rms.toFixed(2)}  ${ret}`);
+        const ret = e.retention !== undefined ? `fov_ret=${(e.retention * 100).toFixed(1)}%` : '';
+        const xret = e.cross_retention !== undefined ? `filt/base=${(e.cross_retention * 100).toFixed(1)}%` : '';
+        console.log(`  ${e.label.padEnd(12)} (${String(e.dist_px).padStart(3)}px): contrast=${e.contrast.toFixed(5)}  ${ret}  ${xret}`);
       }
       console.log();
     }

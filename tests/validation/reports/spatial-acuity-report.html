@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wave 2: Spatial Acuity Validation</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e8; padding: 32px; max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #888; margin-bottom: 24px; }
+  .subtitle span { color: #aaa; }
+  .scorecard { display: flex; gap: 16px; margin-bottom: 24px; }
+  .tier-card { flex: 1; background: #222240; border-radius: 10px; padding: 16px 20px; border: 1px solid #333; }
+  .tier-card h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #888; margin-bottom: 8px; }
+  .tier-card .score { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+  .tier-card .score .of { font-size: 16px; color: #666; font-weight: 400; }
+  .tier-card.all-pass { border-color: #2d6a3080; }
+  .tier-card.all-pass .score { color: #4ade80; }
+  .tier-card.has-fail { border-color: #a0602080; }
+  .tier-card.has-fail .score { color: #fbbf24; }
+  .tier-card.all-fail { border-color: #dc262680; }
+  .tier-card.all-fail .score { color: #f87171; }
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .chart-box { background: #222240; border-radius: 10px; padding: 20px; border: 1px solid #333; }
+  .chart-box h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: #ccc; }
+  svg { display: block; }
+  .axis-label { fill: #666; font-size: 10px; }
+  .grid-line { stroke: #2a2a44; stroke-width: 1; }
+  .legend { font-size: 10px; fill: #aaa; }
+  .results { background: #222240; border-radius: 10px; padding: 20px; border: 1px solid #333; margin-bottom: 16px; }
+  .results h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: #ccc; }
+  .result-row { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; border-bottom: 1px solid #2a2a44; font-size: 12px; line-height: 1.4; }
+  .result-row:last-child { border-bottom: none; }
+  .badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; min-width: 44px; text-align: center; flex-shrink: 0; margin-top: 1px; }
+  .badge.pass { background: #166534; color: #4ade80; }
+  .badge.fail { background: #7c2d12; color: #fbbf24; }
+  .badge.skip { background: #374151; color: #9ca3af; }
+  .result-text { color: #bbb; }
+  .go-wrap { position: relative; display: inline-block; margin-bottom: 24px; }
+  .go-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; background: #222240; border: 1px solid #444; color: #ccc; font-size: 13px; font-weight: 600; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+  .go-btn:hover { border-color: #666; background: #2a2a50; }
+  .go-btn .arrow { font-size: 11px; color: #666; transition: transform 0.2s; }
+  .go-wrap:hover .go-btn .arrow, .go-wrap:focus-within .go-btn .arrow { transform: rotate(90deg); }
+  .flyout { position: absolute; top: calc(100% + 6px); left: 0; z-index: 100; min-width: 380px; background: #1e1e38; border: 1px solid #444; border-radius: 12px; padding: 20px 24px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); opacity: 0; visibility: hidden; transform: translateY(-4px); transition: opacity 0.15s, transform 0.15s, visibility 0.15s; }
+  .go-wrap:hover .flyout, .go-wrap:focus-within .flyout { opacity: 1; visibility: visible; transform: translateY(0); }
+  .flyout h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #666; margin-bottom: 12px; }
+  .stim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+  .stim-link { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 6px; background: #222240; border: 1px solid #333; text-decoration: none; font-size: 12px; color: #bbb; transition: border-color 0.15s; }
+  .stim-link:hover { border-color: #666; color: #eee; }
+  .footer { margin-top: 24px; font-size: 11px; color: #555; text-align: center; }
+</style>
+</head>
+<body>
+<h1>Wave 2: Spatial Acuity Validation</h1>
+<div class="subtitle">
+  DoG E2=0.15 &middot;
+  rg_decay=0.072 &middot; yv_decay=0.014 &middot;
+  fovea=90px &middot;
+  <span>2026-03-07</span>
+</div>
+
+<div class="scorecard">
+  <div class="tier-card has-fail">
+    <h3>Tier 1: Must Pass</h3>
+    <div class="score">12 <span class="of">/ 16</span></div>
+  </div>
+  <div class="tier-card all-pass">
+    <h3>Tier 2: Should Pass</h3>
+    <div class="score">5 <span class="of">/ 5</span></div>
+  </div>
+  <div class="tier-card all-fail">
+    <h3>Tier 3: Stretch</h3>
+    <div class="score">0 <span class="of">/ 4</span></div>
+  </div>
+</div>
+
+<div class="go-wrap" tabindex="0">
+  <div class="go-btn">Go <span class="arrow">&#9654;</span></div>
+  <div class="flyout">
+    <h3>Experimental Stimulus</h3>
+    <div class="stim-grid">
+      <a class="stim-link" href="https://andyed.github.io/scrutinizer-www/reference-pages/spatial-acuity.html?mode=single&freq=0.25&contrast=1" target="_blank">0.25 cpd</a>
+      <a class="stim-link" href="https://andyed.github.io/scrutinizer-www/reference-pages/spatial-acuity.html?mode=single&freq=0.5&contrast=1" target="_blank">0.5 cpd</a>
+      <a class="stim-link" href="https://andyed.github.io/scrutinizer-www/reference-pages/spatial-acuity.html?mode=single&freq=1&contrast=1" target="_blank">1 cpd</a>
+      <a class="stim-link" href="https://andyed.github.io/scrutinizer-www/reference-pages/spatial-acuity.html?mode=single&freq=2&contrast=1" target="_blank">2 cpd</a>
+      <a class="stim-link" href="https://andyed.github.io/scrutinizer-www/reference-pages/spatial-acuity.html?mode=single&freq=4&contrast=1" target="_blank">4 cpd</a>
+      <a class="stim-link" href="https://andyed.github.io/scrutinizer-www/reference-pages/spatial-acuity.html?mode=ladder&contrast=1" target="_blank">Freq Ladder</a>
+    </div>
+  </div>
+</div>
+
+<div class="charts">
+<div class="chart-box">
+  <h3>Model: DoG Band Retention (achromatic)</h3>
+  <svg width="540" height="300" viewBox="0 0 540 300">
+  <g transform="translate(48,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text><line x1="0" y1="195.2" x2="472" y2="195.2" class="grid-line"/><text x="-8" y="198.2" text-anchor="end" class="axis-label">20%</text><line x1="0" y1="146.39999999999998" x2="472" y2="146.39999999999998" class="grid-line"/><text x="-8" y="149.39999999999998" text-anchor="end" class="axis-label">40%</text><line x1="0" y1="97.6" x2="472" y2="97.6" class="grid-line"/><text x="-8" y="100.6" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="48.79999999999998" x2="472" y2="48.79999999999998" class="grid-line"/><text x="-8" y="51.79999999999998" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="67.42857142857143" y="260" text-anchor="middle" class="axis-label">2°</text><text x="134.85714285714286" y="260" text-anchor="middle" class="axis-label">4°</text><text x="202.28571428571428" y="260" text-anchor="middle" class="axis-label">6°</text><text x="269.7142857142857" y="260" text-anchor="middle" class="axis-label">8°</text><text x="337.14285714285717" y="260" text-anchor="middle" class="axis-label">10°</text><text x="404.57142857142856" y="260" text-anchor="middle" class="axis-label">12°</text><text x="472" y="260" text-anchor="middle" class="axis-label">14°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><path d="M0,0 L74.8457142857143,244 L149.6914285714286,244 L224.87428571428572,244 L314.55428571428575,244 L419.4057142857143,244" fill="none" stroke="#e04040" stroke-width="2"/><circle cx="74.8457142857143" cy="244" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/><circle cx="149.6914285714286" cy="244" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/><circle cx="224.87428571428572" cy="244" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/><circle cx="314.55428571428575" cy="244" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/><circle cx="419.4057142857143" cy="244" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/><path d="M0,0 L74.8457142857143,244 L149.6914285714286,244 L224.87428571428572,244 L314.55428571428575,244 L419.4057142857143,244" fill="none" stroke="#e09040" stroke-width="2"/><circle cx="74.8457142857143" cy="244" r="3" fill="#e09040" stroke="#1a1a2e" stroke-width="2"/><circle cx="149.6914285714286" cy="244" r="3" fill="#e09040" stroke="#1a1a2e" stroke-width="2"/><circle cx="224.87428571428572" cy="244" r="3" fill="#e09040" stroke="#1a1a2e" stroke-width="2"/><circle cx="314.55428571428575" cy="244" r="3" fill="#e09040" stroke="#1a1a2e" stroke-width="2"/><circle cx="419.4057142857143" cy="244" r="3" fill="#e09040" stroke="#1a1a2e" stroke-width="2"/><path d="M0,0 L74.8457142857143,204.0084 L149.6914285714286,244 L224.87428571428572,244 L314.55428571428575,244 L419.4057142857143,244" fill="none" stroke="#40a040" stroke-width="2"/><circle cx="74.8457142857143" cy="204.0084" r="3" fill="#40a040" stroke="#1a1a2e" stroke-width="2"/><circle cx="149.6914285714286" cy="244" r="3" fill="#40a040" stroke="#1a1a2e" stroke-width="2"/><circle cx="224.87428571428572" cy="244" r="3" fill="#40a040" stroke="#1a1a2e" stroke-width="2"/><circle cx="314.55428571428575" cy="244" r="3" fill="#40a040" stroke="#1a1a2e" stroke-width="2"/><circle cx="419.4057142857143" cy="244" r="3" fill="#40a040" stroke="#1a1a2e" stroke-width="2"/><path d="M0,0 L74.8457142857143,0 L149.6914285714286,78.76319999999998 L224.87428571428572,244 L314.55428571428575,244 L419.4057142857143,244" fill="none" stroke="#4060d0" stroke-width="2"/><circle cx="74.8457142857143" cy="0" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/><circle cx="149.6914285714286" cy="78.76319999999998" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/><circle cx="224.87428571428572" cy="244" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/><circle cx="314.55428571428575" cy="244" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/><circle cx="419.4057142857143" cy="244" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/><path d="M0,0 L74.8457142857143,0 L149.6914285714286,0 L224.87428571428572,0 L314.55428571428575,0 L419.4057142857143,0" fill="none" stroke="#a040c0" stroke-width="2"/><circle cx="74.8457142857143" cy="0" r="3" fill="#a040c0" stroke="#1a1a2e" stroke-width="2"/><circle cx="149.6914285714286" cy="0" r="3" fill="#a040c0" stroke="#1a1a2e" stroke-width="2"/><circle cx="224.87428571428572" cy="0" r="3" fill="#a040c0" stroke="#1a1a2e" stroke-width="2"/><circle cx="314.55428571428575" cy="0" r="3" fill="#a040c0" stroke="#1a1a2e" stroke-width="2"/><circle cx="419.4057142857143" cy="0" r="3" fill="#a040c0" stroke="#1a1a2e" stroke-width="2"/><rect x="392" y="2" width="12" height="3" fill="#e04040" rx="1"/><text x="408" y="8" class="legend">4 cpd</text><rect x="392" y="16" width="12" height="3" fill="#e09040" rx="1"/><text x="408" y="22" class="legend">2 cpd</text><rect x="392" y="30" width="12" height="3" fill="#40a040" rx="1"/><text x="408" y="36" class="legend">1 cpd</text><rect x="392" y="44" width="12" height="3" fill="#4060d0" rx="1"/><text x="408" y="50" class="legend">0.5 cpd</text><rect x="392" y="58" width="12" height="3" fill="#a040c0" rx="1"/><text x="408" y="64" class="legend">0.25 cpd</text></g></svg></div>
+<div class="chart-box">
+  <h3>Rovamo & Virsu 1979 vs Model</h3>
+  <svg width="540" height="300" viewBox="0 0 540 300">
+  <g transform="translate(48,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text><line x1="0" y1="195.2" x2="472" y2="195.2" class="grid-line"/><text x="-8" y="198.2" text-anchor="end" class="axis-label">20%</text><line x1="0" y1="146.39999999999998" x2="472" y2="146.39999999999998" class="grid-line"/><text x="-8" y="149.39999999999998" text-anchor="end" class="axis-label">40%</text><line x1="0" y1="97.6" x2="472" y2="97.6" class="grid-line"/><text x="-8" y="100.6" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="48.79999999999998" x2="472" y2="48.79999999999998" class="grid-line"/><text x="-8" y="51.79999999999998" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="118" y="260" text-anchor="middle" class="axis-label">4°</text><text x="236" y="260" text-anchor="middle" class="axis-label">8°</text><text x="354" y="260" text-anchor="middle" class="axis-label">12°</text><text x="472" y="260" text-anchor="middle" class="axis-label">16°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><path d="M0,0 L59,12.200000000000017 L147.5,43.920000000000016 L295,92.72 L442.5,131.76" fill="none" stroke="#4060d0" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.6"/><path d="M0,0 L59,29.28 L147.5,78.07999999999998 L295,141.52 L442.5,175.68" fill="none" stroke="#40a040" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.6"/><path d="M0,0 L59,53.68000000000001 L147.5,122 L295,180.56 L442.5,207.4" fill="none" stroke="#e09040" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.6"/><path d="M0,0 L59,97.6 L147.5,170.8 L295,214.72 L442.5,229.36" fill="none" stroke="#e04040" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.6"/><path d="M0,0 L65.49000000000001,244 L130.98000000000002,244 L196.765,244 L275.235,244 L366.97999999999996,244" fill="none" stroke="#e04040" stroke-width="2"/><path d="M0,0 L65.49000000000001,244 L130.98000000000002,244 L196.765,244 L275.235,244 L366.97999999999996,244" fill="none" stroke="#e09040" stroke-width="2"/><path d="M0,0 L65.49000000000001,204.0084 L130.98000000000002,244 L196.765,244 L275.235,244 L366.97999999999996,244" fill="none" stroke="#40a040" stroke-width="2"/><path d="M0,0 L65.49000000000001,0 L130.98000000000002,78.76319999999998 L196.765,244 L275.235,244 L366.97999999999996,244" fill="none" stroke="#4060d0" stroke-width="2"/><line x1="372" y1="8" x2="384" y2="8" stroke="#999" stroke-width="2"/><text x="388" y="11" class="legend">Model (solid)</text><line x1="372" y1="22" x2="384" y2="22" stroke="#999" stroke-width="1.5" stroke-dasharray="4 2"/><text x="388" y="25" class="legend">Rovamo (dashed)</text></g></svg></div>
+<div class="chart-box">
+  <h3>Measured: Cross-Condition Retention (filtered/baseline)</h3>
+  <svg width="540" height="300" viewBox="0 0 540 300">
+  <g transform="translate(48,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text><line x1="0" y1="203.33333333333334" x2="472" y2="203.33333333333334" class="grid-line"/><text x="-8" y="206.33333333333334" text-anchor="end" class="axis-label">20%</text><line x1="0" y1="162.66666666666669" x2="472" y2="162.66666666666669" class="grid-line"/><text x="-8" y="165.66666666666669" text-anchor="end" class="axis-label">40%</text><line x1="0" y1="122" x2="472" y2="122" class="grid-line"/><text x="-8" y="125" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="81.33333333333334" x2="472" y2="81.33333333333334" class="grid-line"/><text x="-8" y="84.33333333333334" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="40.66666666666666" x2="472" y2="40.66666666666666" class="grid-line"/><text x="-8" y="43.66666666666666" text-anchor="end" class="axis-label">100%</text><line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">120%</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="67.42857142857143" y="260" text-anchor="middle" class="axis-label">2°</text><text x="134.85714285714286" y="260" text-anchor="middle" class="axis-label">4°</text><text x="202.28571428571428" y="260" text-anchor="middle" class="axis-label">6°</text><text x="269.7142857142857" y="260" text-anchor="middle" class="axis-label">8°</text><text x="337.14285714285717" y="260" text-anchor="middle" class="axis-label">10°</text><text x="404.57142857142856" y="260" text-anchor="middle" class="axis-label">12°</text><text x="472" y="260" text-anchor="middle" class="axis-label">14°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><line x1="0" y1="40.66666666666666" x2="472" y2="40.66666666666666" stroke="#555" stroke-width="1" stroke-dasharray="4 4"/><path d="M74.8457142857143,85.06653333333333 L149.6914285714286,87.11410000000001 L224.87428571428572,92.8887666666667 L314.55428571428575,119.94226666666668 L419.4057142857143,88.35850000000002" fill="none" stroke="#e04040" stroke-width="2"/><circle cx="74.8457142857143" cy="85.06653333333333" r="4" fill="#e04040" stroke="#fff" stroke-width="1.5"/><circle cx="149.6914285714286" cy="87.11410000000001" r="4" fill="#e04040" stroke="#fff" stroke-width="1.5"/><circle cx="224.87428571428572" cy="92.8887666666667" r="4" fill="#e04040" stroke="#fff" stroke-width="1.5"/><circle cx="314.55428571428575" cy="119.94226666666668" r="4" fill="#e04040" stroke="#fff" stroke-width="1.5"/><circle cx="419.4057142857143" cy="88.35850000000002" r="4" fill="#e04040" stroke="#fff" stroke-width="1.5"/><path d="M74.8457142857143,58.20416666666665 L149.6914285714286,72.46189999999999 L224.87428571428572,64.45056666666667 L314.55428571428575,76.46960000000001 L419.4057142857143,72.2972" fill="none" stroke="#e09040" stroke-width="2"/><circle cx="74.8457142857143" cy="58.20416666666665" r="4" fill="#e09040" stroke="#fff" stroke-width="1.5"/><circle cx="149.6914285714286" cy="72.46189999999999" r="4" fill="#e09040" stroke="#fff" stroke-width="1.5"/><circle cx="224.87428571428572" cy="64.45056666666667" r="4" fill="#e09040" stroke="#fff" stroke-width="1.5"/><circle cx="314.55428571428575" cy="76.46960000000001" r="4" fill="#e09040" stroke="#fff" stroke-width="1.5"/><circle cx="419.4057142857143" cy="72.2972" r="4" fill="#e09040" stroke="#fff" stroke-width="1.5"/><path d="M74.8457142857143,53.128966666666656 L149.6914285714286,47.12859999999998 L224.87428571428572,47.275000000000006 L314.55428571428575,48.743066666666664 L419.4057142857143,51.66496666666666" fill="none" stroke="#40a040" stroke-width="2"/><circle cx="74.8457142857143" cy="53.128966666666656" r="4" fill="#40a040" stroke="#fff" stroke-width="1.5"/><circle cx="149.6914285714286" cy="47.12859999999998" r="4" fill="#40a040" stroke="#fff" stroke-width="1.5"/><circle cx="224.87428571428572" cy="47.275000000000006" r="4" fill="#40a040" stroke="#fff" stroke-width="1.5"/><circle cx="314.55428571428575" cy="48.743066666666664" r="4" fill="#40a040" stroke="#fff" stroke-width="1.5"/><circle cx="419.4057142857143" cy="51.66496666666666" r="4" fill="#40a040" stroke="#fff" stroke-width="1.5"/><path d="M74.8457142857143,41.913100000000014 L149.6914285714286,43.75733333333335 L224.87428571428572,49.93256666666667 L314.55428571428575,50.02406666666667 L419.4057142857143,44.100966666666636" fill="none" stroke="#4060d0" stroke-width="2"/><circle cx="74.8457142857143" cy="41.913100000000014" r="4" fill="#4060d0" stroke="#fff" stroke-width="1.5"/><circle cx="149.6914285714286" cy="43.75733333333335" r="4" fill="#4060d0" stroke="#fff" stroke-width="1.5"/><circle cx="224.87428571428572" cy="49.93256666666667" r="4" fill="#4060d0" stroke="#fff" stroke-width="1.5"/><circle cx="314.55428571428575" cy="50.02406666666667" r="4" fill="#4060d0" stroke="#fff" stroke-width="1.5"/><circle cx="419.4057142857143" cy="44.100966666666636" r="4" fill="#4060d0" stroke="#fff" stroke-width="1.5"/><path d="M74.8457142857143,53.52953333333332 L149.6914285714286,39.96313333333333 L224.87428571428572,43.545866666666655 L314.55428571428575,40.790700000000015 L419.4057142857143,40.400300000000044" fill="none" stroke="#a040c0" stroke-width="2"/><circle cx="74.8457142857143" cy="53.52953333333332" r="4" fill="#a040c0" stroke="#fff" stroke-width="1.5"/><circle cx="149.6914285714286" cy="39.96313333333333" r="4" fill="#a040c0" stroke="#fff" stroke-width="1.5"/><circle cx="224.87428571428572" cy="43.545866666666655" r="4" fill="#a040c0" stroke="#fff" stroke-width="1.5"/><circle cx="314.55428571428575" cy="40.790700000000015" r="4" fill="#a040c0" stroke="#fff" stroke-width="1.5"/><circle cx="419.4057142857143" cy="40.400300000000044" r="4" fill="#a040c0" stroke="#fff" stroke-width="1.5"/><rect x="392" y="2" width="12" height="3" fill="#e04040" rx="1"/><text x="408" y="8" class="legend">4 cpd</text><rect x="392" y="16" width="12" height="3" fill="#e09040" rx="1"/><text x="408" y="22" class="legend">2 cpd</text><rect x="392" y="30" width="12" height="3" fill="#40a040" rx="1"/><text x="408" y="36" class="legend">1 cpd</text><rect x="392" y="44" width="12" height="3" fill="#4060d0" rx="1"/><text x="408" y="50" class="legend">0.5 cpd</text><rect x="392" y="58" width="12" height="3" fill="#a040c0" rx="1"/><text x="408" y="64" class="legend">0.25 cpd</text></g></svg></div>
+<div class="chart-box">
+  <h3>Frequency vs Avg Cross-Condition Retention</h3>
+  <svg width="540" height="300" viewBox="0 0 540 300">
+  <g transform="translate(48,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="189.77777777777777" x2="472" y2="189.77777777777777" class="grid-line"/><text x="-8" y="192.77777777777777" text-anchor="end" class="axis-label">70%</text><line x1="0" y1="135.55555555555554" x2="472" y2="135.55555555555554" class="grid-line"/><text x="-8" y="138.55555555555554" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="81.33333333333334" x2="472" y2="81.33333333333334" class="grid-line"/><text x="-8" y="84.33333333333334" text-anchor="end" class="axis-label">90%</text><line x1="0" y1="27.111111111111114" x2="472" y2="27.111111111111114" class="grid-line"/><text x="-8" y="30.111111111111114" text-anchor="end" class="axis-label">100%</text><text x="26.22222222222222" y="260" text-anchor="middle" class="axis-label">0.25</text><text x="52.44444444444444" y="260" text-anchor="middle" class="axis-label">0.5</text><text x="104.88888888888889" y="260" text-anchor="middle" class="axis-label">1</text><text x="209.77777777777777" y="260" text-anchor="middle" class="axis-label">2</text><text x="419.55555555555554" y="260" text-anchor="middle" class="axis-label">4</text><text x="236" y="276" text-anchor="middle" class="axis-label">Spatial Frequency (cpd)</text><line x1="0" y1="27.111111111111114" x2="472" y2="27.111111111111114" stroke="#555" stroke-width="1" stroke-dasharray="4 4"/><path d="M26.22222222222222,34.50702222222225 L52.44444444444444,39.98165925925926 L104.88888888888889,49.25365925925931 L209.77777777777777,96.84179259259253 L419.55555555555554,163.84509629629628" fill="none" stroke="#6080e0" stroke-width="2.5"/><circle cx="26.22222222222222" cy="34.50702222222225" r="5" fill="#6080e0" stroke="#fff" stroke-width="2"/><text x="26.22222222222222" y="24.507022222222247" text-anchor="middle" class="legend" fill="#aaa">99%</text><circle cx="52.44444444444444" cy="39.98165925925926" r="5" fill="#6080e0" stroke="#fff" stroke-width="2"/><text x="52.44444444444444" y="29.98165925925926" text-anchor="middle" class="legend" fill="#aaa">98%</text><circle cx="104.88888888888889" cy="49.25365925925931" r="5" fill="#6080e0" stroke="#fff" stroke-width="2"/><text x="104.88888888888889" y="39.25365925925931" text-anchor="middle" class="legend" fill="#aaa">96%</text><circle cx="209.77777777777777" cy="96.84179259259253" r="5" fill="#6080e0" stroke="#fff" stroke-width="2"/><text x="209.77777777777777" y="86.84179259259253" text-anchor="middle" class="legend" fill="#aaa">87%</text><circle cx="419.55555555555554" cy="163.84509629629628" r="5" fill="#6080e0" stroke="#fff" stroke-width="2"/><text x="419.55555555555554" y="153.84509629629628" text-anchor="middle" class="legend" fill="#aaa">75%</text></g></svg></div>
+</div>
+
+<div class="results">
+  <h3>Tier 1: Must Pass</h3>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">Ring 1: frequency ordering preserved (4cpd=0%, 2cpd=0%, 1cpd=16%, 0.5cpd=100%, 0.25cpd=100%)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">Ring 2: frequency ordering preserved (4cpd=0%, 2cpd=0%, 1cpd=0%, 0.5cpd=68%, 0.25cpd=100%)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">Ring 3: frequency ordering preserved (4cpd=0%, 2cpd=0%, 1cpd=0%, 0.5cpd=0%, 0.25cpd=100%)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">Ring 4: frequency ordering preserved (4cpd=0%, 2cpd=0%, 1cpd=0%, 0.5cpd=0%, 0.25cpd=100%)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">Ring 5: frequency ordering preserved (4cpd=0%, 2cpd=0%, 1cpd=0%, 0.5cpd=0%, 0.25cpd=100%)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">band0: monotonic decrease (0% >= 0% >= 0% >= 0% >= 0%)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">band1: monotonic decrease (0% >= 0% >= 0% >= 0% >= 0%)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">band2: monotonic decrease (16% >= 0% >= 0% >= 0% >= 0%)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">band3: monotonic decrease (100% >= 68% >= 0% >= 0% >= 0%)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">residual: monotonic decrease (100% >= 100% >= 100% >= 100% >= 100%)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">Residual band >90% at all rings (min=100.0%)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge fail">FAIL</span>
+    <span class="result-text">Measured 4cpd: contrast monotonically decreases</span>
+  </div>
+  <div class="result-row">
+    <span class="badge fail">FAIL</span>
+    <span class="result-text">Measured 2cpd: contrast monotonically decreases</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">Measured 1cpd: contrast monotonically decreases</span>
+  </div>
+  <div class="result-row">
+    <span class="badge fail">FAIL</span>
+    <span class="result-text">Measured 0.5cpd: contrast monotonically decreases</span>
+  </div>
+  <div class="result-row">
+    <span class="badge fail">FAIL</span>
+    <span class="result-text">Measured 0.25cpd: contrast monotonically decreases</span>
+  </div>
+</div>
+<div class="results">
+  <h3>Tier 2: Should Pass</h3>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">band0 cutoff: expected=0.15, actual=0.15 (0% off, threshold=30%)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">band1 cutoff: expected=0.45, actual=0.45 (0% off, threshold=30%)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">band2 cutoff: expected=1.05, actual=1.05 (0% off, threshold=30%)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">band3 cutoff: expected=2.25, actual=2.25 (0% off, threshold=30%)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">Achromatic >= BY >= RG at ring 3 band3: achrom=0.0%, by=0.0%, rg=0.0%</span>
+  </div>
+  <div class="result-row">
+    <span class="badge skip">SKIP</span>
+    <span class="result-text">Rendered vs model — requires per-band model mapping (future)</span>
+  </div>
+</div>
+<div class="results">
+  <h3>Tier 3: Stretch</h3>
+  <div class="result-row">
+    <span class="badge fail">FAIL</span>
+    <span class="result-text">band3 (0.5cpd) correlates with Rovamo & Virsu: r=0.600 (threshold: r>0.9)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge fail">FAIL</span>
+    <span class="result-text">band2 (1cpd) correlates with Rovamo & Virsu: r=0.000 (threshold: r>0.9)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge fail">FAIL</span>
+    <span class="result-text">band1 (2cpd) correlates with Rovamo & Virsu: r=-1.000 (threshold: r>0.9)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge fail">FAIL</span>
+    <span class="result-text">band0 (4cpd) correlates with Rovamo & Virsu: r=-1.000 (threshold: r>0.9)</span>
+  </div>
+</div>
+
+<div class="footer">
+  Scrutinizer Wave 2 &middot; DoG band decomposition &middot; M-scaling (Rovamo &amp; Virsu 1979) &middot; castleCSF
+</div>
+</body>
+</html>

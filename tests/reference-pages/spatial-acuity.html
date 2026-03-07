@@ -155,8 +155,8 @@ function render() {
             let inRing = false;
             let inFovealRef = false;
 
-            // Check foveal reference (bands mode only)
-            if (mode === 'bands' && dist <= BAND_WIDTH / 2) {
+            // Check foveal reference (all modes — needed for retention baseline)
+            if (dist <= BAND_WIDTH / 2) {
                 inFovealRef = true;
                 freq = baseFreq;
             }
