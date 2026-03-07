@@ -1,0 +1,29 @@
+{
+  "source": "Rovamo, J. & Virsu, V. (1979). An estimation and application of the human cortical magnification factor. Experimental Brain Research, 37, 495-510.",
+  "figure": "Figure 3 — Relative contrast sensitivity as function of eccentricity at different spatial frequencies",
+  "notes": "Values normalized to foveal sensitivity (=1.0) at each spatial frequency. Digitized from published figure, averaged across meridians. The M-scaling prediction: sensitivity(ecc) = 1 / (1 + ecc/E2) where E2 depends on spatial frequency.",
+  "eccentricities_deg": [0, 2, 5, 10, 15, 20, 30],
+  "spatial_frequencies_cpd": [0.5, 1, 2, 4],
+  "channels": {
+    "0.5_cpd": {
+      "label": "0.5 cpd — low frequency",
+      "sensitivity_ratio": [1.00, 0.95, 0.82, 0.62, 0.46, 0.34, 0.20],
+      "E2_deg": 7.0
+    },
+    "1_cpd": {
+      "label": "1 cpd — medium-low frequency",
+      "sensitivity_ratio": [1.00, 0.88, 0.68, 0.42, 0.28, 0.19, 0.10],
+      "E2_deg": 3.5
+    },
+    "2_cpd": {
+      "label": "2 cpd — medium frequency",
+      "sensitivity_ratio": [1.00, 0.78, 0.50, 0.26, 0.15, 0.09, 0.04],
+      "E2_deg": 1.8
+    },
+    "4_cpd": {
+      "label": "4 cpd — high frequency",
+      "sensitivity_ratio": [1.00, 0.60, 0.30, 0.12, 0.06, 0.03, 0.01],
+      "E2_deg": 0.9
+    }
+  }
+}

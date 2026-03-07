@@ -197,6 +197,52 @@ if (hasFlag('json')) {
         }
       }
     }
+  } else if (hasFlag('spatial-acuity')) {
+    // Spatial acuity: per-band contrast retention at each ring
+    const ringDistances = [100, 200, 300, 420, 560];
+    rings = ringDistances.map((dist, i) => {
+      const normEcc = dist / foveaRadius;
+      const ecc_deg = normEcc * fovea_deg;
+      return { ring: i + 1, dist_px: dist, norm_ecc: normEcc, ecc_deg };
+    });
+
+    const dog_e2 = castlePeripheral.dog_e2 ?? 0.15;
+
+    for (const band of bands) {
+      for (const ring of rings) {
+        // DoG band weight: smooth transition based on M-scaling
+        // Band k drops when norm_ecc > E2 × (2^k - 1)
+        // With dog_sharpness=0, use a sigmoid transition
+        const bandIndex = bands.indexOf(band);
+        const cutoffMultiplier = bandIndex === 4 ? Infinity : Math.pow(2, bandIndex + 1) - 1;
+        const cutoffNorm = dog_e2 * cutoffMultiplier;
+        const cutoffDeg = cutoffNorm * fovea_deg;
+        // Smooth weight: 1.0 at center, transitions to 0 around cutoff
+        const bandWeight = cutoffMultiplier === Infinity ? 1.0 :
+          1.0 / (1.0 + Math.exp(4.0 * (ring.norm_ecc - cutoffNorm) / dog_e2));
+
+        // Per-channel attenuation (chromatic pooling)
+        const rg = atten(rg_decay, rg_freq_decay, band.freq, ring.ecc_deg, supra_exponent);
+        const yv = atten(yv_decay, yv_freq_decay, band.freq, ring.ecc_deg, supra_exponent);
+
+        // Achromatic contrast retention is dominated by the DoG band weight
+        // (spatial blur removes the band, reducing contrast)
+        predictions.push({
+          band: band.name,
+          freq_cpd: band.freq,
+          ring: ring.ring,
+          dist_px: ring.dist_px,
+          ecc_deg: Math.round(ring.ecc_deg * 100) / 100,
+          norm_ecc: Math.round(ring.norm_ecc * 100) / 100,
+          cutoff_norm: Math.round(cutoffNorm * 100) / 100,
+          cutoff_deg: Math.round(cutoffDeg * 100) / 100,
+          band_weight: Math.round(bandWeight * 10000) / 10000,
+          achromatic_retention: Math.round(bandWeight * 10000) / 10000,
+          rg_retention: Math.round((bandWeight * rg.appearance) * 10000) / 10000,
+          yv_retention: Math.round((bandWeight * yv.appearance) * 10000) / 10000,
+        });
+      }
+    }
   } else {
     // Generic: one entry per band per sample point
     for (const pt of samplePoints) {

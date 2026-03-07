@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spatial Acuity — Scrutinizer Validation</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        background: #333;
+        overflow: hidden;
+        font-family: -apple-system, system-ui, sans-serif;
+        color: #ccc;
+    }
+    canvas { position: absolute; top: 0; left: 0; }
+    #fixation {
+        position: fixed;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 16px;
+        color: #fff;
+        z-index: 10;
+        pointer-events: none;
+    }
+    #hud {
+        position: fixed;
+        top: 8px; left: 50%;
+        transform: translateX(-50%);
+        font-size: 11px;
+        color: #666;
+        z-index: 10;
+        pointer-events: none;
+        text-align: center;
+    }
+    #settings {
+        position: fixed;
+        bottom: 12px; left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+        font-size: 12px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        background: rgba(0,0,0,0.6);
+        padding: 6px 14px;
+        border-radius: 8px;
+    }
+    select, input { font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div id="fixation">+</div>
+<div id="hud"></div>
+<div id="settings">
+    <label>Mode: <select id="modeSelect">
+        <option value="single">Single freq</option>
+        <option value="ladder">Freq ladder</option>
+        <option value="bands">Bands + ref</option>
+    </select></label>
+    <label>Freq: <select id="freqSelect">
+        <option value="0.25">0.25 cpd</option>
+        <option value="0.5">0.5 cpd</option>
+        <option value="1" selected>1 cpd</option>
+        <option value="2">2 cpd</option>
+        <option value="4">4 cpd</option>
+    </select></label>
+    <label>Chromatic: <select id="chromSelect">
+        <option value="achromatic">Achromatic</option>
+        <option value="rg">R-G isoluminant</option>
+        <option value="by">B-Y isoluminant</option>
+    </select></label>
+    <label>Contrast: <input id="contrastInput" type="range" min="0.1" max="1" step="0.1" value="1"></label>
+</div>
+<canvas id="canvas"></canvas>
+
+<script>
+// ── URL params ──
+const params = new URLSearchParams(window.location.search);
+const paramMode = params.get('mode');
+const paramFreq = params.get('freq');
+const paramChrom = params.get('chromatic');
+const paramContrast = params.get('contrast');
+const paramOrientation = parseFloat(params.get('orientation') || '0');
+
+// ── Constants ──
+const RINGS = [100, 200, 300, 420, 560]; // px from center
+const BAND_WIDTH = 60; // px
+const BG_GRAY = 128; // mid-gray background
+const FOVEA_RADIUS = 90; // px CSS
+const FOVEA_DEG = 2.0;
+const PPD = FOVEA_RADIUS / FOVEA_DEG; // pixels per degree
+
+// Frequency ladder: one freq per ring (high → low, matching band0 → band3 + residual)
+const LADDER_FREQS = [4, 2, 1, 0.5, 0.25];
+
+// ── DOM ──
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const hudEl = document.getElementById('hud');
+const settingsEl = document.getElementById('settings');
+const modeSelect = document.getElementById('modeSelect');
+const freqSelect = document.getElementById('freqSelect');
+const chromSelect = document.getElementById('chromSelect');
+const contrastInput = document.getElementById('contrastInput');
+
+// Apply URL params
+if (paramMode) modeSelect.value = paramMode;
+if (paramFreq) freqSelect.value = paramFreq;
+if (paramChrom) chromSelect.value = paramChrom;
+if (paramContrast) contrastInput.value = paramContrast;
+
+// Hide settings in capture modes
+if (paramMode === 'single' || paramMode === 'ladder' || paramMode === 'bands') {
+    settingsEl.style.display = 'none';
+    hudEl.textContent = '';
+}
+
+// ── Grating rendering ──
+
+// Generate a sine-wave grating value at position x (pixels) for given frequency (cpd)
+function gratingValue(x, freq_cpd, contrast, phase) {
+    const freq_px = freq_cpd / PPD; // cycles per pixel
+    return contrast * Math.sin(2 * Math.PI * freq_px * x + (phase || 0));
+}
+
+// Render a grating into an ImageData for an annulus region
+function render() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    canvas.width = w;
+    canvas.height = h;
+
+    const cx = w / 2;
+    const cy = h / 2;
+    const mode = modeSelect.value;
+    const baseFreq = parseFloat(freqSelect.value);
+    const chromatic = chromSelect.value;
+    const contrast = parseFloat(contrastInput.value);
+
+    // Fill background
+    ctx.fillStyle = `rgb(${BG_GRAY}, ${BG_GRAY}, ${BG_GRAY})`;
+    ctx.fillRect(0, 0, w, h);
+
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+
+    // For each pixel, check if it falls within a ring annulus or foveal ref
+    for (let py = 0; py < h; py++) {
+        for (let px = 0; px < w; px++) {
+            const dx = px - cx;
+            const dy = py - cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            let freq = -1;
+            let inRing = false;
+            let inFovealRef = false;
+
+            // Check foveal reference (bands mode only)
+            if (mode === 'bands' && dist <= BAND_WIDTH / 2) {
+                inFovealRef = true;
+                freq = baseFreq;
+            }
+
+            // Check each ring annulus
+            if (!inFovealRef) {
+                for (let r = 0; r < RINGS.length; r++) {
+                    const inner = RINGS[r];
+                    const outer = RINGS[r] + BAND_WIDTH;
+                    if (dist >= inner && dist < outer) {
+                        inRing = true;
+                        if (mode === 'ladder' || mode === 'bands') {
+                            freq = LADDER_FREQS[r];
+                        } else {
+                            freq = baseFreq;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if (!inRing && !inFovealRef) continue;
+
+            // Grating coordinate: project onto orientation axis
+            const angleRad = paramOrientation * Math.PI / 180;
+            const gratingX = dx * Math.cos(angleRad) + dy * Math.sin(angleRad);
+
+            const g = gratingValue(gratingX, freq, contrast, 0);
+            const idx = (py * w + px) * 4;
+
+            if (chromatic === 'achromatic') {
+                // Luminance grating: modulate around mid-gray
+                const lum = BG_GRAY + g * BG_GRAY;
+                data[idx] = Math.round(lum);
+                data[idx + 1] = Math.round(lum);
+                data[idx + 2] = Math.round(lum);
+            } else if (chromatic === 'rg') {
+                // Isoluminant R-G: modulate R and G in opposition, hold luminance constant
+                // Approximate isoluminance: R↑ G↓ with B constant
+                const mod = g * 60; // moderate chromatic contrast
+                data[idx] = Math.round(Math.max(0, Math.min(255, BG_GRAY + mod)));
+                data[idx + 1] = Math.round(Math.max(0, Math.min(255, BG_GRAY - mod)));
+                data[idx + 2] = BG_GRAY;
+            } else if (chromatic === 'by') {
+                // Isoluminant B-Y: modulate B and (R+G) in opposition
+                const mod = g * 60;
+                data[idx] = Math.round(Math.max(0, Math.min(255, BG_GRAY + mod * 0.5)));
+                data[idx + 1] = Math.round(Math.max(0, Math.min(255, BG_GRAY + mod * 0.5)));
+                data[idx + 2] = Math.round(Math.max(0, Math.min(255, BG_GRAY - mod)));
+            }
+        }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+
+    // Update HUD
+    if (!paramMode) {
+        hudEl.textContent = `${mode} | ${chromatic} | ${baseFreq} cpd | contrast ${contrast} | orientation ${paramOrientation}°`;
+    }
+}
+
+// ── Events ──
+modeSelect.addEventListener('change', render);
+freqSelect.addEventListener('change', render);
+chromSelect.addEventListener('change', render);
+contrastInput.addEventListener('input', render);
+window.addEventListener('resize', render);
+
+// Initial render
+render();
+</script>
+</body>
+</html>

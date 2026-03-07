@@ -369,6 +369,43 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                             win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/color-search.html?color=blue&size=24');
                                         }
                                     }
+                                },
+                                { type: 'separator' },
+                                {
+                                    label: 'Spatial Acuity — 4 cpd (fine)',
+                                    click: () => {
+                                        const win = BrowserWindow.getFocusedWindow();
+                                        if (win && win.scrutinizerView) {
+                                            win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/spatial-acuity.html?mode=single&freq=4&contrast=1');
+                                        }
+                                    }
+                                },
+                                {
+                                    label: 'Spatial Acuity — 1 cpd (medium)',
+                                    click: () => {
+                                        const win = BrowserWindow.getFocusedWindow();
+                                        if (win && win.scrutinizerView) {
+                                            win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/spatial-acuity.html?mode=single&freq=1&contrast=1');
+                                        }
+                                    }
+                                },
+                                {
+                                    label: 'Spatial Acuity — 0.25 cpd (coarse)',
+                                    click: () => {
+                                        const win = BrowserWindow.getFocusedWindow();
+                                        if (win && win.scrutinizerView) {
+                                            win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/spatial-acuity.html?mode=single&freq=0.25&contrast=1');
+                                        }
+                                    }
+                                },
+                                {
+                                    label: 'Spatial Acuity — Frequency Ladder',
+                                    click: () => {
+                                        const win = BrowserWindow.getFocusedWindow();
+                                        if (win && win.scrutinizerView) {
+                                            win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/spatial-acuity.html?mode=ladder&contrast=1');
+                                        }
+                                    }
                                 }
                             ]
                         }
