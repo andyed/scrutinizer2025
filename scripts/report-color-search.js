@@ -217,6 +217,96 @@ const html = `<!DOCTYPE html>
     text-align: center;
   }
   .footer a { color: #666; }
+
+  /* Go flyout */
+  .go-wrap {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 24px;
+  }
+  .go-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border-radius: 8px;
+    background: #222240;
+    border: 1px solid #444;
+    color: #ccc;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .go-btn:hover { border-color: #666; background: #2a2a50; }
+  .go-btn .arrow { font-size: 11px; color: #666; transition: transform 0.2s; }
+  .go-wrap:hover .go-btn .arrow,
+  .go-wrap:focus-within .go-btn .arrow { transform: rotate(90deg); }
+
+  .flyout {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 100;
+    min-width: 420px;
+    background: #1e1e38;
+    border: 1px solid #444;
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition: opacity 0.15s, transform 0.15s, visibility 0.15s;
+  }
+  .go-wrap:hover .flyout,
+  .go-wrap:focus-within .flyout {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+  .flyout h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #666;
+    margin-bottom: 12px;
+  }
+  .flyout-section { margin-bottom: 16px; }
+  .flyout-section:last-child { margin-bottom: 0; }
+  .flyout-section h4 {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #2a2a44;
+  }
+  .stim-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .stim-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    background: #222240;
+    border: 1px solid #333;
+    text-decoration: none;
+    font-size: 12px;
+    color: #bbb;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .stim-link:hover { border-color: #666; background: #2a2a50; color: #eee; }
+  .stim-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .stim-mode { color: #666; font-size: 10px; }
 </style>
 </head>
 <body>
@@ -243,6 +333,50 @@ ${[1, 2, 3].map(t => {
     <div class="tier-label">${items.filter(i=>i.status==='SKIP').length ? '(' + items.filter(i=>i.status==='SKIP').length + ' skipped)' : ''}</div>
   </div>`;
 }).join('\n')}
+</div>
+
+<!-- Go flyout -->
+<div class="go-wrap" tabindex="0">
+  <div class="go-btn">Go <span class="arrow">&#9654;</span></div>
+  <div class="flyout">
+    <h3>Experimental Stimulus</h3>
+    <div class="flyout-section">
+      <h4>Bands (validation captures)</h4>
+      <div class="stim-grid">
+${['red', 'green', 'blue', 'yellow'].map(color => {
+  const BASE = 'https://andyed.github.io/scrutinizer-www/reference-pages/color-search.html';
+  return `        <a class="stim-link" href="${BASE}?color=${color}&size=24&mode=bands&seed=42" target="_blank">
+          <span class="stim-swatch" style="background:${COLORS[color]}"></span>
+          ${color}
+        </a>`;
+}).join('\n')}
+      </div>
+    </div>
+    <div class="flyout-section">
+      <h4>Dot arrays (visual search)</h4>
+      <div class="stim-grid">
+${['red', 'green', 'blue', 'yellow'].map(color => {
+  const BASE = 'https://andyed.github.io/scrutinizer-www/reference-pages/color-search.html';
+  return `        <a class="stim-link" href="${BASE}?color=${color}&size=24&mode=static&seed=42" target="_blank">
+          <span class="stim-swatch" style="background:${COLORS[color]}"></span>
+          ${color}
+        </a>`;
+}).join('\n')}
+      </div>
+    </div>
+    <div class="flyout-section">
+      <h4>Interactive trial</h4>
+      <div class="stim-grid">
+${['red', 'green', 'blue', 'yellow'].map(color => {
+  const BASE = 'https://andyed.github.io/scrutinizer-www/reference-pages/color-search.html';
+  return `        <a class="stim-link" href="${BASE}?color=${color}&size=24" target="_blank">
+          <span class="stim-swatch" style="background:${COLORS[color]}"></span>
+          ${color}
+        </a>`;
+}).join('\n')}
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Charts -->

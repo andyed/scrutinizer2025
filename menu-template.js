@@ -273,6 +273,104 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/crowding-stimulus.html');
                                 }
                             }
+                        },
+                        { type: 'separator' },
+                        {
+                            label: 'Experimental Stimulus',
+                            submenu: [
+                                {
+                                    label: 'Color Search — Bands (Red)',
+                                    click: () => {
+                                        const win = BrowserWindow.getFocusedWindow();
+                                        if (win && win.scrutinizerView) {
+                                            win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/color-search.html?color=red&size=24&mode=bands&seed=42');
+                                        }
+                                    }
+                                },
+                                {
+                                    label: 'Color Search — Bands (Green)',
+                                    click: () => {
+                                        const win = BrowserWindow.getFocusedWindow();
+                                        if (win && win.scrutinizerView) {
+                                            win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/color-search.html?color=green&size=24&mode=bands&seed=42');
+                                        }
+                                    }
+                                },
+                                {
+                                    label: 'Color Search — Bands (Blue)',
+                                    click: () => {
+                                        const win = BrowserWindow.getFocusedWindow();
+                                        if (win && win.scrutinizerView) {
+                                            win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/color-search.html?color=blue&size=24&mode=bands&seed=42');
+                                        }
+                                    }
+                                },
+                                {
+                                    label: 'Color Search — Bands (Yellow)',
+                                    click: () => {
+                                        const win = BrowserWindow.getFocusedWindow();
+                                        if (win && win.scrutinizerView) {
+                                            win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/color-search.html?color=yellow&size=24&mode=bands&seed=42');
+                                        }
+                                    }
+                                },
+                                { type: 'separator' },
+                                {
+                                    label: 'Color Search — Dots (Red)',
+                                    click: () => {
+                                        const win = BrowserWindow.getFocusedWindow();
+                                        if (win && win.scrutinizerView) {
+                                            win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/color-search.html?color=red&size=24&mode=static&seed=42');
+                                        }
+                                    }
+                                },
+                                {
+                                    label: 'Color Search — Dots (Green)',
+                                    click: () => {
+                                        const win = BrowserWindow.getFocusedWindow();
+                                        if (win && win.scrutinizerView) {
+                                            win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/color-search.html?color=green&size=24&mode=static&seed=42');
+                                        }
+                                    }
+                                },
+                                {
+                                    label: 'Color Search — Dots (Blue)',
+                                    click: () => {
+                                        const win = BrowserWindow.getFocusedWindow();
+                                        if (win && win.scrutinizerView) {
+                                            win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/color-search.html?color=blue&size=24&mode=static&seed=42');
+                                        }
+                                    }
+                                },
+                                {
+                                    label: 'Color Search — Dots (Yellow)',
+                                    click: () => {
+                                        const win = BrowserWindow.getFocusedWindow();
+                                        if (win && win.scrutinizerView) {
+                                            win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/color-search.html?color=yellow&size=24&mode=static&seed=42');
+                                        }
+                                    }
+                                },
+                                { type: 'separator' },
+                                {
+                                    label: 'Color Search — Interactive (Red)',
+                                    click: () => {
+                                        const win = BrowserWindow.getFocusedWindow();
+                                        if (win && win.scrutinizerView) {
+                                            win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/color-search.html?color=red&size=24');
+                                        }
+                                    }
+                                },
+                                {
+                                    label: 'Color Search — Interactive (Blue)',
+                                    click: () => {
+                                        const win = BrowserWindow.getFocusedWindow();
+                                        if (win && win.scrutinizerView) {
+                                            win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/color-search.html?color=blue&size=24');
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     ]
                 }

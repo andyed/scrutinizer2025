@@ -484,8 +484,9 @@ function renderStatic() {
     introEl.style.display = 'none';
     resultsEl.style.display = 'none';
     arenaEl.style.display = 'block';
+    document.getElementById('settings').style.display = 'none';
     fixationEl.style.color = '#555';
-    hudEl.textContent = 'Static mode — one target per ring';
+    hudEl.textContent = '';
 
     const cx = window.innerWidth / 2;
     const cy = window.innerHeight / 2;
@@ -530,8 +531,9 @@ function renderBands() {
     introEl.style.display = 'none';
     resultsEl.style.display = 'none';
     arenaEl.style.display = 'block';
+    document.getElementById('settings').style.display = 'none';
     fixationEl.style.color = '#fff';
-    hudEl.textContent = 'Bands mode — concentric color annuli for validation';
+    hudEl.textContent = '';
 
     const cx = window.innerWidth / 2;
     const cy = window.innerHeight / 2;
