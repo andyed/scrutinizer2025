@@ -506,6 +506,10 @@
                     this.config.v1_distortion_type = 3; // Pixelate (Saliency-Guided)
                     this.config.v4_style_id = 4;
                     this.config.lgn_ramp_end_mult = 2.0;
+                } else if (modeId > 7.5 && modeId < 8.5) { // Minecraft Eyeball (8)
+                    this.config.v1_distortion_type = 4;
+                    this.config.v4_style_id = 8;
+                    this.config.lgn_ramp_end_mult = 2.0;
                 } else if (modeId > 4.5) { // Trippy (5)
                     this.config.lgn_use_structure_mask = false;
                     this.config.v1_distortion_type = 0; // Noise

@@ -92,6 +92,18 @@ vec4 sampleSourceGrad(vec2 distortedUV, vec2 duvdx, vec2 duvdy) {
     return col;
 }
 
+// === LOD-AWARE SAMPLER (Sector-area averaging) ===
+// Samples at a specific MIP level for area-averaged coverage.
+// Used by polar pooling to average across the sector area instead of
+// point-sampling the center (which misses thin features like toolbars).
+vec4 sampleSourceLod(vec2 uv, float lod) {
+    vec4 col = textureLod(u_texture, uv, lod);
+    float temp = col.r;
+    col.r = col.b;
+    col.b = temp;
+    return col;
+}
+
 // === HELPER: VARIABLE BLUR ===
 vec4 sampleBlurred(vec2 uv, float radius) {
     if (radius < 0.5) return sampleSource(uv);
@@ -266,6 +278,64 @@ float computeMipLevel(float eccentricity, float fovea_radius) {
         return clamp(maxMipLevel * cortical_dist / u_cortical_max, 0.0, maxMipLevel);
     }
     return clamp(normalizedEcc * 2.5, 0.0, maxMipLevel);
+}
+
+// === POLAR SECTOR COMPUTATION ===
+// Shared by V1 type 4 (polar quantize) and V4 style 8 (polar pooling).
+// Computes which radial sector a fragment belongs to: ring index, spoke index,
+// and the UV-space center of that sector.
+struct PolarSector {
+    float r;           // distance from fovea (aspect-corrected)
+    float angle;       // -PI to PI
+    float ring_inner;
+    float ring_outer;
+    float ring_center;
+    float spokeCount;
+    float spokeWidth;
+    float spoke_center;
+    float n_idx;       // ring index
+    vec2 mouse_c;      // aspect-corrected mouse position (needed for UV reconstruction)
+};
+
+PolarSector computePolarSector(vec2 uv, float parafovea_radius) {
+    PolarSector s;
+    float aspect = u_resolution.x / u_resolution.y;
+    vec2 uv_c = vec2(uv.x * aspect, uv.y);
+    vec2 mouse_uv = u_mouse_stable / u_resolution;
+    s.mouse_c = vec2(mouse_uv.x * aspect, mouse_uv.y);
+    vec2 diff = uv_c - s.mouse_c;
+    // Match dist's coordinate system: divide x by fovea_aspect_ratio
+    // so ring radii are consistent with parafovea_radius and fovea_radius.
+    vec2 diff_scaled = vec2(diff.x / u_fovea_aspect_ratio, diff.y);
+    s.r = length(diff_scaled);
+    s.angle = atan(diff_scaled.y, diff_scaled.x);
+
+    // CMF-density ring spacing: ef=1.03 with bias=2.0 produces ring widths
+    // that track Minecraft's CMF block sizes (4–64px) across eccentricity.
+    // At parafovea (r≈0.1): ringWidth ≈ 6px. At far periphery (r≈0.8): ≈49px.
+    float r0 = parafovea_radius;
+    float ef = 1.03;
+    float bias = u_crowding_radial_bias;
+    float n_cont = log(max(s.r, r0) / r0) / log(ef);
+    float n_biased = n_cont / bias;
+    s.n_idx = floor(n_biased);
+
+    s.ring_inner = r0 * pow(ef, s.n_idx * bias);
+    s.ring_outer = r0 * pow(ef, (s.n_idx + 1.0) * bias);
+    s.ring_center = (s.ring_inner + s.ring_outer) * 0.5;
+
+    // Spoke count derived from ring geometry: arc length ≈ ring width.
+    // This makes sectors approximately square before bias elongation.
+    // With bias=2.0, radial extent is 2× tangential → 2:1 aspect ratio.
+    float ringWidth = s.ring_outer - s.ring_inner;
+    s.spokeCount = max(6.0, floor(6.28318530718 * s.ring_center / ringWidth));
+    s.spokeCount = floor(s.spokeCount / 2.0) * 2.0; // keep even
+    s.spokeWidth = 6.28318530718 / s.spokeCount;
+
+    float spoke_idx = floor((s.angle + 3.14159265359) / s.spokeWidth);
+    s.spoke_center = spoke_idx * s.spokeWidth - 3.14159265359 + s.spokeWidth * 0.5;
+
+    return s;
 }
 
 // === LEGACY: Simple MIP pooling (used when DoG disabled) ===
@@ -510,7 +580,7 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     float eccentricityScale = mix(0.0, 0.15, parafoveaRamp);
     eccentricityScale = mix(eccentricityScale, 1.0, boundaryProgress);
     
-    if (config.v4_style_id == 4 || config.v4_style_id == 3) {
+    if (config.v4_style_id == 4 || config.v4_style_id == 3 || config.v4_style_id == 8) {
         eccentricityScale = 1.0;
     }
     
@@ -682,8 +752,36 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
             signal.distortedUV = mix(uv, quantizedUV, blockBlend);
             signal.distortionStrength = strength;
         }
+    } else if (config.v1_distortion_type == 4) {
+        // === POLAR QUANTIZE: Radial sector snapping (TTM pooling regions) ===
+        // Unlike Cartesian Minecraft (type 3) which uses a fixed screen-space grid,
+        // this variant is fovea-relative by design — polar grids don't cause
+        // coherent edge motion like Cartesian grids do.
+        float blockBlend = smoothstep(parafovea_radius, parafovea_radius * 1.5, dist);
+
+        if (blockBlend < 0.001) {
+            signal.distortedUV = uv;
+            signal.distortionStrength = 0.0;
+        } else {
+            PolarSector ps = computePolarSector(uv, parafovea_radius);
+            float aspect = u_resolution.x / u_resolution.y;
+
+            // Reconstruct UV from sector center:
+            // 1. Polar → Cartesian in the scaled space (fovea_aspect_ratio-divided x)
+            // 2. Undo fovea_aspect_ratio to get back to aspect-corrected space
+            // 3. Undo aspect to get back to UV space
+            vec2 sector_offset = ps.ring_center *
+                vec2(cos(ps.spoke_center), sin(ps.spoke_center));
+            // Undo the fovea_aspect_ratio scaling on x
+            sector_offset.x *= u_fovea_aspect_ratio;
+            vec2 quantized_c = ps.mouse_c + sector_offset;
+            vec2 quantizedUV = vec2(quantized_c.x / aspect, quantized_c.y);
+
+            signal.distortedUV = mix(uv, quantizedUV, blockBlend);
+            signal.distortionStrength = strength;
+        }
     }
-    
+
     return signal;
 }
 
@@ -938,6 +1036,144 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         vec3 finalColor = clamp(saturated + subtleNoise, 0.0, 1.0);
         return mix(col, finalColor, effectFactor * bypassTransition);
 
+    } else if (config.v4_style_id == 7) { // Pooling Grid — educational polar overlay
+        // Compute own eccentricity ramp (not dependent on V1 distortion strength)
+        float gridFade = smoothstep(fovea_radius, fovea_radius * 2.0, dist) * bypassTransition;
+
+        // Mild desaturation so content stays readable
+        float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+        col = mix(col, vec3(lum), gridFade * 0.4);
+
+        // Polar grid: concentric rings (log-spaced) + radial spokes
+        // Fade in from parafovea edge outward
+        float gridOnset = smoothstep(fovea_radius, parafovea_radius, dist);
+
+        if (gridOnset > 0.001) {
+            float aspect = u_resolution.x / u_resolution.y;
+            vec2 uv_c = vec2(uv.x * aspect, uv.y);
+            vec2 mouse_uv = u_mouse_stable / u_resolution;
+            vec2 mouse_c = vec2(mouse_uv.x * aspect, mouse_uv.y);
+            vec2 diff = uv_c - mouse_c;
+            float angle = atan(diff.y, diff.x);
+
+            // Log-spaced rings starting at parafovea — matches CMF scaling
+            float r0 = parafovea_radius;
+            float expansionFactor = 1.3;
+            float n = log(dist / r0) / log(expansionFactor);
+            float n_idx = round(n);
+            float dist_to_ring = abs(n - n_idx);
+
+            float ringWidth = 0.015;
+            float ringAlpha = 1.0 - smoothstep(0.0, ringWidth, dist_to_ring);
+
+            // Radial spokes — more spokes near fovea (16), thinning out
+            // Spoke count decreases with eccentricity: pooling regions are wider tangentially at distance
+            float spokeCount = mix(16.0, 8.0, smoothstep(parafovea_radius, parafovea_radius * 4.0, dist));
+            float spokeWidth = smoothstep(0.99, 0.995, cos(angle * spokeCount));
+
+            // Parafovea ring boundary (solid)
+            float paraRingDist = abs(dist - parafovea_radius);
+            float fw = fwidth(paraRingDist);
+            float paraRing = 1.0 - smoothstep(0.0, fw * 2.5, paraRingDist);
+
+            float gridAlpha = max(max(ringAlpha, spokeWidth), paraRing);
+
+            // Grid color: cyan, subtle — page content shows through
+            vec3 gridColor = vec3(0.0, 0.75, 0.9);
+            float opacity = gridOnset * 0.25;
+            col = mix(col, gridColor, gridAlpha * opacity);
+            col += gridColor * gridAlpha * opacity * 0.15; // Slight additive glow
+        }
+
+        return col;
+
+    } else if (config.v4_style_id == 8) { // Minecraft Eyeball (Polar Pooling)
+        // Radial variant of Minecraft: wedge-shaped polar sectors sized by CMF,
+        // emanating from gaze. Same Oklab chromatic decay as Minecraft (style 4).
+        float blockBlend = smoothstep(parafovea_radius, parafovea_radius * 1.5, dist);
+        if (blockBlend < 0.001) return col;
+
+        PolarSector ps = computePolarSector(uv, parafovea_radius);
+        float aspect = u_resolution.x / u_resolution.y;
+
+        // --- RADIAL/TANGENTIAL NEIGHBOR SAMPLING ---
+        // 2 radial (inner/outer ring centers) + 2 tangential (adjacent spokes)
+        float ef = 1.03;
+        float bias = u_crowding_radial_bias;
+        float ring_inner_prev = ps.ring_inner / pow(ef, bias);
+        float ring_center_inner = (ring_inner_prev + ps.ring_inner) * 0.5;
+        float ring_outer_next = ps.ring_outer * pow(ef, bias);
+        float ring_center_outer = (ps.ring_outer + ring_outer_next) * 0.5;
+
+        float spoke_left  = ps.spoke_center - ps.spokeWidth;
+        float spoke_right = ps.spoke_center + ps.spokeWidth;
+
+        // Convert neighbor polar coords to UV.
+        // Sector offsets are in the scaled space (fovea_aspect_ratio-divided x),
+        // so we undo that scaling before converting back to UV.
+        vec2 offRI = ring_center_inner * vec2(cos(ps.spoke_center), sin(ps.spoke_center));
+        offRI.x *= u_fovea_aspect_ratio;
+        vec2 uvRI = vec2((ps.mouse_c + offRI).x / aspect, (ps.mouse_c + offRI).y);
+
+        vec2 offRO = ring_center_outer * vec2(cos(ps.spoke_center), sin(ps.spoke_center));
+        offRO.x *= u_fovea_aspect_ratio;
+        vec2 uvRO = vec2((ps.mouse_c + offRO).x / aspect, (ps.mouse_c + offRO).y);
+
+        vec2 offTL = ps.ring_center * vec2(cos(spoke_left), sin(spoke_left));
+        offTL.x *= u_fovea_aspect_ratio;
+        vec2 uvTL = vec2((ps.mouse_c + offTL).x / aspect, (ps.mouse_c + offTL).y);
+
+        vec2 offTR = ps.ring_center * vec2(cos(spoke_right), sin(spoke_right));
+        offTR.x *= u_fovea_aspect_ratio;
+        vec2 uvTR = vec2((ps.mouse_c + offTR).x / aspect, (ps.mouse_c + offTR).y);
+
+        // MIP-level-aware sampling: use textureLod at a MIP level matching the
+        // sector's ring width in pixels. Single-point sampling (MIP 0) misses
+        // thin features (e.g. toolbars, logos) when the sector center lands on
+        // empty space. Hardware MIP averaging catches them.
+        float ringWidthUV = ps.ring_outer - ps.ring_inner;
+        float ringWidthPx = ringWidthUV * u_resolution.y;
+        // Let MIP level match the actual sector size — no artificial cap at 4.
+        // A 2336px texture has MIP levels up to ~11; sectors need MIP 5-6 to
+        // average their full area and catch thin features like toolbars.
+        float maxMip = floor(log2(max(u_resolution.x, u_resolution.y)));
+        float sectorMip = clamp(log2(max(ringWidthPx, 1.0)), 0.0, maxMip);
+
+        vec3 labCenter = rgbToOklab(sampleSourceLod(v1.distortedUV, sectorMip).rgb);
+        vec3 neighborAvg = (rgbToOklab(sampleSourceLod(uvRI, sectorMip).rgb)
+                          + rgbToOklab(sampleSourceLod(uvRO, sectorMip).rgb)
+                          + rgbToOklab(sampleSourceLod(uvTL, sectorMip).rgb)
+                          + rgbToOklab(sampleSourceLod(uvTR, sectorMip).rgb)) * 0.25;
+
+        // Per-channel blend (same rates as Minecraft style 4)
+        float mipLevel = computeMipLevel(max(0.0, dist - fovea_radius), fovea_radius);
+        float t = clamp(mipLevel / 4.0, 0.0, 1.0);
+        vec3 blended;
+        blended.x = mix(labCenter.x, neighborAvg.x, t * 0.4);   // L
+        blended.y = mix(labCenter.y, neighborAvg.y, t * 0.6);   // a (RG)
+        blended.z = mix(labCenter.z, neighborAvg.z, t * 0.25);  // b (YV)
+
+        // Per-channel chromatic decay (same as Minecraft style 4)
+        float normEcc = max(0.0, dist - fovea_radius) / max(fovea_radius, 0.001);
+        float ecc_deg = normEcc * 2.0;
+        blended.y *= (1.0 - smoothstep(1.0, 28.0, ecc_deg) * 0.7);
+        blended.z *= (1.0 - smoothstep(5.0, 45.0, ecc_deg) * 0.35);
+
+        vec3 result = oklabToRgb(blended);
+
+        // --- RING/SPOKE GRID LINES (6% darkening, same weight as Minecraft) ---
+        float ringWidth = ps.ring_outer - ps.ring_inner;
+        float ringEdgeDist = min(abs(ps.r - ps.ring_inner), abs(ps.r - ps.ring_outer));
+        float ringEdge = 1.0 - 0.06 * (1.0 - smoothstep(0.0, ringWidth * 0.08, ringEdgeDist));
+
+        float angle_in_spoke = mod(ps.angle + 3.14159265359, ps.spokeWidth);
+        float spokeDist = min(angle_in_spoke, ps.spokeWidth - angle_in_spoke);
+        float spokeEdge = 1.0 - 0.06 * (1.0 - smoothstep(0.0, ps.spokeWidth * 0.08, spokeDist));
+
+        result *= min(ringEdge, spokeEdge);
+
+        return mix(col, result, blockBlend * effectFactor * bypassTransition);
+
     } else if (config.v4_style_id == 6) { // FOVI: Gaussian color decay (rod-cone transition)
         if (u_cmf_color_sigma > 0.01) {
             float fovea_deg = 2.0;
@@ -1028,7 +1264,7 @@ void main() {
         config.lgn_use_saliency_gate = false;
     }
     
-    if (config.v4_style_id != 5 && config.v1_distortion_type != 2 && config.v1_distortion_type != 3) {
+    if (config.v4_style_id != 5 && config.v1_distortion_type != 2 && config.v1_distortion_type != 3 && config.v1_distortion_type != 4) {
         if (u_mongrel_mode < 0.5) {
             config.v1_distortion_type = 0; 
         }

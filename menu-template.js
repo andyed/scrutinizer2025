@@ -567,6 +567,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     click: () => { sendToOverlays('menu:set-aesthetic-mode', 4); app.emit('aesthetic-mode-changed', 4); }
                                 },
                                 {
+                                    label: 'Minecraft Eyeball (Polar Pooling)',
+                                    type: 'radio',
+                                    checked: currentAestheticMode === 8,
+                                    click: () => { sendToOverlays('menu:set-aesthetic-mode', 8); app.emit('aesthetic-mode-changed', 8); }
+                                },
+                                {
                                     label: 'Double Vision',
                                     type: 'radio',
                                     checked: currentAestheticMode === 5,

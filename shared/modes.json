@@ -153,6 +153,35 @@
                 "design_basis": "Cortical magnification (Schwartz 1980), castleCSF chromatic pooling rates"
             }
         },
+        "minecraft_eyeball": {
+            "id": 8,
+            "label": "Minecraft Eyeball (Polar Pooling)",
+            "shortLabel": "MC Eyeball",
+            "category": "presentation",
+            "description": "Radial variant of Minecraft: wedge-shaped polar sectors sized by CMF, emanating from gaze. Radially elongated ~2:1 matching TTM pooling regions. Same Oklab chromatic decay as Minecraft.",
+            "pipeline": {
+                "lgn_use_structure_mask": true,
+                "lgn_use_saliency_gate": true,
+                "lgn_ramp_end_mult": 2.0,
+                "v1_distortion_type": 4,
+                "v1_strength_mult": 1.0,
+                "v1_animate": false,
+                "v4_style_id": 8,
+                "cmf_enabled": true,
+                "cmf_a": 2.78,
+                "cmf_color_sigma": 0.0
+            },
+            "tests": [
+                "polar_sector_quantization",
+                "radial_neighbor_averaging",
+                "chromatic_decay_parity"
+            ],
+            "architectural_purpose": "Polar pooling regions visible as wedge geometry — TTM pooling made tangible",
+            "citations": {
+                "technique": "CMF-driven polar sector quantization with Oklab neighbor averaging",
+                "biological_basis": "Rosenholtz TTM pooling regions, Toet & Levi (1992) radial elongation"
+            }
+        },
         "double_vision": {
             "id": 5,
             "label": "Double Vision",
@@ -297,6 +326,11 @@
             "name": "pixelate",
             "label": "Pixelate (Saliency-Guided)",
             "description": "Blocky quantization with saliency-driven variable block sizes"
+        },
+        "4": {
+            "name": "polar_quantize",
+            "label": "Polar Quantize (Radial Sectors)",
+            "description": "Fovea-relative polar sector quantization with CMF-driven ring spacing"
         }
     },
     "categories": {
@@ -319,7 +353,7 @@
     },
     "metadata": {
         "version": "2.0.0",
-        "lastUpdated": "2026-02-28",
+        "lastUpdated": "2026-03-06",
         "documentation": "docs/developers_guide.md#adding-a-new-aesthetic-mode"
     }
 }
