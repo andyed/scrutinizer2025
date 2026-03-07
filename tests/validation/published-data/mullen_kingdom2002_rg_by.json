@@ -1,0 +1,17 @@
+{
+  "source": "Mullen & Kingdom (2002). Differential distributions of red-green and blue-yellow cone opponency across the visual field. Visual Neuroscience, 19, 109-118.",
+  "figure": "Figure 4 — Contrast sensitivity ratio (peripheral/foveal) vs eccentricity",
+  "notes": "RG and BY contrast sensitivity measured at 0.5 cpd. Values are ratio of peripheral to foveal sensitivity. Averaged across subjects.",
+  "spatial_freq_cpd": 0.5,
+  "eccentricities_deg": [0, 5, 10, 15, 20, 25, 30],
+  "channels": {
+    "rg": {
+      "label": "Red-Green (L-M) at 0.5 cpd",
+      "sensitivity_ratio": [1.00, 0.72, 0.48, 0.30, 0.20, 0.13, 0.09]
+    },
+    "by": {
+      "label": "Blue-Yellow (S-(L+M)) at 0.5 cpd",
+      "sensitivity_ratio": [1.00, 0.88, 0.74, 0.62, 0.52, 0.43, 0.36]
+    }
+  }
+}

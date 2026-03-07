@@ -1,0 +1,21 @@
+{
+  "source": "Bowers, Tyson & Bhatt (2025). Suprathreshold chromatic sensitivity across the visual field. Vision Research.",
+  "figure": "Figure 3 — Normalized sensitivity as function of eccentricity",
+  "notes": "Values normalized to 5° baseline (=100%). Suprathreshold measurements at high contrast. Three eccentricities tested: 5°, 15°, 75°.",
+  "baseline_deg": 5,
+  "eccentricities_deg": [5, 15, 75],
+  "channels": {
+    "achromatic": {
+      "label": "Luminance (L+M)",
+      "sensitivity_pct": [100, 76, 12]
+    },
+    "rg": {
+      "label": "Red-Green (L-M)",
+      "sensitivity_pct": [100, 29, 4]
+    },
+    "by": {
+      "label": "Blue-Yellow (S-(L+M))",
+      "sensitivity_pct": [100, 79, 18]
+    }
+  }
+}

@@ -8,25 +8,40 @@
  * Usage:
  *   node scripts/chromatic-attenuation-table.js
  *   node scripts/chromatic-attenuation-table.js --fovea-radius=180 --viewport=1536x914
+ *   node scripts/chromatic-attenuation-table.js --json              # structured output for validation
+ *   node scripts/chromatic-attenuation-table.js --json --color-search  # predictions for color-search rings
  */
+
+const path = require('path');
+const fs = require('fs');
 
 const args = process.argv.slice(2);
 function getArg(name, def) {
   const a = args.find(x => x.startsWith(`--${name}=`));
   return a ? a.split('=')[1] : def;
 }
+const hasFlag = (name) => args.includes(`--${name}`);
 
 // ── Viewport geometry ──
 const foveaRadius = parseInt(getArg('fovea-radius', '90'));
 const [vpW, vpH] = getArg('viewport', '1536x914').split('x').map(Number);
 const fovea_deg = 2.0;  // Hardcoded in shader
 
-// ── castleCSF parameters (from modes.json) ──
-const rg_decay = 0.059;
-const rg_freq_decay = 0.003;
-const yv_decay = 0.004;
-const yv_freq_decay = 0.008;
-const supra_exponent = 0.5;
+// ── Load castleCSF parameters from modes.json ──
+const modesPath = path.join(__dirname, '..', 'shared', 'modes.json');
+const modes = JSON.parse(fs.readFileSync(modesPath, 'utf8'));
+// Find first mode with chromatic_pooling: true (checked in pipeline key)
+const allModes = modes.modes ? Object.values(modes.modes) : Object.values(modes);
+const castleMode = allModes.find(m =>
+  m.pipeline?.chromatic_pooling === true
+) || {};
+const castlePeripheral = castleMode.pipeline || {};
+
+const rg_decay = castlePeripheral.rg_decay ?? 0.072;
+const rg_freq_decay = castlePeripheral.rg_freq_decay ?? 0.003;
+const yv_decay = castlePeripheral.yv_decay ?? 0.014;
+const yv_freq_decay = castlePeripheral.yv_freq_decay ?? 0.008;
+const supra_exponent = castlePeripheral.supra_exponent ?? 0.5;
 
 // Band spatial frequencies (cpd)
 const bands = [
@@ -56,6 +71,7 @@ const samplePoints = [
   { label: 'Corner', dist_px: cornerDist },
 ];
 
+if (!hasFlag('json')) {
 console.log('=== Chromatic Attenuation Predictions ===\n');
 console.log(`Viewport: ${vpW} × ${vpH}`);
 console.log(`Fovea radius: ${foveaRadius} px`);
@@ -124,3 +140,92 @@ console.log();
 console.log('  Note: Bowers measures SENSITIVITY (detection threshold), not appearance.');
 console.log('  Their values should align with our threshold column, not appearance.');
 console.log('  The appearance column is our suprathreshold correction for saturated web colors.');
+} // end if (!hasFlag('json'))
+
+// ── JSON output for validation pipeline ──
+if (hasFlag('json')) {
+  const ppd = foveaRadius / fovea_deg; // pixels per degree
+
+  const colors = [
+    { name: 'red',    primary: 'rg', oklab: { a: 0.152, b: 0.067 } },
+    { name: 'green',  primary: 'rg', oklab: { a: -0.144, b: 0.108 } },
+    { name: 'blue',   primary: 'by', oklab: { a: -0.004, b: -0.173 } },
+    { name: 'yellow', primary: 'by', oklab: { a: -0.026, b: 0.143 } },
+  ];
+
+  const sizes = [16, 20, 24, 32, 48];
+
+  // Default: predictions for standard band frequencies
+  let rings = null;
+  let predictions = [];
+
+  if (hasFlag('color-search')) {
+    // Color-search ring eccentricities (from color-search.html)
+    const ringDistances = [100, 200, 300, 420, 560];
+    rings = ringDistances.map((dist, i) => {
+      const normEcc = dist / foveaRadius;
+      const ecc_deg = normEcc * fovea_deg;
+      return { ring: i + 1, dist_px: dist, norm_ecc: normEcc, ecc_deg };
+    });
+
+    for (const color of colors) {
+      for (const size of sizes) {
+        const freq_cpd = ppd / (2 * size);
+        for (const ring of rings) {
+          const rg = atten(rg_decay, rg_freq_decay, freq_cpd, ring.ecc_deg, supra_exponent);
+          const yv = atten(yv_decay, yv_freq_decay, freq_cpd, ring.ecc_deg, supra_exponent);
+
+          // Composite chroma retention: attenuate a and b independently, compute ratio of resulting chroma
+          const a_atten = color.oklab.a * rg.appearance;
+          const b_atten = color.oklab.b * yv.appearance;
+          const chroma_orig = Math.sqrt(color.oklab.a ** 2 + color.oklab.b ** 2);
+          const chroma_atten = Math.sqrt(a_atten ** 2 + b_atten ** 2);
+          const composite_retention = chroma_orig > 0 ? chroma_atten / chroma_orig : 0;
+
+          predictions.push({
+            color: color.name,
+            primary_channel: color.primary,
+            size_px: size,
+            freq_cpd: Math.round(freq_cpd * 1000) / 1000,
+            ring: ring.ring,
+            dist_px: ring.dist_px,
+            ecc_deg: Math.round(ring.ecc_deg * 100) / 100,
+            rg_retention: Math.round(rg.appearance * 10000) / 10000,
+            yv_retention: Math.round(yv.appearance * 10000) / 10000,
+            composite_retention: Math.round(composite_retention * 10000) / 10000,
+          });
+        }
+      }
+    }
+  } else {
+    // Generic: one entry per band per sample point
+    for (const pt of samplePoints) {
+      const normEcc = pt.dist_px / foveaRadius;
+      const ecc_deg = normEcc * fovea_deg;
+      for (const band of bands) {
+        const rg = atten(rg_decay, rg_freq_decay, band.freq, ecc_deg, supra_exponent);
+        const yv = atten(yv_decay, yv_freq_decay, band.freq, ecc_deg, supra_exponent);
+        predictions.push({
+          location: pt.label,
+          dist_px: Math.round(pt.dist_px),
+          ecc_deg: Math.round(ecc_deg * 10) / 10,
+          band: band.name,
+          freq_cpd: band.freq,
+          rg_threshold: Math.round(rg.threshold * 10000) / 10000,
+          rg_appearance: Math.round(rg.appearance * 10000) / 10000,
+          yv_threshold: Math.round(yv.threshold * 10000) / 10000,
+          yv_appearance: Math.round(yv.appearance * 10000) / 10000,
+        });
+      }
+    }
+  }
+
+  const output = {
+    parameters: { rg_decay, rg_freq_decay, yv_decay, yv_freq_decay, supra_exponent },
+    geometry: { fovea_radius_px: foveaRadius, fovea_deg, ppd, viewport: `${vpW}x${vpH}` },
+    ...(rings && { rings }),
+    predictions,
+  };
+
+  console.log(JSON.stringify(output, null, 2));
+}
