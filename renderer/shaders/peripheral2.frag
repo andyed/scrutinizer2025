@@ -337,8 +337,10 @@ PolarSector computePolarSector(vec2 uv, float parafovea_radius) {
     // Spoke count derived from ring geometry: arc length ≈ ring width.
     // This makes sectors approximately square before bias elongation.
     // With bias=2.0, radial extent is 2× tangential → 2:1 aspect ratio.
-    float ringWidth = s.ring_outer - s.ring_inner;
-    s.spokeCount = max(6.0, floor(6.28318530718 * s.ring_center / ringWidth));
+    // Use unbiased ring width for spoke count so radial bias creates 2:1 R:T sectors
+    // (biased ringWidth = ring_outer - ring_inner is wider; dividing by it neutralized the elongation)
+    float unbiasedWidth = s.ring_center * (ef - 1.0);
+    s.spokeCount = max(6.0, floor(6.28318530718 * s.ring_center / unbiasedWidth));
     s.spokeCount = floor(s.spokeCount / 2.0) * 2.0; // keep even
     s.spokeWidth = 6.28318530718 / s.spokeCount;
 
