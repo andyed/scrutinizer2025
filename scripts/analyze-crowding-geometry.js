@@ -269,6 +269,8 @@ console.log(`         Bouma predicts linear growth; V1 distortion is flat. MIP p
 
 // JSON output
 if (jsonOutput) {
+    const allRadialGtTangential = sectorResults.every(r => r.rt_ratio_current > 1.0);
+    const rtInRange = meanRT_current >= 1.5 && meanRT_current <= 2.5;
     const results = {
         parameters: { FOVEA_RADIUS, PPD, CMF_A, ECC_SCALING, CROWDING_RADIAL_BIAS, POLAR_EF },
         mip_pooling: mipResults,
@@ -277,7 +279,7 @@ if (jsonOutput) {
             tier1_mip_proportional: mipProportional,
             tier1_radial_gt_tangential: allRadialGtTangential,
             tier2_rt_ratio_in_range: rtInRange,
-            mean_rt_ratio: meanRT,
+            mean_rt_ratio: meanRT_current,
             mip_bouma_ratio_mean: meanRatio,
             mip_bouma_ratio_spread: ratioSpread
         }

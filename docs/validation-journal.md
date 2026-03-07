@@ -211,12 +211,63 @@ Scrutinizer doesn't have one "peripheral vision" effect — it has chromatic poo
 
 ---
 
+## Fix Round: 2026-03-07
+
+Applied four fixes identified by the validation suite. Two script-level (immediately verifiable), two shader-level (pending visual review).
+
+### Fix 1: Composite Rovamo Correlation (Wave 2 Tier 3)
+
+**Problem**: Per-band Spearman correlation was meaningless — each DoG band is a step function (100% → 0% at a single cutoff), while Rovamo's published CSF shows smooth continuous decay. Correlating a step against a curve yields noise.
+
+**Fix**: Replaced 4 per-band correlations with 1 composite metric. At each eccentricity: `composite = Σ(retention × freq) / Σ(freq)`, then a single Spearman r against Rovamo's frequency-weighted average. Per-band results demoted to `[INFO]` lines (not scored).
+
+**Result**: Composite r = 0.600, FAIL at r > 0.9 threshold. Both curves decline with eccentricity — the rank ordering is correct — but with E2=0.15, bands 0–1 are already at 0% at ring 1 (2.22°). The composite drops from ~9% to 0% by ring 3, while Rovamo's integrated sensitivity is still ~40% at 6°. The gap is real: Scrutinizer's M-scaling cuts more aggressively than human CSF. Whether this matters depends on the rendering goal — conservative filtering (cut more than biology does) is defensible for a UX tool, but it means the model won't track human data quantitatively.
+
+The methodology is now correct. The failure is informative rather than artifactual.
+
+### Fix 2: Polar Sector R:T Ratio (Wave 3)
+
+**Problem**: `peripheral2.frag` computed spoke count by dividing circumference by the *biased* ring width. Since the bias makes rings radially wider, dividing by the wider value produces fewer, wider spokes — tangential extent grows to match radial, giving ~1:1 sectors instead of the intended 2:1.
+
+**Fix**: Compute spoke count from *unbiased* ring width: `unbiasedWidth = ring_center * (ef - 1.0)`. The biased ring width still determines radial extent. More spokes means narrower tangential extent → 2:1 R:T restored.
+
+**Scope**: Only affects V4 styles 7 (Pooling Grid) and 8 (Minecraft Eyeball). V1 Lateral Smash uses `u_crowding_radial_bias` directly for radial noise scaling — unaffected by this fix.
+
+**Status**: Shader change applied. Geometry script confirms R:T shifts from ~1.00:1 to ~2.00:1. **Pending visual review** on real content.
+
+### Fix 3: V1 Displacement Plateau (Wave 3)
+
+**Problem**: `eccentricityScale` was `mix(parafoveaRamp, 1.0, boundaryProgress)` — it clamped at 1.0 beyond the parafovea. V1 warp displacement stopped growing at ~69px regardless of eccentricity. At 6° this gives 0.51× Bouma (reasonable). At 15° it gives 0.20× Bouma (under-crowding: the far periphery isn't distorted enough).
+
+**Fix**: Replace the 1.0 ceiling with `farScale = 1.0 + max(0.0, (dist - parafovea_radius) / parafovea_radius) * 0.5`. This continues growth at half-rate beyond the parafovea boundary. At 15°, farScale ≈ 1.74, improving the Bouma ratio from ~0.20× to ~0.35×.
+
+**Risk**: This changes visible rendering in the far periphery for all modes. More distortion at large eccentricities may or may not be desirable for readability. **Needs visual review before shipping.**
+
+**Status**: Shader change applied. Pending visual confirmation.
+
+### Fix 4: JSON Output Bug (Wave 3)
+
+**Problem**: `analyze-crowding-geometry.js` referenced three undefined variables (`allRadialGtTangential`, `rtInRange`, `meanRT`) in the `--json` code path. The script crashed when run with `--json`.
+
+**Fix**: Computed the missing values from existing `sectorResults` and `meanRT_current` before the JSON block. Trivial — the data was already available, just not wired up.
+
+**Status**: Fixed and verified. `--json` output is clean.
+
+### What These Fixes Reveal
+
+Fix 1 confirms what the tier structure predicted: comparing a 5-band discrete approximation against continuous psychophysical data exposes the architectural gap, not a coding error. The composite approach is methodologically sound but the model is too aggressive for high correlation. This is a design choice to revisit if Scrutinizer moves toward perceptual fidelity rather than conservative filtering.
+
+Fix 2 is a straightforward bug — the comment said 2:1, the code produced 1:1. The math was internally consistent but wrong relative to intent. This is why the geometry analysis script exists: it replays the shader math in JS and checks invariants the shader can't self-report.
+
+Fix 3 is the most consequential change. The plateau was a smoothstep clamp that made sense at the parafoveal boundary but didn't account for the full eccentricity range. Whether the half-rate continuation is correct depends on visual inspection of real web content — too much displacement destroys readability, too little fails to simulate crowding.
+
+---
+
 ## What's Next
 
-### Immediate Fixes
-- **Wave 2 Tier 3**: Implement composite (summed-band) comparison against Rovamo instead of per-band correlation
-- **Wave 3 polar sector R:T**: One-line fix in `peripheral2.frag:340` — compute spoke count from unbiased ring width
-- **Wave 3 V1 plateau**: Evaluate whether continued eccentricity scaling beyond parafovea improves real-content rendering
+### Pending Visual Review
+- **Fix 2** (polar R:T): Load a text page, enable Pooling Grid (style 7), verify sectors are visibly elongated radially
+- **Fix 3** (V1 plateau): Load text-heavy content, check far-peripheral distortion at 10–15° — should be noticeably stronger than before without becoming illegible in the parafovea
 
 ### Pending Capture-Based Validation (Wave 3)
 - Screenshot captures of crowding stimulus pages through Scrutinizer

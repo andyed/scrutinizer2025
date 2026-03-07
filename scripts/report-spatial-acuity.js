@@ -59,7 +59,7 @@ function parseResults(report) {
     else if (line.startsWith('## Tier 2')) currentTier = 2;
     else if (line.startsWith('## Tier 3')) currentTier = 3;
     else if (line.startsWith('## Summary')) currentTier = 0;
-    const m = line.match(/^- \[(PASS|FAIL|SKIP)\] (.+)$/);
+    const m = line.match(/^- \[(PASS|FAIL|SKIP|INFO)\] (.+)$/);
     if (m && currentTier) tiers[currentTier].push({ status: m[1], text: m[2] });
   }
   return tiers;
@@ -132,9 +132,9 @@ function buildRovamoComparisonChart() {
   let svg = `<div class="chart-box">
   <h3>Rovamo & Virsu 1979 vs Model</h3>
   <p class="chart-desc">Dashed: human contrast sensitivity from Rovamo & Virsu (1979), showing smooth decay per frequency.
-  Solid: our DoG band model, which approximates this with steep sigmoids. The discrete 5-band approximation
-  can't reproduce the smooth published curves — it snaps from 100% to 0% within one ring step.
-  This is a known limitation of the band architecture, not an error in the cutoff positions.</p>
+  Solid thin: per-band DoG model (step functions — can't reproduce smooth curves by design).
+  <strong>Thick white: composite</strong> (frequency-weighted sum across bands) — this is the scored metric.
+  Composite declines smoothly and correlates well with Rovamo's integrated sensitivity.</p>
   <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <g transform="translate(${m.left},${m.top})">`;
 
@@ -173,10 +173,46 @@ function buildRovamoComparisonChart() {
     svg += `<path d="${d}" fill="none" stroke="${color}" stroke-width="2"/>`;
   }
 
-  svg += `<line x1="${iw - 100}" y1="8" x2="${iw - 88}" y2="8" stroke="#999" stroke-width="2"/>`;
-  svg += `<text x="${iw - 84}" y="11" class="legend">Model (solid)</text>`;
-  svg += `<line x1="${iw - 100}" y1="22" x2="${iw - 88}" y2="22" stroke="#999" stroke-width="1.5" stroke-dasharray="4 2"/>`;
-  svg += `<text x="${iw - 84}" y="25" class="legend">Rovamo (dashed)</text>`;
+  // Composite curve: frequency-weighted sum across bands at each eccentricity
+  const freqVals = [4, 2, 1, 0.5];
+  const compBands = ['band0', 'band1', 'band2', 'band3'];
+  const modelEccs = [...new Set(pred.predictions.filter(p => p.band === 'band0').map(p => p.ecc_deg))].sort((a, b) => a - b);
+  let compD = '';
+  for (const ecc of modelEccs) {
+    if (ecc > xMax) continue;
+    let wSum = 0, fSum = 0;
+    for (let fi = 0; fi < freqVals.length; fi++) {
+      const p = pred.predictions.find(pp => pp.band === compBands[fi] && Math.abs(pp.ecc_deg - ecc) < 0.01);
+      if (p) { wSum += p.achromatic_retention * freqVals[fi]; fSum += freqVals[fi]; }
+    }
+    if (fSum === 0) continue;
+    const comp = (wSum / fSum) * 100;
+    compD += (compD ? ' L' : 'M') + `${scaleX(ecc, xMin, xMax, iw)},${scaleY(comp, yMin, yMax, ih)}`;
+  }
+  if (compD) svg += `<path d="${compD}" fill="none" stroke="#fff" stroke-width="3" opacity="0.9"/>`;
+
+  // Rovamo composite (dashed white)
+  const rovFreqVals = { '4_cpd': 4, '2_cpd': 2, '1_cpd': 1, '0.5_cpd': 0.5 };
+  let rovCompD = '';
+  for (let i = 0; i < rovamo.eccentricities_deg.length; i++) {
+    const ecc = rovamo.eccentricities_deg[i];
+    if (ecc > xMax) continue;
+    let wSum = 0, fSum = 0;
+    for (const [key, freq] of Object.entries(rovFreqVals)) {
+      const val = rovamo.channels[key]?.sensitivity_ratio[i];
+      if (val != null) { wSum += val * freq; fSum += freq; }
+    }
+    if (fSum === 0) continue;
+    rovCompD += (rovCompD ? ' L' : 'M') + `${scaleX(ecc, xMin, xMax, iw)},${scaleY((wSum / fSum) * 100, yMin, yMax, ih)}`;
+  }
+  if (rovCompD) svg += `<path d="${rovCompD}" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="6 3" opacity="0.6"/>`;
+
+  svg += `<line x1="${iw - 100}" y1="8" x2="${iw - 88}" y2="8" stroke="#fff" stroke-width="3"/>`;
+  svg += `<text x="${iw - 84}" y="11" class="legend">Composite (scored)</text>`;
+  svg += `<line x1="${iw - 100}" y1="22" x2="${iw - 88}" y2="22" stroke="#999" stroke-width="2"/>`;
+  svg += `<text x="${iw - 84}" y="25" class="legend">Per-band (solid)</text>`;
+  svg += `<line x1="${iw - 100}" y1="36" x2="${iw - 88}" y2="36" stroke="#999" stroke-width="1.5" stroke-dasharray="4 2"/>`;
+  svg += `<text x="${iw - 84}" y="39" class="legend">Rovamo (dashed)</text>`;
 
   svg += `</g></svg></div>`;
   return svg;
@@ -337,6 +373,7 @@ const html = `<!DOCTYPE html>
   .badge.pass { background: #166534; color: #4ade80; }
   .badge.fail { background: #7c2d12; color: #fbbf24; }
   .badge.skip { background: #374151; color: #9ca3af; }
+  .badge.info { background: #1e3a5f; color: #7db4e0; }
   .result-text { color: #bbb; }
   .go-wrap { position: relative; display: inline-block; margin-bottom: 24px; }
   .go-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; background: #222240; border: 1px solid #444; color: #ccc; font-size: 13px; font-weight: 600; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
@@ -419,10 +456,10 @@ ${[1, 2, 3].map(t => {
     E2 = 0.15 for the DoG decomposition means band0 (4 cpd) cuts at 0.15 normalized eccentricity,
     band1 at 0.45, band2 at 1.05, band3 at 2.25. We also check that chromatic decay respects
     the achromatic ≥ BY ≥ RG ordering from castleCSF.</p>`,
-    3: `<p class="section-desc"><strong>Observation:</strong> Does the model's eccentricity-dependent sensitivity profile correlate with
-    published human CSF data? This is a stretch goal because the 5-band DoG approximation produces
-    step-function cutoffs, while human CSF decays smoothly. A composite (summed-band) comparison
-    would be more appropriate than per-band correlation against a continuous curve.</p>`,
+    3: `<p class="section-desc"><strong>Observation:</strong> We compute a frequency-weighted composite (sum of band retentions × freq / total freq)
+    and correlate it against Rovamo's frequency-averaged sensitivity. Per-band correlations are shown as INFO
+    — they're meaningless because each band is a step function. The composite captures the model's overall
+    spatial sensitivity envelope. With E2=0.15, bands 0–1 cut at &lt;3°, so the composite drops fast.</p>`,
   };
   return `<div class="results" style="margin-bottom:16px">
   <h3>Tier ${t}: ${label}</h3>

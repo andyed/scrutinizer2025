@@ -34,10 +34,11 @@ Geometry: fovea_radius=90px, ppd=45
 
 ## Tier 3: Stretch
 
-- [FAIL] band3 (0.5cpd) correlates with Rovamo & Virsu: r=0.600 (threshold: r>0.9)
-- [FAIL] band2 (1cpd) correlates with Rovamo & Virsu: r=0.000 (threshold: r>0.9)
-- [FAIL] band1 (2cpd) correlates with Rovamo & Virsu: r=-1.000 (threshold: r>0.9)
-- [FAIL] band0 (4cpd) correlates with Rovamo & Virsu: r=-1.000 (threshold: r>0.9)
+- [FAIL] Composite spatial sensitivity correlates with Rovamo & Virsu: r=0.600 (threshold: r>0.9)
+- [INFO] band3 (0.5cpd) per-band r=0.600 (not scored — step function vs smooth curve)
+- [INFO] band2 (1cpd) per-band r=0.000 (not scored — step function vs smooth curve)
+- [INFO] band1 (2cpd) per-band r=-1.000 (not scored — step function vs smooth curve)
+- [INFO] band0 (4cpd) per-band r=-1.000 (not scored — step function vs smooth curve)
 
 ## Summary
 
@@ -45,4 +46,4 @@ Geometry: fovea_radius=90px, ppd=45
 |------|--------|-------|--------|
 | Tier 1 (must) | 12 | 16 | FAILURES |
 | Tier 2 (should) | 5 | 5 | ALL PASS |
-| Tier 3 (stretch) | 0 | 4 | 0 pass |
+| Tier 3 (stretch) | 0 | 1 | 0 pass |
