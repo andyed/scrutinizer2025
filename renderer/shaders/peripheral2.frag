@@ -590,7 +590,9 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     // not a blurry mess. Rayner (1998): word-length cues must survive here.
     float parafoveaRamp = smoothstep(fovea_radius * 1.5, parafovea_radius, dist);
     float eccentricityScale = mix(0.0, 0.15, parafoveaRamp);
-    eccentricityScale = mix(eccentricityScale, 1.0, boundaryProgress);
+    // Continue growth beyond parafovea at reduced rate to avoid plateau
+    float farScale = 1.0 + max(0.0, (dist - parafovea_radius) / parafovea_radius) * 0.5;
+    eccentricityScale = mix(eccentricityScale, farScale, boundaryProgress);
     
     if (config.v4_style_id == 4 || config.v4_style_id == 8) {
         eccentricityScale = 1.0;
