@@ -330,8 +330,6 @@ The growth factor tuning loop (4 iterations, ~8 minutes total) demonstrated the 
 
 **Measurement limits discovered**: At 10° in the 28px column, cyan pixel count drops low enough (~500px) that spread ratio noise dominates. Larger font sizes or higher-contrast targets would extend the measurable range. The 48px column has plenty of signal but less crowding sensitivity (letters are large relative to critical spacing).
 
-### What's Next
-
 ### Bouma Spacing Analysis: Architectural Limit Found (2026-03-07)
 
 Captured `crowding-spacing.html` (7 spacing ratios 0.2×–0.8× at 6°, plus isolated baseline) through Scrutinizer. Measured cyan target survival (filtered/baseline pixel count) and spatial spread at each spacing level.
@@ -352,12 +350,28 @@ A density-dependent Bouma curve would require pooling-region-based crowding (Ros
 
 **Classification**: Tier 3 (architectural limit). The V1 Lateral Smash is a fast approximation of crowding, not a full TTM implementation. It correctly predicts that crowding increases with eccentricity (Wave 3 eccentricity analysis confirms this), but can't reproduce spacing-dependent transitions.
 
-**Immediate:**
-- **Fix 2 visual review**: Pooling Grid (style 7) sectors should be visibly elongated radially — verify on text-heavy content
+### Session Summary: 2026-03-07
 
-**Future Waves:**
+One session, five kinds of knowledge:
+
+| Test | Result | Classification |
+|---|---|---|
+| Wave 2 Tier 3: Composite Rovamo | r=0.600 (informative fail) | Methodology fix; model cuts harder than human CSF |
+| Wave 3: Crowding eccentricity | 7/7 PASS after tuning | Bug fix (V1 plateau) + empirical calibration |
+| Wave 3: Polar R:T spoke count | Fixed | Bug (biased width neutralized radial elongation) |
+| Wave 3: Bouma spacing curve | Flat — no transition | Architectural limit (no density-dependent crowding) |
+| Wave 3: JSON output | Fixed | Trivial bug (undefined vars) |
+
+The validation suite now has two scripts (`validate-spatial-acuity.js` for Waves 1–2, `analyze-crowding.js` for Wave 3) and a capture pipeline (`capture-crowding.js`). The capture→analyze loop takes ~2 minutes per iteration — fast enough for empirical tuning.
+
+**What the Bouma result means for the architecture**: V1 Lateral Smash is a good approximation for *eccentricity-dependent* crowding effects on real web content (where letter density varies naturally). It fails the *spacing-dependent* Bouma test because it doesn't model pooling regions. A full TTM implementation would fix this but is a different class of computation — summary statistics within eccentricity-scaled pooling regions, not pixel displacement. This is the clearest boundary the validation has found between "fast approximation" and "perceptual model."
+
+### What's Next
+
+- **Fix 2 visual review**: Pooling Grid (style 7) sectors should be visibly elongated radially — verify on text-heavy content
 - **Wave 4**: Saliency map validation — do Scrutinizer's rendered saliency peaks match known psychophysical saliency (Itti & Koch benchmarks)?
 - **Wave 5**: Temporal integration — does the foveation update correctly during simulated saccades?
+- **Longer term**: Density-dependent crowding via pooling regions (TTM-inspired) — if the visual quality benefit justifies the computational cost
 
 ---
 
