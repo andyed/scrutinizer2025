@@ -56,8 +56,9 @@ Research identifies these as the key preserved features:
 |------|-----------------|----------|--------|
 | **Tier 0** (Legacy) | ~0.5ms | Shatter jitter | ⚠️ Deprecated |
 | **Tier 1** | ~0.3ms | Eccentricity-based MIP sampling | ✅ **Implemented (v1.4)** |
-| **Tier 2** | ~2.0ms | Contrast-preserving pooling | 📋 Planned |
-| **Tier 3** | ~3-4ms | Statistical texture replacement (WebGPU) | 📋 Future |
+| **Tier 2** | ~2.0ms | Contrast-preserving pooling (WebGL2) | 📋 Planned |
+| **Tier 2.5** | ~2-3ms | Walton-style smooth moment synthesis (WebGPU compute) | 📋 Future |
+| **Tier 3** | ~3-4ms | Full statistical texture replacement (WebGPU compute) | 📋 Future |
 
 ---
 
@@ -234,6 +235,28 @@ vec3 mongrelColor = meanColor + (noise * contrast * 0.5);
 
 ---
 
+### Tier 2.5: Smooth Moment Metamer Synthesis (WebGPU Compute)
+
+**Goal**: Real-time ventral metamers via Walton et al. (2021) approach — synthesize textures that match smooth moments of steerable filter responses within eccentricity-scaled pooling regions.
+
+**Mechanism**:
+1. **Steerable filter decomposition**: Decompose the captured frame into oriented subbands (4 orientations × 4 scales) via steerable pyramid
+2. **Smooth moment computation**: Within each pooling region (sized by eccentricity), compute smooth weighted moments of filter response magnitudes
+3. **Metamer synthesis**: Reconstruct a texture that matches the computed moments — different from the original but perceptually equivalent in peripheral vision
+
+**Why WebGPU?**: Fragment shaders cannot accumulate statistics over pooling regions. Compute shaders (WGSL `@compute`) provide:
+- Workgroup shared memory for efficient parallel reduction within pooling tiles
+- Read-write storage buffers for the steerable pyramid decomposition
+- Dispatch flexibility to handle variable-sized pooling regions
+
+**Prior art**: Walton et al. (2021) implemented this in CUDA/DirectX for VR foveated rendering. Porting to WGSL is the primary engineering task. Vacher & Briand (2021) provide a CPU reference implementation of full Portilla-Simoncelli synthesis for offline ground truth comparison.
+
+**Performance estimate**: ~2-3ms on modern GPU (M1+, discrete). The smooth moment approach is substantially cheaper than full Portilla-Simoncelli because it matches moments rather than iteratively optimizing all joint statistics.
+
+**Validation**: Compare output against Vacher & Briand C++ reference for perceptual equivalence. Measure SSIM within pooling regions between Tier 2.5 output and full P-S synthesis.
+
+---
+
 ### Tier 3: Statistical Texture Replacement (WebGPU Path)
 
 **Goal**: True Rosenholtz-style synthesis—replace pooling regions with procedural textures that match summary statistics.
@@ -386,3 +409,6 @@ Add to `blueprint_mods.md`:
 1. **Rosenholtz, R., Huang, J., & Ehinger, K. A.** (2012). *Rethinking the role of top-down attention in vision: Effects attributable to a lossy representation in peripheral vision*. Frontiers in Psychology.
 2. **Freeman, J., & Simoncelli, E. P.** (2011). *Metamers of the ventral stream*. Nature Neuroscience.
 3. **Balas, B., Nakano, L., & Rosenholtz, R.** (2009). *A summary-statistic representation in peripheral vision explains visual crowding*. Journal of Vision.
+4. **Walton, D. R., Dos Anjos, R. K., Friston, S., Swapp, D., Akşit, K., Steed, A., & Ritschel, T.** (2021). *Beyond Blur: Real-time Ventral Metamers for Foveated Rendering*. SIGGRAPH. Real-time smooth-moment synthesis on GPU compute. Tier 2.5 prior art.
+5. **Portilla, J. & Simoncelli, E. P.** (2000). *A Parametric Texture Model Based on Joint Statistics of Complex Wavelet Coefficients*. IJCV. Full texture model; CPU-bound iterative synthesis (~seconds/frame). Offline ground truth, not a real-time path.
+6. **Vacher, J. & Briand, T.** (2021). *Portilla-Simoncelli Texture Synthesis*. IPOL. C++ reference implementation (BSD-3). See `tbriand/portilla-simoncelli-ipol`.

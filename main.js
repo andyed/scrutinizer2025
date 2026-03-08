@@ -1447,7 +1447,20 @@ function runIntegrationTest() {
         console.log(`[Test] Navigating to ${testUrl}...`);
         mainWindow.scrutinizerView.webContents.loadURL(testUrl);
 
-        mainWindow.scrutinizerView.webContents.once('did-finish-load', async () => {
+        // Race did-finish-load against a timeout for heavy external pages
+        const loadTimeoutMs = parseInt(process.env.TEST_LOAD_TIMEOUT || '15000', 10);
+        let loadResolved = false;
+        mainWindow.scrutinizerView.webContents.once('did-finish-load', () => onPageReady());
+        setTimeout(() => {
+            if (!loadResolved) {
+                console.log(`[Test] Load timeout (${loadTimeoutMs}ms) — proceeding with current page state`);
+                onPageReady();
+            }
+        }, loadTimeoutMs);
+
+        const onPageReady = async () => {
+            if (loadResolved) return;
+            loadResolved = true;
             console.log('[Test] Page loaded. Waiting for effects to stabilize...');
 
             // Scroll to specified Y offset if TEST_SCROLL_Y is set
@@ -1623,7 +1636,7 @@ function runIntegrationTest() {
 
                 }, 1000);
             }, 5000);
-        });
+        };
     }
 }
 

@@ -47,22 +47,25 @@ The current DoG band decomposition is isotropic — all edge orientations attenu
 **Discipline**: Vision Science, Computer Graphics
 **Effort**: Very High | **Novelty**: High
 **ROADMAP section**: Priority 2 — Mongrel Texture Synthesis
+**Spec exists**: `docs/specs/mongrel_textures.md` (Tier 1-3 roadmap)
 
 Replace blur-based peripheral rendering with texture synthesis that preserves summary statistics (mean color, orientation distribution, spatial frequency content) while destroying feature identity. This is the "gold standard" for simulating crowding (Rosenholtz et al., 2012) but has never been done in real-time for arbitrary web content.
 
 **Research question**: Can a Portilla-Simoncelli-inspired summary statistic renderer run at 60fps on consumer GPUs for web content?
 
-**Phased approach**:
-1. Simple feature scrambling within blocks (shader-only, ~2 weeks)
-2. Summary statistics matching per pooling region (~1 semester)
-3. Neural texture synthesis via gram matrix matching (~thesis-scale)
+**Phased approach** (aligned with `mongrel_textures.md` tiers):
+1. Simple feature scrambling within blocks (shader-only, ~2 weeks) — extends Tier 1.8 "Melter"
+2. Contrast-preserving statistical MIP in WebGL2 fragment shader (~1 month) — Tier 2
+3. Walton-style smooth moment synthesis via WebGPU compute (~1 semester) — Tier 2.5; primary reference: Walton et al. (2021)
+4. Full pooling-region statistical replacement per TTM via WebGPU compute (~thesis-scale) — Tier 3
+5. (Stretch) Neural texture synthesis via gram matrix matching — beyond current spec
 
 **Deliverables**:
 - Real-time mongrel renderer (Phase 1 minimum)
 - Perceptual comparison: blur vs. mongrel vs. human crowding data
 - Publication target: SIGGRAPH, JOV, or ETRA
 
-**Key references**: Rosenholtz et al. (2012), Portilla & Simoncelli (2000), Fridman et al. (2017) FGN, Shumikhin (2020) pix2pixHD
+**Key references**: Rosenholtz et al. (2012), Portilla & Simoncelli (2000), **Walton et al. (2021) real-time ventral metamers (SIGGRAPH)**, Vacher & Briand (2021) Portilla-Simoncelli C++ reference implementation (IPOL, BSD-3), Fridman et al. (2017) FGN, Shumikhin (2020) pix2pixHD
 
 ---
 
