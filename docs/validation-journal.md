@@ -10,8 +10,8 @@ This document records what we tested, what we found, what broke, and what we lea
 
 | Wave | Mechanism | Result | Links |
 |------|-----------|--------|-------|
-| [1](#wave-1-chromatic-decay) | Chromatic Decay | T1: 7/7 · T2: 3/3 · T3: 1/2 | [spec](../docs/specs/wave1_feature_search_validation.md) · [report](../tests/validation/reports/color-search-report.md) |
-| [2](#wave-2-spatial-frequency-attenuation) | Spatial Frequency | T1: 12/16 · T2: 5/5 · T3: 0/4 | [spec](../docs/specs/wave2_spatial_acuity_validation.md) · [report](../tests/validation/reports/spatial-acuity-report.md) |
+| [1](#wave-1-chromatic-decay) | Chromatic Decay | T1: 7/7 · T2: 3/3 · T3: 1/2 | [spec](../docs/specs/wave1_feature_search_validation.md) · [report](https://andyed.github.io/scrutinizer-www/validation-reports/color-search-report.html) |
+| [2](#wave-2-spatial-frequency-attenuation) | Spatial Frequency | T1: 12/16 · T2: 5/5 · T3: 0/4 | [spec](../docs/specs/wave2_spatial_acuity_validation.md) · [report](https://andyed.github.io/scrutinizer-www/validation-reports/spatial-acuity-report.html) |
 | [3](#wave-3-crowding-geometry) | Crowding Geometry | 7/7 after tuning | [spec](../docs/specs/wave3_crowding_validation.md) |
 | [4](#wave-4-saliency-validation) | Saliency | *pending* | [stimulus](https://andyed.github.io/scrutinizer-www/reference-pages/saliency-popout.html) |
 
@@ -41,7 +41,7 @@ We render known stimuli (gratings, colored dots, flanked letters) as HTML pages,
 
 **Spec**: [wave1_feature_search_validation.md](../docs/specs/wave1_feature_search_validation.md)
 **Stimulus**: [color-search.html](../tests/reference-pages/color-search.html) — colored dot arrays (red, green, blue, yellow targets among gray distractors) at 5 eccentricity rings
-**Report**: [color-search-report.html](../tests/validation/reports/color-search-report.html) · [.md](../tests/validation/reports/color-search-report.md)
+**Report**: [color-search-report.html](https://andyed.github.io/scrutinizer-www/validation-reports/color-search-report.html) · [.md](../tests/validation/reports/color-search-report.md)
 **Scripts**: [capture-color-search.js](../scripts/capture-color-search.js) · [analyze-color-search.js](../scripts/analyze-color-search.js) · [validate-color-search.js](../scripts/validate-color-search.js)
 
 ### What We Tested
@@ -75,7 +75,7 @@ The Oklab color space decomposition into RG (a-axis) and BY (b-axis) channels co
 
 **Spec**: [wave2_spatial_acuity_validation.md](../docs/specs/wave2_spatial_acuity_validation.md)
 **Stimulus**: [spatial-acuity.html](../tests/reference-pages/spatial-acuity.html) — sine-wave gratings at 0.25–4 cpd in concentric annuli
-**Report**: [spatial-acuity-report.html](../tests/validation/reports/spatial-acuity-report.html) · [.md](../tests/validation/reports/spatial-acuity-report.md)
+**Report**: [spatial-acuity-report.html](https://andyed.github.io/scrutinizer-www/validation-reports/spatial-acuity-report.html) · [.md](../tests/validation/reports/spatial-acuity-report.md)
 **Scripts**: [capture-spatial-acuity.js](../scripts/capture-spatial-acuity.js) · [analyze-spatial-acuity.js](../scripts/analyze-spatial-acuity.js) · [validate-spatial-acuity.js](../scripts/validate-spatial-acuity.js)
 
 ### What We Tested
