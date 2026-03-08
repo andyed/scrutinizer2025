@@ -320,7 +320,23 @@ Iterated the `farScale` growth factor in `peripheral2.frag:594` using capture→
 
 The 0.5 factor was counterproductive: it pushed 3° above 1.1 (near-foveal regression) while barely helping 10°. The smoothstep transition between parafoveal and far-peripheral regions blends `eccentricityScale` into `farScale` — a small `farScale` gets dominated by the blend, producing no net effect at 10° but leaking into the parafovea at 3°.
 
-### Future Waves
+### What Wave 3 Established
+
+The capture→analyze pipeline is the first closed-loop validation in Scrutinizer: change the shader, capture a screenshot, measure the effect, compare to psychophysics. Before this, shader changes were evaluated by eyeballing web pages. Now there's a number.
+
+The spread ratio metric (stddev of 2D cyan positions, crowded/isolated) turned out to be more informative than raw pixel count. Count ratio is ambiguous — V1 displacement fragments a letter into scattered cyan pixels, which can *increase* the count even as legibility drops. Spread directly measures the dispersion that crowding causes.
+
+The growth factor tuning loop (4 iterations, ~8 minutes total) demonstrated the pipeline's utility: the initial 0.5 factor was counterproductive (regression at 3°, no effect at 10°), and we'd never have caught that by visual inspection alone. The 1.5 factor was found empirically, not derived — a principled Bouma-proportional model would be better, but the measurement infrastructure needed to exist first.
+
+**Measurement limits discovered**: At 10° in the 28px column, cyan pixel count drops low enough (~500px) that spread ratio noise dominates. Larger font sizes or higher-contrast targets would extend the measurable range. The 48px column has plenty of signal but less crowding sensitivity (letters are large relative to critical spacing).
+
+### What's Next
+
+**Immediate:**
+- **Fix 2 visual review**: Pooling Grid (style 7) sectors should be visibly elongated radially — verify on text-heavy content
+- **Bouma spacing curve**: `crowding-spacing.html` varies flanker spacing from 0.2× to 0.8× at 6°. Measuring the transition from crowded→uncrowded yields a critical spacing estimate — the most direct comparison to Bouma (1970). The capture pipeline is ready; needs an analysis mode for the spacing page.
+
+**Future Waves:**
 - **Wave 4**: Saliency map validation — do Scrutinizer's rendered saliency peaks match known psychophysical saliency (Itti & Koch benchmarks)?
 - **Wave 5**: Temporal integration — does the foveation update correctly during simulated saccades?
 
