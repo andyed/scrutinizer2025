@@ -394,8 +394,211 @@ function analyze() {
   console.log(`[${sprGrows ? 'PASS' : 'INFO'}] Spread ratio grows 6°→10° (6°:${maxSpr6.toFixed(3)}, 10°:${maxSpr10val.toFixed(3)}) — V1 plateau check`);
 }
 
+// ── Bouma Spacing Analysis ──
+// Reads spacing_center_filtered.png and spacing_center_baseline.png.
+// At each spacing ratio (0.2x–0.8x + isolated), measures cyan target survival
+// through the filter. The survival curve should form a sigmoid around 0.5x (Bouma).
+
+const SPACING_RATIOS = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
+const SPACING_ECC_DEG = 6;
+const SPACING_CX = 600, SPACING_CY = 450;
+const SPACING_VP_W = 1200, SPACING_VP_H = 900;
+
+function analyzeSpacing() {
+  const dir = findGoldenDir();
+  if (!dir || !fs.existsSync(dir)) {
+    console.error(`Directory not found: ${dir || '(none)'}`);
+    process.exit(1);
+  }
+
+  const filteredPng = loadPng(path.join(dir, 'spacing_center_filtered.png'));
+  const baselinePng = loadPng(path.join(dir, 'spacing_center_baseline.png'));
+  if (!filteredPng || !baselinePng) {
+    console.error('spacing_center_filtered.png and/or spacing_center_baseline.png not found in ' + dir);
+    console.error('Run: BASE_URL=file:///path/to/scrutinizer-www/src/reference-pages node scripts/capture-crowding.js --pages=spacing');
+    process.exit(1);
+  }
+
+  const dpr = filteredPng.width > 2000 ? 2 : 1;
+  const cssW = filteredPng.width / dpr;
+  const cssH = filteredPng.height / dpr;
+
+  // Viewport is centered in the window
+  const vpOffX = (cssW - SPACING_VP_W) / 2;
+  const vpOffY = (cssH - SPACING_VP_H) / 2;
+
+  // Row geometry (matches crowding-spacing.html)
+  const totalHeight = 600;
+  const rowSpacing = totalHeight / (SPACING_RATIOS.length + 1); // 75px
+  const startY = SPACING_CY - totalHeight / 2 + rowSpacing; // 225px in viewport
+  const targetX = SPACING_CX + SPACING_ECC_DEG * PX_PER_DEG; // 828px in viewport
+
+  // Convert to CSS coords in the full window
+  const targetCSSX = vpOffX + targetX;
+
+  console.log(`=== Wave 3: Bouma Spacing Analysis ===`);
+  console.log(`Source: ${dir}`);
+  console.log(`Image: ${filteredPng.width}×${filteredPng.height}, DPR=${dpr}`);
+  console.log(`Viewport offset: (${vpOffX.toFixed(0)}, ${vpOffY.toFixed(0)}) CSS`);
+  console.log(`Target X: ${targetCSSX.toFixed(0)} CSS (6° right of fixation)`);
+  console.log();
+
+  // Measure cyan at each row for both filtered and baseline
+  const bandH = 50; // CSS px vertical band to sample
+  const bandW = 120; // CSS px horizontal band centered on target
+
+  const rows = [];
+  const allRows = [...SPACING_RATIOS.map((r, i) => ({
+    ratio: r,
+    label: `${r.toFixed(1)}x`,
+    y: vpOffY + startY + i * rowSpacing,
+  })), {
+    ratio: null,
+    label: 'isolated',
+    y: vpOffY + startY + SPACING_RATIOS.length * rowSpacing,
+  }];
+
+  for (const row of allRows) {
+    const pyS = Math.round((row.y - bandH / 2) * dpr);
+    const pyE = Math.round((row.y + bandH / 2) * dpr);
+    const pxL = Math.round((targetCSSX - bandW / 2) * dpr);
+    const pxR = Math.round((targetCSSX + bandW / 2) * dpr);
+
+    // Count cyan pixels in the band
+    let filteredCyan = 0, baselineCyan = 0;
+    const filteredPositions = [], baselinePositions = [];
+
+    for (let py = pyS; py <= pyE; py++) {
+      for (let px = pxL; px < pxR; px++) {
+        const idx = (py * filteredPng.width + px) * 4;
+        if (filteredPng.data[idx + 2] - filteredPng.data[idx] > CYAN_THRESHOLD) {
+          filteredCyan++;
+          filteredPositions.push({ x: px / dpr, y: py / dpr });
+        }
+        const bidx = (py * baselinePng.width + px) * 4;
+        if (baselinePng.data[bidx + 2] - baselinePng.data[bidx] > CYAN_THRESHOLD) {
+          baselineCyan++;
+          baselinePositions.push({ x: px / dpr, y: py / dpr });
+        }
+      }
+    }
+
+    const survival = baselineCyan > 0 ? filteredCyan / baselineCyan : null;
+    const fSpread = computeSpread(filteredPositions);
+    const bSpread = computeSpread(baselinePositions);
+    const spreadRatio = bSpread.spread2D > 0 ? fSpread.spread2D / bSpread.spread2D : null;
+
+    rows.push({
+      ...row,
+      filteredCyan, baselineCyan,
+      survival,
+      filteredSpread: fSpread.spread2D,
+      baselineSpread: bSpread.spread2D,
+      spreadRatio,
+    });
+  }
+
+  // Output table
+  console.log('Spacing  Filtered(px)  Baseline(px)  Survival  Spread(f)  Spread(b)  Spr Ratio');
+  console.log('-------  -----------  -----------  --------  ---------  ---------  ---------');
+
+  for (const r of rows) {
+    const surv = r.survival !== null ? r.survival.toFixed(3) : '  N/A';
+    const spr = r.spreadRatio !== null ? r.spreadRatio.toFixed(3) : '  N/A';
+    console.log(
+      `${r.label.padEnd(9)}` +
+      `${String(r.filteredCyan).padStart(10)}  ` +
+      `${String(r.baselineCyan).padStart(11)}  ` +
+      `${surv.padStart(8)}  ` +
+      `${r.filteredSpread.toFixed(1).padStart(9)}  ` +
+      `${r.baselineSpread.toFixed(1).padStart(9)}  ` +
+      `${spr.padStart(9)}`
+    );
+  }
+
+  // Bouma curve analysis
+  const spacingRows = rows.filter(r => r.ratio !== null);
+  const isoRow = rows.find(r => r.ratio === null);
+
+  // Also report spread relative to isolated (crowding dispersion metric)
+  if (isoRow && isoRow.filteredSpread > 0) {
+    console.log('\n--- Spread relative to isolated ---\n');
+    for (const r of spacingRows) {
+      const relSpread = r.filteredSpread / isoRow.filteredSpread;
+      const bar = '#'.repeat(Math.round(relSpread * 20));
+      console.log(`  ${r.label}  ${relSpread.toFixed(3)}  ${bar}`);
+    }
+  }
+  console.log();
+
+  // Find critical spacing: where survival crosses 0.5 (or nearest)
+  let criticalSpacing = null;
+  for (let i = 0; i < spacingRows.length - 1; i++) {
+    const a = spacingRows[i], b = spacingRows[i + 1];
+    if (a.survival !== null && b.survival !== null) {
+      if ((a.survival <= 0.5 && b.survival >= 0.5) || (a.survival >= 0.5 && b.survival <= 0.5)) {
+        // Linear interpolation
+        const t = (0.5 - a.survival) / (b.survival - a.survival);
+        criticalSpacing = a.ratio + t * (b.ratio - a.ratio);
+      }
+    }
+  }
+
+  // Monotonicity check: survival should generally increase with spacing
+  let monotonic = true;
+  for (let i = 0; i < spacingRows.length - 1; i++) {
+    if (spacingRows[i].survival !== null && spacingRows[i + 1].survival !== null) {
+      if (spacingRows[i + 1].survival < spacingRows[i].survival - 0.1) {
+        monotonic = false;
+      }
+    }
+  }
+
+  console.log('--- Validation ---\n');
+
+  // Isolated target should have high survival (no crowding)
+  const isoSurvival = isoRow && isoRow.survival !== null ? isoRow.survival : 0;
+  console.log(`[${isoSurvival > 0.7 ? 'PASS' : 'FAIL'}] Isolated target survival > 0.7 (${isoSurvival.toFixed(3)})`);
+
+  // Tight spacing should show reduced survival
+  const tightSurvival = spacingRows[0].survival || 0;
+  console.log(`[${tightSurvival < 0.6 ? 'PASS' : 'FAIL'}] Tight spacing (0.2x) survival < 0.6 (${tightSurvival.toFixed(3)})`);
+
+  // Wide spacing should show high survival
+  const wideSurvival = spacingRows[spacingRows.length - 1].survival || 0;
+  console.log(`[${wideSurvival > 0.6 ? 'PASS' : 'FAIL'}] Wide spacing (0.8x) survival > 0.6 (${wideSurvival.toFixed(3)})`);
+
+  // Survival should generally increase with spacing
+  console.log(`[${monotonic ? 'PASS' : 'INFO'}] Survival increases monotonically with spacing`);
+
+  // Critical spacing near Bouma's 0.5x
+  if (criticalSpacing !== null) {
+    const nearBouma = criticalSpacing >= 0.3 && criticalSpacing <= 0.7;
+    console.log(`[${nearBouma ? 'PASS' : 'INFO'}] Critical spacing (50% survival) at ${criticalSpacing.toFixed(2)}x (Bouma predicts ~0.5x)`);
+  } else {
+    // Check if all survival values are above or below 0.5
+    const allAbove = spacingRows.every(r => r.survival === null || r.survival > 0.5);
+    const allBelow = spacingRows.every(r => r.survival === null || r.survival < 0.5);
+    if (allAbove) {
+      console.log(`[INFO] All survival > 0.5 — crowding too weak to reach 50% at any spacing`);
+    } else if (allBelow) {
+      console.log(`[INFO] All survival < 0.5 — crowding too strong, even 0.8x doesn't reach 50%`);
+    } else {
+      console.log(`[INFO] No clean 50% crossing found — survival curve may be non-monotonic`);
+    }
+  }
+
+  if (hasFlag('json')) {
+    console.log(JSON.stringify({ source: dir, spacingRows: rows, criticalSpacing }, null, 2));
+  }
+}
+
 try {
-  analyze();
+  if (hasFlag('spacing')) {
+    analyzeSpacing();
+  } else {
+    analyze();
+  }
 } catch (err) {
   console.error(err);
   process.exit(1);

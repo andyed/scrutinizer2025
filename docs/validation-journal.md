@@ -332,9 +332,28 @@ The growth factor tuning loop (4 iterations, ~8 minutes total) demonstrated the 
 
 ### What's Next
 
+### Bouma Spacing Analysis: Architectural Limit Found (2026-03-07)
+
+Captured `crowding-spacing.html` (7 spacing ratios 0.2×–0.8× at 6°, plus isolated baseline) through Scrutinizer. Measured cyan target survival (filtered/baseline pixel count) and spatial spread at each spacing level.
+
+**Result**: No Bouma curve. All survival ratios are 0.91–0.97 — the filter barely differentiates spacing levels. Spread relative to isolated shows no monotonic trend (bounces 0.70–1.05).
+
+| Spacing | Survival | Spread/Isolated |
+|---|---|---|
+| 0.2× | 0.913 | 0.786 |
+| 0.3× | 0.951 | 0.759 |
+| 0.5× | 0.947 | 0.990 |
+| 0.8× | 0.924 | 1.050 |
+| isolated | 0.920 | 1.000 |
+
+**Why**: Scrutinizer's V1 Lateral Smash is **eccentricity-dependent but not density-dependent**. At a given eccentricity, the displacement amplitude is the same whether flankers are 0.2× or 0.8× away. The shader computes `warpAmp = eccentricityScale × texture`, not `warpAmp = f(local_feature_density) × texture`. This is a fundamental architectural limit, not a tuning issue.
+
+A density-dependent Bouma curve would require pooling-region-based crowding (Rosenholtz TTM), where the pooling region size scales with eccentricity and features within a pooling region are mixed. The current V1 approach applies uniform displacement to the whole eccentricity band — it simulates the *strength* of crowding correctly (more at larger eccentricities) but not the *spatial selectivity* (more when flankers are closer).
+
+**Classification**: Tier 3 (architectural limit). The V1 Lateral Smash is a fast approximation of crowding, not a full TTM implementation. It correctly predicts that crowding increases with eccentricity (Wave 3 eccentricity analysis confirms this), but can't reproduce spacing-dependent transitions.
+
 **Immediate:**
 - **Fix 2 visual review**: Pooling Grid (style 7) sectors should be visibly elongated radially — verify on text-heavy content
-- **Bouma spacing curve**: `crowding-spacing.html` varies flanker spacing from 0.2× to 0.8× at 6°. Measuring the transition from crowded→uncrowded yields a critical spacing estimate — the most direct comparison to Bouma (1970). The capture pipeline is ready; needs an analysis mode for the spacing page.
 
 **Future Waves:**
 - **Wave 4**: Saliency map validation — do Scrutinizer's rendered saliency peaks match known psychophysical saliency (Itti & Koch benchmarks)?
