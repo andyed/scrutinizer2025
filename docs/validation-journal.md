@@ -6,6 +6,15 @@
 
 This document records what we tested, what we found, what broke, and what we learned. The validation suite is designed so that failures are informative — they expose either bugs in the implementation, limitations of the architecture, or gaps in the measurement methodology. Each is a different kind of knowledge.
 
+### Waves
+
+| Wave | Mechanism | Result | Links |
+|------|-----------|--------|-------|
+| [1](#wave-1-chromatic-decay) | Chromatic Decay | T1: 7/7 · T2: 3/3 · T3: 1/2 | [spec](../docs/specs/wave1_feature_search_validation.md) · [report](../tests/validation/reports/color-search-report.md) |
+| [2](#wave-2-spatial-frequency-attenuation) | Spatial Frequency | T1: 12/16 · T2: 5/5 · T3: 0/4 | [spec](../docs/specs/wave2_spatial_acuity_validation.md) · [report](../tests/validation/reports/spatial-acuity-report.md) |
+| [3](#wave-3-crowding-geometry) | Crowding Geometry | 7/7 after tuning | [spec](../docs/specs/wave3_crowding_validation.md) |
+| [4](#wave-4-saliency-validation) | Saliency | *pending* | [stimulus](https://andyed.github.io/scrutinizer-www/reference-pages/saliency-popout.html) |
+
 ---
 
 ## The Approach
@@ -30,9 +39,10 @@ We render known stimuli (gratings, colored dots, flanked letters) as HTML pages,
 
 ## Wave 1: Chromatic Decay
 
-**Spec**: `docs/specs/wave1_feature_search_validation.md` (not committed — evolved directly into implementation)
-**Stimulus**: `tests/reference-pages/color-search.html` — colored dot arrays (red, green, blue, yellow targets among gray distractors) at 5 eccentricity rings
-**Report**: `tests/validation/reports/color-search-report.html`
+**Spec**: [wave1_feature_search_validation.md](../docs/specs/wave1_feature_search_validation.md)
+**Stimulus**: [color-search.html](../tests/reference-pages/color-search.html) — colored dot arrays (red, green, blue, yellow targets among gray distractors) at 5 eccentricity rings
+**Report**: [color-search-report.html](../tests/validation/reports/color-search-report.html) · [.md](../tests/validation/reports/color-search-report.md)
+**Scripts**: [capture-color-search.js](../scripts/capture-color-search.js) · [analyze-color-search.js](../scripts/analyze-color-search.js) · [validate-color-search.js](../scripts/validate-color-search.js)
 
 ### What We Tested
 
@@ -63,9 +73,10 @@ The Oklab color space decomposition into RG (a-axis) and BY (b-axis) channels co
 
 ## Wave 2: Spatial Frequency Attenuation
 
-**Spec**: `docs/specs/wave2_spatial_acuity_validation.md`
-**Stimulus**: `tests/reference-pages/spatial-acuity.html` — sine-wave gratings at 0.25–4 cpd in concentric annuli
-**Report**: `tests/validation/reports/spatial-acuity-report.html`
+**Spec**: [wave2_spatial_acuity_validation.md](../docs/specs/wave2_spatial_acuity_validation.md)
+**Stimulus**: [spatial-acuity.html](../tests/reference-pages/spatial-acuity.html) — sine-wave gratings at 0.25–4 cpd in concentric annuli
+**Report**: [spatial-acuity-report.html](../tests/validation/reports/spatial-acuity-report.html) · [.md](../tests/validation/reports/spatial-acuity-report.md)
+**Scripts**: [capture-spatial-acuity.js](../scripts/capture-spatial-acuity.js) · [analyze-spatial-acuity.js](../scripts/analyze-spatial-acuity.js) · [validate-spatial-acuity.js](../scripts/validate-spatial-acuity.js)
 
 ### What We Tested
 
@@ -125,9 +136,10 @@ Replacing RMS with a DFT matched filter — computing the Fourier amplitude at t
 
 ## Wave 3: Crowding Geometry
 
-**Spec**: `docs/specs/wave3_crowding_validation.md`
-**Analysis**: `scripts/analyze-crowding-geometry.js` — pure numerical computation, no screenshots yet
-**Stimulus pages**: `crowding-radial.html`, `crowding-spacing.html` (created, not yet captured)
+**Spec**: [wave3_crowding_validation.md](../docs/specs/wave3_crowding_validation.md)
+**Analysis**: [analyze-crowding-geometry.js](../scripts/analyze-crowding-geometry.js) — pure numerical computation, no screenshots yet
+**Stimulus pages**: [crowding-radial.html](https://andyed.github.io/scrutinizer-www/reference-pages/crowding-radial.html) · [crowding-spacing.html](https://andyed.github.io/scrutinizer-www/reference-pages/crowding-spacing.html)
+**Scripts**: [capture-crowding.js](../scripts/capture-crowding.js) · [analyze-crowding.js](../scripts/analyze-crowding.js)
 
 ### What We Tested
 
@@ -369,9 +381,72 @@ The validation suite now has two scripts (`validate-spatial-acuity.js` for Waves
 ### What's Next
 
 - **Fix 2 visual review**: Pooling Grid (style 7) sectors should be visibly elongated radially — verify on text-heavy content
-- **Wave 4**: Saliency map validation — do Scrutinizer's rendered saliency peaks match known psychophysical saliency (Itti & Koch benchmarks)?
 - **Wave 5**: Temporal integration — does the foveation update correctly during simulated saccades?
 - **Longer term**: Density-dependent crowding via pooling regions (TTM-inspired) — if the visual quality benefit justifies the computational cost
+
+---
+
+## Wave 4: Saliency Validation
+
+**Stimulus**: [saliency-popout.html](https://andyed.github.io/scrutinizer-www/reference-pages/saliency-popout.html) — four regions: color singleton (red among green), luminance singleton (white among dark), inline base64 face, homogeneous control (blue squares)
+**Existing**: [face-test.html](https://andyed.github.io/scrutinizer-www/reference-pages/face-test.html) — Ada Lovelace portrait for face detection validation
+**Scripts**: [capture-saliency.js](../scripts/capture-saliency.js) · [analyze-saliency.js](../scripts/analyze-saliency.js)
+**Shader**: [peripheral2.frag:565](../renderer/shaders/peripheral2.frag) — `suppressionFactor *= mix(1.0, 0.3, saliency)`
+**Worker**: [saliency-worker.js:393-449](../renderer/saliency-worker.js) — weights, normalization, output packing
+
+### What We're Testing
+
+Two questions about Scrutinizer's saliency pipeline (center-surround DoG on I/RG/BY channels + face detection + structure gating):
+
+**4A — Pop-Out Detection**: Does the saliency map peak where it should? The popout page places four stimulus types at known viewport positions. The saliency debug view (R channel = intensity) should show high values at color/luminance singletons and face, low values at the homogeneous control region.
+
+**4B — Protection**: Does saliency modulation actually protect content during rendering? The shader reduces V1 distortion at salient locations (`suppressionFactor *= mix(1.0, 0.3, saliency)` — 70% less distortion at saliency=1.0). Comparing filtered captures with modulation ON vs OFF vs baseline measures whether salient regions are better preserved.
+
+### Capture Matrix
+
+| # | Filename | Mode | Saliency Mod | Page |
+|---|----------|------|-------------|------|
+| 1 | `popout_saliency.png` | `saliency` | default | popout |
+| 2 | `popout_filtered_mod_on.png` | `0` | `true` | popout |
+| 3 | `popout_filtered_mod_off.png` | `0` | `false` | popout |
+| 4 | `popout_baseline.png` | `bypass` | default | popout |
+| 5 | `face_saliency.png` | `saliency` | default | face-test |
+| 6 | `face_filtered_mod_on.png` | `0` | `true` | face-test |
+| 7 | `face_filtered_mod_off.png` | `0` | `false` | face-test |
+
+### Validation Criteria
+
+**4A checks** (preliminary thresholds — calibrate on first run):
+
+| Check | Criterion |
+|---|---|
+| Color singleton detected | Saliency > 80 |
+| Luminance singleton detected | Saliency > 80 |
+| Face detected | Saliency > 60 |
+| Control low | Saliency < 40 |
+| Color > 2× control | Ratio check (robust to renormalization) |
+| Luminance > 2× control | Same |
+| Background low | Saliency < 30 at page center |
+
+**4B checks**:
+
+| Check | Criterion |
+|---|---|
+| Modulation changes pixels | Deviation delta > 5 at high-saliency location |
+| Protection at high saliency | Protection ratio < 0.85 at ≥1 high-saliency location |
+| No protection at low saliency | Protection ratio ≥ 0.95 at control/background |
+| Consistent | Protection ratio at singleton < ratio at control |
+
+### Results
+
+*Pending capture and analysis.*
+
+```bash
+node scripts/capture-saliency.js --dry-run
+node scripts/capture-saliency.js
+node scripts/analyze-saliency.js --popout --dir=tests/golden-captures/validation/saliency
+node scripts/analyze-saliency.js --protection --dir=tests/golden-captures/validation/saliency
+```
 
 ---
 
