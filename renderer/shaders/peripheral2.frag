@@ -591,7 +591,7 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     float parafoveaRamp = smoothstep(fovea_radius * 1.5, parafovea_radius, dist);
     float eccentricityScale = mix(0.0, 0.15, parafoveaRamp);
     // Continue growth beyond parafovea at reduced rate to avoid plateau
-    float farScale = 1.0 + max(0.0, (dist - parafovea_radius) / parafovea_radius) * 0.5;
+    float farScale = 1.0 + max(0.0, (dist - parafovea_radius) / parafovea_radius) * 1.5;
     eccentricityScale = mix(eccentricityScale, farScale, boundaryProgress);
     
     if (config.v4_style_id == 4 || config.v4_style_id == 8) {

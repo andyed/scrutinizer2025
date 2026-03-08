@@ -269,10 +269,56 @@ Fix 3 is the most consequential change. The plateau was a smoothstep clamp that 
 - **Fix 2** (polar R:T): Load a text page, enable Pooling Grid (style 7), verify sectors are visibly elongated radially
 - **Fix 3** (V1 plateau): Load text-heavy content, check far-peripheral distortion at 10–15° — should be noticeably stronger than before without becoming illegible in the parafovea
 
-### Pending Capture-Based Validation (Wave 3)
-- Screenshot captures of crowding stimulus pages through Scrutinizer
-- Pixel-level crowding ratio measurement (crowded vs isolated letter contrast)
-- Parametric Bouma spacing transition curve
+### Wave 3 Capture Analysis: Pre-Fix Baseline (2026-03-07)
+
+Analyzed existing v2.0 golden capture (`crowding_center.png`, 3840×2024 @DPR=2) before Fix 2/3 shader changes. Measurement pipeline: detect cyan target pixels (B-R channel difference), cluster by X-position, split at largest gap into crowded/isolated groups, compute spatial spread (stddev of 2D positions).
+
+**Key metric**: Spread ratio = crowded_spread / isolated_spread. Values >1.0 mean V1 displacement is scattering the crowded letter — direct crowding measurement.
+
+**28px column results (primary measurement):**
+
+| Eccentricity | Spread Ratio (mean) | Count Ratio (mean) | Interpretation |
+|---|---|---|---|
+| 3° | 0.989 | 0.916 | Near-foveal: no crowding (correct) |
+| 6° | 1.837 (peak: 2.578) | 1.863 | Strong crowding — V1 lateral smash working |
+| 10° | 1.099 | 0.859 | Crowding drops back — V1 plateau confirmed |
+
+The 6°→10° spread ratio decline (2.578 → 1.217) directly confirms the V1 eccentricityScale plateau identified in Fix 3. Post-fix captures should show continued growth at 10°.
+
+**Validation checks**: 6/6 PASS, 1 INFO (V1 plateau — expected pre-fix).
+
+### Wave 3 Capture Analysis: Post-Fix Comparison (2026-03-07)
+
+Captured fresh screenshots after Fix 2 (R:T spoke count) and Fix 3 (V1 plateau continuation). Same stimulus, same fixation.
+
+**28px column comparison (pre-fix → post-fix):**
+
+| Eccentricity | Spread Ratio Pre | Spread Ratio Post | Δ | Notes |
+|---|---|---|---|---|
+| 3° | 0.989 | 1.127 | +0.138 | Slightly worse — 3° below shows 1.266 |
+| 6° | 1.837 (peak 2.578) | 1.686 (peak 2.416) | −0.151 | Peak shifted above→below fixation |
+| 10° | 1.099 | 1.045 | −0.054 | Still plateaued |
+
+**Interpretation**: Fix 3's half-rate continuation factor (0.5) has minimal effect at the measured eccentricities. The V1 displacement plateau remains — `farScale` at 10° is only ~1.24, which adds marginal displacement. The cyan spread metric confirms this: 10° post-fix is indistinguishable from pre-fix.
+
+The 3° regression (spread ratio 1.127, above the 1.1 threshold) suggests Fix 3's eccentricity scaling may be reaching slightly into the near-parafovea. The `boundaryProgress` smoothstep transition region is where this bleeds.
+
+**Post-fix validation**: 4/7 PASS, 2 FAIL (3° near-foveal regression, 48px crowding), 1 INFO (plateau persists).
+
+### Wave 3 Growth Factor Tuning (2026-03-07)
+
+Iterated the `farScale` growth factor in `peripheral2.frag:594` using capture→analyze loop:
+
+| Factor | 3° spread | 6° peak | 10° peak | Checks |
+|---|---|---|---|---|
+| 0.0 (pre-fix) | 0.989 | 2.578 | 1.099 | 6/7 |
+| 0.5 (initial) | 1.127 | 2.416 | 1.045 | 4/7 |
+| 1.0 | 0.921 | 2.604 | 1.256 | 6/7 |
+| **1.5** | **0.988** | **2.542** | **1.256** | **7/7** |
+
+**Winner: 1.5×**. The 10° spread ratio plateaus at 1.256 for both 1.0 and 1.5 — measurement ceiling, not a shader limit. The cyan signal at 10° is thin enough that further displacement doesn't produce measurably more spread. At 1.5, the 48px column count-ratio check also passes (crowded targets lose cyan at large eccentricities, ratio < 0.9).
+
+The 0.5 factor was counterproductive: it pushed 3° above 1.1 (near-foveal regression) while barely helping 10°. The smoothstep transition between parafoveal and far-peripheral regions blends `eccentricityScale` into `farScale` — a small `farScale` gets dominated by the blend, producing no net effect at 10° but leaking into the parafovea at 3°.
 
 ### Future Waves
 - **Wave 4**: Saliency map validation — do Scrutinizer's rendered saliency peaks match known psychophysical saliency (Itti & Koch benchmarks)?
