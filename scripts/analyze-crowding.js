@@ -464,21 +464,35 @@ function analyzeSpacing() {
     const pxL = Math.round((targetCSSX - bandW / 2) * dpr);
     const pxR = Math.round((targetCSSX + bandW / 2) * dpr);
 
-    // Count cyan pixels in the band
+    // Count cyan pixels and collect luminance values in the band
     let filteredCyan = 0, baselineCyan = 0;
     const filteredPositions = [], baselinePositions = [];
+    // Luminance samples in a tight patch around expected target center for variance analysis
+    const patchHalf = Math.round(14 * dpr); // ~14 CSS px radius
+    const patchCX = Math.round(targetCSSX * dpr);
+    const patchCY = Math.round(row.y * dpr);
+    const filteredLum = [], baselineLum = [];
 
     for (let py = pyS; py <= pyE; py++) {
       for (let px = pxL; px < pxR; px++) {
         const idx = (py * filteredPng.width + px) * 4;
+        const bidx = (py * baselinePng.width + px) * 4;
+
         if (filteredPng.data[idx + 2] - filteredPng.data[idx] > CYAN_THRESHOLD) {
           filteredCyan++;
           filteredPositions.push({ x: px / dpr, y: py / dpr });
         }
-        const bidx = (py * baselinePng.width + px) * 4;
         if (baselinePng.data[bidx + 2] - baselinePng.data[bidx] > CYAN_THRESHOLD) {
           baselineCyan++;
           baselinePositions.push({ x: px / dpr, y: py / dpr });
+        }
+
+        // Luminance in tight patch (captures V1 fragmentation)
+        if (Math.abs(px - patchCX) <= patchHalf && Math.abs(py - patchCY) <= patchHalf) {
+          const fLum = 0.2126 * filteredPng.data[idx] + 0.7152 * filteredPng.data[idx+1] + 0.0722 * filteredPng.data[idx+2];
+          const bLum = 0.2126 * baselinePng.data[bidx] + 0.7152 * baselinePng.data[bidx+1] + 0.0722 * baselinePng.data[bidx+2];
+          filteredLum.push(fLum);
+          baselineLum.push(bLum);
         }
       }
     }
@@ -488,6 +502,29 @@ function analyzeSpacing() {
     const bSpread = computeSpread(baselinePositions);
     const spreadRatio = bSpread.spread2D > 0 ? fSpread.spread2D / bSpread.spread2D : null;
 
+    // Centroid displacement: how far did V1 shift the target's cyan center?
+    const fCentroid = filteredPositions.length > 0
+      ? { x: filteredPositions.reduce((s,p) => s+p.x, 0) / filteredPositions.length,
+          y: filteredPositions.reduce((s,p) => s+p.y, 0) / filteredPositions.length }
+      : null;
+    const bCentroid = baselinePositions.length > 0
+      ? { x: baselinePositions.reduce((s,p) => s+p.x, 0) / baselinePositions.length,
+          y: baselinePositions.reduce((s,p) => s+p.y, 0) / baselinePositions.length }
+      : null;
+    const centroidDisp = (fCentroid && bCentroid)
+      ? Math.sqrt((fCentroid.x - bCentroid.x)**2 + (fCentroid.y - bCentroid.y)**2)
+      : null;
+
+    // Patch luminance variance: V1 displacement fragments letters → higher variance
+    function variance(arr) {
+      if (arr.length < 2) return 0;
+      const mean = arr.reduce((a,b) => a+b) / arr.length;
+      return arr.reduce((s,v) => s + (v-mean)**2, 0) / arr.length;
+    }
+    const fVar = variance(filteredLum);
+    const bVar = variance(baselineLum);
+    const distortionRatio = bVar > 0 ? fVar / bVar : null;
+
     rows.push({
       ...row,
       filteredCyan, baselineCyan,
@@ -495,101 +532,137 @@ function analyzeSpacing() {
       filteredSpread: fSpread.spread2D,
       baselineSpread: bSpread.spread2D,
       spreadRatio,
+      centroidDisp,
+      distortionRatio,
     });
   }
 
-  // Output table
-  console.log('Spacing  Filtered(px)  Baseline(px)  Survival  Spread(f)  Spread(b)  Spr Ratio');
-  console.log('-------  -----------  -----------  --------  ---------  ---------  ---------');
+  // Output table — survival (pixel count) metric
+  console.log('--- Pixel Survival (count-based, weak signal for crowding) ---\n');
+  console.log('Spacing  Filtered(px)  Baseline(px)  Survival');
+  console.log('-------  -----------  -----------  --------');
 
   for (const r of rows) {
     const surv = r.survival !== null ? r.survival.toFixed(3) : '  N/A';
-    const spr = r.spreadRatio !== null ? r.spreadRatio.toFixed(3) : '  N/A';
     console.log(
       `${r.label.padEnd(9)}` +
       `${String(r.filteredCyan).padStart(10)}  ` +
       `${String(r.baselineCyan).padStart(11)}  ` +
-      `${surv.padStart(8)}  ` +
-      `${r.filteredSpread.toFixed(1).padStart(9)}  ` +
-      `${r.baselineSpread.toFixed(1).padStart(9)}  ` +
-      `${spr.padStart(9)}`
+      `${surv.padStart(8)}`
     );
   }
 
-  // Bouma curve analysis
   const spacingRows = rows.filter(r => r.ratio !== null);
   const isoRow = rows.find(r => r.ratio === null);
 
-  // Also report spread relative to isolated (crowding dispersion metric)
-  if (isoRow && isoRow.filteredSpread > 0) {
-    console.log('\n--- Spread relative to isolated ---\n');
+  // Dispersion metrics — the correct signal for V1 Lateral Smash crowding
+  console.log('\n--- Dispersion Metrics (V1 displacement signal) ---\n');
+  console.log('Spacing  Centroid(px)  Distortion  Spr Ratio  Spread(f)  Spread(b)');
+  console.log('-------  -----------  ----------  ---------  ---------  ---------');
+
+  for (const r of rows) {
+    const cd = r.centroidDisp !== null ? r.centroidDisp.toFixed(1) : 'N/A';
+    const dr = r.distortionRatio !== null ? r.distortionRatio.toFixed(3) : 'N/A';
+    const spr = r.spreadRatio !== null ? r.spreadRatio.toFixed(3) : 'N/A';
+    console.log(
+      `${r.label.padEnd(9)}` +
+      `${cd.padStart(11)}  ` +
+      `${dr.padStart(10)}  ` +
+      `${spr.padStart(9)}  ` +
+      `${r.filteredSpread.toFixed(1).padStart(9)}  ` +
+      `${r.baselineSpread.toFixed(1).padStart(9)}`
+    );
+  }
+
+  // Dispersion curve — should decrease with spacing (more dispersion at tight spacing)
+  if (isoRow && isoRow.centroidDisp !== null) {
+    console.log('\n--- Centroid Displacement vs Spacing (Bouma curve) ---\n');
+    const maxDisp = Math.max(...rows.map(r => r.centroidDisp || 0));
     for (const r of spacingRows) {
-      const relSpread = r.filteredSpread / isoRow.filteredSpread;
-      const bar = '#'.repeat(Math.round(relSpread * 20));
-      console.log(`  ${r.label}  ${relSpread.toFixed(3)}  ${bar}`);
+      const barLen = maxDisp > 0 ? Math.round((r.centroidDisp || 0) / maxDisp * 40) : 0;
+      const bar = '|'.repeat(barLen);
+      console.log(`  ${r.label}  ${(r.centroidDisp || 0).toFixed(1).padStart(5)}px  ${bar}`);
     }
+    console.log(`  iso    ${(isoRow.centroidDisp || 0).toFixed(1).padStart(5)}px  ${'|'.repeat(maxDisp > 0 ? Math.round((isoRow.centroidDisp || 0) / maxDisp * 40) : 0)}  <-- baseline`);
+  }
+
+  if (isoRow && isoRow.distortionRatio !== null) {
+    console.log('\n--- Distortion Ratio vs Spacing ---\n');
+    const maxDR = Math.max(...rows.map(r => r.distortionRatio || 0));
+    for (const r of spacingRows) {
+      const barLen = maxDR > 0 ? Math.round((r.distortionRatio || 0) / maxDR * 40) : 0;
+      const bar = '#'.repeat(barLen);
+      console.log(`  ${r.label}  ${(r.distortionRatio || 0).toFixed(3).padStart(6)}  ${bar}`);
+    }
+    console.log(`  iso    ${(isoRow.distortionRatio || 0).toFixed(3).padStart(6)}  ${'#'.repeat(maxDR > 0 ? Math.round((isoRow.distortionRatio || 0) / maxDR * 40) : 0)}  <-- baseline`);
   }
   console.log();
 
-  // Find critical spacing: where survival crosses 0.5 (or nearest)
-  let criticalSpacing = null;
-  for (let i = 0; i < spacingRows.length - 1; i++) {
-    const a = spacingRows[i], b = spacingRows[i + 1];
-    if (a.survival !== null && b.survival !== null) {
-      if ((a.survival <= 0.5 && b.survival >= 0.5) || (a.survival >= 0.5 && b.survival <= 0.5)) {
-        // Linear interpolation
-        const t = (0.5 - a.survival) / (b.survival - a.survival);
-        criticalSpacing = a.ratio + t * (b.ratio - a.ratio);
+  // Find critical spacing using centroid displacement: where displacement crosses
+  // the midpoint between max (tight) and iso (baseline)
+  let criticalSpacingDisp = null;
+  const isoDisp = isoRow ? (isoRow.centroidDisp || 0) : 0;
+  const tightDisp = spacingRows[0] ? (spacingRows[0].centroidDisp || 0) : 0;
+  const midDisp = (tightDisp + isoDisp) / 2;
+  if (tightDisp > isoDisp * 1.2) { // Only if there's a meaningful range
+    for (let i = 0; i < spacingRows.length - 1; i++) {
+      const a = spacingRows[i], b = spacingRows[i + 1];
+      const aD = a.centroidDisp || 0, bD = b.centroidDisp || 0;
+      if ((aD >= midDisp && bD <= midDisp) || (aD <= midDisp && bD >= midDisp)) {
+        const t = (midDisp - aD) / (bD - aD);
+        criticalSpacingDisp = a.ratio + t * (b.ratio - a.ratio);
+        break;
       }
     }
   }
 
-  // Monotonicity check: survival should generally increase with spacing
-  let monotonic = true;
+  // Monotonicity check on centroid displacement (should decrease with spacing)
+  let dispDecreases = true;
   for (let i = 0; i < spacingRows.length - 1; i++) {
-    if (spacingRows[i].survival !== null && spacingRows[i + 1].survival !== null) {
-      if (spacingRows[i + 1].survival < spacingRows[i].survival - 0.1) {
-        monotonic = false;
-      }
+    const a = spacingRows[i].centroidDisp || 0;
+    const b = spacingRows[i + 1].centroidDisp || 0;
+    if (b > a + 1.0) { // Allow 1px noise
+      dispDecreases = false;
     }
   }
 
   console.log('--- Validation ---\n');
 
-  // Isolated target should have high survival (no crowding)
+  // Dispersion-based checks (primary)
+  const tightDispVal = spacingRows[0] ? (spacingRows[0].centroidDisp || 0) : 0;
+  const wideDispVal = spacingRows[spacingRows.length - 1] ? (spacingRows[spacingRows.length - 1].centroidDisp || 0) : 0;
+  const isoDispVal = isoRow ? (isoRow.centroidDisp || 0) : 0;
+  const tightMoreThanIso = tightDispVal > isoDispVal * 1.3;
+  console.log(`[${tightMoreThanIso ? 'PASS' : 'FAIL'}] Tight spacing (0.2x) more displaced than isolated (${tightDispVal.toFixed(1)}px vs ${isoDispVal.toFixed(1)}px)`);
+
+  const wideNearIso = Math.abs(wideDispVal - isoDispVal) < Math.max(isoDispVal * 0.5, 3.0);
+  console.log(`[${wideNearIso ? 'PASS' : 'INFO'}] Wide spacing (0.8x) displacement near isolated (${wideDispVal.toFixed(1)}px vs ${isoDispVal.toFixed(1)}px)`);
+
+  console.log(`[${dispDecreases ? 'PASS' : 'INFO'}] Displacement generally decreases with spacing`);
+
+  if (criticalSpacingDisp !== null) {
+    const nearBouma = criticalSpacingDisp >= 0.3 && criticalSpacingDisp <= 0.7;
+    console.log(`[${nearBouma ? 'PASS' : 'INFO'}] Critical spacing (dispersion midpoint) at ${criticalSpacingDisp.toFixed(2)}x (Bouma predicts ~0.5x)`);
+  } else if (tightDisp <= isoDisp * 1.2) {
+    console.log(`[INFO] Centroid displacement range too narrow for Bouma curve (tight=${tightDispVal.toFixed(1)}, iso=${isoDispVal.toFixed(1)})`);
+  } else {
+    console.log(`[INFO] No clean dispersion midpoint crossing found`);
+  }
+
+  // Distortion ratio checks
+  const tightDR = spacingRows[0] ? (spacingRows[0].distortionRatio || 0) : 0;
+  const isoDR = isoRow ? (isoRow.distortionRatio || 0) : 0;
+  const drSignal = tightDR > isoDR * 1.1;
+  console.log(`[${drSignal ? 'PASS' : 'INFO'}] Tight spacing has higher patch distortion than isolated (${tightDR.toFixed(3)} vs ${isoDR.toFixed(3)})`);
+
+  // Legacy survival checks (secondary)
+  console.log();
+  console.log('--- Legacy (survival-based, weaker signal) ---\n');
   const isoSurvival = isoRow && isoRow.survival !== null ? isoRow.survival : 0;
   console.log(`[${isoSurvival > 0.7 ? 'PASS' : 'FAIL'}] Isolated target survival > 0.7 (${isoSurvival.toFixed(3)})`);
 
-  // Tight spacing should show reduced survival
-  const tightSurvival = spacingRows[0].survival || 0;
-  console.log(`[${tightSurvival < 0.6 ? 'PASS' : 'FAIL'}] Tight spacing (0.2x) survival < 0.6 (${tightSurvival.toFixed(3)})`);
-
-  // Wide spacing should show high survival
-  const wideSurvival = spacingRows[spacingRows.length - 1].survival || 0;
-  console.log(`[${wideSurvival > 0.6 ? 'PASS' : 'FAIL'}] Wide spacing (0.8x) survival > 0.6 (${wideSurvival.toFixed(3)})`);
-
-  // Survival should generally increase with spacing
-  console.log(`[${monotonic ? 'PASS' : 'INFO'}] Survival increases monotonically with spacing`);
-
-  // Critical spacing near Bouma's 0.5x
-  if (criticalSpacing !== null) {
-    const nearBouma = criticalSpacing >= 0.3 && criticalSpacing <= 0.7;
-    console.log(`[${nearBouma ? 'PASS' : 'INFO'}] Critical spacing (50% survival) at ${criticalSpacing.toFixed(2)}x (Bouma predicts ~0.5x)`);
-  } else {
-    // Check if all survival values are above or below 0.5
-    const allAbove = spacingRows.every(r => r.survival === null || r.survival > 0.5);
-    const allBelow = spacingRows.every(r => r.survival === null || r.survival < 0.5);
-    if (allAbove) {
-      console.log(`[INFO] All survival > 0.5 — crowding too weak to reach 50% at any spacing`);
-    } else if (allBelow) {
-      console.log(`[INFO] All survival < 0.5 — crowding too strong, even 0.8x doesn't reach 50%`);
-    } else {
-      console.log(`[INFO] No clean 50% crossing found — survival curve may be non-monotonic`);
-    }
-  }
-
   if (hasFlag('json')) {
-    console.log(JSON.stringify({ source: dir, spacingRows: rows, criticalSpacing }, null, 2));
+    console.log(JSON.stringify({ source: dir, spacingRows: rows, criticalSpacingDisp }, null, 2));
   }
 }
 
