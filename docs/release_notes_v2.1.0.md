@@ -2,6 +2,9 @@
 
 **Release Date:** March 2026
 
+**Blog post:** [Measuring the Pipeline](https://andyed.github.io/scrutinizer-www/blog/2026-03-08-v2.1.html)
+**Previous:** [v2.0 blog post](https://andyed.github.io/scrutinizer-www/blog/2026-03-07-v2.0.html)
+
 ## In This Release
 
 1. [Psychophysical Validation Pipeline](#psychophysical-validation-pipeline) — Four-wave validation against published data: chromatic decay, spatial frequency, crowding geometry, saliency protection. 5 capture scripts, 5 analysis scripts, 15 reference pages, 25 golden captures.
