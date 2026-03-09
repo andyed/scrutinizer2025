@@ -1515,7 +1515,10 @@ void main() {
         float eg = smoothstep(0.02, 0.08, sqrt(g2_d));
         float ob = c2t * eg * u_dog_orient_bias;
         float base = bandCount / 8.0;
-        color.rgb = vec3(base, base + ob * 0.3, base);  // green tint where bonus active
+        vec3 diagColor = vec3(base, base + ob * 0.3, base);
+        // Blend to source inside fovea — all-white there is uninformative
+        float foveaBlend = smoothstep(0.0, fovea_radius * 0.3, ecc_dbg);
+        color.rgb = mix(sampleSource(uv).rgb, diagColor, foveaBlend);
     } else if (debugLevel > 3.5) {
         // Debug 4: Gradient field overlay
         // R = edge strength, G = cardinal (H/V) edges, B = oblique edges
