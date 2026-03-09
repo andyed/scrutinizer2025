@@ -1,234 +1,331 @@
-# **Specification: Semantic Guidance & Linguistic Priming Layer (v2)**
+# Specification: Semantic Guidance & Linguistic Priming Layer (v3)
 
 > [!NOTE]
-> **Version 2.0** — This revision incorporates a critical review addressing gaps in the original spec, particularly regarding legibility gating, icon recognition, and dynamic attention weighting.
+> **Version 3.0** — Rewritten to align with the current Scrutinizer architecture (v2.1+). Replaces v2 spec. Grounded in existing pipeline components: `dom-adapter.js`, `saliency-worker.js`, `peripheral2.frag`, and the declarative mode registry.
 
 > [!IMPORTANT]
 > **Implementation Status: PLANNED**
-> 
-> This specification is a design document for a future feature. Current implementation status:
-> - [ ] Transformers.js integration (model loading)
-> - [ ] Goal Embedding pipeline
-> - [ ] Icon/Symbol Dictionary
-> - [ ] Legibility Gating in shader
-> - [ ] Dynamic Exploration/Exploitation controller
-> - [ ] "Scent Map" visualization overlay
-> 
-> **Dependencies**: Requires `saliency-worker.js` refactor and new shader uniforms. See [ROADMAP.md](../ROADMAP.md) for prioritization.
-
-## **1. Executive Summary**
-
-This feature introduces **Top-Down Attentional Control** to the Scrutinizer engine. By comparing the semantic meaning of a User Goal against the text content of a rendered page, we generate a **Semantic Saliency Map**. This map biases the simulated saccades toward "high information scent" areas, modeling how users scan for specific information rather than just reacting to bright colors or contrast.
+>
+> - [ ] Transformers.js v3 integration (model loading + Web Worker)
+> - [ ] Goal embedding pipeline (user intent → vector)
+> - [ ] Content embedding pipeline (DOM text nodes → vectors)
+> - [ ] Scent texture channel in saliency worker output
+> - [ ] Legibility gating in scent computation
+> - [ ] Exploration/exploitation controller
+> - [ ] Scent map overlay mode
+> - [ ] Icon/symbol dictionary
+> - [ ] `scent_gated` mode in `modes.json`
+>
+> **No external dependencies.** Runs entirely within Electron — no servers, no Qdrant, no external embedding APIs.
 
 ---
 
-## **2. User Experience & Inputs**
+## 1. Executive Summary
 
-### **2.1 Goal Input Mechanism**
+This feature adds **top-down attentional control** to the Scrutinizer pipeline. A user-specified goal ("find the price", "check return policy") is embedded into a vector, compared against the text content of every DOM element the existing `dom-adapter.js` already extracts, and the resulting cosine similarity scores are painted into the saliency texture that the shader already consumes. High-scent regions receive saliency protection; low-scent regions degrade normally.
 
-The designer is presented with a "User Intent" panel. This input drives the generation of the Goal Embedding Vector ($\vec{G}$).
+The integration touches two existing branch points:
+- **Branch point #2 (Saliency):** Scent scores are blended into the R channel of `u_saliencyMap` (TEXTURE3).
+- **Branch point #4 (Structure):** `dom-adapter.js` already harvests text nodes with bounding rects — we extend its output with semantic scores rather than building a parallel extraction pipeline.
 
-### **2.2 Pre-Populated Intents (The "Persona" Menu)**
-
-To facilitate quick testing, the system provides default weighted vectors representing common browsing modes:
-
-| Intent Label | Description | Underlying Logic |
-| :---- | :---- | :---- |
-| **"Just Browsing"** (Baseline) | Low focus, high exploration. | $\beta_{semantic} \approx 0$. Relies on visual pop-out (Itti-Koch) and novelty. |
-| **"Find a Specific Item"** | High focus, narrow search. | User inputs specific keywords (e.g., "Returns Policy"). High $\beta_{semantic}$. |
-| **"Validate Trustworthiness"** | Skeptical scrutiny. | Pre-calculated vector targeting terms like: *reviews, secure, privacy, verified, contact, address*. |
-| **"Transact / Convert"** | Action-oriented. | Pre-calculated vector targeting: *buy, price, checkout, add to cart, sign up*. |
-| **"Learn / Research"** | Information gathering. | vector targeting: *specs, features, how-to, documentation, details*. |
+No shader modifications are required. The scent signal enters through the same saliency gating path that already protects faces and luminance singletons.
 
 ---
 
-## **3. Scientific Basis & Expected Efficacy**
+## 2. User Experience
 
-### **3.1 Theory: Top-Down Control & Information Scent**
+### 2.1 Goal Input
 
-Human vision is rarely passive; it is task-dependent. As demonstrated by **Yarbus (1967)**, eye movement patterns change drastically based on the viewer's goal.
+A text field in the toolbar (or a keyboard shortcut) accepts a free-text goal string. The goal is embedded once and cached until changed. An empty goal disables semantic guidance (pure bottom-up saliency).
 
-* **Information Foraging Theory (Pirolli & Card, 1999):** Users follow "information scent"—visual or linguistic cues that estimate the probability of finding valuable information. This layer quantifies that scent.  
-* **Guided Search Model (Wolfe, 1994):** Attention is a product of Bottom-Up (visual) and Top-Down (task) activation.
+### 2.2 Preset Intents
 
-$$Activation_{total} = W_{bottom} \cdot A_{visual} + W_{top} \cdot A_{semantic}$$
+Quick-select menu of pre-embedded goal vectors:
 
-### **3.2 Linguistic Priming & Pre-Attentive Processing**
+| Label | Goal String | Behavior |
+|-------|-------------|----------|
+| **Just Browsing** | *(empty)* | $\beta_{semantic} = 0$. Bottom-up only. |
+| **Find Item** | User-typed keywords | High $\beta_{semantic}$. Narrow search. |
+| **Validate Trust** | "reviews, verified, secure, privacy, contact" | Skeptical scrutiny. |
+| **Transact** | "buy, price, checkout, add to cart, sign up" | Action-oriented. |
+| **Learn** | "specs, features, documentation, how-to, details" | Research mode. |
 
-While deep reading requires foveal focus, **lexical processing begins parafoveally**.
-
-* **Parafoveal Preview:** Readers process the length and partial shape of the *next* word before their eyes move to it (Rayner, 1998).  
-* **Repetition Priming:** Words seen frequently or recently have lower recognition thresholds. We model this by boosting the saliency of repeated terms (e.g., if the user just read "Price", the next instance of "Price" or "$" pops out more easily).
-
-### **3.3 The Eccentricity-Semantics Interaction** *(New in v2)*
-
-We must model the interaction between visual capability and semantic processing. A strong semantic match is irrelevant if the user cannot physically read the text.
-
-**Legibility Gating:** The Semantic Score ($S_{sem}$) must be modulated by a Visual Acuity function ($A_{visual}$). If a text node is in the far periphery (e.g., >10° eccentricity) and the font size is below the resolution threshold, its semantic signal is suppressed. This forces the simulation to make exploratory saccades to "zoom in" before confirming a match.
-
-$$S_{effective} = S_{sem} \cdot \text{Sigmoid}( \text{Legibility}(font\_size, eccentricity) )$$
-
-> [!IMPORTANT]
-> **The "Eagle Eye" Fallacy:** The original model assumed that if a word matches the goal, it generates saliency regardless of size or position. Physiologically, a user cannot process the semantics of a word in their periphery if the visual acuity at that eccentricity is insufficient to resolve the letters. The semantic signal must be gated by legibility.
+Presets are stored as pre-computed 384-dim Float32Arrays in a JSON file, regenerated at build time.
 
 ---
 
-## **4. Technical Architecture (In-Browser)**
+## 3. Scientific Basis
 
-To maintain the <16ms (60fps) or <5ms (ideal) target, heavy NLP inference must be decoupled from the main thread.
+### 3.1 Information Scent (Pirolli & Card, 1999)
 
-### **4.1 Technology Landscape & Selection**
+Users follow linguistic cues that estimate the probability of finding valuable information. This layer quantifies scent as cosine similarity between goal and content embeddings, then feeds it into the same LGN gating path that already modulates peripheral degradation.
 
-| Technology | Verdict | Rationale |
-| :---- | :---- | :---- |
-| **TensorFlow.js** | ⚠️ Too Heavy | Mature, but often creates large bundle sizes and slower cold-start times for transformer models compared to ONNX. |
-| **WebLLM** | ❌ Overkill | Designed for LLMs (Llama, Vicuna). Too resource-intensive for simple embedding generation. |
-| **Transformers.js** (Rec.) | ✅ **Selected** | Runs state-of-the-art models via **ONNX Runtime Web**. Supports quantization (shrinking models to <20MB). |
-| **WebGPU** | ✅ **Target** | Essential for parallelizing the matrix multiplications of the attention mechanism. |
-| **WASM (SIMD)** | ✅ **Fallback** | Robust fallback for devices without WebGPU support. |
+### 3.2 Guided Search (Wolfe, 1994)
 
-### **4.2 Selected Model: all-MiniLM-L6-v2 (Quantized)**
+Attention combines bottom-up (visual) and top-down (task) activation:
 
-* **Why:** It offers the best trade-off between speed and semantic accuracy. It maps sentences to a 384-dimensional dense vector space.  
-* **Format:** ONNX Quantized (Int8).  
-* **Size:** ~23MB (cacheable).
+$$A_{total} = \alpha \cdot A_{visual} + \beta \cdot A_{semantic}$$
 
-### **4.3 Data Structures**
+The $\alpha / \beta$ balance is dynamic (Section 5.3).
 
-1. **DOMMap:** A registry mapping spatial coordinates to text content.  
-   ```json
-   [{ "id": 1, "text": "Add to Cart", "rect": { "x": 100, "y": 200, "w": 80, "h": 40 } }, ...]
-   ```
+### 3.3 Eccentricity-Semantics Interaction
 
-2. **VectorCache:** A `Map<String, Float32Array>` storing computed embeddings for unique strings to avoid re-inference.
+A semantic match is irrelevant if the text is unreadable at that eccentricity. The scent score must be gated by legibility — the same $E_2$-based resolution model the shader already uses for band cutoffs (Section 5.2).
 
-3. **Icon/Symbol Dictionary** *(New in v2)*: A lightweight lookup table mapping common UI icon classes and SVGs to semantic keywords.
-   
-   | Icon Pattern | Semantic Keyword |
-   |--------------|------------------|
-   | `fa-shopping-cart`, `cart-icon` | "Shopping Cart" |
-   | `fa-search`, `material-icons-search` | "Search" |
-   | `fa-bars`, `hamburger-menu` | "Navigation Menu" |
-   | `fa-user`, `account-icon` | "Account" |
-   | `fa-heart`, `wishlist` | "Favorites" |
-   
-   **Implementation:** Scan class lists for patterns. Map matched icons to keywords before embedding.
-   
-   **Rationale:** Addresses the "Icon Blindness" problem—modern UIs use icons for critical navigation, and a text-only scanner would miss these.
+> **The "Eagle Eye" Fallacy.** A word matching the goal does not generate saliency if the visual system cannot resolve its letters at that eccentricity. Semantic signal must be gated by legibility. This forces the simulation to make exploratory saccades toward candidate regions before confirming a match — which is what humans actually do.
 
-4. **QuadTree Spatial Index** *(New in v2)*: Enables O(log n) spatial lookups during the render loop instead of O(n) linear scans.
+### 3.4 Parafoveal Preview (Rayner, 1998)
+
+Readers process word length and partial shape parafoveally before fixating. We model this by allowing partial scent signal (attenuated, not zeroed) at eccentricities where word shape but not letter identity is available — the zone between the crowding boundary and the acuity limit.
 
 ---
 
-## **5. Implementation Logic (The Pipeline)**
+## 4. Technical Architecture
 
-This logic runs inside `saliency-worker.js`.
+### 4.1 Embedding Engine: Transformers.js v3
 
-### **Phase 1: Initialization (Load)**
+Self-contained, ships with Scrutinizer. No external servers.
 
-1. Check Cache API for `all-MiniLM-L6-v2_quantized.onnx`.  
-2. Initialize `ort.InferenceSession` (ONNX Runtime) with `executionProviders: ['webgpu', 'wasm']`.
+| Property | Value |
+|----------|-------|
+| **Library** | `@huggingface/transformers` v3 |
+| **Model** | `Xenova/all-MiniLM-L6-v2` (384-dim) |
+| **Format** | ONNX quantized (int8, ~23 MB) |
+| **Runtime** | ONNX Runtime Web (WebGPU → WASM fallback) |
+| **Execution** | Dedicated Web Worker (`scent-worker.js`) |
+| **Caching** | Cache API — downloaded once, persisted across sessions |
+| **Cold start** | ~2s (cached), ~8s (first download on fast connection) |
 
-### **Phase 2: Goal Embedding ($\vec{G}$)**
+Why this model: 384 dimensions is sufficient for short UI text strings. Larger models (gte-large, mxbai-embed-large) improve accuracy on paragraphs but are oversized for button labels and menu items. The 23 MB footprint is comparable to face-api.js models already shipped.
 
-1. Receive User Goal String (e.g., "Find the price").  
-2. Run Inference → Output: $1 \times 384$ Float32 vector.
+### 4.2 Worker Architecture
 
-### **Phase 3: Content Map Generation ($\vec{C}$)**
+A new `scent-worker.js` runs alongside the existing `saliency-worker.js`. They communicate through the main thread's texture compositor.
 
-**Trigger:** `IntersectionObserver` (viewport changes) + `MutationObserver` (debounced 500ms).
+```
+                ┌─────────────────────┐
+  Goal string → │   scent-worker.js   │ → scent scores (per-block Float32)
+  DOM blocks  → │  (Transformers.js)  │
+                └─────────────────────┘
+                           │
+                           ▼
+                ┌─────────────────────┐
+  Frame pixels →│ saliency-worker.js  │ → RGBA texture (256px)
+                │  (DoG + face + FC)  │   R: saliency (now includes scent)
+                └─────────────────────┘   G: congestion
+                           │              B: edge density
+                           ▼              A: 255
+                    u_saliencyMap
+                     (TEXTURE3)
+                           │
+                           ▼
+                  peripheral2.frag
+                  (LGN saliency gate)
+```
 
-> [!TIP]
-> **Performance on Dynamic Pages:** SPAs often trigger rapid micro-mutations. The 500ms debounce prevents flooding the inference engine.
+### 4.3 Integration with Existing Components
 
-**Steps:**
+**`dom-adapter.js` (branch point #4)** already produces:
+```javascript
+{ x, y, w, h, type, density, lineHeight, saliency, text? }
+```
 
-1. **Viewport Filtering:** Only extract text nodes currently visible within the viewport + 200px buffer. This prevents wasting cycles on footer content when the user is at the header.
-2. **Icon Augmentation:** Inject semantic keywords for identified icons into the token stream.
-3. **Batch Processing:** Concatenate text nodes and tokenize in a single batch (up to 512 tokens per chunk).  
-4. **Run Inference** → Output: $N \times 384$ matrix.  
-5. **Spatial Indexing:** Insert results into QuadTree for fast spatial lookups during render loop.
+Currently `saliency` is hardcoded to 1.0 for all blocks. The integration:
+1. Extend `dom-adapter.js` to include `text` content in its StructureBlock output (it already walks text nodes via TreeWalker — the text is available, just not exported).
+2. Pass blocks with text to `scent-worker.js` for embedding.
+3. Scent worker returns per-block scores.
+4. `dom-adapter.js` writes scent scores into the `saliency` field of each block.
+5. `saliency-worker.js` reads these scores when painting the R channel — scent-bearing blocks get boosted saliency.
 
-### **Phase 4: Saliency Computation (The "Dual-Stream" Controller)**
+**No new shader uniforms.** The scent signal enters through `u_saliencyMap` R channel, which the LGN saliency gate (`u_lgn_use_saliency_gate`) already reads. High-scent regions are protected; low-scent regions degrade normally.
 
-Instead of a static mix, use a **dynamic controller** based on Task Uncertainty.
+**No new texture slots.** TEXTURE0–4 are all occupied. Scent is blended into the existing saliency texture before upload.
 
-#### **4.1 Semantic Score ($S_{sem}$)**
+---
 
-$$S_{sem} = \frac{\vec{G} \cdot \vec{C}_i}{||\vec{G}|| \cdot ||\vec{C}_i||} \quad (\text{Cosine Similarity})$$
+## 5. Pipeline Logic
 
-(Range: -1.0 to 1.0. Clamp negative values to 0).
+### 5.1 Embedding Pipeline
 
-#### **4.2 Legibility Gating** *(New in v2)*
+Runs in `scent-worker.js`:
 
-Calculate visual acuity at node $i$'s distance from the current simulated gaze point $(g_x, g_y)$.
+**On goal change:**
+1. Tokenize goal string.
+2. Run inference → $\vec{G}$ (1 × 384 Float32Array).
+3. Cache $\vec{G}$ until next change.
+
+**On DOM update** (triggered by `dom-adapter.js`, debounced 500 ms):
+1. Receive StructureBlocks with text content.
+2. Deduplicate text strings (many blocks share identical labels).
+3. Batch embed unique strings → $\vec{C}_i$ (N × 384 matrix).
+4. Compute cosine similarity: $S_i = \max(0, \cos(\vec{G}, \vec{C}_i))$.
+5. Apply legibility gating (Section 5.2).
+6. Apply exploration/exploitation weighting (Section 5.3).
+7. Return per-block scent scores to main thread.
+
+**Cadence:** Embeddings are recomputed when DOM changes (MutationObserver, 500 ms debounce) or viewport scrolls (IntersectionObserver). The goal vector is computed once. Cosine similarity is O(N × 384) — negligible compared to inference.
+
+**Vector cache:** A `Map<string, Float32Array>` keyed on text content. Survives across DOM updates. Cleared on page navigation. Typical page has 50–200 unique text strings; cache prevents re-embedding unchanged content.
+
+### 5.2 Legibility Gating
+
+The scent score is modulated by whether the text is legible at its current eccentricity from gaze:
 
 ```javascript
-const eccentricity = distanceFromGaze(node.rect, gazePoint);
-const minLegibleSize = getMinLegibleFontSize(eccentricity);
-const legibility = sigmoid((node.fontSize - minLegibleSize) / 4);
+const ecc = distanceFromGaze(block.rect, gazePoint);  // pixels → degrees
+const minSize = E2_FONT_THRESHOLD * (1 + ecc / E2);   // M-scaling
+const legibility = sigmoid((block.fontSize - minSize) / 4);
 const S_effective = S_sem * legibility;
 ```
 
-If `legibility < threshold`, set $S_{sem} \approx 0$. The user knows *something* is there, but not *what* it says.
+This uses the same $E_2$ (half-resolution eccentricity) parameter the shader uses for band cutoffs. At eccentricities where letters are irresolvable, scent drops to zero regardless of semantic match. Between the crowding boundary and the acuity limit, partial scent leaks through — modeling parafoveal word-shape processing.
 
-#### **4.3 Dynamic Weighting (Exploration vs Exploitation)** *(New in v2)*
+**Gaze dependency:** Legibility gating makes scent scores gaze-contingent. When gaze moves, the legibility multiplier changes for every block. Recomputation is cheap (no re-embedding, just distance + sigmoid per block) and piggybacks on the existing gaze update loop.
 
-| Mode | Condition | Behavior |
-|------|-----------|----------|
-| **Exploration** | max($S_{sem}$) across viewport is low | No strong scent. Boost Bottom-Up (Visual) saliency. User is "lost" and defaults to scanning salient features. |
-| **Exploitation** | max($S_{sem}$) is high | Strong scent detected. Suppress Bottom-Up saliency. User is "locked on" and will filter out visual noise (e.g., ads). |
+### 5.3 Exploration / Exploitation Controller
 
-$$\beta_{dynamic} = \text{Sigmoid}(\max(S_{sem}) - k)$$
-$$\alpha_{dynamic} = 1.0 - \beta_{dynamic}$$
+Static $\alpha / \beta$ mixing feels robotic. Instead, the blend adapts to scent strength:
 
-> [!NOTE]
-> **Static Weighting Critique:** The original spec suggested a fixed 60/40 mix of visual vs semantic saliency. In reality, this relationship is dynamic. The new controller adapts based on detected scent strength.
+| State | Condition | Behavior |
+|-------|-----------|----------|
+| **Exploration** | $\max(S_{sem})$ across viewport is low | No strong scent. Boost bottom-up saliency. User is scanning. |
+| **Exploitation** | $\max(S_{sem})$ is high | Strong scent. Suppress bottom-up saliency. User is locked on. |
 
-#### **4.4 Priming/Frequency Boost ($B_{freq}$)**
+$$\beta = \sigma(\max(S_{sem}) - k)$$
+$$\alpha = 1.0 - \beta$$
 
-$$B_{freq} = \ln(1 + \text{Count}(Token_i)) \cdot k_{prime}$$
+Where $k$ is a threshold (default 0.4, tunable). The final saliency value per pixel blends bottom-up and semantic:
 
-Where $k_{prime}$ is a small constant (e.g., 0.1) to model the "ease of processing" for familiar terms.
+$$R_{pixel} = \alpha \cdot V_{bottomup} + \beta \cdot S_{effective}$$
 
-#### **4.5 Final Map Integration**
+This is computed in `saliency-worker.js` when painting the R channel, not in the shader.
 
-$$\text{Map}(x,y) = \alpha_{dynamic} \cdot V(x,y) + \beta_{dynamic} \cdot (S_{effective} + B_{freq})$$
+### 5.4 Icon / Symbol Dictionary
 
----
+`dom-adapter.js` already classifies elements by type (text=1.0, media=0.5, interactive=0.0). For interactive elements without visible text, a lightweight dictionary maps icon class patterns to semantic keywords before embedding:
 
-## **6. Visualization Output**
+| Pattern | Injected Text |
+|---------|---------------|
+| `cart`, `basket`, `shopping` | "Shopping Cart" |
+| `search`, `magnify` | "Search" |
+| `menu`, `hamburger`, `bars` | "Navigation Menu" |
+| `user`, `account`, `profile` | "Account" |
+| `heart`, `favorite`, `wishlist` | "Favorites" |
+| `close`, `dismiss`, `×` | "Close" |
 
-The Scrutinizer UI will visualize this layer as:
-
-1. **"Scent Map" Overlay:** A toggleable heatmap showing only the Semantic Saliency layer. (e.g., If the goal is "Price", only numbers and currency symbols glow).
-
-2. **Predicted Gaze Path:** The saccade simulation will now "leap" towards high-scent areas, skipping over visually loud but semantically irrelevant elements (like decorative banners).
-
-3. **"Distractor Analysis" Panel** *(New in v2)*: A list of elements that have high Visual Saliency but low Semantic Saliency relative to the current goal.
-
-   **Example Output:**
-   > "The 'Sign Up' modal is visually dominant ($V=0.9$) but semantically irrelevant ($S=0.1$) to the 'Checkout' goal. It is a **Distractor**."
-
-   **Use Case:** Helps designers identify UI elements that compete for attention but don't serve the user's task.
+Implementation: regex scan on `className`, `aria-label`, `title`, and `alt` attributes. Runs during DOM extraction, before embedding. Extensible via JSON config.
 
 ---
 
-## **7. Critique Summary (v1 → v2)**
+## 6. Mode Registry Integration
 
-| Issue | v1 Weakness | v2 Solution |
-|-------|-------------|-------------|
-| **Icon Blindness** | Text-only scanning misses icon-based navigation | Icon/Symbol Dictionary maps common icons to semantic keywords |
-| **Static Weighting** | Fixed α/β ratio feels robotic | Dynamic Exploration/Exploitation controller |
-| **Dynamic Pages** | Batch processing all nodes risks flooding | Viewport filtering + 500ms debounce + QuadTree indexing |
-| **Eagle Eye Fallacy** | Semantic match regardless of legibility | Legibility gating suppresses signals from illegible periphery |
+Add a `scent_gated` mode to `shared/modes.json`:
+
+```json
+{
+  "name": "scent_gated",
+  "id": 10,
+  "label": "Scent-Gated",
+  "description": "Semantic saliency: goal-relevant content is protected, irrelevant content degrades",
+  "lgn_use_structure_mask": true,
+  "lgn_use_saliency_gate": true,
+  "enable_saliency_modulation": 1.0,
+  "scent_enabled": true,
+  "scent_exploration_threshold": 0.4,
+  "v1_distortion_type": 0,
+  ...
+}
+```
+
+The `scent_enabled` flag tells the main thread to start `scent-worker.js` and route DOM text to it. All other pipeline parameters (DoG bands, chromatic pooling, crowding) remain independent — scent only modulates the saliency channel.
+
+Zero shader changes. The mode registry is the configuration interface (branch point #5).
 
 ---
 
-## **8. References**
+## 7. Visualization
 
-1. **Yarbus, A. L.** (1967). *Eye Movements and Vision*. Plenum Press. (Demonstrates task-dependent gaze trajectories).  
-2. **Pirolli, P., & Card, S.** (1999). *Information Foraging*. Psychological Review. (Foundational theory for "Information Scent").  
-3. **Wolfe, J. M.** (1994). *Guided Search 2.0: A revised model of visual search*. Psychonomic Bulletin & Review. (Architecture for combining top-down and bottom-up signals).  
-4. **Rayner, K.** (1998). *Eye movements in reading and information processing: 20 years of research*. Psychological Bulletin. (Evidence for parafoveal preview and linguistic processing).  
-5. **Hugging Face / Xenova**. (2023). *Transformers.js Documentation*. (Technical feasibility of browser-based embedding).
+### 7.1 Scent Map Overlay
+
+A toggleable overlay (like the existing congestion heatmap, `u_show_congestion`) renders only the semantic saliency channel. High-scent regions glow warm; low-scent regions are dark.
+
+Implementation: reuse the congestion overlay rendering path with a different color ramp. The scent scores are already in the saliency texture R channel; the overlay just needs a uniform to select the display source.
+
+### 7.2 Distractor Analysis
+
+Elements with high bottom-up saliency ($V > 0.7$) but low semantic scent ($S < 0.2$) are flagged as distractors. Rendered as a sidebar list or DOM overlay:
+
+> "The 'Sign Up' banner is visually dominant ($V=0.9$) but irrelevant to the 'Checkout' goal ($S=0.1$). **Distractor.**"
+
+This is a design audit output — useful in `scrutinizer-audit` CLI headless mode.
+
+### 7.3 Stats HUD Integration
+
+The existing ComplexityHUD (Score/Facts/Spatial/Breakdowns tabs) gains a "Scent" tab showing:
+- Goal string
+- Top 5 scent-bearing elements (text + score)
+- Top 3 distractors
+- Exploration/exploitation state
+
+---
+
+## 8. CLI / MCP Integration
+
+`scrutinizer-audit` gains a `--goal` flag:
+
+```bash
+scrutinizer-audit https://example.com --goal "find the price" --viewport desktop
+```
+
+Output includes scent scores per visible element, distractor list, and an aggregate "scent coverage" metric (fraction of viewport area covered by high-scent elements). The MCP server exposes the same via a `semantic_audit` tool.
+
+---
+
+## 9. Performance Budget
+
+| Operation | Frequency | Cost | Thread |
+|-----------|-----------|------|--------|
+| Goal embedding | On change | ~50 ms | scent-worker |
+| Content embedding (50 strings) | On DOM change (500 ms debounce) | ~200 ms | scent-worker |
+| Cosine similarity (50 blocks) | On DOM change | < 1 ms | scent-worker |
+| Legibility gating (50 blocks) | On gaze move (every frame) | < 0.1 ms | main |
+| Texture painting | Every 15th frame | Absorbed into existing saliency paint | saliency-worker |
+
+Model inference is the bottleneck. At ~4 ms/string (WebGPU) or ~15 ms/string (WASM), a 50-element page takes 200–750 ms. This is acceptable because:
+- Embeddings are cached and only recomputed on DOM change.
+- The scent texture updates asynchronously; the shader always has a valid (possibly stale) saliency map.
+- Cold start (model load) is ~2s cached, amortized across the session.
+
+---
+
+## 10. Dependencies
+
+| Package | Version | Size | Purpose |
+|---------|---------|------|---------|
+| `@huggingface/transformers` | ^3.0 | ~2 MB (code) | Inference runtime |
+| `all-MiniLM-L6-v2` (ONNX int8) | — | ~23 MB (model) | Sentence embeddings |
+
+No external servers. No database. Model is downloaded once from Hugging Face CDN and cached via Cache API. Fully offline after first load.
+
+---
+
+## 11. Open Questions
+
+1. **Model size vs. accuracy.** all-MiniLM-L6-v2 (384-dim, 23 MB) is the safe choice. `gte-small` and `bge-small-en-v1.5` are newer and may perform better on short UI strings. Needs benchmarking on actual web page text.
+
+2. **Multilingual.** MiniLM is English-only. For multilingual support, `paraphrase-multilingual-MiniLM-L12-v2` (471 MB) is too large. `multilingual-e5-small` (118 MB) is feasible but increases cold start. Defer until demand.
+
+3. **Priming / frequency boost.** v2 spec proposed boosting repeated terms ($B_{freq} = \ln(1 + \text{count}) \cdot k$). This is biologically motivated (repetition priming lowers recognition thresholds) but adds complexity. Defer to post-MVP.
+
+4. **Scent decay over time.** Once a user fixates a high-scent element and presumably reads it, should its scent decay? This models "information consumed" vs. "information available." Biologically interesting, unclear if useful for design audit.
+
+---
+
+## 12. References
+
+1. **Pirolli, P., & Card, S.** (1999). Information Foraging. *Psychological Review*, 106(4), 643–675.
+2. **Wolfe, J. M.** (1994). Guided Search 2.0. *Psychonomic Bulletin & Review*, 1(2), 202–238.
+3. **Yarbus, A. L.** (1967). *Eye Movements and Vision*. Plenum Press.
+4. **Rayner, K.** (1998). Eye movements in reading and information processing. *Psychological Bulletin*, 124(3), 372–422.
+5. **Fu, W.-T., & Pirolli, P.** (2007). SNIF-ACT: A cognitive model of user navigation on the WWW. *Human–Computer Interaction*, 22(4), 355–412.
+6. **Hugging Face.** (2024). Transformers.js v3 documentation. https://huggingface.co/docs/transformers.js
