@@ -4,8 +4,8 @@
 
 ## In This Release
 
-1. [Per-Channel Chromatic Pooling](#per-channel-chromatic-pooling-castlecsf) — Large colored regions preserve mean chromaticity; small features lose chromatic identity. Per-channel RG/YV decay with suprathreshold correction.
-2. [Congestion-Gated Pooling (Mode 9)](#congestion-gated-pooling-mode-9) — Local clutter modulates peripheral spatial pooling strength. Tests the TTM prediction that clutter and crowding share summary-statistic computation.
+1. [Per-Channel Chromatic Pooling](#per-channel-chromatic-pooling-castlecsf) — Large colored regions preserve mean chromaticity; small features lose chromatic identity. Per-channel RG/YV decay with suprathreshold correction (adjusting detection thresholds to account for the perceived appearance of stimuli well above threshold).
+2. [Congestion-Gated Pooling (Mode 9)](#congestion-gated-pooling-mode-9) — Local clutter modulates peripheral spatial pooling strength. Tests the TTM (Texture Tiling Model — Rosenholtz's framework where peripheral vision represents the visual field via summary statistics computed over pooling regions that grow with eccentricity) prediction that clutter and crowding share summary-statistic computation.
 3. [Saccadic Blindness](#saccadic-blindness) — Foveal region shrinks during rapid mouse movement, simulating saccadic suppression.
 4. [Crowding Diagnostics](#crowding-diagnostics) — Reference pages and a simulation limitations doc exposing the density-independent crowding gap.
 5. [Saliency vs Congestion Split View](#saliency-vs-congestion-split-view) — Side-by-side heatmap comparison: "What pops out?" vs "How cluttered?"
@@ -21,12 +21,12 @@ Full spec: [`docs/specs/implemented/chromatic_pooling.md`](specs/implemented/chr
 
 ### What It Does
 
-Peripheral color is **pooled, not lost** (Rosenholtz TTM). The visual system averages chromaticity over progressively larger regions with eccentricity — a large colored panel retains its mean hue far into the periphery, while small colored text loses chromatic identity because it falls within a single pooling region. The previous uniform chrominance reduction missed both of these effects: it treated a full-width banner and 14px text identically, and it attenuated red-green and blue-yellow at the same rate.
+Peripheral color is **pooled, not lost** (Rosenholtz's Texture Tiling Model). The visual system averages chromaticity over progressively larger regions with eccentricity — a large colored panel retains its mean hue far into the periphery, while small colored text loses chromatic identity because it falls within a single pooling region. The previous uniform chrominance reduction missed both of these effects: it treated a full-width banner and 14px text identically, and it attenuated red-green and blue-yellow at the same rate.
 
 The new pipeline models two biological asymmetries:
 
-- **Size-dependent preservation:** The DoG bands already decompose content by spatial scale. Large color fields live in low-frequency bands where chromatic pooling preserves mean chromaticity. Small colored features live in high-frequency bands where chromatic spatial resolution is genuinely reduced. Per-band attenuation gives size-dependent color preservation for free — no explicit stimulus-size measurement needed.
-- **Channel-dependent rates:** L-M (red-green) is a foveal specialization — midget ganglion cell wiring thins rapidly outside the fovea (castleCSF k_e = 0.059). S-(L+M) (blue-yellow) tracks close to achromatic (k_e = 0.004), persisting far into the periphery. Both channels have frequency-dependent per-band attenuation — YV strongly (k_ef = 0.008), RG weakly (k_ef = 0.003). castleCSF reports k_ef ≈ 0 for RG at detection threshold, but suprathreshold spatial summation means larger red-green stimuli integrate over more receptive fields, yielding better color constancy than small ones.
+- **Size-dependent preservation:** The DoG (Difference of Gaussians) bands already decompose content by spatial scale. Large color fields live in low-frequency bands where chromatic pooling preserves mean chromaticity. Small colored features live in high-frequency bands where chromatic spatial resolution is genuinely reduced. Per-band attenuation gives size-dependent color preservation for free — no explicit stimulus-size measurement needed.
+- **Channel-dependent rates:** L-M (red-green) is a foveal specialization — midget ganglion cell wiring thins rapidly outside the fovea. The castleCSF model (Ashraf et al. 2024 — contrast sensitivity as a function of spatial frequency, eccentricity, and chromatic channel) parameterizes this with k_e (eccentricity decay rate: how fast sensitivity drops per degree from fixation) = 0.059 for RG. S-(L+M) (blue-yellow) tracks close to achromatic (k_e = 0.004), persisting far into the periphery. Both channels have frequency-dependent per-band attenuation controlled by k_ef (the interaction between eccentricity and spatial frequency decay) — YV strongly (k_ef = 0.008), RG weakly (k_ef = 0.003). castleCSF reports k_ef ≈ 0 for RG at detection threshold, but suprathreshold spatial summation means larger red-green stimuli integrate over more receptive fields, yielding better color constancy than small ones.
 
 ### Suprathreshold Correction
 
@@ -45,7 +45,7 @@ The castleCSF parameters are detection thresholds — the minimum visible chroma
 
 ### Implementation
 
-6 uniforms: `u_chromatic_pooling`, `u_rg_decay`, `u_rg_freq_decay`, `u_yv_decay`, `u_yv_freq_decay`, `u_supra_exponent`. The `chromaticAttenuate()` helper splits each DoG band into Oklab luminance + chrominance, attenuates `a` (RG) and `b` (YV) independently per band, recombines. Both channels now have per-band frequency-dependent attenuation — YV strongly (k_ef=0.008), RG weakly (k_ef=0.003). When chromatic pooling is active, the legacy V4 uniform chrominance path and Red Kill Switch are bypassed.
+6 uniforms: `u_chromatic_pooling`, `u_rg_decay`, `u_rg_freq_decay`, `u_yv_decay`, `u_yv_freq_decay`, `u_supra_exponent`. The `chromaticAttenuate()` helper splits each DoG band into Oklab (a perceptually uniform color space where L = lightness, a = red-green, b = blue-yellow) luminance + chrominance, attenuates `a` (RG) and `b` (YV) independently per band, recombines. Both channels now have per-band frequency-dependent attenuation — YV strongly (k_ef=0.008), RG weakly (k_ef=0.003). When chromatic pooling is active, the legacy V4 uniform chrominance path and Red Kill Switch are bypassed.
 
 Enabled on modes 0 (High-Key), 1 (Biological), 9 (Congestion). Menu toggle: Behavior → Chromatic Pooling (RG/YV).
 

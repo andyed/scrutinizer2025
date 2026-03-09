@@ -13,7 +13,7 @@
 3. [Experimental Stimuli](#experimental-stimuli) — 15 HTML reference pages shipped as open-source psychophysical stimuli. Menu: Go → Reference Pages → Experimental Stimulus.
 4. [Arxiv Paper Updates](#arxiv-paper-updates) — Walton 2021 contradiction fixed, WebGPU tiered roadmap added, mongrel Tier 2.5 spec.
 5. [Wave 5: Halverson Mixed-Density Validation](#wave-5-halverson-mixed-density) — Behavioral validation of density gate against Halverson & Hornof (2011) UI visual search data. Stimulus page, capture script, analysis script.
-6. [8 Half-Octave DoG Bands](#8-half-octave-dog-bands) — DoG peripheral reconstruction upgraded from 4 octave-spaced to 8 half-octave bands. Smoother blur gradient, twice as many frequency transition steps.
+6. [8 Half-Octave DoG Bands](#8-half-octave-dog-bands) — DoG (Difference of Gaussians — isolates spatial frequency bands by subtracting two blurred versions of an image) peripheral reconstruction upgraded from 4 octave-spaced to 8 half-octave bands. Smoother blur gradient, twice as many frequency transition steps.
 7. [Capture Infrastructure](#capture-infrastructure) — `TEST_LOAD_TIMEOUT` for heavy external pages; appendix baseline capture script.
 
 ---
@@ -26,9 +26,9 @@ v2.1 ships the validation infrastructure that grounds the arxiv paper's claims. 
 
 Each wave targets a different stage of the rendering pipeline and emulates a different class of psychophysical experiment:
 
-**Wave 1 — Chromatic decay** emulates a *color naming task* (Hansen et al. 2009). Colored singletons on a neutral background at increasing eccentricity. The question: does the Oklab RG/YV decomposition predict which colors lose identity first? This tests the V4 chromatic processing stage — the castleCSF contrast sensitivity functions and the suprathreshold correction. What matters is channel assignment: green tracks the RG decay curve, not BY. A hue-rotation model would get this wrong; Oklab opponent channels get it right.
+**Wave 1 — Chromatic decay** emulates a *color naming task* (Hansen et al. 2009). Colored singletons on a neutral background at increasing eccentricity. The question: does the Oklab RG/YV decomposition predict which colors lose identity first? This tests the V4 chromatic processing stage — the castleCSF contrast sensitivity functions (Ashraf et al. 2024 — a model of how contrast detection thresholds vary with spatial frequency, eccentricity, and chromatic channel) and the suprathreshold correction (adjusting from bare detection thresholds to the perceived appearance of stimuli well above threshold, which is what web colors are). What matters is channel assignment: green tracks the RG decay curve, not BY. A hue-rotation model would get this wrong; Oklab opponent channels get it right.
 
-**Wave 2 — Spatial frequency** emulates a *contrast sensitivity measurement* (Rovamo & Virsu 1979). Sine-wave gratings at known frequencies presented at increasing eccentricity. The question: does the DoG band decomposition attenuate each spatial frequency at the eccentricity predicted by M-scaling? This tests the retinal ganglion cell stage — the MIP chain as a Laplacian pyramid. The key finding is that the pipeline is frequency-selective (high frequencies drop before low), not uniformly degrading (as Gaussian blur would be).
+**Wave 2 — Spatial frequency** emulates a *contrast sensitivity measurement* (Rovamo & Virsu 1979). Sine-wave gratings at known frequencies presented at increasing eccentricity. The question: does the DoG band decomposition attenuate each spatial frequency at the eccentricity predicted by M-scaling (the principle that spatial resolution scales with cortical magnification factor — more cortex per degree near the fovea, less in the periphery)? This tests the retinal ganglion cell stage — the MIP chain as a Laplacian pyramid. The key finding is that the pipeline is frequency-selective (high frequencies drop before low), not uniformly degrading (as Gaussian blur would be).
 
 **Wave 3 — Crowding geometry** emulates a *flanked letter identification task* (Bouma 1970, Toet & Levi 1992). Target letters surrounded by flankers at parametric spacing and eccentricity. The question: does the V1 distortion stage produce crowding zones whose geometry matches published measurements? This tests two things: that polar sector elongation approximates the 2:1 radial:tangential aspect ratio, and that the density gate differentiates crowded from isolated targets. The architectural limit — no spacing-dependent Bouma curve — is documented.
 
@@ -113,7 +113,7 @@ v2.1 adds a fifth validation wave targeting the density gate — the first wave 
 
 ### Why this experiment
 
-Halverson & Hornof (2011) built an EPIC cognitive architecture model of visual search in HCI. Their Text-Encoding Error (TEE) model found that peripheral encoding accuracy depends on local text density: 90% accuracy for sparse text (nearest neighbor ≥ 0.15°), 50% for dense text (< 0.15°). The perception region stays constant at 1° — it's encoding quality that drops with density.
+Halverson & Hornof (2011) built a model within the EPIC cognitive architecture (Executive Process/Interactive Control — a production-system framework for modeling human perception, cognition, and motor behavior) of visual search in HCI. Their Text-Encoding Error (TEE) model found that peripheral encoding accuracy depends on local text density: 90% accuracy for sparse text (nearest neighbor ≥ 0.15°), 50% for dense text (< 0.15°). The perception region stays constant at 1° — it's encoding quality that drops with density.
 
 This is analogous to Scrutinizer's density gate: the rendered region doesn't change with density, but distortion increases in dense areas. Wave 5 tests whether Scrutinizer's pipeline predicts the same density-dependent degradation pattern that Halverson validated against 24 participants' eye-tracking data.
 
@@ -173,8 +173,8 @@ The DoG peripheral reconstruction in `peripheral2.frag` now uses 8 half-octave b
 
 ### What changed
 
-- **MIP sampling**: 5 levels (LOD 0–4) → 9 levels (LOD 0.0, 0.5, 1.0, ... 4.0). Half-integer LODs use hardware trilinear interpolation natively.
-- **Band decomposition**: 4 bands (4, 2, 1, 0.5 cpd) → 8 bands (5.66, 4.0, 2.83, 2.0, 1.41, 1.0, 0.71, 0.5 cpd). Geometric √2 spacing.
+- **MIP sampling**: 5 levels (LOD 0–4) → 9 levels (LOD 0.0, 0.5, 1.0, ... 4.0). LOD = Level of Detail — which MIP level the GPU samples from, where higher LODs are blurrier. Half-integer LODs use hardware trilinear interpolation natively.
+- **Band decomposition**: 4 bands (4, 2, 1, 0.5 cpd) → 8 bands (5.66, 4.0, 2.83, 2.0, 1.41, 1.0, 0.71, 0.5 cpd). Cpd = cycles per degree of visual angle — how many light-dark stripes fit in one degree. Higher cpd = finer detail. Geometric √2 spacing.
 - **Cutoff eccentricities**: `cutoff_k = E2 × (2^(k/2) − 1)`. Odd-indexed cutoffs match the old 4-band values exactly — existing E2 tuning carries over.
 
 ### Why
