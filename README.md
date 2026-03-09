@@ -48,6 +48,8 @@ The rendering pipeline mirrors how the brain's visual pathway actually works —
 
 Resolution falloff across all stages follows a [cortical magnification function](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html) — a log-mapping that describes how the brain allocates disproportionate processing power to the center of gaze.
 
+**DOM-aware rendering.** Most foveated renderers operate on pixels alone. Scrutinizer reads the live DOM — it groups adjacent text nodes into paragraph clusters (Gestalt proximity), measures local density from the node tree, and feeds that into the V1 crowding gate. A dense text column and an isolated heading at the same eccentricity get different treatment, because Rosenholtz's pooling regions would compute different summary statistics over them. The density signal comes from structure, not just pixel variance.
+
 **[Feature Congestion](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html)** scoring runs alongside the pipeline, measuring visual clutter (color variance, edge density, contrast) to produce a 0–100 complexity score per region. See [congestion-journey.md](docs/congestion-journey.md).
 
 **Calibration.** A [Motion Silence staircase](docs/foveal-calibration-logic.md) anchors the simulation to the user's actual perceptual foveal extent.
