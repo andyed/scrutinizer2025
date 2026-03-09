@@ -826,9 +826,10 @@ function createScrutinizerWindow(startUrl) {
 
 
 
-    // Position views
+    // Position views — use getContentSize() not getSize() because child view
+    // bounds are relative to the content area (excludes title bar on macOS)
     const updateViewBounds = () => {
-        const [width, height] = win.getSize();
+        const [width, height] = win.getContentSize();
         // Toolbar at top
         toolbarView.setBounds({ x: 0, y: 0, width: width, height: TOOLBAR_HEIGHT });
         // Content below toolbar
