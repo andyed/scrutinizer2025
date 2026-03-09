@@ -1,7 +1,7 @@
 # Gaussian Blur Comparison: Frequency-Selective vs Uniform Degradation
 
-**Status:** Not started
-**Priority:** High — central claim in arxiv paper lacks direct evidence
+**Status:** In progress — shader `u_gaussian_blur_mode` implemented, spatial-frequency data collected (inconclusive), expanding to chromatic + saliency stimuli
+**Priority:** High — central claim in arxiv paper lacks direct evidence on spatial frequency alone; multi-dimensional comparison needed
 **Tracks:** v2.1 validation gap
 
 ## The Problem
@@ -80,15 +80,150 @@ The comparison succeeds if:
 3. **The difference is measurable** — at intermediate eccentricities (5-15°), DoG retains significantly more low-frequency contrast than Gaussian at matched total information loss
 4. **Real web content** shows visible structural preservation under DoG that Gaussian destroys
 
+## Findings: Spatial Frequency Alone Is Insufficient
+
+**2026-03-08**: First capture run (48 screenshots, 5 frequencies × 5 E2 values × {DoG, Gaussian, baseline}) shows DoG and Gaussian produce **near-identical** contrast retention slopes on achromatic gratings. At ring 4 (10°): DoG slope = -0.4675, Gaussian slope = -0.4675. At ring 5 (13.1°): DoG = -0.3592, Gaussian = -0.3601.
+
+**Root cause**: The MIP chain is itself a Gaussian pyramid. `sampleMIPPooled()` (Gaussian mode) and `sampleDoGReconstructed()` (DoG mode) both sample from the same MIP levels — the band decomposition and reconstruction produces effectively the same total attenuation as a single MIP sample at the same eccentricity-scaled level. The difference between them is one of pathway (8 weighted bands vs 1 MIP sample) not of information content on single-frequency stimuli.
+
+**Implication**: The differentiation argument cannot rest on spatial frequency selectivity alone. It must include the dimensions where the full Scrutinizer pipeline structurally differs from pure Gaussian blur:
+
+1. **Chromatic channel separation** — per-band RG/YV decay rates (castleCSF) that Gaussian blur cannot reproduce
+2. **Saliency protection** — eccentricity modulated by saliency map, reducing degradation at salient regions
+3. **Density-gated crowding** — V1 distortion strength modulated by DOM structure map density
+4. **Congestion pooling** — Rosenholtz Feature Congestion boosting pooling in cluttered regions
+
+## Expanded Comparison: Multi-Dimensional
+
+### Capture Scripts (updated)
+- `capture-color-search.js` — now includes `gaussian` condition alongside `filtered` and `baseline`
+  - Run `--gaussian-only` to add Gaussian captures to existing dataset
+- `capture-saliency.js` — now includes `popout_gaussian` and `face_gaussian` conditions
+  - Run `--gaussian-only` for incremental capture
+
+### Analysis Scripts (updated)
+- `analyze-color-search.js` — now parses `gaussian` condition, outputs DoG vs Gaussian chroma retention comparison table
+- `analyze-saliency.js` — now computes DoG vs Gaussian deviation from baseline at each stimulus region
+
+### Expected Multi-Dimensional Results
+| Dimension | DoG pipeline | Gaussian | Why Gaussian fails |
+|-----------|-------------|----------|--------------------|
+| Chromatic (color-search) | RG decays faster than YV per band | Uniform desaturation | No opponent-channel separation |
+| Saliency (popout/face) | Salient regions get reduced degradation | Same blur everywhere | No saliency gating |
+| Crowding (halverson) | Dense text gets stronger V1 distortion | Same blur regardless | No DOM awareness |
+| Congestion (halverson mode 9) | High-clutter = stronger pooling | Same blur everywhere | No congestion signal |
+
+## Results: Saliency Protection (2026-03-08)
+
+22 new captures (20 color-search + 2 saliency) with `u_gaussian_blur_mode = true`.
+
+### Saliency: DoG+saliency vs Gaussian blur
+
+Deviation from unfiltered baseline, measured as mean absolute pixel difference across each stimulus region. Lower = closer to original = better preservation.
+
+| Region | Saliency channel | DoG+saliency dev | Gaussian dev | Ratio | Effect |
+|--------|-----------------|-----------------|-------------|-------|--------|
+| Face | Face detector (640px) | 2.9 | 23.9 | 0.121 | **8.2× better** |
+| Luminance singleton | Bottom-up DoG (256px) | 1.3 | 14.0 | 0.094 | **10.8× better** |
+| Color singleton | Bottom-up DoG (256px) | 1.2 | 6.7 | 0.173 | **5.6× better** |
+| Control | — | 4.9 | 15.5 | 0.318 | 3.2× better |
+| Background (center) | — | 0.0 | 0.0 | N/A | Both preserve fovea |
+
+**Key finding**: The full Scrutinizer pipeline preserves salient content 5–10× better than eccentricity-matched Gaussian blur. This is not a tuning difference — Gaussian blur has no saliency signal, so it structurally cannot modulate degradation by content importance.
+
+The control region also shows a 3.2× advantage, which is expected: the control region sits in the periphery where mode 0's V1 distortion and desaturation produce less total deviation than Gaussian's uniform MIP blur at the same eccentricity. The control advantage is smaller than the high-saliency advantage, confirming the saliency gating is doing differential work.
+
+### Face page (no baseline available)
+
+Direct DoG-vs-Gaussian pixel comparison (not deviation from baseline):
+
+| Region | Delta (DoG vs Gaussian) |
+|--------|------------------------|
+| Face center | 107.7 |
+| Background | 111.5 |
+
+Both show large deltas, confirming the two pipelines produce visibly different output. The face delta is slightly smaller than background, suggesting the DoG pipeline preserved more face structure — but without a baseline this is not a clean protection metric.
+
+### Validation checks (all PASS)
+
+```
+[PASS] Color singleton: DoG preserves salient content better (dev=1.2 vs Gaussian=6.7)
+[PASS] Luminance singleton: DoG preserves salient content better (dev=1.3 vs Gaussian=14)
+[PASS] Face: DoG preserves salient content better (dev=2.9 vs Gaussian=23.9)
+```
+
+## arxiv Integration: Draft LaTeX
+
+The following extends Section 4.4 (Saliency-Driven Protection) with a Gaussian comparison subsection. Insert after the existing protection ratio table (Table 5) and before Section 4.5 (Summary and Failure Analysis).
+
+```latex
+\textbf{Gaussian comparison.} A matched eccentricity-scaled Gaussian blur
+(\texttt{u\_gaussian\_blur\_mode}), using the same MIP chain and M-scaling
+curve but without band decomposition, saliency gating, or chromatic
+separation, was applied to the same stimulus. Table~\ref{tab:gaussian_saliency}
+reports mean absolute pixel deviation from the unfiltered baseline at each
+region. The full pipeline preserves salient content 5--10$\times$ better
+than Gaussian blur.
+
+\begin{table}[t]
+\centering
+\caption{DoG+saliency vs.\ Gaussian blur: deviation from unfiltered baseline (lower = better preservation). Ratio $< 1$ means the full pipeline preserves more content.}\vspace{-2pt}
+\label{tab:gaussian_saliency}
+\footnotesize
+\begin{tabular}{@{}lcccl@{}}
+\toprule
+\textbf{Region} & \textbf{DoG+sal} & \textbf{Gaussian} & \textbf{Ratio} & \textbf{Effect} \\
+\midrule
+Face              & 2.9  & 23.9 & 0.121 & 8.2$\times$ \\
+Luminance single. & 1.3  & 14.0 & 0.094 & 10.8$\times$ \\
+Color singleton   & 1.2  &  6.7 & 0.173 & 5.6$\times$ \\
+Control           & 4.9  & 15.5 & 0.318 & 3.2$\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This is not a parameter-tuning advantage. Gaussian blur has no saliency
+signal; it structurally cannot modulate degradation by content importance.
+The control region also shows a 3.2$\times$ advantage because mode~0's
+biological pipeline (V1 distortion, Oklab desaturation) produces less total
+deviation than uniform MIP blur at matched eccentricity---but the
+high-saliency advantage (5--10$\times$) exceeds the control advantage
+(3.2$\times$), confirming the saliency gate is doing differential work.
+
+The spatial-frequency comparison (Section~\ref{sec:validation}.2) showed
+DoG and Gaussian produce near-identical contrast retention slopes on
+achromatic gratings (ring~4: both $-0.4675$; ring~5: $-0.3592$ vs.\
+$-0.3601$). Both pipelines sample from the same MIP chain, so the band
+decomposition does not add frequency selectivity beyond what the MIP
+pyramid already provides. The differentiation is architectural: saliency
+gating, chromatic channel separation, and density-gated crowding are
+pipeline stages that Gaussian blur lacks entirely.
+```
+
+### Where this goes in the paper
+
+1. **Table 5 area** (line ~239): Insert the new table and text after the existing saliency protection discussion
+2. **Abstract** (line 55): The claim "Difference-of-Gaussians band decomposition... for frequency-selective attenuation" should be softened — the MIP chain produces equivalent frequency selectivity. The real differentiation is the multi-stage pipeline (saliency, chromatic, crowding), not the DoG bands alone.
+3. **Introduction** (line 61): "uniformly destroying spatial structure that real peripheral vision preserves" — this claim is now empirically supported for saliency (5–10×), not just theoretically argued
+4. **Summary table** (Table 6, line ~245): Add a row or note for the Gaussian comparison results
+5. **Open Problems** (line 285): The "Continuous cortical magnification" discussion can note that the DoG/Gaussian equivalence on spatial frequency is a characterized limitation, while the pipeline-level advantages (saliency, chromatic, crowding) are the primary differentiation
+
+### What still needs to happen
+- [ ] Screenshots of DoG vs Gaussian output on the popout stimulus (visual figure for the paper)
+- [ ] Chromatic comparison analysis needs reframing (DoG+chromatic pooling produces biologically correct differential RG/YV decay; Gaussian does not desaturate at all)
+- [ ] Consider adding Halverson mixed-density comparison (Wave 5 with Gaussian condition) for density-gated crowding evidence
+
 ## Failure Modes
 
-- If the MIP chain's discrete bands make DoG effectively Gaussian between band boundaries, the difference may be smaller than claimed
+- If the MIP chain's discrete bands make DoG effectively Gaussian between band boundaries, the difference may be smaller than claimed — **CONFIRMED on spatial frequency stimuli**
 - If "matched total information loss" is hard to define, the comparison becomes apples-to-oranges
-- If Gaussian with eccentricity-scaled radius already produces decent frequency selectivity (large Gaussian kernels naturally attenuate high frequencies more), the difference may be one of degree rather than kind
+- If Gaussian with eccentricity-scaled radius already produces decent frequency selectivity (large Gaussian kernels naturally attenuate high frequencies more), the difference may be one of degree rather than kind — **CONFIRMED: both use MIP chain, so both are inherently Gaussian**
+- The multi-dimensional comparison avoids these failure modes because saliency gating, chromatic separation, and density-gated crowding are architectural features that Gaussian blur structurally lacks
 
 ## References
 
 - Rovamo, J. & Virsu, V. (1979). An estimation and application of the human cortical magnification factor. *Experimental Brain Research*, 37, 495-510.
 - Geisler, W.S. & Perry, J.S. (1998). A real-time foveated multiresolution system for low-bandwidth video communication. *SPIE Human Vision*.
+- Itti, L., Koch, C. & Niebur, E. (1998). A model of saliency-based visual attention. *IEEE Trans PAMI*, 20(11), 1254-1259.
 - Arxiv paper Section 4: Wave 2 spatial frequency results
 - Arxiv paper Section 5: "Continuous cortical magnification" open problem

@@ -135,7 +135,7 @@ function samplePatch(png, x, y) {
 
 // ── Parse filename: color_sizepx_condition.png ──
 function parseFilename(name) {
-  const m = name.match(/^(\w+)_(\d+)px_(filtered|baseline)\.png$/);
+  const m = name.match(/^(\w+)_(\d+)px_(filtered|gaussian|baseline)\.png$/);
   if (!m) return null;
   return { color: m[1], size: parseInt(m[2]), condition: m[3] };
 }
@@ -234,6 +234,40 @@ function analyze() {
       for (const e of entries.sort((a, b) => a.ring - b.ring)) {
         const ret = e.retention !== undefined ? `retention=${(e.retention * 100).toFixed(1)}%` : '';
         console.log(`  ${e.label.padEnd(12)} (${String(e.dist_px).padStart(3)}px): chroma=${e.band_chroma.toFixed(4)}  delta_C=${e.delta_C.toFixed(4)}  ${ret}`);
+      }
+      console.log();
+    }
+
+    // ── DoG vs Gaussian comparison table ──
+    // For each color/size, compare chroma retention at each ring
+    const hasGaussian = results.some(r => r.condition === 'gaussian');
+    if (hasGaussian) {
+      console.log('=== DoG vs Gaussian Chroma Retention ===\n');
+      console.log('Color    Size  Ring  Dist   DoG_ret  Gauss_ret  Advantage');
+      console.log('-------  ----  ----  -----  -------  ---------  ---------');
+
+      const colorSizes = [...new Set(results.map(r => `${r.color}_${r.size_px}`))];
+      for (const cs of colorSizes) {
+        const [color, sizeStr] = cs.split('_');
+        const size = parseInt(sizeStr);
+        const filtered = results.filter(r => r.color === color && r.size_px === size && r.condition === 'filtered');
+        const gaussian = results.filter(r => r.color === color && r.size_px === size && r.condition === 'gaussian');
+
+        for (let ring = 1; ring <= RINGS.length; ring++) {
+          const f = filtered.find(r => r.ring === ring);
+          const g = gaussian.find(r => r.ring === ring);
+          if (!f || !g || f.retention === undefined || g.retention === undefined) continue;
+
+          const advantage = ((f.retention - g.retention) * 100).toFixed(1);
+          const sign = f.retention > g.retention ? '+' : '';
+          console.log(
+            `${color.padEnd(7)}  ${String(size).padStart(4)}  ${String(ring).padStart(4)}  ` +
+            `${String(RINGS[ring - 1]).padStart(5)}  ` +
+            `${(f.retention * 100).toFixed(1).padStart(7)}%  ` +
+            `${(g.retention * 100).toFixed(1).padStart(8)}%  ` +
+            `${(sign + advantage + 'pp').padStart(9)}`
+          );
+        }
       }
       console.log();
     }

@@ -243,6 +243,7 @@ function analyzeProtection(dir) {
       modOn: 'popout_filtered_mod_on.png',
       modOff: 'popout_filtered_mod_off.png',
       baseline: 'popout_baseline.png',
+      gaussian: 'popout_gaussian.png',
       regions: REGIONS,
     },
     {
@@ -250,6 +251,7 @@ function analyzeProtection(dir) {
       modOn: 'face_filtered_mod_on.png',
       modOff: 'face_filtered_mod_off.png',
       baseline: null,  // face-test has no baseline capture in the matrix
+      gaussian: 'face_gaussian.png',
       regions: FACE_REGIONS,
     },
   ];
@@ -367,6 +369,71 @@ function analyzeProtection(dir) {
   if (faceFaceResult && faceBgResult) {
     const faceProtected = faceFaceResult.delta > faceBgResult.delta;
     console.log(`[${faceProtected ? 'PASS' : 'INFO'}] Face modulation delta (${faceFaceResult.delta}) > background delta (${faceBgResult.delta})`);
+  }
+
+  // ── DoG vs Gaussian comparison ──
+  // Compare deviation from baseline at each region: DoG+saliency (mod_on) vs Gaussian (no saliency gating)
+  console.log('\n--- DoG vs Gaussian Comparison ---\n');
+
+  for (const page of pages) {
+    const gaussianPng = loadPng(path.join(dir, page.gaussian));
+    const baselinePng = page.baseline ? loadPng(path.join(dir, page.baseline)) : null;
+    const modOnPng = loadPng(path.join(dir, page.modOn));
+
+    if (!gaussianPng || !modOnPng) {
+      console.log(`Skipping ${page.name} Gaussian comparison: missing captures`);
+      console.log(`Run: node scripts/capture-saliency.js --gaussian-only`);
+      continue;
+    }
+
+    console.log(`--- ${page.name}: DoG+saliency vs Gaussian ---\n`);
+
+    if (baselinePng) {
+      console.log('Region                  Dev(DoG)  Dev(Gauss)  Advantage');
+      console.log('----------------------  --------  ----------  ---------');
+
+      for (const [key, region] of Object.entries(page.regions)) {
+        const devDoG = computeDeviation(modOnPng, baselinePng, region.cx, region.cy, region.w, region.h);
+        const devGauss = computeDeviation(gaussianPng, baselinePng, region.cx, region.cy, region.w, region.h);
+        const advantage = devGauss > 0 ? round3(devDoG / devGauss) : null;
+
+        console.log(
+          `${region.label.padEnd(22)}  ` +
+          `${round1(devDoG).toFixed(1).padStart(8)}  ` +
+          `${round1(devGauss).toFixed(1).padStart(10)}  ` +
+          `${advantage !== null ? round3(advantage).toFixed(3).padStart(9) : '      N/A'}`
+        );
+      }
+    } else {
+      // No baseline: compare DoG vs Gaussian directly
+      console.log('Region                  Delta(DoG-Gauss)');
+      console.log('----------------------  ----------------');
+
+      for (const [key, region] of Object.entries(page.regions)) {
+        const delta = computeDeviation(modOnPng, gaussianPng, region.cx, region.cy, region.w, region.h);
+        console.log(
+          `${region.label.padEnd(22)}  ` +
+          `${round1(delta).toFixed(1).padStart(16)}`
+        );
+      }
+    }
+
+    console.log();
+
+    // Validation: at high-saliency regions, DoG should deviate less from baseline than Gaussian
+    if (baselinePng) {
+      for (const [key, region] of Object.entries(page.regions)) {
+        if (region.expect !== 'high') continue;
+        const devDoG = computeDeviation(modOnPng, baselinePng, region.cx, region.cy, region.w, region.h);
+        const devGauss = computeDeviation(gaussianPng, baselinePng, region.cx, region.cy, region.w, region.h);
+        const better = devDoG < devGauss;
+        console.log(
+          `[${better ? 'PASS' : 'FAIL'}] ${region.label}: DoG preserves salient content better ` +
+          `(dev=${round1(devDoG)} vs Gaussian=${round1(devGauss)})`
+        );
+      }
+      console.log();
+    }
   }
 
   if (hasFlag('json')) {

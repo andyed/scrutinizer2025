@@ -44,11 +44,13 @@ const colors = getArg('colors', ALL_COLORS.join(',')).split(',');
 const sizes = getArg('sizes', ALL_SIZES.join(',')).split(',').map(Number);
 const dryRun = hasFlag('dry-run');
 
-// Two conditions: filtered (Scrutinizer active with chromatic pooling) and baseline (off)
+// Conditions: filtered (DoG + chromatic pooling), Gaussian comparison, and baseline
 const CONDITIONS = [
-  { id: 'filtered', chromaticPooling: 'true', mode: '0' },
-  { id: 'baseline', chromaticPooling: 'false', mode: '0' },
+  { id: 'filtered',  chromaticPooling: 'true',  gaussianBlur: 'false', mode: '0' },
+  { id: 'gaussian',  chromaticPooling: 'false', gaussianBlur: 'true',  mode: '0' },
+  { id: 'baseline',  chromaticPooling: 'false', gaussianBlur: 'false', mode: 'disabled' },
 ];
+const onlyGaussian = hasFlag('gaussian-only');
 
 function runCapture(color, size, condition) {
   return new Promise((resolve, reject) => {
@@ -74,6 +76,7 @@ function runCapture(color, size, condition) {
       TEST_FIXATION_Y: '0.5',
       TEST_OVERLAY: 'false',
       TEST_CHROMATIC_POOLING: condition.chromaticPooling,
+      TEST_GAUSSIAN_BLUR: condition.gaussianBlur,
       TEST_OUTPUT_FILENAME: filename,
       SCREENSHOT_MODE: 'update',
       ELECTRON_RUN_AS_NODE: undefined,
@@ -107,11 +110,14 @@ function runCapture(color, size, condition) {
 }
 
 async function main() {
-  const total = colors.length * sizes.length * CONDITIONS.length;
+  const conditions = onlyGaussian
+    ? CONDITIONS.filter(c => c.id === 'gaussian')
+    : CONDITIONS;
+  const total = colors.length * sizes.length * conditions.length;
   console.log(`\nWave 1 Color Search Capture`);
   console.log(`  Colors: ${colors.join(', ')}`);
   console.log(`  Sizes: ${sizes.join(', ')}px`);
-  console.log(`  Conditions: ${CONDITIONS.map(c => c.id).join(', ')}`);
+  console.log(`  Conditions: ${conditions.map(c => c.id).join(', ')}`);
   console.log(`  Total: ${total} screenshots`);
   console.log(`  Output: ${OUTPUT_DIR}`);
   console.log(`  Fovea radius: ${CAPTURE_FOVEA_RADIUS}px, Window: ${CAPTURE_WIDTH}x${CAPTURE_HEIGHT}`);
@@ -122,7 +128,7 @@ async function main() {
   let captured = 0;
   for (const color of colors) {
     for (const size of sizes) {
-      for (const condition of CONDITIONS) {
+      for (const condition of conditions) {
         await runCapture(color, size, condition);
         captured++;
         if (!dryRun) {

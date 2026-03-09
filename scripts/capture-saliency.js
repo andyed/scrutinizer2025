@@ -37,7 +37,10 @@ const CAPTURE_HEIGHT = '1080';
 const dryRun = hasFlag('dry-run');
 const pagesFilter = getArg('pages', 'all');
 
-// Capture matrix: 7 captures across 2 pages × multiple conditions
+const onlyGaussian = hasFlag('gaussian-only');
+
+// Capture matrix: 11 captures across 2 pages × multiple conditions
+// Gaussian conditions added for DoG vs Gaussian comparison (uniform blur, no saliency gating)
 const CAPTURES = [
   // Test 4A: Saliency debug view of popout stimulus
   {
@@ -45,6 +48,7 @@ const CAPTURES = [
     page: 'saliency-popout.html',
     mode: 'saliency',
     saliencyMod: null,    // default
+    gaussianBlur: 'false',
     group: 'popout',
   },
   // Test 4B: Protection captures for popout
@@ -53,6 +57,7 @@ const CAPTURES = [
     page: 'saliency-popout.html',
     mode: '0',
     saliencyMod: 'true',
+    gaussianBlur: 'false',
     group: 'popout',
   },
   {
@@ -60,6 +65,7 @@ const CAPTURES = [
     page: 'saliency-popout.html',
     mode: '0',
     saliencyMod: 'false',
+    gaussianBlur: 'false',
     group: 'popout',
   },
   {
@@ -67,6 +73,16 @@ const CAPTURES = [
     page: 'saliency-popout.html',
     mode: 'bypass',
     saliencyMod: null,
+    gaussianBlur: 'false',
+    group: 'popout',
+  },
+  // Test 4C: Gaussian blur on popout — same eccentricity scaling, no saliency gating
+  {
+    id: 'popout_gaussian',
+    page: 'saliency-popout.html',
+    mode: '0',
+    saliencyMod: 'false',
+    gaussianBlur: 'true',
     group: 'popout',
   },
   // Face-test saliency + protection
@@ -75,6 +91,7 @@ const CAPTURES = [
     page: 'saliency-face.html',
     mode: 'saliency',
     saliencyMod: null,
+    gaussianBlur: 'false',
     group: 'face',
   },
   {
@@ -82,6 +99,7 @@ const CAPTURES = [
     page: 'saliency-face.html',
     mode: '0',
     saliencyMod: 'true',
+    gaussianBlur: 'false',
     group: 'face',
   },
   {
@@ -89,6 +107,16 @@ const CAPTURES = [
     page: 'saliency-face.html',
     mode: '0',
     saliencyMod: 'false',
+    gaussianBlur: 'false',
+    group: 'face',
+  },
+  // Test 4D: Gaussian blur on face — same eccentricity scaling, no saliency gating
+  {
+    id: 'face_gaussian',
+    page: 'saliency-face.html',
+    mode: '0',
+    saliencyMod: 'false',
+    gaussianBlur: 'true',
     group: 'face',
   },
 ];
@@ -127,6 +155,11 @@ function runCapture(capture) {
       env.TEST_ENABLE_SALIENCY_MODULATION = capture.saliencyMod;
     }
 
+    // Gaussian blur comparison mode
+    if (capture.gaussianBlur) {
+      env.TEST_GAUSSIAN_BLUR = capture.gaussianBlur;
+    }
+
     const child = spawn('npm', ['start'], {
       cwd: ROOT,
       env,
@@ -154,9 +187,12 @@ function runCapture(capture) {
 }
 
 async function main() {
-  const captures = CAPTURES.filter(c =>
+  let captures = CAPTURES.filter(c =>
     pagesFilter === 'all' || c.group === pagesFilter
   );
+  if (onlyGaussian) {
+    captures = captures.filter(c => c.gaussianBlur === 'true');
+  }
 
   console.log(`\nWave 4 Saliency Capture`);
   console.log(`  Pages: ${[...new Set(captures.map(c => c.group))].join(', ')}`);
