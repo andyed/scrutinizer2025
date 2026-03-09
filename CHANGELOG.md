@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.1.0] - 2026-03-08
+
+### Added
+- **8 Half-Octave DoG Bands**: `peripheral2.frag` upgraded from 4 octave-spaced to 8 half-octave bands. 9 MIP levels (LOD 0.0–4.0), √2 frequency spacing, smoother blur gradient. Half-integer LODs use hardware trilinear interpolation natively.
+- **Five-Wave Psychophysical Validation**: Automated test suite against published data — chromatic decay (Hansen 2009), spatial frequency (Rovamo 1979), crowding geometry (Bouma 1970), saliency protection (Itti & Koch 2001), mixed-density UI (Halverson & Hornof 2011). 5 capture scripts, 5 analysis scripts, 25+ golden captures.
+- **15 Experimental Stimulus Pages**: Open-source HTML psychophysical stimuli (color-search, spatial-acuity, crowding variants, saliency-popout, face-test, halverson-mixed-density). Menu: Go → Reference Pages → Experimental Stimulus.
+- **Capture Infrastructure**: `TEST_LOAD_TIMEOUT` for heavy external pages, `capture-appendix-baselines.js`, appendix figures (fig-a1, fig-a2).
+- **Band Weight Analysis**: `scripts/analyze-dog-bands.js` — pure math analysis of DoG band weights across eccentricity for both linear and CMF paths.
+
+### Fixed
+- **Toolbar clipping**: `getSize()` → `getContentSize()` for child view bounds. Title bar height was eating into toolbar, cropping URL bar and eye toggle.
+- **Polar sector R:T ratio**: `peripheral.frag` spoke count computed from biased ring width, cancelling 2:1 radial elongation. Fixed to use unbiased width.
+- **V1 far-peripheral growth**: Growth factor tuned 0.5→1.5 via capture-analyze loop against crowding reference pages.
+- **Composite Rovamo correlation**: Replaced per-band Spearman with frequency-weighted composite metric (r=0.600).
+
+### Docs
+- Arxiv paper: Walton 2021 contradiction fixed, WebGPU tiered roadmap, band equations updated to half-octave.
+- Developer guide, primer, foveated vision model, oriented DoG spec all updated for 8-band architecture.
+
 ## [2.0.0] - 2026-03-07
 
 ### Added

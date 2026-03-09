@@ -1,5 +1,17 @@
 # Scrutinizer Roadmap
 
+## ✅ Completed Features (v2.1)
+
+### v2.1: Psychophysical Validation & 8-Band DoG
+**Date:** 2026-03-08
+
+- [x] **8 Half-Octave DoG Bands** — 9 MIP levels at √2 spacing, smoother blur gradient
+- [x] **Five-Wave Psychophysical Validation** — Chromatic, spatial, crowding, saliency, mixed-density UI
+- [x] **15 Experimental Stimulus Pages** — Open-source HTML psychophysical stimuli
+- [x] **Toolbar clipping fix** — getContentSize() for correct child view bounds
+- [x] **Polar sector R:T ratio fix** — Correct 2:1 radial elongation
+- [x] **Capture infrastructure** — TEST_LOAD_TIMEOUT, appendix baselines, band analysis
+
 ## ✅ Completed Features (v2.0)
 
 ### v2.0: Explainer Modes & Density-Gated Crowding

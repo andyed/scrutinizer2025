@@ -50,7 +50,7 @@ Together, the four waves cover the four biological stages in the pipeline: retin
 
 Two patterns recur across all four waves:
 
-**Discrete bands vs continuous CSF.** The 5-band DoG produces step functions at each MIP-level boundary. Rovamo's smooth decay curves correlate at r=0.600 but diverge quantitatively. All 4 Tier 3 Rovamo correlations fail for this reason. This is the price of using hardware MIP chains — the same issue documented in the arxiv paper's "Continuous cortical magnification" open problem.
+**Discrete bands vs continuous CSF.** The 8-band DoG produces step functions at each MIP-level boundary. Rovamo's smooth decay curves correlate at r=0.600 but diverge quantitatively. All 4 Tier 3 Rovamo correlations fail for this reason. This is the price of using hardware MIP chains — the same issue documented in the arxiv paper's "Continuous cortical magnification" open problem.
 
 **Strength vs spacing.** The density-gated crowding model modulates distortion strength as a function of eccentricity, not spacing as a function of flanker distance. The pipeline cannot differentiate flankers at 0.2× vs 0.5× eccentricity spacing. This is an architectural limit of per-pixel fragment shaders.
 
