@@ -294,11 +294,14 @@ vec4 pooled = textureLod(u_texture, uv, mipLevel);
 The simple MIP approach uniformly blurs all spatial frequencies together. The DoG upgrade decomposes the same hardware MIP chain into an approximate Laplacian pyramid (hardware mipmaps use box/bilinear filtering, not Gaussian convolution, so band isolation has some spectral leakage) and attenuates each frequency band independently based on eccentricity (M-scaling). This preserves low-frequency structure (buttons, layout blocks) while filtering high-frequency detail (serifs, thin strokes).
 
 ```glsl
-// DoG bands from existing MIP chain
-vec4 band0 = textureLod(tex, uv, 0.0) - textureLod(tex, uv, 1.0); // fine detail
-vec4 band1 = textureLod(tex, uv, 1.0) - textureLod(tex, uv, 2.0); // letter bodies
-// ... per-band smoothstep rolloff based on eccentricity
-vec4 result = residual + band3*w3 + band2*w2 + band1*w1 + band0*w0;
+// 8 half-octave DoG bands from 9 MIP levels (LOD 0.0 to 4.0 in 0.5 steps)
+vec4 band[8];
+band[0] = mip[0] - mip[1];  // ~5.66 cpd: serifs
+band[1] = mip[1] - mip[2];  // ~4.0 cpd:  thin strokes
+// ... band[2] through band[7] at √2-spaced frequencies down to 0.5 cpd
+// Per-band smoothstep rolloff: cutoff_k = E2 × (2^(k/2) - 1)
+result = mip[8]; // residual (DC, always preserved)
+for (int k = 0; k < 8; k++) { result += band[k] * w[k]; }
 ```
 
 Controlled by three `modes.json` fields: `dog_enabled`, `dog_e2`, `dog_sharpness`. See `foveated-vision-model.md` Section 5.1 for full details.
@@ -625,6 +628,35 @@ This generates 19 screenshots across 5 reference pages (`dashboard`, `article`, 
 -   **Generated Images**: `tests/golden-captures/vX.X.X/*.png`
 -   **Reference**: See [Test Suite Reference](test_suite_reference.md) for details on all scenarios.
 
+### Validation Captures (Psychophysical Stimuli)
+
+Dedicated capture scripts produce paired baseline/filtered screenshots of the four validation stimulus pages for the arxiv paper and regression testing:
+
+| Script | Stimulus | Output |
+|--------|----------|--------|
+| `capture-color-search.js` | Chromatic decay (color-search.html) | `tests/golden-captures/validation/color-search/` |
+| `capture-spatial-acuity.js` | Spatial frequency (spatial-acuity.html) | `tests/golden-captures/validation/spatial-acuity/` |
+| `capture-crowding.js` | Crowding geometry (crowding.html + variants) | `tests/golden-captures/validation/crowding/` |
+| `capture-saliency.js` | Saliency pop-out (saliency-popout.html) | `tests/golden-captures/validation/saliency/` |
+| `capture-appendix-baselines.js` | All four stimuli, effects disabled | `docs/arxiv-paper/figures/baselines/` |
+
+```bash
+# Capture unfiltered baselines for paper figures (uses TEST_MODES=disabled)
+node scripts/capture-appendix-baselines.js
+
+# Capture filtered + baseline pairs for a specific wave
+node scripts/capture-color-search.js --colors=red,blue --sizes=24
+node scripts/capture-crowding.js
+node scripts/capture-saliency.js
+
+# Dry run (show what would be captured without launching Electron)
+node scripts/capture-appendix-baselines.js --dry-run
+```
+
+The `disabled` mode captures from `mainWindow.scrutinizerView` (the content WebContentsView) instead of the HUD overlay, producing a true unfiltered screenshot of the HTML page. Other modes capture from the HUD where the WebGL canvas renders the pipeline output.
+
+Analysis scripts in `scripts/analyze-*.js` and `scripts/validate-*.js` compare captured pixels against published psychophysical data. Results land in `tests/validation/results*/`.
+
 ### Browser ↔ Figma Golden Compare (Parity Harness)
 - Capture browser goldens and compute SSIM/PSNR against Figma exports:
     ```bash
@@ -667,13 +699,18 @@ TEST_URL=https://www.figma.com TEST_MODES=0,3 npm start
 
 **Parameters:**
 - `TEST_URL`: The URL to load (Required)
-- `TEST_MODES`: Comma-separated list of aesthetic modes to capture:
+- `TEST_MODES`: Comma-separated list of modes to capture:
   - `0`: High-Key Ghosting
   - `1`: Lab Mode
   - `2`: Frosted Glass
   - `3`: Blueprint
   - `4`: Minecraft (Block Pooling)
   - `5`: Trippy (Psychedelic + Curvy)
+  - `disabled`: Effects off — captures raw page content from the content view (not the HUD). Equivalent to the eye icon toggle. Useful for unfiltered baseline screenshots.
+  - `saliency`: Saliency debug heatmap
+  - `structure`: Structure map debug overlay
+  - `congestion_overlay`: Feature Congestion overlay
+  - `congestion_solo`: Feature Congestion solo view
 - `TEST_RADIUS`: Override foveal radius (pixels)
 - `TEST_INTENSITY`: Override peripheral intensity (0.0-1.0)
 - `TEST_MOBILE_EMULATION`: Device profile name (`iphone_14_pro`, `ipad_air_landscape`, etc.) or `true`/`false`

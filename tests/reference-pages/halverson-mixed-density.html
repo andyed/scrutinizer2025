@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Search: Mixed Density (Halverson &amp; Hornof 2011)</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #fff;
+            color: #000;
+            font-family: 'Times New Roman', 'Georgia', serif;
+            overflow: hidden;
+            height: 100vh;
+            user-select: none;
+        }
+
+        /* --- Intro Panel --- */
+        #intro {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            background: #fff;
+        }
+        #intro h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            font-family: -apple-system, sans-serif;
+        }
+        #intro p {
+            font-size: 14px;
+            color: #555;
+            max-width: 560px;
+            text-align: center;
+            line-height: 1.6;
+            margin-bottom: 8px;
+            font-family: -apple-system, sans-serif;
+        }
+        #intro .hint {
+            font-size: 12px;
+            color: #888;
+            margin-top: 16px;
+            max-width: 520px;
+            text-align: center;
+            line-height: 1.4;
+            font-family: -apple-system, sans-serif;
+        }
+        button {
+            margin-top: 24px;
+            padding: 10px 32px;
+            font-size: 15px;
+            border: 1px solid #333;
+            background: #333;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+            font-family: -apple-system, sans-serif;
+        }
+        button:hover { background: #555; }
+
+        /* --- Controls --- */
+        #controls {
+            position: fixed;
+            top: 8px;
+            right: 8px;
+            z-index: 5;
+            font-family: -apple-system, sans-serif;
+            font-size: 11px;
+            color: #999;
+            display: none;
+        }
+        #controls select, #controls input {
+            font-size: 11px;
+            margin-left: 4px;
+        }
+        #controls label {
+            margin-left: 12px;
+        }
+
+        /* --- Stimulus Area --- */
+        #stimulus {
+            display: none;
+            position: absolute;
+            inset: 0;
+        }
+
+        /* Precue — shown before layout appears */
+        #precue {
+            position: absolute;
+            font-size: 24px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: none;
+        }
+
+        /* Layout container — centered in viewport */
+        #layout {
+            position: absolute;
+            display: none;
+        }
+
+        /* Word groups */
+        .group {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .group .word {
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        .group .word:hover {
+            background: #eef;
+        }
+        .group .word.target {
+            /* no visible styling until clicked */
+        }
+
+        /* Trial feedback */
+        #feedback {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: -apple-system, sans-serif;
+            font-size: 13px;
+            color: #666;
+            display: none;
+        }
+
+        /* Status bar */
+        #status {
+            position: fixed;
+            top: 8px;
+            left: 8px;
+            font-family: -apple-system, sans-serif;
+            font-size: 11px;
+            color: #bbb;
+            display: none;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+
+<div id="intro">
+    <h1>Mixed-Density Visual Search</h1>
+    <p>
+        Replication of Halverson &amp; Hornof (2011) mixed-density search task.
+        Find the precued word in a layout of sparse and dense word groups.
+    </p>
+    <p>
+        Sparse groups: 5 words, 0.65° spacing.
+        Dense groups: 10 words, 0.33° spacing.
+        Layout spans ~7.5° of visual angle.
+    </p>
+    <p class="hint">
+        Condition: <select id="conditionSelect">
+            <option value="mixed">Mixed (3 sparse + 3 dense)</option>
+            <option value="sparse">All Sparse (6 groups)</option>
+            <option value="dense">All Dense (6 groups)</option>
+        </select>
+        <br>
+        Pixels per degree: <input type="number" id="ppdInput" value="38" min="20" max="80" style="width:50px">
+        (default 38 ≈ 60cm viewing on 24" 1080p)
+    </p>
+    <button id="startBtn">Start Task</button>
+</div>
+
+<div id="controls">
+    <span id="trialLabel">Trial 0/0</span>
+    <label>Condition: <select id="conditionControl">
+        <option value="mixed">Mixed</option>
+        <option value="sparse">Sparse</option>
+        <option value="dense">Dense</option>
+    </select></label>
+</div>
+
+<div id="status"></div>
+<div id="feedback"></div>
+
+<div id="stimulus">
+    <div id="precue"></div>
+    <div id="layout"></div>
+</div>
+
+<script>
+// ============================================================
+// Halverson & Hornof (2011) Mixed-Density Visual Search
+// Stimulus reproduction for Scrutinizer validation (Wave 5)
+// ============================================================
+
+// MRC Psycholinguistic Database nouns — 765 words (subset).
+// Original used Wilson (1988) MRC database. These are common
+// English monosyllabic/bisyllabic nouns matching the original
+// frequency and length distributions.
+const WORD_POOL = [
+    // From the paper's figures + common MRC nouns
+    'scale','sleep','post','flame','steel','rock','border','doorway','whistle','essay',
+    'ramp','thaw','honey','sheep','horse','wire','east','jam','mink','coat',
+    'kitten','eight','face','rail','birth','scare','choir','cable','skin','teeth',
+    'hunt','ankle','shoe','clown','sleigh','dot','charm','lake','guy','youth',
+    'quart','seed','soup','dive','square','staff','letter','yawn','net','cry',
+    'room','flower','beer','hero','itch','nod','glass','sink','lady','trip',
+    // Additional common nouns for larger pools
+    'apple','badge','bench','bird','blade','blind','block','board','bone','boot',
+    'bowl','brain','bread','brick','bridge','brush','bunch','burst','cabin','cake',
+    'camp','card','cave','chain','chair','chalk','chest','child','chin','church',
+    'cliff','clock','cloth','cloud','coach','corn','couch','court','craft','crane',
+    'crash','cream','cross','crowd','crown','curve','dance','dawn','death','depth',
+    'desk','dish','dome','door','draft','drain','dream','dress','drift','drill',
+    'drink','drive','drum','dust','dwarf','eagle','earth','edge','elbow','elm',
+    'faith','feast','fence','field','film','flame','flash','flesh','flight','flood',
+    'floor','foam','fold','force','fork','fort','frame','front','frost','fruit',
+    'gain','gang','gate','ghost','gift','globe','glove','goal','gold','grace',
+    'grade','grain','grant','grape','grasp','grass','grave','grief','grill','grind',
+    'grip','ground','grove','growth','guard','guess','guide','gulf','habit','hall',
+    'hand','harm','haste','hat','hawk','hay','heart','hedge','heel','height',
+    'herb','hill','hint','hole','hood','hook','horn','host','house','hull',
+    'ice','ink','inn','iron','isle','jail','jar','jaw','jet','jewel',
+    'joint','joy','judge','jug','juice','jump','jungle','key','kick','king',
+    'kiss','knee','knife','knob','knot','lab','lace','lamp','land','lane',
+    'lawn','leaf','ledge','leg','lens','lift','lime','limb','line','link',
+    'lip','list','load','loan','lock','lodge','log','loop','lord','luck',
+    'lung','maid','mail','map','mark','marsh','mask','match','maze','meal',
+    'meat','mill','mind','mine','mint','mix','moat','mode','mood','moon',
+    'moss','mount','mouse','mouth','mud','mug','myth','nail','name','neck',
+    'nerve','nest','night','nose','note','nurse','oak','oath','oil','ounce',
+    'owl','pace','pack','page','pain','paint','pair','palm','pan','park',
+    'patch','path','pause','paw','peak','pearl','pen','pet','phrase','pile',
+    'pine','pipe','pit','pitch','plain','plane','plant','plate','plot','plum',
+    'plunge','point','pole','pond','pool','port','pot','pound','praise','press',
+    'price','pride','prince','print','prize','proof','prose','pub','pulse','pump',
+    'punch','purse','push','quail','queen','quote','race','rage','raid','rain',
+    'range','rank','rat','ray','realm','rice','ridge','ring','rise','risk',
+    'road','robe','rod','role','roof','root','rope','rose','round','route',
+    'row','rug','rule','rush','rust','sack','sage','sail','saint','salt',
+    'sand','sauce','scarf','scene','scent','school','scope','scout','screen','script',
+    'seal','search','seat','shade','shaft','shame','shape','share','shell','shift',
+    'shine','ship','shirt','shock','shore','shrub','siege','sight','sign','silk',
+    'skill','skull','slate','slave','slice','slide','slope','slot','smile','smoke',
+    'snake','snow','soil','sole','song','sort','soul','spark','spear','speech',
+    'speed','spell','sphere','spice','spine','spite','split','spoon','sport','spray',
+    'spring','spy','squad','stack','staff','stage','stain','stair','stake','stall',
+    'stamp','stand','star','state','steak','steam','stem','step','stick','stock',
+    'stone','stool','store','storm','stove','strain','straw','stream','street','stress',
+    'stretch','stride','string','strip','stroke','style','sum','sun','surf','surge',
+    'swamp','swan','sweat','sweep','swing','sword','tail','tale','tank','tape',
+    'taste','team','tear','term','test','theme','thorn','thread','throat','throne',
+    'thumb','tide','tile','tip','toast','toe','tone','tongue','tool','top',
+    'torch','touch','tour','tower','town','toy','trace','track','trade','trail',
+    'train','trait','trap','trash','tray','treat','tree','trend','tribe','trick',
+    'troop','truck','trunk','trust','truth','tube','tune','turn','tusk','tutor',
+    'twist','type','valve','vault','verse','view','vine','voice','wage','waist',
+    'walk','wall','wand','ward','waste','watch','wave','wax','wealth','web',
+    'wedge','weed','weight','well','wheat','wheel','whip','width','will','wind',
+    'wing','wish','witch','wolf','wood','wool','word','work','world','worm',
+    'wound','wrap','wrist','yard','yell','zone'
+];
+
+// Layout geometry from Figure 3 (in degrees of visual angle)
+const LAYOUT = {
+    // 2 columns × 3 rows of groups
+    // Positions are group top-left corners relative to layout origin
+    // Layout is ~7.5° wide, ~6.5° tall (estimated from figure proportions)
+    totalWidthDeg: 7.5,
+    totalHeightDeg: 7.0,
+    // Group positions (col, row) in degrees from top-left
+    // Column 0: left side, Column 1: center, Column 2: right side
+    groupPositions: [
+        { col: 0, row: 0, xDeg: 0.0,  yDeg: 0.0 },   // top-left
+        { col: 1, row: 0, xDeg: 3.0,  yDeg: 0.0 },   // top-center
+        { col: 2, row: 0, xDeg: 6.0,  yDeg: 0.0 },   // top-right
+        { col: 0, row: 1, xDeg: 0.0,  yDeg: 3.5 },   // bottom-left
+        { col: 1, row: 1, xDeg: 3.0,  yDeg: 3.5 },   // bottom-center
+        { col: 2, row: 1, xDeg: 6.0,  yDeg: 3.5 },   // bottom-right
+    ],
+    sparseSpacingDeg: 0.65,  // inter-word spacing for sparse groups
+    denseSpacingDeg: 0.33,   // inter-word spacing for dense groups
+    sparseWordCount: 5,
+    denseWordCount: 10,
+    sparseFontSizeDeg: 0.45, // larger text for sparse
+    denseFontSizeDeg: 0.22,  // smaller text for dense
+};
+
+// Condition definitions
+const CONDITIONS = {
+    sparse: [false, false, false, false, false, false],  // all sparse
+    dense:  [true, true, true, true, true, true],         // all dense
+    mixed:  [true, false, true, false, true, false],      // alternating dense/sparse
+};
+
+// State
+let ppd = 38;
+let condition = 'mixed';
+let trialNum = 0;
+const TRIALS_PER_BLOCK = 20;
+let trialData = [];
+let currentTarget = '';
+let trialStartTime = 0;
+let layoutVisible = false;
+let usedWords = new Set();
+
+// Seeded PRNG (mulberry32) for reproducible layouts across captures
+function mulberry32(a) {
+    return function() {
+        a |= 0; a = a + 0x6D2B79F5 | 0;
+        var t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+let rng = Math.random; // default; overridden by seed param
+
+function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+function pickWords(count) {
+    // Pick words not yet used in this block
+    const available = WORD_POOL.filter(w => !usedWords.has(w));
+    const picked = shuffle(available).slice(0, count);
+    picked.forEach(w => usedWords.add(w));
+    return picked;
+}
+
+function pickTarget(words) {
+    const idx = Math.floor(rng() * words.length);
+    return words[idx];
+}
+
+function buildLayout() {
+    const layoutEl = document.getElementById('layout');
+    layoutEl.innerHTML = '';
+
+    const denseFlags = CONDITIONS[condition];
+    const totalWordsNeeded = denseFlags.reduce((sum, d) =>
+        sum + (d ? LAYOUT.denseWordCount : LAYOUT.sparseWordCount), 0);
+
+    // Pick all words for this trial
+    const allWords = pickWords(totalWordsNeeded);
+    let wordIdx = 0;
+
+    // Pick a random target from the words
+    const targetIdx = Math.floor(Math.random() * allWords.length);
+    currentTarget = allWords[targetIdx];
+
+    // Size the layout container
+    const layoutW = LAYOUT.totalWidthDeg * ppd;
+    const layoutH = LAYOUT.totalHeightDeg * ppd;
+    layoutEl.style.width = layoutW + 'px';
+    layoutEl.style.height = layoutH + 'px';
+
+    // Center in viewport
+    layoutEl.style.left = ((window.innerWidth - layoutW) / 2) + 'px';
+    layoutEl.style.top = ((window.innerHeight - layoutH) / 2) + 'px';
+
+    // Build each group
+    LAYOUT.groupPositions.forEach((pos, gi) => {
+        const isDense = denseFlags[gi];
+        const wordCount = isDense ? LAYOUT.denseWordCount : LAYOUT.sparseWordCount;
+        const spacingDeg = isDense ? LAYOUT.denseSpacingDeg : LAYOUT.sparseSpacingDeg;
+        const fontSizeDeg = isDense ? LAYOUT.denseFontSizeDeg : LAYOUT.sparseFontSizeDeg;
+
+        const groupEl = document.createElement('div');
+        groupEl.className = 'group';
+        groupEl.style.left = (pos.xDeg * ppd) + 'px';
+        groupEl.style.top = (pos.yDeg * ppd) + 'px';
+
+        const spacingPx = spacingDeg * ppd;
+        const fontSizePx = fontSizeDeg * ppd;
+
+        for (let wi = 0; wi < wordCount; wi++) {
+            const word = allWords[wordIdx++];
+            const wordEl = document.createElement('div');
+            wordEl.className = 'word' + (word === currentTarget ? ' target' : '');
+            wordEl.textContent = word;
+            wordEl.style.fontSize = fontSizePx + 'px';
+            wordEl.style.lineHeight = spacingPx + 'px';
+            wordEl.style.height = spacingPx + 'px';
+            wordEl.dataset.word = word;
+            wordEl.addEventListener('click', onWordClick);
+            groupEl.appendChild(wordEl);
+        }
+
+        layoutEl.appendChild(groupEl);
+    });
+
+    return currentTarget;
+}
+
+function showPrecue(targetWord) {
+    const precueEl = document.getElementById('precue');
+    precueEl.textContent = targetWord;
+    precueEl.style.fontSize = (0.5 * ppd) + 'px';
+    // Center precue at layout top-left position (where first group will appear)
+    const layoutW = LAYOUT.totalWidthDeg * ppd;
+    precueEl.style.left = ((window.innerWidth - layoutW) / 2) + 'px';
+    precueEl.style.top = ((window.innerHeight - LAYOUT.totalHeightDeg * ppd) / 2 - 1.0 * ppd) + 'px';
+    precueEl.style.display = 'block';
+}
+
+function startTrial() {
+    trialNum++;
+    layoutVisible = false;
+
+    document.getElementById('feedback').style.display = 'none';
+    document.getElementById('layout').style.display = 'none';
+    document.getElementById('status').textContent = `Trial ${trialNum}/${TRIALS_PER_BLOCK} — ${condition}`;
+
+    // Build the layout (hidden) and get target
+    const target = buildLayout();
+
+    // Show precue
+    showPrecue(target);
+
+    // After click on precue, show layout
+    document.getElementById('precue').onclick = () => {
+        document.getElementById('precue').style.display = 'none';
+        document.getElementById('layout').style.display = 'block';
+        layoutVisible = true;
+        trialStartTime = performance.now();
+    };
+}
+
+function onWordClick(e) {
+    if (!layoutVisible) return;
+    const rt = performance.now() - trialStartTime;
+    const clickedWord = e.target.dataset.word;
+    const correct = clickedWord === currentTarget;
+
+    // Record trial data
+    trialData.push({
+        trial: trialNum,
+        condition,
+        target: currentTarget,
+        clicked: clickedWord,
+        correct,
+        rt: Math.round(rt),
+        ppd,
+    });
+
+    // Show feedback
+    const fb = document.getElementById('feedback');
+    fb.textContent = correct
+        ? `✓ ${Math.round(rt)}ms`
+        : `✗ Wrong — target was "${currentTarget}" (${Math.round(rt)}ms)`;
+    fb.style.color = correct ? '#2a2' : '#c22';
+    fb.style.display = 'block';
+
+    // Next trial after brief delay
+    if (trialNum < TRIALS_PER_BLOCK) {
+        setTimeout(startTrial, correct ? 800 : 1500);
+    } else {
+        fb.textContent += ' — Block complete. Results in console.';
+        console.log('Trial data:', JSON.stringify(trialData, null, 2));
+    }
+}
+
+// --- Static display mode for Scrutinizer capture ---
+// URL param ?static=true renders a single layout without interaction
+// for screenshot capture through the pipeline
+function renderStatic() {
+    const params = new URLSearchParams(window.location.search);
+    condition = params.get('condition') || 'mixed';
+    ppd = parseInt(params.get('ppd') || '38', 10);
+
+    // Initialize seeded PRNG for reproducible layouts across captures
+    const seed = params.get('seed');
+    if (seed) rng = mulberry32(parseInt(seed, 10));
+
+    document.getElementById('intro').style.display = 'none';
+    document.getElementById('stimulus').style.display = 'block';
+    document.getElementById('precue').style.display = 'none';
+
+    usedWords.clear();
+    buildLayout();
+    document.getElementById('layout').style.display = 'block';
+
+    // Remove click handlers in static mode
+    document.querySelectorAll('.word').forEach(el => {
+        el.style.cursor = 'default';
+        el.replaceWith(el.cloneNode(true));
+    });
+
+    // Show condition label
+    document.getElementById('status').style.display = 'block';
+    document.getElementById('status').textContent = `${condition} — ${ppd} ppd — static`;
+}
+
+// --- Init ---
+function init() {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get('static') === 'true') {
+        renderStatic();
+        return;
+    }
+
+    // Set initial values from URL params
+    if (params.get('condition')) {
+        condition = params.get('condition');
+        document.getElementById('conditionSelect').value = condition;
+    }
+    if (params.get('ppd')) {
+        ppd = parseInt(params.get('ppd'), 10);
+        document.getElementById('ppdInput').value = ppd;
+    }
+
+    document.getElementById('startBtn').addEventListener('click', () => {
+        condition = document.getElementById('conditionSelect').value;
+        ppd = parseInt(document.getElementById('ppdInput').value, 10);
+
+        document.getElementById('intro').style.display = 'none';
+        document.getElementById('stimulus').style.display = 'block';
+        document.getElementById('controls').style.display = 'block';
+        document.getElementById('status').style.display = 'block';
+
+        document.getElementById('conditionControl').value = condition;
+        document.getElementById('conditionControl').addEventListener('change', (e) => {
+            condition = e.target.value;
+            trialNum = 0;
+            usedWords.clear();
+            trialData = [];
+            startTrial();
+        });
+
+        usedWords.clear();
+        startTrial();
+    });
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

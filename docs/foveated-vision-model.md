@@ -255,25 +255,38 @@ The simple MIP pooling approach uniformly blurs content, progressively destroyin
 **Key insight**: The hardware MIP chain (generated every frame by `gl.generateMipmap()`) provides an approximate multi-scale decomposition using box/bilinear filtering (not true Gaussian convolution as in Burt & Adelson 1983). Subtracting adjacent MIP levels gives **approximate Laplacian pyramid bands** that function analogously to DoG, with some spectral leakage between bands:
 
 ```glsl
-// DoG bands from existing MIP chain — no new textures needed
-vec4 band0 = textureLod(tex, uv, 0.0) - textureLod(tex, uv, 1.0);  // 1-2px: serifs, thin strokes
-vec4 band1 = textureLod(tex, uv, 1.0) - textureLod(tex, uv, 2.0);  // 2-4px: letter bodies, icons
-vec4 band2 = textureLod(tex, uv, 2.0) - textureLod(tex, uv, 3.0);  // 4-8px: words, UI elements
-vec4 band3 = textureLod(tex, uv, 3.0) - textureLod(tex, uv, 4.0);  // 8-16px: buttons, layout
-// residual = textureLod(tex, uv, 4.0)                               // DC: overall luminance
+// 9 MIP levels at half-octave spacing (LOD 0.0 to 4.0 in 0.5 steps)
+// Half-integer LODs use hardware trilinear interpolation natively
+vec4 mip[9];
+mip[0] = textureLod(tex, uv, 0.0);
+mip[1] = textureLod(tex, uv, 0.5);
+// ... mip[2] through mip[7] at LOD 1.0, 1.5, 2.0, 2.5, 3.0, 3.5
+mip[8] = textureLod(tex, uv, 4.0);
+
+// 8 half-octave DoG bands — geometric √2 spacing
+vec4 band[8];
+band[0] = mip[0] - mip[1];  // ~5.66 cpd: finest detail, serifs
+band[1] = mip[1] - mip[2];  // ~4.0 cpd:  thin strokes
+band[2] = mip[2] - mip[3];  // ~2.83 cpd: letter bodies
+// ... band[3] through band[7] down to ~0.5 cpd (layout blocks)
+// residual = mip[8]         // ~0.35 cpd: DC, always preserved
 ```
 
 Each band is attenuated by a **smoothstep rolloff** based on normalized eccentricity, with cutoff distances derived from **linear M-scaling** (Rovamo & Virsu 1979, Levi, Klein & Aitsebaomo 1985):
 
 The minimum resolvable spatial detail grows linearly with eccentricity: **s_min(e) = s₀ × (1 + e/E₂)**. Band k (spatial scale 2^k px) drops out when s_min(e) > 2^k, giving cutoff eccentricity = E₂ × (2^k − 1):
 
-| Band | Spatial Scale | Cutoff (× E₂) | Content Preserved |
-|------|--------------|----------------|-------------------|
-| band0 | 1-2px | 1 | Serifs, hairlines |
-| band1 | 2-4px | 3 | Letter bodies, small icons |
-| band2 | 4-8px | 7 | Words, UI elements |
-| band3 | 8-16px | 15 | Buttons, layout blocks |
-| residual | 16px+ | Always | Overall color/luminance |
+| Band | Freq (cpd) | Cutoff (× E₂) | Content Preserved |
+|------|-----------|----------------|-------------------|
+| band[0] | 5.66 | 0.414 | Finest detail, serifs |
+| band[1] | 4.0  | 1.0   | Thin strokes |
+| band[2] | 2.83 | 1.828 | Letter bodies |
+| band[3] | 2.0  | 3.0   | Small icons |
+| band[4] | 1.41 | 4.657 | Words, UI labels |
+| band[5] | 1.0  | 7.0   | Word groups |
+| band[6] | 0.71 | 10.314 | Buttons, panels |
+| band[7] | 0.5  | 15.0  | Layout blocks |
+| residual | 0.35 | Always | DC: overall color/luminance |
 
 The non-uniform spacing is biologically correct: coarse structure (bands 2–3) persists far into the periphery while fine detail (band 0) drops quickly. You can see *where* a button is without being able to read its label — matching the subjective experience of peripheral vision.
 
@@ -714,9 +727,14 @@ float ecc_deg = chromNormEcc * 2.0;  // fovea ≈ 2° radius
 // RG: frequency-independent steep decay (castleCSF k_e = 0.059)
 float rg_atten = pow(pow(10.0, -u_rg_decay * ecc_deg), supra);
 
-// YV: per-band frequency-dependent decay — large color fields persist
-float yv_atten_band0 = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * 4.0) * ecc_deg), supra);
-// ... band1 (×2.0), band2 (×1.0), band3 (×0.5), residual (×0.25)
+// Per-band frequency-dependent decay — large color fields persist
+// 8 bands + residual, frequencies from 5.66 cpd (serifs) to 0.35 cpd (DC)
+const float bandFreq[9] = float[9](5.657, 4.0, 2.828, 2.0, 1.414, 1.0, 0.707, 0.5, 0.354);
+float rg_atten[9], yv_atten[9];
+for (int k = 0; k < 9; k++) {
+    rg_atten[k] = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * bandFreq[k]) * ecc_deg), supra);
+    yv_atten[k] = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * bandFreq[k]) * ecc_deg), supra);
+}
 
 // Each band: split into Oklab luminance + chrominance, attenuate independently
 result += chromaticAttenuate(band_k, rg_atten, yv_atten_band_k) * w_k;

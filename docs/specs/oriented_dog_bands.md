@@ -63,11 +63,13 @@ V1 simple cells are orientation-tuned (Hubel & Wiesel, 1962). Key facts:
 Isotropic DoG as implemented. Serves as comparison target.
 
 ```glsl
-// peripheral2.frag:92-143 — current code, unchanged
+// peripheral2.frag — current code (v2.1: 8 half-octave bands)
 vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
-                             float dog_e2, float dog_sharpness) {
-    // ... 5 MIP samples, 4 bands, scalar smoothstep rolloff ...
-    vec4 result = clamp(mip4 + band3*w3 + band2*w2 + band1*w1 + band0*w0, 0.0, 1.0);
+                             float dog_e2, float dog_sharpness, float visual_ecc) {
+    // ... 9 MIP samples (LOD 0.0–4.0 in 0.5 steps), 8 bands, smoothstep rolloff ...
+    // cutoff_k = E2 × (2^(k/2) - 1) for k=1..8
+    result = mip[8];
+    for (int k = 0; k < 8; k++) { result += band[k] * w[k]; }
     return result;
 }
 ```
@@ -122,50 +124,48 @@ vec4 sampleDoGOriented(vec2 uv, float eccentricity, float fovea_radius,
     float orientBonus = cardinalAlign * edgeGate * orient_enabled * orient_bias;
 
     // --- Standard DoG band decomposition (unchanged) ---
-    vec4 mip0 = textureLod(u_texture, uv, 0.0);
-    vec4 mip1 = textureLod(u_texture, uv, 1.0);
-    vec4 mip2 = textureLod(u_texture, uv, 2.0);
-    vec4 mip3 = textureLod(u_texture, uv, 3.0);
-    vec4 mip4 = textureLod(u_texture, uv, 4.0);
+    // 9 MIP levels at half-octave spacing
+    vec4 mip[9];
+    mip[0] = textureLod(u_texture, uv, 0.0);
+    mip[1] = textureLod(u_texture, uv, 0.5);
+    // ... mip[2]–mip[7] at LOD 1.0, 1.5, 2.0, 2.5, 3.0, 3.5
+    mip[8] = textureLod(u_texture, uv, 4.0);
 
-    vec4 band0 = mip0 - mip1;  // 1-2px: serifs, thin strokes
-    vec4 band1 = mip1 - mip2;  // 2-4px: letter bodies, small icons
-    vec4 band2 = mip2 - mip3;  // 4-8px: words, UI elements
-    vec4 band3 = mip3 - mip4;  // 8-16px: buttons, layout blocks
+    // 8 half-octave bands
+    vec4 band[8];
+    for (int k = 0; k < 8; k++) { band[k] = mip[k] - mip[k+1]; }
 
     // --- Per-band cutoffs with orientation-modulated M-scaling ---
     float e2 = max(dog_e2, 0.1);
 
-    // Base cutoffs (geometric progression, same as current)
-    float c0_base = 0.3 * e2;
-    float c1_base = 0.6 * e2;
-    float c2_base = 1.2 * e2;
-    float c3_base = 2.4 * e2;
+    // Base cutoffs: half-octave M-scaling, c_k = E2 × (2^(k/2) - 1)
+    float c_base[8];
+    float mults[8] = float[8](0.41421, 1.0, 1.82843, 3.0, 4.65685, 7.0, 10.31371, 15.0);
+    for (int k = 0; k < 8; k++) { c_base[k] = e2 * mults[k]; }
 
     // Push cutoffs outward for cardinal-aligned content.
     // 1.5x = "50% further into periphery" for perfectly H/V edges.
     // Higher bands (coarser) get less bonus — they're already robust.
-    float boost0 = 1.0 + orientBonus * 0.5;  // Band 0: up to 1.5x
-    float boost1 = 1.0 + orientBonus * 0.4;  // Band 1: up to 1.4x
-    float boost2 = 1.0 + orientBonus * 0.25; // Band 2: up to 1.25x
-    float boost3 = 1.0 + orientBonus * 0.1;  // Band 3: up to 1.1x
+    // Bonus tapers linearly from 0.5 (finest) to 0.1 (coarsest)
+    float c[8];
+    for (int k = 0; k < 8; k++) {
+        float boost = 1.0 + orientBonus * mix(0.5, 0.1, float(k) / 7.0);
+        c[k] = c_base[k] * boost;
+    }
 
-    float c0 = c0_base * boost0;
-    float c1 = c1_base * boost1;
-    float c2 = c2_base * boost2;
-    float c3 = c3_base * boost3;
-
-    // Transition width (unchanged from current)
+    // Transition width (unchanged)
     float transMult = mix(0.4, 0.05, dog_sharpness);
 
     // Per-band weights via smoothstep rolloff
-    float w0 = 1.0 - smoothstep(c0 - c0 * transMult, c0 + c0 * transMult, normEcc);
-    float w1 = 1.0 - smoothstep(c1 - c1 * transMult, c1 + c1 * transMult, normEcc);
-    float w2 = 1.0 - smoothstep(c2 - c2 * transMult, c2 + c2 * transMult, normEcc);
-    float w3 = 1.0 - smoothstep(c3 - c3 * transMult, c3 + c3 * transMult, normEcc);
+    float w[8];
+    for (int k = 0; k < 8; k++) {
+        w[k] = 1.0 - smoothstep(c[k] - c[k] * transMult, c[k] + c[k] * transMult, normEcc);
+    }
 
     // Reconstruct
-    vec4 result = clamp(mip4 + band3*w3 + band2*w2 + band1*w1 + band0*w0, 0.0, 1.0);
+    result = mip[8];
+    for (int k = 0; k < 8; k++) { result += band[k] * w[k]; }
+    result = clamp(result, 0.0, 1.0);
 
     // BGRA → RGBA (Electron capture quirk)
     float temp = result.r;

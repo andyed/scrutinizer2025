@@ -521,6 +521,22 @@
             }
         }
 
+        toggleGaussianBlurMode(enabled) {
+            if (this.renderer) {
+                this.renderer.config.gaussian_blur_mode = enabled;
+                this.renderer._gaussianBlurModeOverride = enabled;
+                ipcRenderer.send('log:renderer', `[Scrutinizer] Gaussian blur mode: ${enabled}`);
+            }
+        }
+
+        setDogE2(value) {
+            if (this.renderer) {
+                this.renderer.config.dog_e2 = value;
+                this.renderer._dogE2Override = value;
+                ipcRenderer.send('log:renderer', `[Scrutinizer] DoG E2 override: ${value}`);
+            }
+        }
+
         // Delegate to VisualMemory
         setVisualMemoryLimit(limit) {
             ipcRenderer.send('log:renderer', `[Scrutinizer] setVisualMemoryLimit called with: ${limit}`);

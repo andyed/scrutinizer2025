@@ -1540,7 +1540,12 @@ function runIntegrationTest() {
                         console.log(`[Test] Switching to Mode: ${mode}...`);
 
                         // Handle Debug Modes vs Aesthetic Modes
-                        if (mode === 'saliency') {
+                        if (mode === 'disabled') {
+                            // Toggle effects OFF — captures raw page content
+                            if (currentEnabled) {
+                                ipcMain.emit('toolbar:toggle-fovea', { sender: null });
+                            }
+                        } else if (mode === 'saliency') {
                             mainWindow.scrutinizerHud.webContents.send('menu:toggle-saliency-map', true);
                         } else if (mode === 'structure') {
                             mainWindow.scrutinizerHud.webContents.send('menu:toggle-structure-map', true);
@@ -1562,12 +1567,30 @@ function runIntegrationTest() {
                             mainWindow.scrutinizerHud.webContents.send('menu:toggle-chromatic-pooling', enabled);
                         }
 
+                        const gaussianBlurOverride = process.env.TEST_GAUSSIAN_BLUR;
+                        if (gaussianBlurOverride !== undefined) {
+                            const enabled = gaussianBlurOverride === 'true';
+                            console.log(`[Test] Gaussian blur mode override: ${enabled}`);
+                            mainWindow.scrutinizerHud.webContents.send('menu:toggle-gaussian-blur-mode', enabled);
+                        }
+
+                        const dogE2Override = process.env.TEST_DOG_E2;
+                        if (dogE2Override !== undefined) {
+                            const value = parseFloat(dogE2Override);
+                            console.log(`[Test] DoG E2 override: ${value}`);
+                            mainWindow.scrutinizerHud.webContents.send('menu:set-dog-e2', value);
+                        }
+
                         // Wait for render
                         await new Promise(resolve => setTimeout(resolve, 500));
 
                         console.log(`[Test] Capturing screenshot for Mode ${mode}...`);
                         try {
-                            const image = await mainWindow.scrutinizerHud.capturePage();
+                            // When disabled, capture raw content view (not the empty HUD overlay)
+                            const captureTarget = (mode === 'disabled' && mainWindow.scrutinizerView)
+                                ? mainWindow.scrutinizerView.webContents
+                                : mainWindow.scrutinizerHud;
+                            const image = await captureTarget.capturePage();
                             let buffer = image.toPNG();
 
                             // Reuse save logic
@@ -1622,7 +1645,12 @@ function runIntegrationTest() {
                         }
 
                         // Cleanup Debug Modes
-                        if (mode === 'saliency') {
+                        if (mode === 'disabled') {
+                            // Re-enable effects for subsequent modes
+                            if (!currentEnabled) {
+                                ipcMain.emit('toolbar:toggle-fovea', { sender: null });
+                            }
+                        } else if (mode === 'saliency') {
                             mainWindow.scrutinizerHud.webContents.send('menu:toggle-saliency-map', false);
                         } else if (mode === 'structure') {
                             mainWindow.scrutinizerHud.webContents.send('menu:toggle-structure-map', false);

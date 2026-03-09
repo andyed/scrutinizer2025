@@ -261,6 +261,14 @@
             scrutinizer.toggleSaccadicBlindness(enabled);
         });
 
+        ipcRenderer.on('menu:toggle-gaussian-blur-mode', (e, enabled) => {
+            scrutinizer.toggleGaussianBlurMode(enabled);
+        });
+
+        ipcRenderer.on('menu:set-dog-e2', (e, value) => {
+            scrutinizer.setDogE2(value);
+        });
+
         ipcRenderer.on('menu:set-aesthetic-mode', (event, mode) => {
             if (scrutinizer) scrutinizer.setAestheticMode(mode);
         });

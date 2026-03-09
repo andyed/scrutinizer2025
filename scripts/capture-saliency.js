@@ -72,21 +72,21 @@ const CAPTURES = [
   // Face-test saliency + protection
   {
     id: 'face_saliency',
-    page: 'face-test.html',
+    page: 'saliency-face.html',
     mode: 'saliency',
     saliencyMod: null,
     group: 'face',
   },
   {
     id: 'face_filtered_mod_on',
-    page: 'face-test.html',
+    page: 'saliency-face.html',
     mode: '0',
     saliencyMod: 'true',
     group: 'face',
   },
   {
     id: 'face_filtered_mod_off',
-    page: 'face-test.html',
+    page: 'saliency-face.html',
     mode: '0',
     saliencyMod: 'false',
     group: 'face',
@@ -95,16 +95,7 @@ const CAPTURES = [
 
 function runCapture(capture) {
   return new Promise((resolve) => {
-    // face-test.html lives in tests/reference-pages/ locally, use file:// if BASE_URL is local
-    let pageUrl;
-    if (capture.page === 'face-test.html' && !BASE_URL.startsWith('http')) {
-      pageUrl = `${BASE_URL}/${capture.page}`;
-    } else if (capture.page === 'face-test.html') {
-      // face-test.html is on the live site too
-      pageUrl = `${BASE_URL}/${capture.page}`;
-    } else {
-      pageUrl = `${BASE_URL}/${capture.page}`;
-    }
+    const pageUrl = `${BASE_URL}/${capture.page}`;
 
     const filename = `${capture.id}.png`;
 

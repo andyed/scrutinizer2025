@@ -41,6 +41,9 @@ uniform float u_dog_enabled;     // 0.0 = legacy MIP, 1.0 = DoG reconstruction
 uniform float u_dog_e2;          // M-scaling E2 (half-resolution eccentricity)
 uniform float u_dog_sharpness;   // Band rolloff sharpness (0=biological, 1=sharp)
 
+// Gaussian blur comparison mode — eccentricity-scaled MIP blur without band decomposition
+uniform float u_gaussian_blur_mode; // 0.0 = normal, 1.0 = comparison Gaussian
+
 // FOVI (Cortical Magnification) uniforms — Blauch, Alvarez & Konkle (2026)
 uniform float u_cmf_enabled;     // 0.0 = legacy linear, 1.0 = CMF logarithmic
 uniform float u_cmf_a;            // Cortical magnification constant (default 2.78)
@@ -153,58 +156,76 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     float normEcc = max(0.0, eccentricity) / max(fovea_radius, 0.001);           // spatial bands (V1 distortion-coupled)
     float chromNormEcc = max(0.0, visual_ecc) / max(fovea_radius, 0.001);        // chromatic decay (true gaze eccentricity)
 
-    // Sample 5 MIP levels (existing hardware chain)
-    vec4 mip0 = textureLod(u_texture, uv, 0.0);
-    vec4 mip1 = textureLod(u_texture, uv, 1.0);
-    vec4 mip2 = textureLod(u_texture, uv, 2.0);
-    vec4 mip3 = textureLod(u_texture, uv, 3.0);
-    vec4 mip4 = textureLod(u_texture, uv, 4.0);
+    // Sample 9 MIP levels at half-octave spacing (LOD 0.0 to 4.0 in 0.5 steps)
+    // Half-integer LODs trigger hardware trilinear interpolation (2 bilinear reads + lerp),
+    // giving us the half-octave Gaussian we need. 9 samples = 13 bilinear lookups total.
+    vec4 mip[9];
+    mip[0] = textureLod(u_texture, uv, 0.0);
+    mip[1] = textureLod(u_texture, uv, 0.5);
+    mip[2] = textureLod(u_texture, uv, 1.0);
+    mip[3] = textureLod(u_texture, uv, 1.5);
+    mip[4] = textureLod(u_texture, uv, 2.0);
+    mip[5] = textureLod(u_texture, uv, 2.5);
+    mip[6] = textureLod(u_texture, uv, 3.0);
+    mip[7] = textureLod(u_texture, uv, 3.5);
+    mip[8] = textureLod(u_texture, uv, 4.0);
 
-    // Approximate DoG bands (box/bilinear MIP differences, not true Gaussian)
-    vec4 band0 = mip0 - mip1;  // 1-2px: serifs, thin strokes
-    vec4 band1 = mip1 - mip2;  // 2-4px: letter bodies, small icons
-    vec4 band2 = mip2 - mip3;  // 4-8px: words, UI elements
-    vec4 band3 = mip3 - mip4;  // 8-16px: buttons, layout blocks
-    // residual = mip4          // DC: overall color/luminance
+    // 8 half-octave DoG bands — geometric sqrt(2) spacing
+    // Odd-indexed new cutoffs match old 4-band anchors exactly.
+    // At intermediate eccentricities, 3-4 bands carry distinct fractional weights
+    // simultaneously — measurable frequency-selective behavior that single-sample
+    // Gaussian blur cannot reproduce.
+    vec4 band[8];
+    band[0] = mip[0] - mip[1];  // ~5.66 cpd  (finest detail, serifs)
+    band[1] = mip[1] - mip[2];  // ~4.0 cpd   (thin strokes)
+    band[2] = mip[2] - mip[3];  // ~2.83 cpd  (letter bodies)
+    band[3] = mip[3] - mip[4];  // ~2.0 cpd   (small icons)
+    band[4] = mip[4] - mip[5];  // ~1.41 cpd  (words, UI labels)
+    band[5] = mip[5] - mip[6];  // ~1.0 cpd   (word groups)
+    band[6] = mip[6] - mip[7];  // ~0.71 cpd  (buttons, panels)
+    band[7] = mip[7] - mip[8];  // ~0.5 cpd   (layout blocks)
+    // residual = mip[8]         // ~0.35 cpd  (DC, always preserved)
 
-    // Per-band cutoff eccentricities — linear M-scaling
-    // Rovamo & Virsu (1979), Levi, Klein & Aitsebaomo (1985):
-    //   s_min(e) = s_0 * (1 + e/E2)
-    // Band k (spatial scale 2^k px) drops out when s_min(e) > 2^k:
-    //   cutoff_k = E2 * (2^k - 1)
-    // With s_0 = 1px, this gives cutoffs at 1, 3, 7, 15 × E2.
-    // Coarse structure (bands 2-3) persists far into the periphery —
-    // biologically correct: you see WHERE a button is, not its label.
-    float c0, c1, c2, c3;
+    // Per-band cutoff eccentricities — half-octave M-scaling
+    // cutoff_k = E2 × (2^(k/2) − 1) for linear path
+    // Odd-indexed cutoffs (c[1], c[3], c[5], c[7]) match old 4-band cutoffs exactly:
+    //   c[1]=E2*1.0, c[3]=E2*3.0, c[5]=E2*7.0, c[7]=E2*15.0
+    float c[8];
     float e2 = max(dog_e2, 0.01);
     if (u_cmf_enabled > 0.5) {
-        // CMF-derived: invert mipLevel = maxMip * log1p(r/a) / cortical_max
-        // → r = a * (exp(level * cortical_max / maxMip) - 1)
+        // CMF-derived: c_k = cmf_a × (exp(k×0.5×scale) − 1) / fovea_deg
         // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
         float fovea_deg = 2.0;
         float maxMipLevel = 4.0;
-        // Scale inversely with ecc_scaling so bands stay consistent with MIP levels
         float scale = u_cortical_max / maxMipLevel / (u_ecc_scaling / 0.75);
-        c0 = u_cmf_a * (exp(1.0 * scale) - 1.0) / fovea_deg;
-        c1 = u_cmf_a * (exp(2.0 * scale) - 1.0) / fovea_deg;
-        c2 = u_cmf_a * (exp(3.0 * scale) - 1.0) / fovea_deg;
-        c3 = u_cmf_a * (exp(4.0 * scale) - 1.0) / fovea_deg;
+        c[0] = u_cmf_a * (exp(0.5 * scale) - 1.0) / fovea_deg;
+        c[1] = u_cmf_a * (exp(1.0 * scale) - 1.0) / fovea_deg;  // == old c0
+        c[2] = u_cmf_a * (exp(1.5 * scale) - 1.0) / fovea_deg;
+        c[3] = u_cmf_a * (exp(2.0 * scale) - 1.0) / fovea_deg;  // == old c1
+        c[4] = u_cmf_a * (exp(2.5 * scale) - 1.0) / fovea_deg;
+        c[5] = u_cmf_a * (exp(3.0 * scale) - 1.0) / fovea_deg;  // == old c2
+        c[6] = u_cmf_a * (exp(3.5 * scale) - 1.0) / fovea_deg;
+        c[7] = u_cmf_a * (exp(4.0 * scale) - 1.0) / fovea_deg;  // == old c3
     } else {
-        // Linear M-scaling: cutoff_k = E2 * (2^k - 1)
-        c0 = e2 * 1.0;    // 2^1 - 1 = 1
-        c1 = e2 * 3.0;    // 2^2 - 1 = 3
-        c2 = e2 * 7.0;    // 2^3 - 1 = 7
-        c3 = e2 * 15.0;   // 2^4 - 1 = 15
+        // Linear M-scaling: cutoff_k = E2 * (2^(k/2) - 1), k=1..8
+        c[0] = e2 * 0.41421;   // sqrt(2) - 1
+        c[1] = e2 * 1.0;       // == old c0
+        c[2] = e2 * 1.82843;   // 2*sqrt(2) - 1
+        c[3] = e2 * 3.0;       // == old c1
+        c[4] = e2 * 4.65685;   // 4*sqrt(2) - 1
+        c[5] = e2 * 7.0;       // == old c2
+        c[6] = e2 * 10.31371;  // 8*sqrt(2) - 1
+        c[7] = e2 * 15.0;      // == old c3
     }
 
     // Transition width: biological (wide, gradual) vs sharp (narrow, crisp)
     float transMult = mix(0.4, 0.05, dog_sharpness);
 
     // Per-band weights via smoothstep rolloff
-    float w0 = 1.0 - smoothstep(c0 - c0 * transMult, c0 + c0 * transMult, normEcc);
-    float w1 = 1.0 - smoothstep(c1 - c1 * transMult, c1 + c1 * transMult, normEcc);
-    float w2 = 1.0 - smoothstep(c2 - c2 * transMult, c2 + c2 * transMult, normEcc);
-    float w3 = 1.0 - smoothstep(c3 - c3 * transMult, c3 + c3 * transMult, normEcc);
+    float w[8];
+    for (int k = 0; k < 8; k++) {
+        w[k] = 1.0 - smoothstep(c[k] - c[k] * transMult, c[k] + c[k] * transMult, normEcc);
+    }
 
     // Reconstruct: residual (always full) + weighted bands
     // Clamp to [0,1] — band differences can be negative, partial attenuation
@@ -219,48 +240,36 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         float ecc_deg = chromNormEcc * fovea_deg;
 
         // Threshold sensitivity → appearance compression (Jiang, Shooner & Mullen 2022)
-        // At high contrasts (saturated UI colors), contrast constancy holds better —
-        // power-law exponent ~0.5 maps detection threshold to perceived saturation.
-        // exponent=0.5: sqrt of threshold decay (gentler), exponent=1.0: raw threshold (harsh)
         float supra = max(u_supra_exponent, 0.01);
 
-        // RG: per-band attenuation — large red regions preserve hue further than small red details
-        // castleCSF reports k_ef ≈ 0 for RG at threshold, but suprathreshold spatial summation
-        // means larger stimuli integrate over more receptive fields → better color constancy.
-        // u_rg_freq_decay defaults to 0.003 (conservative — ~1/3 of YV's 0.008).
-        // Band frequencies: band0≈4cpd, band1≈2cpd, band2≈1cpd, band3≈0.5cpd, residual≈0.25cpd
-        float rg_atten_band0 = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * 4.0) * ecc_deg), supra);
-        float rg_atten_band1 = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * 2.0) * ecc_deg), supra);
-        float rg_atten_band2 = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * 1.0) * ecc_deg), supra);
-        float rg_atten_band3 = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * 0.5) * ecc_deg), supra);
-        float rg_atten_res   = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * 0.25) * ecc_deg), supra);
+        // Half-octave band center frequencies (cpd)
+        // 9 values: 8 bands + 1 residual (mip[8])
+        const float bandFreq[9] = float[9](5.657, 4.0, 2.828, 2.0, 1.414, 1.0, 0.707, 0.5, 0.354);
 
-        // YV: per-band attenuation — band spatial frequency determines k_ef contribution
-        float yv_atten_band0 = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * 4.0) * ecc_deg), supra);
-        float yv_atten_band1 = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * 2.0) * ecc_deg), supra);
-        float yv_atten_band2 = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * 1.0) * ecc_deg), supra);
-        float yv_atten_band3 = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * 0.5) * ecc_deg), supra);
-        float yv_atten_res   = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * 0.25) * ecc_deg), supra);
+        // Per-band RG and YV attenuation
+        float rg_atten[9], yv_atten[9];
+        for (int k = 0; k < 9; k++) {
+            rg_atten[k] = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * bandFreq[k]) * ecc_deg), supra);
+            yv_atten[k] = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * bandFreq[k]) * ecc_deg), supra);
+        }
 
         // BGRA → RGBA before Oklab round-trips (Electron capture quirk)
         // chromaticAttenuate() uses rgbToOklab() which assumes RGB channel order
-        mip4 = mip4.bgra;
-        band0 = band0.bgra;
-        band1 = band1.bgra;
-        band2 = band2.bgra;
-        band3 = band3.bgra;
+        mip[8] = mip[8].bgra;
+        for (int k = 0; k < 8; k++) { band[k] = band[k].bgra; }
 
         // Reconstruct with per-band Oklab chromatic attenuation
-        result = chromaticAttenuate(mip4, rg_atten_res, yv_atten_res);
-        result += chromaticAttenuate(band3, rg_atten_band3, yv_atten_band3) * w3;
-        result += chromaticAttenuate(band2, rg_atten_band2, yv_atten_band2) * w2;
-        result += chromaticAttenuate(band1, rg_atten_band1, yv_atten_band1) * w1;
-        result += chromaticAttenuate(band0, rg_atten_band0, yv_atten_band0) * w0;
+        result = chromaticAttenuate(mip[8], rg_atten[8], yv_atten[8]);
+        for (int k = 7; k >= 0; k--) {
+            result += chromaticAttenuate(band[k], rg_atten[k], yv_atten[k]) * w[k];
+        }
         result = clamp(result, 0.0, 1.0);
         // Already in RGBA — skip the swap below
     } else {
         // Legacy: luminance-only reconstruction (no per-channel decay)
-        result = clamp(mip4 + band3 * w3 + band2 * w2 + band1 * w1 + band0 * w0, 0.0, 1.0);
+        result = mip[8];
+        for (int k = 0; k < 8; k++) { result += band[k] * w[k]; }
+        result = clamp(result, 0.0, 1.0);
 
         // BGRA → RGBA (Electron capture quirk)
         float temp = result.r;
@@ -831,7 +840,11 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     }
 
     vec3 pooledCol;
-    if (u_dog_enabled > 0.5) {
+    if (u_gaussian_blur_mode > 0.5) {
+        // Eccentricity-scaled Gaussian blur via MIP chain (no band decomposition).
+        // Same M-scaling curve as DoG, but uniform frequency degradation.
+        pooledCol = sampleMIPPooled(v1.distortedUV, coupledEccentricity, fovea_radius).rgb;
+    } else if (u_dog_enabled > 0.5) {
         pooledCol = sampleDoGReconstructed(
             v1.distortedUV, coupledEccentricity, fovea_radius,
             u_dog_e2, u_dog_sharpness, eccentricity

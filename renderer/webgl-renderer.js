@@ -84,6 +84,9 @@
                 this.dogE2Location = null;
                 this.dogSharpnessLocation = null;
 
+                // Gaussian blur comparison mode
+                this.gaussianBlurModeLocation = null;
+
                 // Cortical Magnification Function (CMF) uniform locations
                 this.cmfEnabledLocation = null;
                 this.cmfALocation = null;
@@ -129,6 +132,7 @@
                     dog_enabled: false,
                     dog_e2: 0.5,
                     dog_sharpness: 0.0,
+                    gaussian_blur_mode: false,
                     cmf_enabled: false,
                     cmf_a: 2.78,
                     cmf_color_sigma: 0.0,
@@ -226,6 +230,9 @@
                 this.dogEnabledLocation = gl.getUniformLocation(this.program, "u_dog_enabled");
                 this.dogE2Location = gl.getUniformLocation(this.program, "u_dog_e2");
                 this.dogSharpnessLocation = gl.getUniformLocation(this.program, "u_dog_sharpness");
+
+                // Gaussian blur comparison mode
+                this.gaussianBlurModeLocation = gl.getUniformLocation(this.program, "u_gaussian_blur_mode");
 
                 // Cortical Magnification Function (CMF) uniform lookups
                 this.cmfEnabledLocation = gl.getUniformLocation(this.program, "u_cmf_enabled");
@@ -435,6 +442,8 @@
                 // Only preserve if explicitly overridden (flag set by toggleChromaticPooling).
                 const savedChromaticOverride = this._chromaticPoolingOverride;
                 const savedSaccadicBlindness = this._saccadicBlindnessOverride;
+                const savedGaussianBlurMode = this._gaussianBlurModeOverride;
+                const savedDogE2 = this._dogE2Override;
 
                 // Default: High-Key (0)
                 const defaults = {
@@ -448,6 +457,7 @@
                     dog_enabled: false,
                     dog_e2: 0.5,
                     dog_sharpness: 0.0,
+                    gaussian_blur_mode: false,
                     cmf_enabled: false,
                     cmf_a: 2.78,
                     cmf_color_sigma: 0.0,
@@ -477,6 +487,7 @@
                         this.config.dog_enabled = p.dog_enabled ?? defaults.dog_enabled;
                         this.config.dog_e2 = p.dog_e2 ?? defaults.dog_e2;
                         this.config.dog_sharpness = p.dog_sharpness ?? defaults.dog_sharpness;
+                        this.config.gaussian_blur_mode = p.gaussian_blur_mode ?? defaults.gaussian_blur_mode;
                         this.config.cmf_enabled = p.cmf_enabled ?? defaults.cmf_enabled;
                         this.config.cmf_a = p.cmf_a ?? defaults.cmf_a;
                         this.config.cmf_color_sigma = p.cmf_color_sigma ?? defaults.cmf_color_sigma;
@@ -496,6 +507,12 @@
                         }
                         if (savedSaccadicBlindness !== undefined) {
                             this.config.saccadic_blindness = savedSaccadicBlindness;
+                        }
+                        if (savedGaussianBlurMode !== undefined) {
+                            this.config.gaussian_blur_mode = savedGaussianBlurMode;
+                        }
+                        if (savedDogE2 !== undefined) {
+                            this.config.dog_e2 = savedDogE2;
                         }
                         return;
                     }
@@ -653,6 +670,7 @@
                 gl.uniform1f(this.dogEnabledLocation, this.config.dog_enabled ? 1.0 : 0.0);
                 gl.uniform1f(this.dogE2Location, this.config.dog_e2);
                 gl.uniform1f(this.dogSharpnessLocation, this.config.dog_sharpness);
+                gl.uniform1f(this.gaussianBlurModeLocation, this.config.gaussian_blur_mode ? 1.0 : 0.0);
                 gl.uniform1f(this.cmfEnabledLocation, this.config.cmf_enabled ? 1.0 : 0.0);
                 gl.uniform1f(this.cmfALocation, this.config.cmf_a);
                 gl.uniform1f(this.corticalMaxLocation, corticalMax);

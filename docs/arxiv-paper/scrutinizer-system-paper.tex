@@ -35,7 +35,7 @@
 
 \hypersetup{colorlinks=true, linkcolor=blue!70!black, citecolor=blue!70!black, urlcolor=blue!70!black}
 
-\title{\vspace{-8pt}\textbf{Scrutinizer: A Psychophysically-Validated Foveated Vision Simulator for Web Content}\\[4pt]
+\title{\vspace{-8pt}\textbf{Scrutinizer: A Psychophysically-Grounded Foveated Vision Simulator for Web Content}\\[4pt]
 {\normalfont\small\textcolor{red}{PRE-PRINT DRAFT --- Not yet submitted to arXiv}}\vspace{-4pt}}
 
 \author{
@@ -52,7 +52,7 @@
 
 % ============================================================
 \begin{abstract}
-Gaze-contingent tools used in HCI research (BubbleView, ViewSer, ScreenMasker) simulate peripheral vision with Gaussian blur, uniformly destroying spatial structure that real peripheral vision preserves. We present Scrutinizer, an open-source foveated rendering system that applies biologically-grounded peripheral filtering to live web pages at 60\,fps. A GLSL shader implements a pipeline mapped to the visual pathway (retinal ganglion cells~$\rightarrow$ LGN~$\rightarrow$ V1~$\rightarrow$ V4), using Difference-of-Gaussians band decomposition on the hardware MIP chain for frequency-selective attenuation that approximates cortical magnification~\citep{rovamo1979}. V4 color processing models differential chromatic decay via castleCSF contrast sensitivity functions~\citep{ashraf2024}. V1 crowding distortion is density-gated. We validate against published psychophysical data across four domains: chromatic decay~\citep{mullen2002,bowers2025}, spatial frequency attenuation~\citep{rovamo1979}, crowding geometry~\citep{bouma1970,toet1992}, and saliency-driven protection~\citep{itti2001}. Section~\ref{sec:validation} characterizes both agreement and discrete-band approximation error. Open source (MIT), $>$120 unit tests.
+Gaze-contingent tools used in HCI research (BubbleView, ViewSer, ScreenMasker) simulate peripheral vision with Gaussian blur, uniformly destroying spatial structure that real peripheral vision preserves. We present Scrutinizer, an open-source foveated rendering system that applies biologically-grounded peripheral filtering to live web pages at 60\,fps. A GLSL shader implements a pipeline mapped to the visual pathway (retinal ganglion cells~$\rightarrow$ LGN~$\rightarrow$ V1~$\rightarrow$ V4), using Difference-of-Gaussians band decomposition on the hardware MIP chain for frequency-selective attenuation that approximates cortical magnification~\citep{rovamo1979}. V4 color processing models differential chromatic decay via castleCSF contrast sensitivity functions~\citep{ashraf2024}. V1 crowding distortion is density-gated. We characterize agreement with published psychophysical data across four domains: chromatic decay~\citep{mullen2002,bowers2025}, spatial frequency attenuation~\citep{rovamo1979}, crowding geometry~\citep{bouma1970,toet1992}, and saliency-driven protection~\citep{itti2001}. Section~\ref{sec:validation} characterizes both agreement and discrete-band approximation error. Open source (MIT), $>$120 unit tests.
 \end{abstract}
 
 % ============================================================
@@ -119,11 +119,11 @@ The architecture exposes five branch points (gaze input, saliency, crowding mode
 Retinal ganglion cells have center-surround receptive fields modeled as DoG filters~\citep{kuffler1953}, with field size growing with eccentricity (M-scaling). We decompose the hardware MIP chain into an \emph{approximate} Laplacian pyramid---hardware mipmaps use box/bilinear filtering rather than Gaussian convolution~\citep{burt1983}, so band differences are Difference-of-Boxes rather than true DoG, with some spectral leakage between bands:
 \vspace{-2pt}
 \begin{equation}
-\text{band}_k = \text{textureLod}(\mathit{tex}, \mathit{uv}, k) - \text{textureLod}(\mathit{tex}, \mathit{uv}, k{+}1)
+\text{band}_k = \text{textureLod}(\mathit{tex}, \mathit{uv}, k/2) - \text{textureLod}(\mathit{tex}, \mathit{uv}, (k{+}1)/2)
 \end{equation}
 \vspace{-4pt}
 
-Four bands span 1--2\,px (serifs) to 8--16\,px (buttons), each weighted by a smoothstep rolloff with cutoffs following a geometric progression ($0.3, 0.6, 1.2, 2.4 \times E_2$), approximating cortical magnification~\citep{rovamo1979}. The DC residual always passes through---even far-peripheral vision preserves mean luminance. Result: peripheral text shows letter shapes rather than uniform fog. Cost: 5 \texttt{textureLod} calls vs.\ 1.
+Eight half-octave bands span 5.66\,cpd (serifs) to 0.5\,cpd (layout blocks), each weighted by a smoothstep rolloff with cutoffs at $c_k = E_2 \times (2^{k/2} - 1)$ for $k = 1 \ldots 8$, approximating cortical magnification~\citep{rovamo1979}. The DC residual always passes through---even far-peripheral vision preserves mean luminance. Result: peripheral text shows letter shapes rather than uniform fog. Cost: 9 \texttt{textureLod} calls (half-integer LODs use hardware trilinear interpolation) vs.\ 1.
 
 \subsection{Chromatic Processing}
 
@@ -157,7 +157,9 @@ High-saliency regions receive up to 70\% of rendering bandwidth. The saliency wo
 % ============================================================
 \section{Validation}\label{sec:validation}
 
-We validate Scrutinizer's rendering pipeline against published psychophysical data across four domains. The method is screenshot-based: known psychophysical stimuli are rendered through the full pipeline (shader compilation, MIP chain, texture sampling, color space transforms), output pixels are measured, and results are compared against published human vision data. All stimuli are open-source HTML pages shipped with the repository.
+We characterize Scrutinizer's rendering pipeline against published psychophysical data across four domains. The method is screenshot-based: known psychophysical stimuli are rendered through the full pipeline (shader compilation, MIP chain, texture sampling, color space transforms), output pixels are measured, and results are compared against published human vision data. No human observers were tested; this is a comparison of computational outputs against published measurements. All stimuli are open-source HTML pages shipped with the repository.
+
+\textbf{Limitations of screenshot-based validation.} Each condition is a single capture---no repeated measurements, no error bars, no capture-to-capture variability assessment. Spatial blur from the peripheral rendering pipeline compresses the dynamic range available for chromatic measurement in Mode~0. Some Tier~2 tests verify that the shader produces its own hardcoded parameters (implementation verification, not perceptual validation). These caveats are noted per-wave below.
 
 We organize tests into three tiers. \textbf{Tier~1} (must pass): properties that hold by construction, such as monotonic decay and correct ordering. \textbf{Tier~2} (should pass): quantitative agreement with published data within stated tolerances. \textbf{Tier~3} (stretch): cross-study correlations where discrete GPU approximations meet continuous psychophysical functions.
 
@@ -167,7 +169,7 @@ We organize tests into three tiers. \textbf{Tier~1} (must pass): properties that
 
 \textbf{Stimulus.} Colored dot arrays (red, green, blue, yellow targets among gray distractors) at 5 eccentricity rings, rendered through Scrutinizer's full pipeline.
 
-\textbf{Results: Tier~1 7/7, Tier~2 3/3, Tier~3 1/2.} The Oklab decomposition into RG ($a$-axis) and BY ($b$-axis) channels correctly predicts peripheral color loss patterns. The key validation is that green tracks the RG decay curve, not BY---hue-based models would get this wrong. Monotonicity checks required non-strict comparison due to 8-bit RGB quantization creating legitimate plateaus at low chroma values.
+\textbf{Results: Tier~1 7/7, Tier~2 1/3, Tier~3 3/3.} The Oklab decomposition into RG ($a$-axis) and BY ($b$-axis) channels correctly predicts peripheral color loss patterns. The key validation is that green tracks the RG decay curve, not BY---hue-based models would get this wrong. Monotonicity checks required non-strict comparison due to 8-bit RGB quantization creating legitimate plateaus at low chroma values. Tier~2 failures: the Bowers suprathreshold ratio deviates 21\% from predicted (threshold 20\%), and rendered pixel values diverge from model predictions at 2/10 ring$\times$channel comparisons---Mode~0's spatial blur compresses the chromatic dynamic range available for measurement. Tier~3: rank ordering of chromatic decay across 4 eccentricities is preserved (Hansen naming data), though with $N{=}4$ this is equivalent to testing monotonicity.
 
 \subsection{Spatial Frequency Attenuation}
 
@@ -175,9 +177,9 @@ We organize tests into three tiers. \textbf{Tier~1} (must pass): properties that
 
 \textbf{Stimulus.} Sine-wave gratings at 0.25--4\,cpd in concentric annuli, analyzed via DFT matched filter at the stimulus frequency.
 
-\textbf{Results: Tier~1 12/16, Tier~2 5/5, Tier~3 0/4.} M-scaling cutoff positions validated cleanly. The 4 Tier~1 failures are measurement artifacts: the 30\,px foveal patch contains less than one full cycle of the 0.25\,cpd grating, producing nonsensical foveal-relative retention values. Cross-condition retention (filtered vs.\ unfiltered at the same eccentricity) eliminates this dependency: 4\,cpd drops from 81\% to 61\% across rings while 0.25\,cpd holds at 94--100\%, confirming frequency-selective attenuation.
+\textbf{Results: Tier~1 12/16, Tier~2 5/5, Tier~3 0/1.} The 4 Tier~1 failures are test design limitations: the 30\,px foveal patch contains less than one full cycle of the 0.25\,cpd grating, producing nonsensical foveal-relative retention values. These tests should be excluded or redesigned rather than excused. Cross-condition retention (filtered vs.\ unfiltered at the same eccentricity) eliminates this dependency: 4\,cpd drops from 81\% to 61\% across rings while 0.25\,cpd holds at 94--100\%, confirming frequency-selective attenuation. Note: the 5 Tier~2 M-scaling cutoff tests verify that the shader implements its hardcoded $E_2$ parameters correctly (implementation verification); they do not test perceptual accuracy.
 
-All 4 Tier~3 Rovamo correlations fail because the 5-band DoG produces step functions (100\%~$\rightarrow$~0\% at each cutoff), while Rovamo's data shows smooth decay. A composite frequency-weighted metric yields Spearman $r = 0.600$: correct rank ordering but quantitatively aggressive.
+The Tier~3 composite Rovamo correlation yields Spearman $r = 0.600$ with $N{=}5$, which is not statistically significant ($p > 0.2$). The 8-band half-octave DoG produces step functions (100\%~$\rightarrow$~0\% at each cutoff) while Rovamo's data shows smooth decay, so moderate rank-order agreement is the best this architecture can achieve.
 
 \subsection{Crowding Geometry}
 
@@ -185,7 +187,9 @@ All 4 Tier~3 Rovamo correlations fail because the 5-band DoG produces step funct
 
 \textbf{Stimulus.} Cyan target letters among flanking characters at 3$^{\circ}$, 6$^{\circ}$, and 10$^{\circ}$ eccentricity, in crowded (flanked) and isolated conditions. Metric: spread ratio = standard deviation of target positions, crowded / isolated.
 
-\textbf{Results: 7/7 after tuning.} MIP pooling diameter grows linearly from 2.5\,px at 2$^{\circ}$ to 14.9\,px at 15$^{\circ}$ (spread 1.71$\times$). At 6$^{\circ}$, V1 displacement reaches ${\sim}$69\,px for dense content; Bouma predicts $0.5 \times 6^{\circ} \times 45$\,ppd $= 135$\,px. The measured ratio is 0.51$\times$---close to Bouma's proportionality constant in the parafoveal range where most screen content lives.
+\textbf{Results: 3/7 initial, 7/7 after parameter adjustment.} Four fixes were required: (1)~polar sector R:T ratio corrected from ${\sim}$1:1 to 2:1 (the spoke count formula cancelled radial elongation); (2)~V1 eccentricity scaling extended beyond the parafoveal boundary; (3)~V1 growth factor calibrated from 0.5$\times$ to 1.5$\times$; (4)~composite Rovamo correlation metric replaced per-band Spearman. Fixes (2--3) were calibrated against the test stimuli, making the post-tuning score partially circular.
+
+MIP pooling diameter grows linearly from 2.5\,px at 2$^{\circ}$ to 14.9\,px at 15$^{\circ}$ (spread 1.71$\times$). At 6$^{\circ}$, V1 displacement reaches ${\sim}$69\,px for dense content; Bouma predicts $0.5 \times 6^{\circ} \times 45$\,ppd $= 135$\,px. The measured ratio is 0.51$\times$---close to Bouma's proportionality constant in the parafoveal range where most screen content lives.
 
 \begin{table}[t]
 \centering
@@ -196,14 +200,16 @@ All 4 Tier~3 Rovamo correlations fail because the 5-band DoG produces step funct
 \toprule
 \textbf{Eccentricity} & \textbf{Spread Ratio} & \textbf{Published Prediction} \\
 \midrule
-3$^{\circ}$ & 0.988 & No crowding in fovea \\
+3$^{\circ}$ & 0.988 & Near-foveal (minimal crowding expected) \\
 6$^{\circ}$ & 2.542 & Strong crowding (Bouma range) \\
-10$^{\circ}$ & 1.256 & Continued crowding \\
+10$^{\circ}$ & 1.256 & Should increase (Bouma); see below \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The density gate produces a 3.3:1 ratio between dense (69\,px displacement, factor ${\sim}$1.0) and isolated content (21\,px, factor ${\sim}$0.3). Polar sector geometry was corrected during validation: the original spoke count formula cancelled radial elongation, producing ${\sim}$1:1 aspect ratio instead of Toet \& Levi's 2:1. Fix: compute spoke count from unbiased ring width.
+The spread ratio \emph{decreases} from 6$^{\circ}$ to 10$^{\circ}$, contrary to Bouma's prediction of increasing crowding with eccentricity. At 10$^{\circ}$, MIP pooling destroys differentiable structure in both crowded and isolated conditions, compressing the ratio toward 1.0. This bounds the effective crowding range to ${\sim}$4--8$^{\circ}$---the parafoveal range where most screen content lives, but an architectural limit for wider-field applications.
+
+The density gate produces a 3.3:1 ratio between dense (69\,px displacement, factor ${\sim}$1.0) and isolated content (21\,px, factor ${\sim}$0.3).
 
 \textbf{Architectural limit.} The V1 stage is eccentricity-dependent but not spacing-dependent---it does not differentiate flanker distances within the crowding zone. A spacing-dependent Bouma curve would require pooling-region-based crowding~\citep{rosenholtz2012}, where features within an eccentricity-scaled region are mixed.
 
@@ -213,26 +219,26 @@ The density gate produces a 3.3:1 ratio between dense (69\,px displacement, fact
 
 \textbf{Stimulus.} Four-region test page: color singleton (red among green), luminance singleton (white among dark), inline face image, and homogeneous control. Protection ratio $= \text{deviation}(\text{mod\_on}, \text{baseline}) / \text{deviation}(\text{mod\_off}, \text{baseline})$; values ${<}1.0$ indicate saliency modulation preserves content.
 
-\textbf{Results: Pop-out 6/7, Protection 5/5.} Face saliency is 4.79$\times$ control. The saliency-to-shader path is validated end-to-end:
+\textbf{Results: Pop-out 6/7, Protection 5/5.} Face saliency is 4.79$\times$ control. The saliency-to-shader path is validated end-to-end for face detection; bottom-up saliency shows weaker results:
 
 \begin{table}[t]
 \centering
-\caption{Saliency protection ratios by region type.}\vspace{-2pt}
+\caption{Saliency protection ratios by region type and detection channel.}\vspace{-2pt}
 \label{tab:saliency}
 \footnotesize
-\begin{tabular}{@{}lcc@{}}
+\begin{tabular}{@{}lccc@{}}
 \toprule
-\textbf{Region} & \textbf{Protection Ratio} & \textbf{Effect} \\
+\textbf{Region} & \textbf{Channel} & \textbf{Protection Ratio} & \textbf{Effect} \\
 \midrule
-Face & 0.283 & 72\% less distortion \\
-Luminance singleton & 0.708 & 29\% less distortion \\
-Color singleton & 0.987 & No protection \\
-Control & 0.990 & No protection (correct) \\
+Face & Face detector (640\,px) & 0.283 & 72\% less distortion \\
+Luminance singleton & Bottom-up DoG (256\,px) & 0.708 & 29\% less distortion \\
+Color singleton & Bottom-up DoG (256\,px) & 0.987 & No protection \\
+Control & --- & 0.990 & No protection (correct) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The luminance singleton (INFO) scored below control in raw saliency---at 256\,px worker resolution, 40\,px items map to ${\sim}$5 saliency pixels, below the DoG center-surround's resolving power. This is a resolution design choice: the saliency worker targets page-level features while face detection operates at 640\,px for the biologically-privileged face category.
+The face detector (face-api.js TinyFaceDetector at 640\,px) provides the dominant saliency signal. The bottom-up Oklab DoG channel failed to detect the color singleton and barely resolved the luminance singleton: at 256\,px worker resolution, 40\,px UI elements map to ${\sim}$5 saliency pixels, below the center-surround's resolving power. This means the current saliency pipeline protects page-level features (faces, large images) but not individual UI elements (buttons, icons). Increasing worker resolution or adding a dedicated small-element detector would address this gap.
 
 \subsection{Summary and Failure Analysis}
 
@@ -241,25 +247,28 @@ The luminance singleton (INFO) scored below control in raw saliency---at 256\,px
 \caption{Validation summary across four domains.}\vspace{-2pt}
 \label{tab:validation_summary}
 \footnotesize
-\begin{tabular}{@{}llccc@{}}
+\begin{tabular}{@{}llcccc@{}}
 \toprule
-\textbf{Wave} & \textbf{Mechanism} & \textbf{T1} & \textbf{T2} & \textbf{T3} \\
+\textbf{Wave} & \textbf{Mechanism} & \textbf{T1} & \textbf{T2} & \textbf{T3} & \textbf{Note} \\
 \midrule
-1 & Chromatic decay & 7/7 & 3/3 & 1/2 \\
-2 & Spatial frequency & 12/16 & 5/5 & 0/4 \\
-3 & Crowding geometry & \multicolumn{3}{c}{7/7 after tuning} \\
-4 & Saliency protection & \multicolumn{3}{c}{11/12 (6+5)} \\
+1 & Chromatic decay & 7/7 & 1/3 & 3/3$^a$ & T2: blur compresses chroma \\
+2 & Spatial frequency & 12/16$^b$ & 5/5$^c$ & 0/1 & T3: $r{=}0.600$, n.s. \\
+3 & Crowding geometry & \multicolumn{3}{c}{3/7 $\rightarrow$ 7/7$^d$} & Calibrated, not independent \\
+4 & Saliency protection & \multicolumn{3}{c}{11/12 (6+5)} & Face channel dominant \\
 \bottomrule
 \end{tabular}
+\par\vspace{1pt}{\scriptsize $^a$Hansen $r{=}1.0$, $N{=}4$ (equivalent to monotonicity test). $^b$4 failures from undersized foveal patch. $^c$Implementation verification (hardcoded parameters). $^d$Post parameter adjustment; see Section~\ref{sec:validation}.3.}
 \end{table}
 
-The pattern across all four waves is consistent: the pipeline matches published data where the mechanism maps cleanly to GPU operations (chromatic channel separation, frequency-dependent attenuation, eccentricity-dependent displacement), and diverges where discrete MIP levels approximate continuous psychophysical functions. Two systematic failure modes:
+The pattern across all four waves is consistent: the pipeline matches published data where the mechanism maps cleanly to GPU operations (chromatic channel separation, frequency-dependent attenuation, eccentricity-dependent displacement), and diverges where discrete MIP levels approximate continuous psychophysical functions. Three systematic failure modes:
 
-\textbf{Discrete bands vs.\ continuous CSF.} The 5-band DoG produces step functions at each MIP-level boundary. Rovamo's smooth decay curves correlate at $r = 0.600$ but diverge quantitatively. A continuous Gaussian blur with eccentricity-dependent sigma (as in FOVI) would produce smoother curves but loses selective frequency preservation.
+\textbf{Discrete bands vs.\ continuous CSF.} The 8-band half-octave DoG produces step functions at each MIP-level boundary. Rovamo's smooth decay curves yield only $r = 0.600$ ($N{=}5$, not significant). A continuous Gaussian blur with eccentricity-dependent sigma (as in FOVI) would produce smoother curves but loses selective frequency preservation.
 
 \textbf{Strength vs.\ spacing.} The density-gated crowding model modulates distortion \emph{strength} as a function of eccentricity, not \emph{spacing} as a function of flanker distance. The model cannot differentiate a target with flankers at 0.2$\times$ vs.\ 0.5$\times$ eccentricity spacing. This is an architectural limit of per-pixel fragment shaders, which cannot compute summary statistics over pooling regions.
 
-Four fixes were applied during validation: (1)~composite Rovamo correlation replacing per-band Spearman; (2)~polar sector R:T ratio corrected from 1:1 to 2:1; (3)~V1 displacement plateau fixed via far-scale continuation; (4)~V1 growth factor calibrated to 1.5$\times$ via capture-analyze loop.
+\textbf{Bottom-up saliency resolution.} The saliency worker operates at 256\,px, which cannot resolve UI elements smaller than ${\sim}$60\,px. Face detection operates at 640\,px and provides the dominant protection signal. The bottom-up channel protects page-level layout features but not individual interactive elements.
+
+\textbf{Parameter adjustment during validation.} Four fixes were applied during the crowding wave: (1)~polar sector R:T ratio corrected from 1:1 to 2:1 (a bug fix); (2)~V1 displacement extended beyond the parafoveal boundary (a bug fix); (3)~V1 growth factor calibrated from 0.5$\times$ to 1.5$\times$ (parameter fitting); (4)~composite Rovamo metric replaced per-band Spearman (metric redesign). Fixes (1--2) are corrections to implementation errors. Fixes (3--4) were calibrated against the test stimuli, making those specific results partially circular. Independent validation on held-out stimuli would strengthen the crowding claims.
 
 % ============================================================
 \section{Applications}
