@@ -12,6 +12,18 @@ Specification for importing published eye-tracking scanpath datasets, replaying 
 
 `GazeModel` exposes `update(now)`, `getPosition()`, `getVelocity()` and is consumed by the render loop at `scrutinizer.js:352-354`. This clean interface is a branch point — any object implementing these four methods can drive the pipeline. Importing published scanpath data through a drop-in replacement enables:
 
+### Dependent grad student projects
+
+Phases 1–2 (common format + ScanpathPlayer) are prerequisites for:
+- **Project 2.1** (Fixation Recording) — recording format and coordinate conversion
+- **Project 2.3** (Cognitive Load) — behavioral baseline for mouse-vs-eye comparison
+- **Project 4.1** (Saliency/Congestion Comparison) — Validation Experiment D
+- See `docs/grad-student-projects.md` for full project descriptions.
+
+### Pipeline validation integration
+
+The v2.1 validation waves (`docs/release_notes_v2.1.0.md`) use static fixation captures. Scanpath replay enables dynamic validation — replaying published scanpaths (UEyes, MIT1003) through the pipeline and measuring temporal output against Wave 3 crowding predictions.
+
 1. **Automated video demos** — deterministic, repeatable renderings for blog posts and presentations
 2. **Perceptual validation** — compare Scrutinizer's output against known human fixation data
 3. **Regression testing** — detect unintended pipeline changes by replaying identical scanpaths across versions

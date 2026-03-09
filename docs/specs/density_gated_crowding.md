@@ -3,6 +3,8 @@
 **Status**: Shipped (v1.9.1, 2026-03-07)
 **Created**: 2026-03-04
 **Diagnostic**: `reference-pages/crowding.html`, `reference-pages/crowding-stimulus.html`
+**Validation**: Wave 3 — Crowding Geometry (`docs/specs/wave3_crowding_validation.md`, Prediction C). Density gate validated at 3.3:1 crowded-to-isolated ratio. Wave 5 — Halverson Mixed-Density (`docs/release_notes_v2.1.0.md#wave-5-halverson-mixed-density`): density gate predicts same sparse/dense degradation pattern as Halverson & Hornof 2011 EPIC model.
+**Successor**: Mongrel texture synthesis (`docs/specs/mongrel_textures.md`) replaces this strength-based proxy with statistical texture replacement.
 
 ## Context
 

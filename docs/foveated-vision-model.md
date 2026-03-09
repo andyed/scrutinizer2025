@@ -106,8 +106,8 @@ The biological architecture produces several emergent properties that Scrutinize
 | Biological Phenomenon | Cause | Scrutinizer Implementation |
 |----------------------|-------|---------------------------|
 | **Resolution loss** | Receptor pooling (100:1) | Approximate DoG band decomposition (MIP-derived, box/bilinear not Gaussian) with M-scaling rolloff; legacy: simple MIP pooling |
-| **Chromatic pooling** | Reduced chromatic spatial resolution; mean chromaticity preserved over large regions (Rosenholtz TTM) | Per-channel RG/YV attenuation in DoG bands (castleCSF); legacy: uniform Oklab chrominance reduction + cyan tint |
-| **Crowding** | Receptive field overlap | Fractal Crowding (Tier 2.0) + vertical chop. **Known gap:** distortion is eccentricity-only, not density-dependent — isolated and flanked targets degrade equally (see `docs/simulation-limitations.md`, `docs/specs/density_gated_crowding.md`) |
+| **Chromatic pooling** | Reduced chromatic spatial resolution; mean chromaticity preserved over large regions (Rosenholtz TTM) | Per-channel RG/YV attenuation in DoG bands (castleCSF). Spec: `docs/specs/implemented/chromatic_pooling.md`. Validated: Wave 1 (Hansen 2009, Mullen 2002). |
+| **Crowding** | Receptive field overlap | Density-gated V1 distortion (sigmoid on structure density). Spec: `docs/specs/density_gated_crowding.md`. Validated: Wave 3 (Bouma 1970), Wave 5 (Halverson 2011). Future: mongrel texture synthesis (`docs/specs/mongrel_textures.md`). |
 | **Motion sensitivity** | Magnocellular pathway | Preserved contrast in periphery |
 | **Positional uncertainty** | Large receptive fields | Simplex noise displacement |
 
