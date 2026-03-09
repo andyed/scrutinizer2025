@@ -9,6 +9,7 @@
 \usepackage{amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
+\usepackage{float}
 \usepackage{hyperref}
 \usepackage{xcolor}
 \usepackage{caption}
@@ -68,7 +69,7 @@ These contributions serve three use cases. \textbf{(a)~Vision research:} the bra
 
 \textbf{Limitations.} The current gaze input is mouse cursor position---unable to capture saccades, reading fixations, or gaze-cursor dissociation. Eccentricity is computed in pixel units; without per-user viewing distance and display DPI calibration, the mapping to degrees of visual angle is approximate. The foveal radius (default 90\,px) is configurable for research use but requires expert calibration of viewing geometry.
 
-\begin{table}[t]
+\begin{table}[htbp]
 \centering
 \caption{Comparison with existing gaze-contingent tools.}\vspace{-2pt}
 \label{tab:comparison}
@@ -92,21 +93,21 @@ FOVI~\citeyearpar{blauch2026} & \checkmark & CMF & -- & -- & \checkmark \\
 
 The pipeline is a single-pass fragment shader (${\sim}$1200~LOC, GLSL~ES~3.0) with 47 uniforms organized into biological stages, fed by four JavaScript modules (Table~\ref{tab:architecture}).
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{Pipeline stages mapped to biological subsystems.}\vspace{-2pt}
 \label{tab:architecture}
-\footnotesize
-\begin{tabular}{@{}l p{3.6cm} p{2.0cm}@{}}
+\scriptsize
+\begin{tabular}{@{}l p{2.8cm} l@{}}
 \toprule
 \textbf{Biology} & \textbf{Computation} & \textbf{Source} \\
 \midrule
-Oculomotor (eye movement) & Velocity, fixation, saccadic suppression & --- \\
-Retinal GC & DoG center-surround via MIP chain & \citet{kuffler1953} \\
-LGN gating & Structure mask + saliency gate & \citet{mcalonan2008} \\
-V1 features & Noise crowding, grid scramble & \citet{pelli2008} \\
-V4 color & Per-channel chromatic pooling (castleCSF) & \citet{ashraf2024} \\
-Clutter & Feature Congestion scoring & \citet{rosenholtz2007} \\
+Oculomotor & Velocity, fixation, saccade & --- \\
+Retinal GC & DoG via MIP chain & \citet{kuffler1953} \\
+LGN gating & Structure + saliency gate & \citet{mcalonan2008} \\
+V1 features & Noise crowding, scramble & \citet{pelli2008} \\
+V4 color & Chromatic pooling (castleCSF) & \citet{ashraf2024} \\
+Clutter & Feature Congestion & \citet{rosenholtz2007} \\
 Saliency & Oklab DoG + face + DOM & \citet{itti2001} \\
 \bottomrule
 \end{tabular}
@@ -191,18 +192,18 @@ The Tier~3 composite Rovamo correlation yields Spearman $r = 0.600$ with $N{=}5$
 
 MIP pooling diameter grows linearly from 2.5\,px at 2$^{\circ}$ to 14.9\,px at 15$^{\circ}$ (spread 1.71$\times$). At 6$^{\circ}$, V1 displacement reaches ${\sim}$69\,px for dense content; Bouma predicts $0.5 \times 6^{\circ} \times 45$\,ppd $= 135$\,px. The measured ratio is 0.51$\times$---close to Bouma's proportionality constant in the parafoveal range where most screen content lives.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{Crowding spread ratios vs.\ published predictions.}\vspace{-2pt}
 \label{tab:crowding}
-\footnotesize
-\begin{tabular}{@{}lcl@{}}
+\scriptsize
+\begin{tabular}{@{}lcp{3.2cm}@{}}
 \toprule
-\textbf{Eccentricity} & \textbf{Spread Ratio} & \textbf{Published Prediction} \\
+\textbf{Ecc.} & \textbf{Ratio} & \textbf{Published Prediction} \\
 \midrule
-3$^{\circ}$ & 0.988 & Near-foveal (minimal crowding expected) \\
-6$^{\circ}$ & 2.542 & Strong crowding (Bouma range) \\
-10$^{\circ}$ & 1.256 & Should increase (Bouma); see below \\
+3\textdegree & 0.988 & Near-foveal (minimal) \\
+6\textdegree & 2.542 & Strong crowding (Bouma) \\
+10\textdegree & 1.256 & Should increase; see below \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -221,19 +222,19 @@ The density gate produces a 3.3:1 ratio between dense (69\,px displacement, fact
 
 \textbf{Results: Pop-out 6/7, Protection 5/5.} Face saliency is 4.79$\times$ control. The saliency-to-shader path is validated end-to-end for face detection; bottom-up saliency shows weaker results:
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
-\caption{Saliency protection ratios by region type and detection channel.}\vspace{-2pt}
+\caption{Saliency protection ratios by region type.}\vspace{-2pt}
 \label{tab:saliency}
-\footnotesize
-\begin{tabular}{@{}lccc@{}}
+\scriptsize
+\begin{tabular}{@{}llcl@{}}
 \toprule
-\textbf{Region} & \textbf{Channel} & \textbf{Protection Ratio} & \textbf{Effect} \\
+\textbf{Region} & \textbf{Channel} & \textbf{Ratio} & \textbf{Effect} \\
 \midrule
-Face & Face detector (640\,px) & 0.283 & 72\% less distortion \\
-Luminance singleton & Bottom-up DoG (256\,px) & 0.708 & 29\% less distortion \\
-Color singleton & Bottom-up DoG (256\,px) & 0.987 & No protection \\
-Control & --- & 0.990 & No protection (correct) \\
+Face & Face det.\ (640\,px) & 0.283 & 72\% less \\
+Lum.\ singleton & DoG (256\,px) & 0.708 & 29\% less \\
+Color singleton & DoG (256\,px) & 0.987 & None \\
+Control & --- & 0.990 & None (correct) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -242,19 +243,19 @@ The face detector (face-api.js TinyFaceDetector at 640\,px) provides the dominan
 
 \textbf{Gaussian comparison.} A matched eccentricity-scaled Gaussian blur (\texttt{u\_gaussian\_blur\_mode}), using the same MIP chain and M-scaling curve but without band decomposition, saliency gating, or chromatic separation, was applied to the same saliency stimulus. Table~\ref{tab:gaussian_saliency} reports mean absolute pixel deviation from the unfiltered baseline at each region.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
-\caption{Full pipeline vs.\ Gaussian blur: deviation from unfiltered baseline (lower = better preservation). Ratio $< 1$ means the full pipeline preserves more content.}\vspace{-2pt}
+\caption{Full pipeline vs.\ Gaussian blur: mean pixel deviation from unfiltered baseline. Ratio ${<}\,1$ = pipeline preserves more.}\vspace{-2pt}
 \label{tab:gaussian_saliency}
-\footnotesize
-\begin{tabular}{@{}lcccl@{}}
+\scriptsize
+\begin{tabular}{@{}lcccc@{}}
 \toprule
-\textbf{Region} & \textbf{Pipeline} & \textbf{Gaussian} & \textbf{Ratio} & \textbf{Effect} \\
+\textbf{Region} & \textbf{Pipe.} & \textbf{Gauss.} & \textbf{Ratio} & \textbf{Adv.} \\
 \midrule
-Face              & 2.9  & 23.9 & 0.121 & 8.2$\times$ \\
-Luminance single. & 1.3  & 14.0 & 0.094 & 10.8$\times$ \\
-Color singleton   & 1.2  &  6.7 & 0.173 & 5.6$\times$ \\
-Control           & 4.9  & 15.5 & 0.318 & 3.2$\times$ \\
+Face          & 2.9  & 23.9 & 0.121 & 8.2$\times$ \\
+Lum.\ single. & 1.3  & 14.0 & 0.094 & 10.8$\times$ \\
+Color single. & 1.2  &  6.7 & 0.173 & 5.6$\times$ \\
+Control       & 4.9  & 15.5 & 0.318 & 3.2$\times$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -265,22 +266,22 @@ On spatial frequency alone, DoG and Gaussian produce near-identical contrast ret
 
 \subsection{Summary and Failure Analysis}
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{Validation summary across four domains.}\vspace{-2pt}
 \label{tab:validation_summary}
-\footnotesize
-\begin{tabular}{@{}llcccc@{}}
+\scriptsize
+\begin{tabular}{@{}llcccp{2.0cm}@{}}
 \toprule
-\textbf{Wave} & \textbf{Mechanism} & \textbf{T1} & \textbf{T2} & \textbf{T3} & \textbf{Note} \\
+\textbf{W} & \textbf{Mechanism} & \textbf{T1} & \textbf{T2} & \textbf{T3} & \textbf{Note} \\
 \midrule
-1 & Chromatic decay & 7/7 & 1/3 & 3/3$^a$ & T2: blur compresses chroma \\
-2 & Spatial frequency & 12/16$^b$ & 5/5$^c$ & 0/1 & T3: $r{=}0.600$, n.s. \\
-3 & Crowding geometry & \multicolumn{3}{c}{3/7 $\rightarrow$ 7/7$^d$} & Calibrated, not independent \\
-4 & Saliency protection & \multicolumn{3}{c}{11/12 (6+5)} & Face channel dominant \\
+1 & Chrom.\ decay & 7/7 & 1/3 & 3/3$^a$ & Blur compresses chroma \\
+2 & Spatial freq. & 12/16$^b$ & 5/5$^c$ & 0/1 & $r{=}0.600$, n.s. \\
+3 & Crowding & \multicolumn{3}{c}{3/7 $\rightarrow$ 7/7$^d$} & Calibrated \\
+4 & Saliency & \multicolumn{3}{c}{11/12 (6+5)} & Face dominant \\
 \bottomrule
 \end{tabular}
-\par\vspace{1pt}{\scriptsize $^a$Hansen $r{=}1.0$, $N{=}4$ (equivalent to monotonicity test). $^b$4 failures from undersized foveal patch. $^c$Implementation verification (hardcoded parameters). $^d$Post parameter adjustment; see Section~\ref{sec:validation}.3.}
+\par\vspace{1pt}{\scriptsize $^a$Hansen $r{=}1.0$, $N{=}4$ (monotonicity). $^b$Undersized foveal patch. $^c$Hardcoded params. $^d$Post tuning; see Sec.~\ref{sec:validation}.3.}
 \end{table}
 
 The pattern across all four waves is consistent: the pipeline matches published data where the mechanism maps cleanly to GPU operations (chromatic channel separation, frequency-dependent attenuation, eccentricity-dependent displacement), and diverges where discrete MIP levels approximate continuous psychophysical functions. Three systematic failure modes:
