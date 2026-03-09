@@ -2,6 +2,35 @@
 
 Last updated: 2026-03-09 (v2.1)
 
+## Specs
+
+Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in `docs/specs/implemented/`.
+
+| Spec | Topic | Status |
+|------|-------|--------|
+| [linguistic_priming.md](docs/specs/linguistic_priming.md) | Goal embeddings → scent map → saliency gating | **Planned** |
+| [oriented_dog_bands.md](docs/specs/oriented_dog_bands.md) | Orientation-selective band attenuation, radial-tangential bias | **Planned** |
+| [mongrel_textures.md](docs/specs/mongrel_textures.md) | Statistical texture synthesis (WebGPU tiered path) | **Planned** |
+| [congestion_text_density.md](docs/specs/congestion_text_density.md) | Congestion gate enhancement for text density | **Planned** |
+| [gaussian_blur_comparison.md](docs/specs/gaussian_blur_comparison.md) | DoG vs Gaussian frequency/saliency comparison | In progress |
+| [halverson_hornof_validation.md](docs/specs/halverson_hornof_validation.md) | Active vision behavioral validation | In progress |
+| [continuous_chromatic_mip.md](docs/specs/continuous_chromatic_mip.md) | Continuous chromatic MIP sampling per channel | In progress |
+| [human_subjects_data_collection.md](docs/specs/human_subjects_data_collection.md) | Human subjects experiment platform | **Planned** (post-v2.2) |
+| [keyboard_shortcuts.md](docs/specs/keyboard_shortcuts.md) | Keyboard shortcuts for visualization modes | In progress |
+| [browser-features-and-extensions.md](docs/specs/browser-features-and-extensions.md) | Chrome extension support, browser niceties | **Planned** |
+
+<details>
+<summary>Completed / shipped specs</summary>
+
+| Spec | Shipped |
+|------|---------|
+| [density_gated_crowding.md](docs/specs/density_gated_crowding.md) | v1.9.1 |
+| [cmf_mip_derivation.md](docs/specs/cmf_mip_derivation.md) | v1.8 |
+| [blueprint_mods.md](docs/specs/blueprint_mods.md) | v2.0 |
+| [implemented/chromatic_pooling.md](docs/specs/implemented/chromatic_pooling.md) | v1.9 |
+
+</details>
+
 ---
 
 ## Completed
