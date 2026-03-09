@@ -3,6 +3,7 @@
 **Release Date:** March 2026
 
 **Blog post:** [Measuring the Pipeline](https://andyed.github.io/scrutinizer-www/blog/2026-03-08-v2.1.html)
+**Published data:** [tests/validation/published-data/](https://github.com/andyed/scrutinizer2025/tree/main/tests/validation/published-data) — Rovamo 1979, Hansen 2009, Mullen & Kingdom 2002, Bowers 2025
 **Previous:** [v2.0 blog post](https://andyed.github.io/scrutinizer-www/blog/2026-03-07-v2.0.html)
 
 ## In This Release
