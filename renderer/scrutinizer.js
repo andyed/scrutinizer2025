@@ -496,6 +496,10 @@
             this.contentAnalysis.toggleSaliencyMapDebug(enabled, this.renderer);
         }
 
+        setDebugLevel(level) {
+            this.contentAnalysis.setDebugLevel(level);
+        }
+
         toggleSaliencyModulation(enabled) {
             this.contentAnalysis.toggleSaliencyModulation(enabled);
         }

@@ -1,7 +1,9 @@
 # Oriented DoG Band Decomposition
 
+> **Last updated:** 2026-03-08
+
 Date: 2026-02-28
-Status: PLANNED
+Status: IN PROGRESS (Phase 1 implemented, needs visual verification)
 Dependencies: DoG band decomposition (v1.6, implemented), V1 crowding pipeline (implemented)
 
 ## 1. Problem Statement

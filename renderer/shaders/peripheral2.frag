@@ -41,6 +41,11 @@ uniform float u_dog_enabled;     // 0.0 = legacy MIP, 1.0 = DoG reconstruction
 uniform float u_dog_e2;          // M-scaling E2 (half-resolution eccentricity)
 uniform float u_dog_sharpness;   // Band rolloff sharpness (0=biological, 1=sharp)
 
+// Oriented DoG — orientation-selective band attenuation (Appelle 1972, Toet & Levi 1992)
+uniform float u_dog_oriented;      // 0.0 = isotropic (legacy), 1.0 = oriented
+uniform float u_dog_orient_bias;   // Oblique effect strength (0=none, 1=biological ~50%, 2=exaggerated)
+uniform float u_dog_radial_bias;   // Radial-tangential anisotropy (0=off, Phase 3)
+
 // Gaussian blur comparison mode — eccentricity-scaled MIP blur without band decomposition
 uniform float u_gaussian_blur_mode; // 0.0 = normal, 1.0 = comparison Gaussian
 
@@ -152,9 +157,39 @@ vec4 chromaticAttenuate(vec4 color, float rg_atten, float yv_atten);
 // Biology: retinal ganglion cells have center-surround RFs ≈ DoG filters.
 // Field size grows with eccentricity. At fovea: all bands. In periphery: only low-freq survives.
 vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
-                             float dog_e2, float dog_sharpness, float visual_ecc) {
+                             float dog_e2, float dog_sharpness, float visual_ecc,
+                             vec2 undistortedUV) {
     float normEcc = max(0.0, eccentricity) / max(fovea_radius, 0.001);           // spatial bands (V1 distortion-coupled)
     float chromNormEcc = max(0.0, visual_ecc) / max(fovea_radius, 0.001);        // chromatic decay (true gaze eccentricity)
+
+    // --- Oriented DoG: local gradient from 4-tap cross at MIP 1 ---
+    // Uses undistorted UV so gradient measures content orientation, not V1 warp artifacts.
+    // MIP 1 averages 2x2 blocks — robust to pixel noise, captures stroke-level orientation.
+    float orientBonus = 0.0;
+    if (u_dog_oriented > 0.5) {
+        vec2 px = 2.0 / u_resolution;  // MIP 1 texel size
+        // Luminance from BGRA-ordered texture: .b=Red, .g=Green, .r=Blue
+        // Correct luma weights: 0.299*R(.b) + 0.587*G(.g) + 0.114*B(.r)
+        vec3 lumaW = vec3(0.114, 0.587, 0.299);
+        float lum_r = dot(textureLod(u_texture, undistortedUV + vec2(px.x, 0.0), 1.0).rgb, lumaW);
+        float lum_l = dot(textureLod(u_texture, undistortedUV - vec2(px.x, 0.0), 1.0).rgb, lumaW);
+        float lum_t = dot(textureLod(u_texture, undistortedUV + vec2(0.0, px.y), 1.0).rgb, lumaW);
+        float lum_b = dot(textureLod(u_texture, undistortedUV - vec2(0.0, px.y), 1.0).rgb, lumaW);
+
+        float gx = lum_r - lum_l;
+        float gy = lum_t - lum_b;
+
+        // Cardinal alignment via double-angle identity: cos(2θ) = |gx²−gy²| / (gx²+gy²)
+        // Maps both H and V to 1.0, obliques (45°/135°) to 0.0
+        float g2 = gx * gx + gy * gy;
+        float cos2theta = (g2 > 1e-6) ? abs(gx * gx - gy * gy) / g2 : 0.0;
+
+        // Gradient magnitude gate — flat regions get no bonus (prevents noise amplification)
+        float gradMag = sqrt(g2);
+        float edgeGate = smoothstep(0.02, 0.08, gradMag);
+
+        orientBonus = cos2theta * edgeGate * u_dog_orient_bias;
+    }
 
     // Sample 9 MIP levels at half-octave spacing (LOD 0.0 to 4.0 in 0.5 steps)
     // Half-integer LODs trigger hardware trilinear interpolation (2 bilinear reads + lerp),
@@ -216,6 +251,15 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         c[5] = e2 * 7.0;       // == old c2
         c[6] = e2 * 10.31371;  // 8*sqrt(2) - 1
         c[7] = e2 * 15.0;      // == old c3
+    }
+
+    // Oriented DoG: push cutoffs outward for cardinal-aligned content
+    // Finest bands (k=0) get up to 50% boost, coarsest (k=7) get 10% — fine detail
+    // benefits most from the oblique effect, coarse structure is already robust.
+    // When orientBonus=0 (disabled or flat region), all boosts are 1.0 — no change.
+    for (int k = 0; k < 8; k++) {
+        float boost = 1.0 + orientBonus * mix(0.5, 0.1, float(k) / 7.0);
+        c[k] *= boost;
     }
 
     // Transition width: biological (wide, gradual) vs sharp (narrow, crisp)
@@ -847,7 +891,8 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     } else if (u_dog_enabled > 0.5) {
         pooledCol = sampleDoGReconstructed(
             v1.distortedUV, coupledEccentricity, fovea_radius,
-            u_dog_e2, u_dog_sharpness, eccentricity
+            u_dog_e2, u_dog_sharpness, eccentricity,
+            uv  // undistorted UV for orientation gradient (not V1-warped)
         ).rgb;
     } else {
         pooledCol = sampleMIPPooledGrad(v1.distortedUV, duvdx, duvdy, coupledEccentricity, fovea_radius).rgb;
@@ -1443,7 +1488,54 @@ void main() {
         color = sampleSource(uv);
     }
     
-    if (debugLevel > 2.5) {
+    if (debugLevel > 4.5) {
+        // Debug 5: Oriented DoG band weight overlay
+        // Brighter = more bands preserved. Green tint = orientation bonus active.
+        float dist_dbg = length(uv_corrected - mouse_corrected);
+        float ecc_dbg = max(0.0, dist_dbg - fovea_radius);
+        float normEcc_dbg = ecc_dbg / max(fovea_radius, 0.001);
+        float e2_dbg = max(u_dog_e2, 0.01);
+        // Recompute band weights at this eccentricity (simplified — isotropic baseline)
+        float bandCount = 0.0;
+        for (int k = 0; k < 8; k++) {
+            float c_dbg = e2_dbg * float[8](0.41421, 1.0, 1.82843, 3.0, 4.65685, 7.0, 10.31371, 15.0)[k];
+            float tm = 0.4;
+            bandCount += 1.0 - smoothstep(c_dbg - c_dbg * tm, c_dbg + c_dbg * tm, normEcc_dbg);
+        }
+        // Gradient orientation (same computation as in sampleDoGReconstructed)
+        vec2 px_dbg = 2.0 / u_resolution;
+        vec3 lumaW_dbg = vec3(0.114, 0.587, 0.299); // BGRA-corrected luminance weights
+        float lr = dot(textureLod(u_texture, uv + vec2(px_dbg.x, 0.0), 1.0).rgb, lumaW_dbg);
+        float ll = dot(textureLod(u_texture, uv - vec2(px_dbg.x, 0.0), 1.0).rgb, lumaW_dbg);
+        float lt = dot(textureLod(u_texture, uv + vec2(0.0, px_dbg.y), 1.0).rgb, lumaW_dbg);
+        float lb = dot(textureLod(u_texture, uv - vec2(0.0, px_dbg.y), 1.0).rgb, lumaW_dbg);
+        float gx_d = lr - ll; float gy_d = lt - lb;
+        float g2_d = gx_d*gx_d + gy_d*gy_d;
+        float c2t = (g2_d > 1e-6) ? abs(gx_d*gx_d - gy_d*gy_d) / g2_d : 0.0;
+        float eg = smoothstep(0.02, 0.08, sqrt(g2_d));
+        float ob = c2t * eg * u_dog_orient_bias;
+        float base = bandCount / 8.0;
+        color.rgb = vec3(base, base + ob * 0.3, base);  // green tint where bonus active
+    } else if (debugLevel > 3.5) {
+        // Debug 4: Gradient field overlay
+        // R = edge strength, G = cardinal (H/V) edges, B = oblique edges
+        vec2 px_dbg = 2.0 / u_resolution;
+        vec3 lumaW_dbg = vec3(0.114, 0.587, 0.299);
+        float lr = dot(textureLod(u_texture, uv + vec2(px_dbg.x, 0.0), 1.0).rgb, lumaW_dbg);
+        float ll = dot(textureLod(u_texture, uv - vec2(px_dbg.x, 0.0), 1.0).rgb, lumaW_dbg);
+        float lt = dot(textureLod(u_texture, uv + vec2(0.0, px_dbg.y), 1.0).rgb, lumaW_dbg);
+        float lb = dot(textureLod(u_texture, uv - vec2(0.0, px_dbg.y), 1.0).rgb, lumaW_dbg);
+        float gx_d = lr - ll; float gy_d = lt - lb;
+        float mag_d = sqrt(gx_d*gx_d + gy_d*gy_d);
+        float g2_d = gx_d*gx_d + gy_d*gy_d;
+        float c2t = (g2_d > 1e-6) ? abs(gx_d*gx_d - gy_d*gy_d) / g2_d : 0.0;
+        float eg = smoothstep(0.02, 0.08, mag_d);
+        color.rgb = vec3(
+            smoothstep(0.0, 0.15, mag_d),   // R: edge strength
+            c2t * eg,                        // G: cardinal edges (bright green = H/V)
+            (1.0 - c2t) * eg                 // B: oblique edges (bright blue = diagonal)
+        );
+    } else if (debugLevel > 2.5) {
         float mask = texture(u_maskTexture, v_texCoord).r;
         color.rgb = vec3(mask);
     } else if (debugLevel > 1.5) {

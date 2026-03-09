@@ -742,6 +742,28 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         },
                         { type: 'separator' },
                         {
+                            label: 'Orientation Diagnostics',
+                            submenu: [
+                                {
+                                    label: 'Off',
+                                    type: 'radio',
+                                    checked: true,
+                                    click: () => { sendToOverlays('menu:set-debug-level', 0); }
+                                },
+                                {
+                                    label: 'Gradient Field (H/V vs Oblique)',
+                                    type: 'radio',
+                                    click: () => { sendToOverlays('menu:set-debug-level', 4); }
+                                },
+                                {
+                                    label: 'Band Weights + Orientation Bonus',
+                                    type: 'radio',
+                                    click: () => { sendToOverlays('menu:set-debug-level', 5); }
+                                }
+                            ]
+                        },
+                        { type: 'separator' },
+                        {
                             label: 'Congestion Report',
                             submenu: [
                                 {

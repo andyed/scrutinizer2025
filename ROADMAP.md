@@ -9,7 +9,7 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 | Spec | Topic | Status |
 |------|-------|--------|
 | [linguistic_priming.md](docs/specs/linguistic_priming.md) | Goal embeddings → scent map → saliency gating | **Planned** |
-| [oriented_dog_bands.md](docs/specs/oriented_dog_bands.md) | Orientation-selective band attenuation, radial-tangential bias | **Planned** |
+| [oriented_dog_bands.md](docs/specs/oriented_dog_bands.md) | Orientation-selective band attenuation, radial-tangential bias | **In progress** (Phase 1) |
 | [mongrel_textures.md](docs/specs/mongrel_textures.md) | Statistical texture synthesis (WebGPU tiered path) | **Planned** |
 | [congestion_text_density.md](docs/specs/congestion_text_density.md) | Congestion gate enhancement for text density | **Planned** |
 | [gaussian_blur_comparison.md](docs/specs/gaussian_blur_comparison.md) | DoG vs Gaussian frequency/saliency comparison | In progress |
@@ -172,10 +172,21 @@ Bottom-up saliency worker operates at 256px — cannot resolve UI elements small
 
 ---
 
-### Suprathreshold Correction Across Channels
-**Status:** Open question from validation
+### Suprathreshold Correction Across Channels {#suprathreshold-correction}
+**Status:** Open question from validation — [Wave 1 chart 2](tests/validation/reports/color-search-report.html)
 
 Power-law exponent (0.5) from Jiang et al. 2022 was measured for luminance contrast. Applied to chromatic channels without evidence the same exponent holds. Bowers 2025 decay constants partially compensate, but the interaction is untested.
+
+**Validation finding (v2.1):** Bowers 2025 and Mullen & Kingdom 2002 diverge in the near-periphery. At 5°, Bowers (suprathreshold appearance) shows ~95-100% retention for both RG and BY, while Mullen & Kingdom (threshold sensitivity) and our model both predict meaningful decay. At 15°, the Bowers BY/RG ratio is 21% off the model prediction (threshold=20%). The model sides with Mullen & Kingdom because it uses threshold-derived decay constants, then applies a flat suprathreshold correction — but the correction is insufficient in the parafovea (2-8°).
+
+**Implication:** The `supra=0.5` exponent may need to be eccentricity-dependent rather than flat. Near-peripheral color appearance is more robust than threshold sensitivity predicts (contrast constancy). The parafovea is where most UI interaction happens — over-desaturating it is the highest-cost error the model can make.
+
+**Possible fixes:**
+- [ ] Eccentricity-dependent suprathreshold exponent: stronger compression (higher effective exponent) at small eccentricities, converging to current 0.5 in far-periphery
+- [ ] Separate chromatic suprathreshold exponents for RG vs BY (Jiang 2022 measured luminance only)
+- [ ] Fit suprathreshold curve directly to Bowers data points (5°, 15°, 75°) rather than deriving from threshold
+
+**Discussion:** Queued for Rosenholtz/Blauch meeting
 
 ---
 

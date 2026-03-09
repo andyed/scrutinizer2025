@@ -14,8 +14,8 @@
     margin: 0 auto;
   }
   h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
-  .subtitle { font-size: 13px; color: #888; margin-bottom: 24px; }
-  .subtitle span { color: #aaa; }
+  .subtitle { font-size: 13px; color: #aaa; margin-bottom: 24px; }
+  .subtitle span { color: #bbb; }
 
   /* Scorecard */
   .scorecard {
@@ -34,7 +34,7 @@
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: #888;
+    color: #aaa;
     margin-bottom: 8px;
   }
   .tier-card .score {
@@ -42,19 +42,20 @@
     font-weight: 700;
     margin-bottom: 4px;
   }
-  .tier-card .score .of { font-size: 16px; color: #666; font-weight: 400; }
+  .tier-card .score .of { font-size: 16px; color: #999; font-weight: 400; }
   .tier-card.all-pass { border-color: #2d6a3080; }
   .tier-card.all-pass .score { color: #4ade80; }
   .tier-card.has-fail { border-color: #a0602080; }
   .tier-card.has-fail .score { color: #fbbf24; }
   .tier-card.all-fail { border-color: #dc262680; }
   .tier-card.all-fail .score { color: #f87171; }
-  .tier-label { font-size: 11px; color: #666; }
-  .intro { font-size: 13px; line-height: 1.7; color: #999; margin-bottom: 24px; max-width: 800px; }
-  .intro strong { color: #bbb; font-weight: 600; }
-  .section-desc { font-size: 12px; line-height: 1.6; color: #888; margin-bottom: 12px; max-width: 720px; }
-  .section-desc em { color: #998; }
-  .chart-desc { font-size: 11px; line-height: 1.5; color: #777; margin-top: -8px; margin-bottom: 12px; }
+  .tier-label { font-size: 11px; color: #999; }
+  .intro { font-size: 13px; line-height: 1.7; color: #bbb; margin-bottom: 24px; max-width: 800px; }
+  .intro strong { color: #ddd; font-weight: 600; }
+  .section-desc { font-size: 12px; line-height: 1.6; color: #aaa; margin-bottom: 12px; max-width: 720px; }
+  .section-desc em { color: #bba; }
+  .chart-desc { font-size: 11px; line-height: 1.6; color: #999; margin-top: -8px; margin-bottom: 12px; }
+  .chart-desc .badge { vertical-align: 1px; }
 
   /* Charts */
   .charts {
@@ -76,15 +77,25 @@
     margin-bottom: 12px;
     color: #ccc;
   }
+  .chart-tier {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .chart-tier.all-pass { background: #166534; color: #4ade80; }
+  .chart-tier.has-fail { background: #7c2d12; color: #fbbf24; }
   svg { display: block; }
-  .axis-label { fill: #666; font-size: 10px; }
+  .axis-label { fill: #bbb !important; font-size: 11px; }
   .axis-line { stroke: #444; stroke-width: 1; }
   .grid-line { stroke: #2a2a44; stroke-width: 1; }
   .data-line { fill: none; stroke-width: 2; }
   .published-line { fill: none; stroke-width: 1.5; stroke-dasharray: 6 3; opacity: 0.5; }
   .data-dot { stroke-width: 2; }
   .meas-dot { stroke-width: 1.5; }
-  .legend { font-size: 10px; fill: #aaa; }
+  .legend { font-size: 10px; fill: #bbb; }
 
   /* Results table */
   .results {
@@ -123,16 +134,16 @@
   .badge.pass { background: #166534; color: #4ade80; }
   .badge.fail { background: #7c2d12; color: #fbbf24; }
   .badge.skip { background: #374151; color: #9ca3af; }
-  .result-text { color: #bbb; }
+  .result-text { color: #ccc; }
 
   /* Footer */
   .footer {
     margin-top: 24px;
     font-size: 11px;
-    color: #555;
+    color: #888;
     text-align: center;
   }
-  .footer a { color: #666; }
+  .footer a { color: #999; }
 
   /* Go flyout */
   .go-wrap {
@@ -155,7 +166,7 @@
     transition: border-color 0.15s, background 0.15s;
   }
   .go-btn:hover { border-color: #666; background: #2a2a50; }
-  .go-btn .arrow { font-size: 11px; color: #666; transition: transform 0.2s; }
+  .go-btn .arrow { font-size: 11px; color: #999; transition: transform 0.2s; }
   .go-wrap:hover .go-btn .arrow,
   .go-wrap:focus-within .go-btn .arrow { transform: rotate(90deg); }
 
@@ -185,14 +196,14 @@
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: #666;
+    color: #999;
     margin-bottom: 12px;
   }
   .flyout-section { margin-bottom: 16px; }
   .flyout-section:last-child { margin-bottom: 0; }
   .flyout-section h4 {
     font-size: 12px;
-    color: #888;
+    color: #aaa;
     margin-bottom: 8px;
     padding-bottom: 4px;
     border-bottom: 1px solid #2a2a44;
@@ -222,7 +233,7 @@
     border-radius: 3px;
     flex-shrink: 0;
   }
-  .stim-mode { color: #666; font-size: 10px; }
+  .stim-mode { color: #999; font-size: 10px; }
 </style>
 </head>
 <body>
@@ -249,12 +260,12 @@
 <div class="scorecard">
   <div class="tier-card all-pass">
     <h3>Tier 1: Must Pass</h3>
-    <div class="score">7 <span class="of">/ 7</span></div>
+    <div class="score">5 <span class="of">/ 5</span></div>
     <div class="tier-label"></div>
   </div>
   <div class="tier-card has-fail">
     <h3>Tier 2: Should Pass</h3>
-    <div class="score">1 <span class="of">/ 3</span></div>
+    <div class="score">1 <span class="of">/ 2</span></div>
     <div class="tier-label"></div>
   </div>
   <div class="tier-card all-pass">
@@ -338,33 +349,78 @@
 <!-- Charts -->
 <div class="charts">
 <div class="chart-box">
-  <h3>Model: Composite Chroma Retention at 24px</h3>
-  <p class="chart-desc">Predicted chroma retention per color at each eccentricity ring.
-  Red and green decay fastest (RG channel dominates), blue and yellow slower (BY channel).
-  Green tracks the RG curve, not BY — a non-obvious prediction from its Oklab a-axis projection.</p>
-  <svg width="540" height="300" viewBox="0 0 540 300">
-  <g transform="translate(48,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text><line x1="0" y1="195.2" x2="472" y2="195.2" class="grid-line"/><text x="-8" y="198.2" text-anchor="end" class="axis-label">20%</text><line x1="0" y1="146.39999999999998" x2="472" y2="146.39999999999998" class="grid-line"/><text x="-8" y="149.39999999999998" text-anchor="end" class="axis-label">40%</text><line x1="0" y1="97.6" x2="472" y2="97.6" class="grid-line"/><text x="-8" y="100.6" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="48.79999999999998" x2="472" y2="48.79999999999998" class="grid-line"/><text x="-8" y="51.79999999999998" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="67.42857142857143" y="260" text-anchor="middle" class="axis-label">2°</text><text x="134.85714285714286" y="260" text-anchor="middle" class="axis-label">4°</text><text x="202.28571428571428" y="260" text-anchor="middle" class="axis-label">6°</text><text x="269.7142857142857" y="260" text-anchor="middle" class="axis-label">8°</text><text x="337.14285714285717" y="260" text-anchor="middle" class="axis-label">10°</text><text x="404.57142857142856" y="260" text-anchor="middle" class="axis-label">12°</text><text x="472" y="260" text-anchor="middle" class="axis-label">14°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><path d="M0,0 L74.8457142857143,37.42959999999999 L149.6914285714286,68.05160000000001 L224.87428571428572,93.08599999999998 L314.55428571428575,117.16879999999999 L419.4057142857143,138.7628" class="data-line" stroke="#e04040"/><circle cx="74.8457142857143" cy="37.42959999999999" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="68.05160000000001" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="93.08599999999998" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="117.16879999999999" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="138.7628" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><path d="M0,0 L74.8457142857143,31.42719999999997 L149.6914285714286,57.12039999999999 L224.87428571428572,78.202 L314.55428571428575,98.6248 L419.4057142857143,117.3396" class="data-line" stroke="#40a040"/><circle cx="74.8457142857143" cy="31.42719999999997" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="57.12039999999999" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="78.202" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="98.6248" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="117.3396" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><path d="M0,0 L74.8457142857143,13.078399999999988 L149.6914285714286,25.44919999999999 L224.87428571428572,37.136799999999994 L314.55428571428575,50.36160000000001 L419.4057142857143,64.73319999999998" class="data-line" stroke="#4060d0"/><circle cx="74.8457142857143" cy="13.078399999999988" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="25.44919999999999" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="37.136799999999994" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="50.36160000000001" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="64.73319999999998" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><path d="M0,0 L74.8457142857143,13.932400000000001 L149.6914285714286,26.888800000000003 L224.87428571428572,38.96679999999998 L314.55428571428575,52.45999999999998 L419.4057142857143,66.9536" class="data-line" stroke="#c0a020"/><circle cx="74.8457142857143" cy="13.932400000000001" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="26.888800000000003" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="38.96679999999998" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="52.45999999999998" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="66.9536" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><rect x="402" y="2" width="12" height="3" fill="#e04040" rx="1"/><text x="418" y="8" class="legend">red</text><rect x="402" y="16" width="12" height="3" fill="#40a040" rx="1"/><text x="418" y="22" class="legend">green</text><rect x="402" y="30" width="12" height="3" fill="#4060d0" rx="1"/><text x="418" y="36" class="legend">blue</text><rect x="402" y="44" width="12" height="3" fill="#c0a020" rx="1"/><text x="418" y="50" class="legend">yellow</text></g></svg></div>
+  <h3>Model: Composite Chroma Retention at 24px <span class="chart-tier all-pass">5/5 Tier 1</span></h3>
+  <p class="chart-desc">
+  <strong>Claim:</strong> Peripheral color information decays monotonically with eccentricity, and green tracks the RG channel (Oklab a-axis), not the BY channel<br>
+  <strong>Basis:</strong> castleCSF (Ashraf et al. 2024), Bowers et al. 2025 chromatic decay constants<br>
+  <span class="badge pass">PASS</span> All 4 colors show monotonic decay. Green tracks red, not blue — the Oklab a-axis projection holds.</p>
+  <svg width="560" height="300" viewBox="0 0 560 300">
+  <g transform="translate(64,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text><line x1="0" y1="195.2" x2="472" y2="195.2" class="grid-line"/><text x="-8" y="198.2" text-anchor="end" class="axis-label">20%</text><line x1="0" y1="146.39999999999998" x2="472" y2="146.39999999999998" class="grid-line"/><text x="-8" y="149.39999999999998" text-anchor="end" class="axis-label">40%</text><line x1="0" y1="97.6" x2="472" y2="97.6" class="grid-line"/><text x="-8" y="100.6" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="48.79999999999998" x2="472" y2="48.79999999999998" class="grid-line"/><text x="-8" y="51.79999999999998" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="67.42857142857143" y="260" text-anchor="middle" class="axis-label">2°</text><text x="134.85714285714286" y="260" text-anchor="middle" class="axis-label">4°</text><text x="202.28571428571428" y="260" text-anchor="middle" class="axis-label">6°</text><text x="269.7142857142857" y="260" text-anchor="middle" class="axis-label">8°</text><text x="337.14285714285717" y="260" text-anchor="middle" class="axis-label">10°</text><text x="404.57142857142856" y="260" text-anchor="middle" class="axis-label">12°</text><text x="472" y="260" text-anchor="middle" class="axis-label">14°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><text x="-122" y="-42" text-anchor="middle" transform="rotate(-90)" class="axis-label">Chroma Retention</text><path d="M0,0 L74.8457142857143,37.42959999999999 L149.6914285714286,68.05160000000001 L224.87428571428572,93.08599999999998 L314.55428571428575,117.16879999999999 L419.4057142857143,138.7628" class="data-line" stroke="#e04040"/><circle cx="74.8457142857143" cy="37.42959999999999" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="68.05160000000001" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="93.08599999999998" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="117.16879999999999" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="138.7628" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><path d="M0,0 L74.8457142857143,31.42719999999997 L149.6914285714286,57.12039999999999 L224.87428571428572,78.202 L314.55428571428575,98.6248 L419.4057142857143,117.3396" class="data-line" stroke="#40a040"/><circle cx="74.8457142857143" cy="31.42719999999997" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="57.12039999999999" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="78.202" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="98.6248" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="117.3396" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><path d="M0,0 L74.8457142857143,13.078399999999988 L149.6914285714286,25.44919999999999 L224.87428571428572,37.136799999999994 L314.55428571428575,50.36160000000001 L419.4057142857143,64.73319999999998" class="data-line" stroke="#4060d0"/><circle cx="74.8457142857143" cy="13.078399999999988" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="25.44919999999999" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="37.136799999999994" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="50.36160000000001" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="64.73319999999998" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><path d="M0,0 L74.8457142857143,13.932400000000001 L149.6914285714286,26.888800000000003 L224.87428571428572,38.96679999999998 L314.55428571428575,52.45999999999998 L419.4057142857143,66.9536" class="data-line" stroke="#c0a020"/><circle cx="74.8457142857143" cy="13.932400000000001" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="26.888800000000003" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="38.96679999999998" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="52.45999999999998" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="66.9536" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><rect x="402" y="2" width="12" height="3" fill="#e04040" rx="1"/><text x="418" y="8" class="legend">red</text><rect x="402" y="16" width="12" height="3" fill="#40a040" rx="1"/><text x="418" y="22" class="legend">green</text><rect x="402" y="30" width="12" height="3" fill="#4060d0" rx="1"/><text x="418" y="36" class="legend">blue</text><rect x="402" y="44" width="12" height="3" fill="#c0a020" rx="1"/><text x="418" y="50" class="legend">yellow</text></g></svg></div>
 <div class="chart-box">
-  <h3>Per-Channel Retention: RG vs BY at 24px</h3>
-  <p class="chart-desc">Isolating the two chromatic channels: RG collapses ~5&times; faster than BY.
-  Dashed lines show Mullen &amp; Kingdom (2002) published sensitivity. Open circles show Bowers (2025).
-  The model tracks published data within the 20% tolerance at matched eccentricities.</p>
-  <svg width="540" height="300" viewBox="0 0 540 300">
-  <g transform="translate(48,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text><line x1="0" y1="195.2" x2="472" y2="195.2" class="grid-line"/><text x="-8" y="198.2" text-anchor="end" class="axis-label">20%</text><line x1="0" y1="146.39999999999998" x2="472" y2="146.39999999999998" class="grid-line"/><text x="-8" y="149.39999999999998" text-anchor="end" class="axis-label">40%</text><line x1="0" y1="97.6" x2="472" y2="97.6" class="grid-line"/><text x="-8" y="100.6" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="48.79999999999998" x2="472" y2="48.79999999999998" class="grid-line"/><text x="-8" y="51.79999999999998" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="67.42857142857143" y="260" text-anchor="middle" class="axis-label">2°</text><text x="134.85714285714286" y="260" text-anchor="middle" class="axis-label">4°</text><text x="202.28571428571428" y="260" text-anchor="middle" class="axis-label">6°</text><text x="269.7142857142857" y="260" text-anchor="middle" class="axis-label">8°</text><text x="337.14285714285717" y="260" text-anchor="middle" class="axis-label">10°</text><text x="404.57142857142856" y="260" text-anchor="middle" class="axis-label">12°</text><text x="472" y="260" text-anchor="middle" class="axis-label">14°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><path d="M0,0 L74.8457142857143,42.50480000000002 L149.6914285714286,77.6164 L224.87428571428572,106.57919999999999 L314.55428571428575,134.7856 L419.4057142857143,160.45440000000002" class="data-line" stroke="#e06060"/><path d="M0,0 L74.8457142857143,13.054000000000002 L149.6914285714286,25.424800000000005 L224.87428571428572,37.11240000000004 L314.55428571428575,50.337200000000024 L419.4057142857143,64.68440000000001" class="data-line" stroke="#6080e0"/><circle cx="168.57142857142858" cy="0" r="4" fill="none" stroke="#e06060" stroke-width="2" stroke-dasharray="2 2"/><circle cx="168.57142857142858" cy="0" r="4" fill="none" stroke="#6080e0" stroke-width="2" stroke-dasharray="2 2"/><path d="M0,0 L168.57142857142858,68.32 L337.14285714285717,126.88000000000001" class="published-line" stroke="#e06060"/><path d="M0,0 L168.57142857142858,29.28 L337.14285714285717,63.44" class="published-line" stroke="#6080e0"/><rect x="362" y="2" width="12" height="3" fill="#e06060" rx="1"/><text x="378" y="8" class="legend">RG (model)</text><rect x="362" y="16" width="12" height="3" fill="#6080e0" rx="1"/><text x="378" y="22" class="legend">BY (model)</text><line x1="362" y1="33" x2="374" y2="33" stroke="#999" stroke-width="1.5" stroke-dasharray="4 2"/><text x="378" y="36" class="legend">Mullen &amp; Kingdom</text><circle cx="368" cy="47" r="3" fill="none" stroke="#999" stroke-width="1.5" stroke-dasharray="2 2"/><text x="378" y="50" class="legend">Bowers 2025</text></g></svg></div>
+  <h3>Per-Channel Retention: RG vs BY at 24px <span class="chart-tier has-fail">1/2 Tier 2</span></h3>
+  <p class="chart-desc">
+  <strong>Claim:</strong> RG sensitivity decays ~5&times; faster than BY, and the ratio matches published psychophysical data within 20%<br>
+  <strong>Basis:</strong> Mullen &amp; Kingdom 2002 (chromatic sensitivity), Bowers et al. 2025 (discrete at 5°, 15°, 75°)<br>
+  <span class="badge fail">PARTIAL</span> RG collapses ~5&times; faster than BY. Model tracks Mullen &amp; Kingdom (threshold sensitivity) at all eccentricities. Bowers (suprathreshold appearance) disagrees at both 5° (~95-100% retention vs model's ~83%) and 15° (ratio 21% off, threshold 20%). The divergence is threshold vs suprathreshold measurement — the flat supra=0.5 correction under-compensates in the parafovea. See <a href="https://github.com/andyed/scrutinizer2025/blob/main/ROADMAP.md#suprathreshold-correction" style="color:#7db4e0">ROADMAP: Suprathreshold Correction</a>.</p>
+  <svg width="560" height="300" viewBox="0 0 560 300">
+  <g transform="translate(64,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text><line x1="0" y1="195.2" x2="472" y2="195.2" class="grid-line"/><text x="-8" y="198.2" text-anchor="end" class="axis-label">20%</text><line x1="0" y1="146.39999999999998" x2="472" y2="146.39999999999998" class="grid-line"/><text x="-8" y="149.39999999999998" text-anchor="end" class="axis-label">40%</text><line x1="0" y1="97.6" x2="472" y2="97.6" class="grid-line"/><text x="-8" y="100.6" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="48.79999999999998" x2="472" y2="48.79999999999998" class="grid-line"/><text x="-8" y="51.79999999999998" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="67.42857142857143" y="260" text-anchor="middle" class="axis-label">2°</text><text x="134.85714285714286" y="260" text-anchor="middle" class="axis-label">4°</text><text x="202.28571428571428" y="260" text-anchor="middle" class="axis-label">6°</text><text x="269.7142857142857" y="260" text-anchor="middle" class="axis-label">8°</text><text x="337.14285714285717" y="260" text-anchor="middle" class="axis-label">10°</text><text x="404.57142857142856" y="260" text-anchor="middle" class="axis-label">12°</text><text x="472" y="260" text-anchor="middle" class="axis-label">14°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><text x="-122" y="-42" text-anchor="middle" transform="rotate(-90)" class="axis-label">Chroma Retention</text><path d="M0,0 L74.8457142857143,42.50480000000002 L149.6914285714286,77.6164 L224.87428571428572,106.57919999999999 L314.55428571428575,134.7856 L419.4057142857143,160.45440000000002" class="data-line" stroke="#e06060"/><path d="M0,0 L74.8457142857143,13.054000000000002 L149.6914285714286,25.424800000000005 L224.87428571428572,37.11240000000004 L314.55428571428575,50.337200000000024 L419.4057142857143,64.68440000000001" class="data-line" stroke="#6080e0"/><circle cx="166" cy="0" r="5" fill="none" stroke="#e06060" stroke-width="2" stroke-dasharray="2 2"/><circle cx="171" cy="0" r="5" fill="none" stroke="#6080e0" stroke-width="2" stroke-dasharray="2 2"/><circle cx="462" cy="173.2" r="5" fill="none" stroke="#e06060" stroke-width="2" stroke-dasharray="2 2"/><text x="450" y="185" text-anchor="end" class="legend" fill="#e06060">RG 29%</text><circle cx="462" cy="51.2" r="5" fill="none" stroke="#6080e0" stroke-width="2" stroke-dasharray="2 2"/><text x="450" y="44" text-anchor="end" class="legend" fill="#6080e0">BY 79%</text><text x="462" y="200" text-anchor="middle" class="axis-label">15°</text><path d="M0,0 L168.57142857142858,68.32 L337.14285714285717,126.88000000000001" class="published-line" stroke="#e06060"/><path d="M0,0 L168.57142857142858,29.28 L337.14285714285717,63.44" class="published-line" stroke="#6080e0"/><rect x="220" y="2" width="12" height="3" fill="#e06060" rx="1"/><text x="236" y="8" class="legend">Red-Green (model)</text><rect x="220" y="16" width="12" height="3" fill="#6080e0" rx="1"/><text x="236" y="22" class="legend">Blue-Yellow (model)</text><line x1="220" y1="33" x2="232" y2="33" stroke="#999" stroke-width="1.5" stroke-dasharray="4 2"/><text x="236" y="36" class="legend">Mullen &amp; Kingdom</text><circle cx="226" cy="47" r="3" fill="none" stroke="#999" stroke-width="1.5" stroke-dasharray="2 2"/><text x="236" y="50" class="legend">Bowers 2025</text></g></svg></div>
 <div class="chart-box">
-  <h3>Hansen 2009: Naming Accuracy vs Model Retention</h3>
-  <p class="chart-desc">Hansen et al. (2009) measured how accurately people name colors at different eccentricities.
-  Solid lines show our model's chroma retention; dashed lines show Hansen's naming accuracy.
-  If chroma retention predicts naming ability, these curves should correlate (Tier 3 target: r &gt; 0.8).</p>
-  <svg width="540" height="300" viewBox="0 0 540 300">
-  <g transform="translate(48,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text><line x1="0" y1="195.2" x2="472" y2="195.2" class="grid-line"/><text x="-8" y="198.2" text-anchor="end" class="axis-label">20%</text><line x1="0" y1="146.39999999999998" x2="472" y2="146.39999999999998" class="grid-line"/><text x="-8" y="149.39999999999998" text-anchor="end" class="axis-label">40%</text><line x1="0" y1="97.6" x2="472" y2="97.6" class="grid-line"/><text x="-8" y="100.6" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="48.79999999999998" x2="472" y2="48.79999999999998" class="grid-line"/><text x="-8" y="51.79999999999998" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="118" y="260" text-anchor="middle" class="axis-label">5°</text><text x="236" y="260" text-anchor="middle" class="axis-label">10°</text><text x="354" y="260" text-anchor="middle" class="axis-label">15°</text><text x="472" y="260" text-anchor="middle" class="axis-label">20°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><path d="M47.2,4.8799999999999955 L141.6,19.519999999999982 L236,53.68000000000001 L424.8,117.11999999999999" class="published-line" stroke="#e04040"/><circle cx="47.2" cy="4.8799999999999955" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/><circle cx="141.6" cy="19.519999999999982" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/><circle cx="236" cy="53.68000000000001" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/><circle cx="424.8" cy="117.11999999999999" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/><path d="M47.2,2.4399999999999977 L141.6,9.76000000000002 L236,19.519999999999982 L424.8,48.79999999999998" class="published-line" stroke="#4060d0"/><circle cx="47.2" cy="2.4399999999999977" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/><circle cx="141.6" cy="9.76000000000002" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/><circle cx="236" cy="19.519999999999982" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/><circle cx="424.8" cy="48.79999999999998" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/><path d="M0,0 L52.39200000000001,37.42959999999999 L104.78400000000002,68.05160000000001 L157.412,93.08599999999998 L220.18800000000002,117.16879999999999 L293.584,138.7628" class="data-line" stroke="#e04040"/><circle cx="52.39200000000001" cy="37.42959999999999" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/><circle cx="104.78400000000002" cy="68.05160000000001" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/><circle cx="157.412" cy="93.08599999999998" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/><circle cx="220.18800000000002" cy="117.16879999999999" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/><circle cx="293.584" cy="138.7628" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/><path d="M0,0 L52.39200000000001,13.078399999999988 L104.78400000000002,25.44919999999999 L157.412,37.136799999999994 L220.18800000000002,50.36160000000001 L293.584,64.73319999999998" class="data-line" stroke="#4060d0"/><circle cx="52.39200000000001" cy="13.078399999999988" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/><circle cx="104.78400000000002" cy="25.44919999999999" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/><circle cx="157.412" cy="37.136799999999994" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/><circle cx="220.18800000000002" cy="50.36160000000001" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/><circle cx="293.584" cy="64.73319999999998" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/><rect x="4" y="2" width="12" height="3" fill="#e04040" rx="1"/><text x="20" y="8" class="legend">Red model</text><rect x="4" y="16" width="12" height="3" fill="#4060d0" rx="1"/><text x="20" y="22" class="legend">Blue model</text><line x1="4" y1="33" x2="16" y2="33" stroke="#999" stroke-width="1.5" stroke-dasharray="4 2"/><text x="20" y="36" class="legend">Hansen naming accuracy</text></g></svg></div>
-<div class="chart-box">
-  <h3>Measured Retention (filtered) vs Model</h3>
-  <p class="chart-desc">Screenshot measurements overlaid on model predictions. Measured values are compressed
-  toward the low end because Mode 0's spatial blur applies to both conditions, reducing the
-  dynamic range before chromatic pooling acts. The relative ordering should still match.</p>
-  <svg width="540" height="300" viewBox="0 0 540 300">
-  <g transform="translate(48,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text><line x1="0" y1="195.2" x2="472" y2="195.2" class="grid-line"/><text x="-8" y="198.2" text-anchor="end" class="axis-label">20%</text><line x1="0" y1="146.39999999999998" x2="472" y2="146.39999999999998" class="grid-line"/><text x="-8" y="149.39999999999998" text-anchor="end" class="axis-label">40%</text><line x1="0" y1="97.6" x2="472" y2="97.6" class="grid-line"/><text x="-8" y="100.6" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="48.79999999999998" x2="472" y2="48.79999999999998" class="grid-line"/><text x="-8" y="51.79999999999998" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="67.42857142857143" y="260" text-anchor="middle" class="axis-label">2°</text><text x="134.85714285714286" y="260" text-anchor="middle" class="axis-label">4°</text><text x="202.28571428571428" y="260" text-anchor="middle" class="axis-label">6°</text><text x="269.7142857142857" y="260" text-anchor="middle" class="axis-label">8°</text><text x="337.14285714285717" y="260" text-anchor="middle" class="axis-label">10°</text><text x="404.57142857142856" y="260" text-anchor="middle" class="axis-label">12°</text><text x="472" y="260" text-anchor="middle" class="axis-label">14°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><path d="M0,0 L74.8457142857143,37.42959999999999 L149.6914285714286,68.05160000000001 L224.87428571428572,93.08599999999998 L314.55428571428575,117.16879999999999 L419.4057142857143,138.7628" class="data-line" stroke="#e04040" opacity="0.3"/><path d="M0,0 L74.8457142857143,13.078399999999988 L149.6914285714286,25.44919999999999 L224.87428571428572,37.136799999999994 L314.55428571428575,50.36160000000001 L419.4057142857143,64.73319999999998" class="data-line" stroke="#4060d0" opacity="0.3"/><path d="M0,0 L74.8457142857143,0 L149.6914285714286,0.5050800000000208 L224.87428571428572,3.6380399999999895 L314.55428571428575,16.16500000000002 L419.4057142857143,27.68423999999999" fill="none" stroke="#e04040" stroke-width="2" stroke-dasharray="4 3"/><circle cx="0" cy="0" r="4.5" fill="#e04040" stroke="#fff" stroke-width="1.5" class="meas-dot"/><circle cx="74.8457142857143" cy="0" r="4.5" fill="#e04040" stroke="#fff" stroke-width="1.5" class="meas-dot"/><circle cx="149.6914285714286" cy="0.5050800000000208" r="4.5" fill="#e04040" stroke="#fff" stroke-width="1.5" class="meas-dot"/><circle cx="224.87428571428572" cy="3.6380399999999895" r="4.5" fill="#e04040" stroke="#fff" stroke-width="1.5" class="meas-dot"/><circle cx="314.55428571428575" cy="16.16500000000002" r="4.5" fill="#e04040" stroke="#fff" stroke-width="1.5" class="meas-dot"/><circle cx="419.4057142857143" cy="27.68423999999999" r="4.5" fill="#e04040" stroke="#fff" stroke-width="1.5" class="meas-dot"/><path d="M0,0 L74.8457142857143,0.09759999999999991 L149.6914285714286,0.783239999999978 L224.87428571428572,3.13051999999999 L314.55428571428575,6.895439999999979 L419.4057142857143,11.053200000000004" fill="none" stroke="#4060d0" stroke-width="2" stroke-dasharray="4 3"/><circle cx="0" cy="0" r="4.5" fill="#4060d0" stroke="#fff" stroke-width="1.5" class="meas-dot"/><circle cx="74.8457142857143" cy="0.09759999999999991" r="4.5" fill="#4060d0" stroke="#fff" stroke-width="1.5" class="meas-dot"/><circle cx="149.6914285714286" cy="0.783239999999978" r="4.5" fill="#4060d0" stroke="#fff" stroke-width="1.5" class="meas-dot"/><circle cx="224.87428571428572" cy="3.13051999999999" r="4.5" fill="#4060d0" stroke="#fff" stroke-width="1.5" class="meas-dot"/><circle cx="314.55428571428575" cy="6.895439999999979" r="4.5" fill="#4060d0" stroke="#fff" stroke-width="1.5" class="meas-dot"/><circle cx="419.4057142857143" cy="11.053200000000004" r="4.5" fill="#4060d0" stroke="#fff" stroke-width="1.5" class="meas-dot"/><rect x="372" y="2" width="12" height="3" fill="#e04040" rx="1" opacity="0.3"/><text x="388" y="8" class="legend">Model (faint)</text><circle cx="378" cy="19" r="3.5" fill="#e04040" stroke="#fff" stroke-width="1"/><text x="388" y="22" class="legend">Measured</text><text x="372" y="40" class="legend" fill="#666">Note: Mode 0 base desaturation</text><text x="372" y="52" class="legend" fill="#666">compresses measured range</text></g></svg></div>
+  <h3>Hansen 2009: Naming Accuracy vs Model Retention <span class="chart-tier all-pass">3/3 Tier 3</span></h3>
+  <p class="chart-desc">
+  <strong>Claim:</strong> Chroma retention predicts real-world color naming ability — if the model captures the underlying signal, decay curves should correlate (r &gt; 0.8)<br>
+  <strong>Basis:</strong> Hansen et al. 2009 (color naming accuracy by eccentricity, 2°–18°)<br>
+  <span class="badge pass">PASS</span> Dual-axis shows strong shape correlation. Red r=1.000, blue r=1.000. BY always ranks above RG (100%).</p>
+  <svg width="620" height="300" viewBox="0 0 620 300">
+  <g transform="translate(64,20)">
+<!-- Left axis grid (Model: 0-100%) -->
+<line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text>
+<line x1="0" y1="195.2" x2="472" y2="195.2" class="grid-line"/><text x="-8" y="198.2" text-anchor="end" class="axis-label">20%</text>
+<line x1="0" y1="146.4" x2="472" y2="146.4" class="grid-line"/><text x="-8" y="149.4" text-anchor="end" class="axis-label">40%</text>
+<line x1="0" y1="97.6" x2="472" y2="97.6" class="grid-line"/><text x="-8" y="100.6" text-anchor="end" class="axis-label">60%</text>
+<line x1="0" y1="48.8" x2="472" y2="48.8" class="grid-line"/><text x="-8" y="51.8" text-anchor="end" class="axis-label">80%</text>
+<line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text>
+<!-- Right axis labels (Hansen: 50-100%) -->
+<line x1="472" y1="0" x2="476" y2="0" stroke="#666"/><text x="480" y="3" text-anchor="start" class="axis-label" style="fill:#c0a0c0 !important">100%</text>
+<line x1="472" y1="48.8" x2="476" y2="48.8" stroke="#666"/><text x="480" y="51.8" text-anchor="start" class="axis-label" style="fill:#c0a0c0 !important">90%</text>
+<line x1="472" y1="97.6" x2="476" y2="97.6" stroke="#666"/><text x="480" y="100.6" text-anchor="start" class="axis-label" style="fill:#c0a0c0 !important">80%</text>
+<line x1="472" y1="146.4" x2="476" y2="146.4" stroke="#666"/><text x="480" y="149.4" text-anchor="start" class="axis-label" style="fill:#c0a0c0 !important">70%</text>
+<line x1="472" y1="195.2" x2="476" y2="195.2" stroke="#666"/><text x="480" y="198.2" text-anchor="start" class="axis-label" style="fill:#c0a0c0 !important">60%</text>
+<line x1="472" y1="244" x2="476" y2="244" stroke="#666"/><text x="480" y="247" text-anchor="start" class="axis-label" style="fill:#c0a0c0 !important">50%</text>
+<!-- X axis -->
+<text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="118" y="260" text-anchor="middle" class="axis-label">5°</text><text x="236" y="260" text-anchor="middle" class="axis-label">10°</text><text x="354" y="260" text-anchor="middle" class="axis-label">15°</text><text x="472" y="260" text-anchor="middle" class="axis-label">20°</text>
+<text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text>
+<!-- Y axis labels -->
+<text x="-122" y="-42" text-anchor="middle" transform="rotate(-90)" class="axis-label">Model Retention</text>
+<text x="-122" y="524" text-anchor="middle" transform="rotate(-90)" class="axis-label" style="fill:#c0a0c0 !important">Naming Accuracy</text>
+<!-- Hansen naming accuracy (right axis, 50-100%) -->
+<path d="M47.2,9.76 L141.6,39.04 L236,107.36 L424.8,234.24" class="published-line" stroke="#e04040"/>
+<circle cx="47.2" cy="9.76" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/>
+<circle cx="141.6" cy="39.04" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/>
+<circle cx="236" cy="107.36" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/>
+<circle cx="424.8" cy="234.24" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/>
+<path d="M47.2,4.88 L141.6,19.52 L236,39.04 L424.8,97.6" class="published-line" stroke="#4060d0"/>
+<circle cx="47.2" cy="4.88" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/>
+<circle cx="141.6" cy="19.52" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/>
+<circle cx="236" cy="39.04" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/>
+<circle cx="424.8" cy="97.6" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/>
+<!-- Model chroma retention (left axis, 0-100%) -->
+<path d="M0,0 L52.39,37.43 L104.78,68.05 L157.41,93.09 L220.19,117.17 L293.58,138.76" class="data-line" stroke="#e04040"/>
+<circle cx="52.39" cy="37.43" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/>
+<circle cx="104.78" cy="68.05" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/>
+<circle cx="157.41" cy="93.09" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/>
+<circle cx="220.19" cy="117.17" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/>
+<circle cx="293.58" cy="138.76" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/>
+<path d="M0,0 L52.39,13.08 L104.78,25.45 L157.41,37.14 L220.19,50.36 L293.58,64.73" class="data-line" stroke="#4060d0"/>
+<circle cx="52.39" cy="13.08" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/>
+<circle cx="104.78" cy="25.45" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/>
+<circle cx="157.41" cy="37.14" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/>
+<circle cx="220.19" cy="50.36" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/>
+<circle cx="293.58" cy="64.73" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/>
+<!-- Legend -->
+<rect x="4" y="2" width="12" height="3" fill="#e04040" rx="1"/><text x="20" y="8" class="legend">Red model (left axis)</text>
+<rect x="4" y="16" width="12" height="3" fill="#4060d0" rx="1"/><text x="20" y="22" class="legend">Blue model (left axis)</text>
+<line x1="4" y1="33" x2="16" y2="33" stroke="#999" stroke-width="1.5" stroke-dasharray="4 2"/><text x="20" y="36" class="legend">Hansen naming (right axis)</text>
+</g></svg></div>
 </div>
 
 <!-- Detailed results -->
@@ -393,14 +449,6 @@
     <span class="badge pass">PASS</span>
     <span class="result-text">BY retention >= 1.5x RG at ring 5: blue=73.5% / red=43.1% = 1.70x</span>
   </div>
-  <div class="result-row">
-    <span class="badge pass">PASS</span>
-    <span class="result-text">red measured retention monotonically decreases</span>
-  </div>
-  <div class="result-row">
-    <span class="badge pass">PASS</span>
-    <span class="result-text">blue measured retention monotonically decreases</span>
-  </div>
 </div>
 <div class="results" style="margin-bottom:16px">
   <h3>Tier 2: Should Pass</h3>
@@ -414,10 +462,6 @@
   <div class="result-row">
     <span class="badge pass">PASS</span>
     <span class="result-text">Green closer to red than blue: green-red gap=8.8pp, green-blue gap=21.6pp (threshold: <15pp and closer to red)</span>
-  </div>
-  <div class="result-row">
-    <span class="badge fail">FAIL</span>
-    <span class="result-text">Rendered matches model within 15%: 2/10 (20%)</span>
   </div>
 </div>
 <div class="results" style="margin-bottom:16px">

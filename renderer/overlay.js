@@ -232,6 +232,10 @@
             scrutinizer.toggleSaliencyModulation(enabled);
         });
 
+        ipcRenderer.on('menu:set-debug-level', (e, level) => {
+            scrutinizer.setDebugLevel(level);
+        });
+
         ipcRenderer.on('menu:toggle-enable-structure-map', (e, enabled) => {
             scrutinizer.toggleEnableStructureMap(enabled);
         });

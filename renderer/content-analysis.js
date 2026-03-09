@@ -451,6 +451,20 @@
         }
 
         /**
+         * Set debug level directly (for levels beyond structure/saliency toggles).
+         * Levels 4 and 5 are oriented DoG diagnostics.
+         * @param {number} level - 0=none, 1=structure, 2=saliency, 3=mask, 4=gradient field, 5=band weights
+         */
+        setDebugLevel(level) {
+            // Clear toggle state when setting directly
+            if (level !== 1) this.showStructureMap = false;
+            if (level !== 2) this.showSaliencyMap = false;
+            if (level === 1) this.showStructureMap = true;
+            if (level === 2) this.showSaliencyMap = true;
+            this.debugStructure = level;
+        }
+
+        /**
          * Update debug mode priority: Saliency (2.0) > Structure (1.0) > None (0.0)
          * @private
          */
