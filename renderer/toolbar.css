@@ -9,9 +9,10 @@
     --accent-color: #007bff;
 }
 
-body {
-    margin: 0;
-    padding: 0;
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    height: 100%;
     background-color: var(--bg-color);
     color: var(--text-color);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -22,19 +23,17 @@ body {
 .toolbar {
     display: flex;
     align-items: center;
-    height: 40px; /* Match TOOLBAR_HEIGHT in main.js */
+    height: 100%; /* Fill the WebContentsView exactly */
     padding: 0 10px;
     gap: 10px;
-    box-sizing: border-box;
     border-bottom: 1px solid var(--border-color);
-    overflow: hidden;
 }
 
 button {
     background: transparent;
     border: none;
     color: var(--text-color);
-    padding: 8px;
+    padding: 0;
     border-radius: 4px;
     cursor: pointer;
     font-size: 14px;
@@ -42,8 +41,9 @@ button {
     align-items: center;
     justify-content: center;
     transition: background-color 0.2s;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
 }
 
 button:hover {
@@ -66,28 +66,25 @@ button:disabled {
 
 .url-container {
     flex: 1;
-    min-width: 0; /* Allow flex child to shrink below content size */
-    position: relative;
+    min-width: 0;
     display: flex;
     align-items: center;
-    overflow: hidden;
 }
 
 #url-trigger {
     width: 100%;
-    height: auto; /* Override generic button 32px height */
+    height: 28px;
     background-color: var(--input-bg);
     border: 1px solid transparent;
     border-radius: 4px;
     color: #999;
-    padding: 6px 10px;
+    padding: 0 10px;
     font-size: 13px;
     text-align: left;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     display: block;
-    /* Override default flex from generic button rule */
     cursor: pointer;
 }
 
@@ -110,16 +107,13 @@ button:disabled {
 /* Fovea Toggle Button */
 #fovea-toggle-btn {
     color: #666;
-    /* Disabled state: Grey */
     transition: color 0.2s, text-shadow 0.2s;
-    font-size: 18px;
-    flex-shrink: 0; /* Never collapse when URL is long */
+    font-size: 15px;
 }
 
 #fovea-toggle-btn.active {
     color: var(--accent-color);
-    /* Enabled state: Blue */
-    text-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+    text-shadow: 0 0 3px rgba(0, 123, 255, 0.4);
 }
 
 /* Loading Animation */

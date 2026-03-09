@@ -23,6 +23,12 @@ let currentVisualMemory;
 let currentMobileEmulation;
 let currentAestheticMode = 0;
 
+// Tier 1 keyboard shortcut state (cycling modes)
+let currentCongestionMode = 0;   // 0=Off, 1=Stats, 2=Heatmap, 3=Saliency vs Congestion
+let currentEccentricityMode = 0; // 0=Off, 1=Fovea, 2=+Parafovea, 3=+Periphery
+let currentSaliencyMapOn = false;
+let currentStructureMapOn = false;
+
 let mainWindow;
 let splashWindow;
 
@@ -63,7 +69,7 @@ function rebuildMenu() {
     // Ensure settings are initialized
     const radius = currentRadius || 180;
     const blur = currentBlur || 10;
-    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur, currentMobileEmulation, currentAestheticMode));
+    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur, currentMobileEmulation, currentAestheticMode, currentCongestionMode, currentEccentricityMode, currentSaliencyMapOn, currentStructureMapOn));
     Menu.setApplicationMenu(menu);
 
     // Explicitly set for all non-HUD windows (Windows/Linux)
@@ -123,6 +129,27 @@ ipcMain.on('settings:page-changed', (event, url) => {
 // Aesthetic mode changed — rebuild menu to sync radio buttons across Behavior/Utility submenus
 app.on('aesthetic-mode-changed', (mode) => {
     currentAestheticMode = mode;
+    rebuildMenu();
+});
+
+// Sync Tier 1 shortcut state when changed via menu clicks
+app.on('congestion-mode-changed', (mode) => {
+    currentCongestionMode = mode;
+    rebuildMenu();
+});
+
+app.on('eccentricity-mode-changed', (mode) => {
+    currentEccentricityMode = mode;
+    rebuildMenu();
+});
+
+app.on('saliency-map-changed', (on) => {
+    currentSaliencyMapOn = on;
+    rebuildMenu();
+});
+
+app.on('structure-map-changed', (on) => {
+    currentStructureMapOn = on;
     rebuildMenu();
 });
 
@@ -1706,6 +1733,43 @@ app.whenReady().then(() => {
             // Store reference for IPC handlers
             win.urlDialog = dialog;
         }
+    });
+});
+
+// Tier 1 keyboard shortcuts — visualization toggles & cycling modes
+app.whenReady().then(() => {
+    // Ctrl+Shift+S — Toggle Saliency Map
+    globalShortcut.register('Ctrl+Shift+S', () => {
+        currentSaliencyMapOn = !currentSaliencyMapOn;
+        sendToOverlays('menu:toggle-saliency-map', currentSaliencyMapOn);
+        rebuildMenu();
+        console.log(`[Shortcut] Saliency Map: ${currentSaliencyMapOn ? 'ON' : 'OFF'}`);
+    });
+
+    // Ctrl+Shift+D — Toggle Structure Map (DOM)
+    globalShortcut.register('Ctrl+Shift+D', () => {
+        currentStructureMapOn = !currentStructureMapOn;
+        sendToOverlays('menu:toggle-structure-map', currentStructureMapOn);
+        rebuildMenu();
+        console.log(`[Shortcut] Structure Map: ${currentStructureMapOn ? 'ON' : 'OFF'}`);
+    });
+
+    // Ctrl+Shift+C — Cycle Congestion Report (Off → Stats → Heatmap → Saliency vs Congestion → Off)
+    globalShortcut.register('Ctrl+Shift+C', () => {
+        currentCongestionMode = (currentCongestionMode + 1) % 4;
+        sendToOverlays('menu:set-show-congestion', currentCongestionMode);
+        rebuildMenu();
+        const labels = ['Off', 'Stats', 'Heatmap', 'Saliency vs Congestion'];
+        console.log(`[Shortcut] Congestion Report: ${labels[currentCongestionMode]}`);
+    });
+
+    // Ctrl+Shift+B — Cycle Eccentricity Overlay (Off → Fovea → +Para → +Periphery → Off)
+    globalShortcut.register('Ctrl+Shift+B', () => {
+        currentEccentricityMode = (currentEccentricityMode + 1) % 4;
+        sendToOverlays('menu:set-debug-boundary', currentEccentricityMode);
+        rebuildMenu();
+        const labels = ['Off', 'Fovea Only', 'Fovea + Parafovea', 'Fovea + Parafovea + Periphery'];
+        console.log(`[Shortcut] Eccentricity: ${labels[currentEccentricityMode]}`);
     });
 });
 

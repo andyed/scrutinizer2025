@@ -2,7 +2,7 @@ const { app, shell } = require('electron');
 
 const { RADIUS_OPTIONS, ASPECT_OPTIONS, INTENSITY_OPTIONS } = require('./shared/constants.json');
 
-function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10, currentMobileEmulation = false, currentAestheticMode = 0) {
+function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10, currentMobileEmulation = false, currentAestheticMode = 0, currentCongestionMode = 0, currentEccentricityMode = 0, currentSaliencyMapOn = false, currentStructureMapOn = false) {
     const isMac = process.platform === 'darwin';
     const { BrowserWindow } = require('electron');
 
@@ -729,14 +729,16 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         {
                             label: 'Show Structure Map',
                             type: 'checkbox',
-                            checked: false,
-                            click: (menuItem) => sendToOverlays('menu:toggle-structure-map', menuItem.checked)
+                            checked: currentStructureMapOn,
+                            accelerator: 'Ctrl+Shift+D',
+                            click: (menuItem) => { sendToOverlays('menu:toggle-structure-map', menuItem.checked); app.emit('structure-map-changed', menuItem.checked); }
                         },
                         {
                             label: 'Show Saliency Map',
                             type: 'checkbox',
-                            checked: false,
-                            click: (menuItem) => sendToOverlays('menu:toggle-saliency-map', menuItem.checked)
+                            checked: currentSaliencyMapOn,
+                            accelerator: 'Ctrl+Shift+S',
+                            click: (menuItem) => { sendToOverlays('menu:toggle-saliency-map', menuItem.checked); app.emit('saliency-map-changed', menuItem.checked); }
                         },
                         { type: 'separator' },
                         {
@@ -745,26 +747,26 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                 {
                                     label: 'Off',
                                     type: 'radio',
-                                    checked: true,
-                                    click: () => sendToOverlays('menu:set-show-congestion', 0)
+                                    checked: currentCongestionMode === 0,
+                                    click: () => { sendToOverlays('menu:set-show-congestion', 0); app.emit('congestion-mode-changed', 0); }
                                 },
                                 {
                                     label: 'Stats',
                                     type: 'radio',
-                                    checked: false,
-                                    click: () => sendToOverlays('menu:set-show-congestion', 1)
+                                    checked: currentCongestionMode === 1,
+                                    click: () => { sendToOverlays('menu:set-show-congestion', 1); app.emit('congestion-mode-changed', 1); }
                                 },
                                 {
                                     label: 'Heatmap',
                                     type: 'radio',
-                                    checked: false,
-                                    click: () => sendToOverlays('menu:set-show-congestion', 2)
+                                    checked: currentCongestionMode === 2,
+                                    click: () => { sendToOverlays('menu:set-show-congestion', 2); app.emit('congestion-mode-changed', 2); }
                                 },
                                 {
                                     label: 'Saliency vs Congestion',
                                     type: 'radio',
-                                    checked: false,
-                                    click: () => sendToOverlays('menu:set-show-congestion', 3)
+                                    checked: currentCongestionMode === 3,
+                                    click: () => { sendToOverlays('menu:set-show-congestion', 3); app.emit('congestion-mode-changed', 3); }
                                 }
                             ]
                         }
@@ -778,26 +780,26 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         {
                             label: 'Off',
                             type: 'radio',
-                            checked: true,
-                            click: () => sendToOverlays('menu:set-debug-boundary', 0)
+                            checked: currentEccentricityMode === 0,
+                            click: () => { sendToOverlays('menu:set-debug-boundary', 0); app.emit('eccentricity-mode-changed', 0); }
                         },
                         {
                             label: 'Fovea Only',
                             type: 'radio',
-                            checked: false,
-                            click: () => sendToOverlays('menu:set-debug-boundary', 1)
+                            checked: currentEccentricityMode === 1,
+                            click: () => { sendToOverlays('menu:set-debug-boundary', 1); app.emit('eccentricity-mode-changed', 1); }
                         },
                         {
                             label: 'Fovea + Parafovea',
                             type: 'radio',
-                            checked: false,
-                            click: () => sendToOverlays('menu:set-debug-boundary', 2)
+                            checked: currentEccentricityMode === 2,
+                            click: () => { sendToOverlays('menu:set-debug-boundary', 2); app.emit('eccentricity-mode-changed', 2); }
                         },
                         {
                             label: 'Fovea + Parafovea + Periphery',
                             type: 'radio',
-                            checked: false,
-                            click: () => sendToOverlays('menu:set-debug-boundary', 3)
+                            checked: currentEccentricityMode === 3,
+                            click: () => { sendToOverlays('menu:set-debug-boundary', 3); app.emit('eccentricity-mode-changed', 3); }
                         }
                     ]
                 }
