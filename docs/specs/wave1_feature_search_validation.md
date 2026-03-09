@@ -1,5 +1,7 @@
 # Wave 1: Feature Search Color Singleton Validation
 
+> **Last updated:** 2026-03-07
+
 **Status**: Proposed
 **Created**: 2026-03-07
 **Dependencies**: `tests/reference-pages/color-search.html`, `scripts/chromatic-attenuation-table.js`, castleCSF chromatic pooling (v1.8.0+)

@@ -1,5 +1,7 @@
 # Human Subjects Data Collection Platform
 
+> **Last updated:** 2026-03-08
+
 **Status:** Spec stub — not building yet
 **Priority:** Future (post-v2.2)
 **Depends on:** Halverson validation (Wave 5), scanpath replay infrastructure

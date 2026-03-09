@@ -1,19 +1,24 @@
 # Mongrel Textures Specification
 
+> **Last updated:** 2026-03-09 (v2.1)
+
 ## 1. Overview
 
 "Mongrel" textures (Rosenholtz et al.) represent the **statistical summary** of visual information as processed by the peripheral visual system. The brain does not "see" individual pixels in the periphery—it perceives pooled statistics: average color, texture orientation, contrast variance, and density.
 
-### Current State: "Shatter" Approximation
-Scrutinizer's current peripheral simulation uses **positional jitter** (the "Shatter" mode) to break legibility. While effective at disrupting word shapes, it does not accurately model how the peripheral visual system compresses information.
+### Current State (v2.1)
 
-| Aspect | Shatter (Current) | True Mongrel |
-|--------|-------------------|--------------|
-| Breaks legibility | ✅ Yes | ✅ Yes |
-| Preserves local contrast | ❌ Lost in jitter | ✅ Yes |
-| Preserves texture orientation | ❌ No | ✅ Yes |
-| Pooling region size grows with eccentricity | ❌ No | ✅ Yes |
-| Performance | ✅ Excellent | ⚠️ Depends on tier |
+Scrutinizer implements Tier 1 MIP-based pooling with density-gated crowding and per-channel chromatic decay. Five V1 distortion types are available in `shared/modes.json`, selectable per aesthetic mode. Higher tiers (contrast-preserving pooling, metamer synthesis) remain future work.
+
+| Tier | Status | Strategy |
+|------|--------|----------|
+| **Tier 0** (Legacy) | ❌ Removed | Shatter jitter — replaced by Slow Wave (v1.4.1) |
+| **Tier 1** | ✅ Implemented (v1.4) | Eccentricity-based MIP sampling |
+| **Tier 1.5** | ✅ Implemented (v2.0) | Density-gated crowding + anisotropic noise |
+| **Tier 1.6** | ✅ Reimplemented (v1.9) | Per-channel chromatic pooling (castleCSF) |
+| **Tier 2** | 📋 Planned | Contrast-preserving pooling (WebGL2) |
+| **Tier 2.5** | 📋 Future | Walton-style smooth moment synthesis (WebGPU compute) |
+| **Tier 3** | 📋 Future | Full statistical texture replacement (WebGPU compute) |
 
 ### Goal
 This spec defines a **tiered improvement roadmap** that:
@@ -49,120 +54,200 @@ Research identifies these as the key preserved features:
 
 ---
 
-## 3. Tiered Implementation Strategy
+## 3. Implemented Tiers
 
 ### Performance Budget
 | Tier | Target GPU Cost | Strategy | Status |
 |------|-----------------|----------|--------|
-| **Tier 0** (Legacy) | ~0.5ms | Shatter jitter | ⚠️ Deprecated |
 | **Tier 1** | ~0.3ms | Eccentricity-based MIP sampling | ✅ **Implemented (v1.4)** |
+| **Tier 1.5** | ~0.5ms | Density-gated crowding + anisotropic V1 noise | ✅ **Implemented (v2.0)** |
+| **Tier 1.6** | ~0.3ms | Per-channel chromatic decay (castleCSF) | ✅ **Reimplemented (v1.9)** |
 | **Tier 2** | ~2.0ms | Contrast-preserving pooling (WebGL2) | 📋 Planned |
 | **Tier 2.5** | ~2-3ms | Walton-style smooth moment synthesis (WebGPU compute) | 📋 Future |
 | **Tier 3** | ~3-4ms | Full statistical texture replacement (WebGPU compute) | 📋 Future |
 
 ---
 
-### Tier 1: Eccentricity-Based MIP Sampling (Low Cost) ✅ IMPLEMENTED
+### Tier 1: Eccentricity-Based MIP Sampling ✅ IMPLEMENTED (v1.4)
 
 **Goal**: Replace uniform blur with biologically-motivated pooling that grows with eccentricity.
 
 **Mechanism**: Use `textureLod()` with MIP level driven by distance from fovea.
 
-**WebGL2 Implementation** (`peripheral.frag`):
+**WebGL2 Implementation** (`peripheral.frag:166–192`):
 
 ```glsl
-// === HELPER: MIP-BASED POOLING ===
 vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
     float normalizedEcc = max(0.0, eccentricity) / fovea_radius;
-    
-    // Biological: receptive field size doubles every ~2° of eccentricity
-    float mipScaling = 2.5; // Tune: higher = faster pooling growth
-    float maxMipLevel = 4.0; // Cap at 16x16 pooling (level 4)
-    
+    float mipScaling = 2.5;
+    float maxMipLevel = 4.0;
     float mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
-    
-    // Sample using textureLod with computed MIP level
     vec4 col = textureLod(u_texture, uv, mipLevel);
-    
-    // Apply BGRA -> RGBA swap
-    float temp = col.r;
-    col.r = col.b;
-    col.b = temp;
-    
+    // BGRA -> RGBA swap
+    float temp = col.r; col.r = col.b; col.b = temp;
     return col;
 }
+```
 
-// === V4 STAGE: Smooth Blend Zone ===
-vec3 foveaCol = sampleSource(v1.distortedUV).rgb;
-vec3 pooledCol = sampleMIPPooled(v1.distortedUV, eccentricity, fovea_radius).rgb;
+**V4 Stage: Coupled Pooling + Smooth Blend** (`peripheral.frag:693–711`):
+```glsl
+// Tier 1.8: Coupled pooling — blur radius linked to V1 distortion strength.
+// If LGN suppresses the warp, blur also vanishes.
+float blurMult = 1.0 + (u_blurRadius * 0.3);
+float coupledEccentricity = v1.distortionStrength * u_intensity * fovea_radius * blurMult;
+vec3 pooledCol = sampleMIPPooled(v1.distortedUV, coupledEccentricity, fovea_radius).rgb;
 
 // 10% transition band to eliminate visible boundary
-float blendFactor = smoothstep(0.0, fovea_radius * 0.1, eccentricity);
+float baseBlend = smoothstep(0.0, fovea_radius * 0.1, eccentricity);
+float blendFactor = baseBlend * u_intensity;
 vec3 col = mix(foveaCol, pooledCol, blendFactor);
 ```
-
-**WebGL2 Renderer** (`webgl-renderer.js`):
-```javascript
-// Texture setup: Enable MIP-map generation
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-
-// On frame upload: Generate MIP chain
-gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-gl.generateMipmap(gl.TEXTURE_2D);
-```
-
-**Visual Effect**:
-- Progressive pooling that increases smoothly with eccentricity
-- No visible boundary at fovea edge (smooth blend zone)
-- MIP level transitions are invisible (trilinear filtering)
-
-**Performance**: ~0.1-0.2ms (trivial—MIP sampling is hardware-accelerated, blend is a single `mix()`).
 
 **Tunable Parameters**:
 - `mipScaling = 2.5`: How quickly pooling grows with eccentricity
 - `maxMipLevel = 4.0`: Maximum pooling (level 4 = 16×16 blocks)
 - Blend zone = `fovea_radius * 0.1`: Width of smooth transition
+- `u_blurRadius`: Saccadic state modulation (2.0 Gather → 10.0 Hunt)
 
 ---
 
-### Tier 1.8: Coherent Micro-Warp & Lateral Smash (The "Melter") ✅ IMPLEMENTED (v1.4.1)
+### Tier 1.5: Density-Gated Crowding ✅ IMPLEMENTED (v2.0)
 
-**Goal**: Replace "Shatter" jitter with coherent distortion that targets stroke width. This is the new baseline for peripheral distortion.
+**Goal**: Modulate V1 distortion strength by local element density. Dense content (text blocks, icon grids) gets full crowding; isolated elements (buttons, logos in whitespace) get minimal distortion.
 
-**Mechanism**:
-- **Simplex Noise (High Freq)**: ~900Hz noise twists detailed strokes.
-- **Simplex Noise (Low Freq)**: ~20Hz noise wobbles word shapes.
-- **Lateral Smash**: X-axis distortion is multiplied by 6.0x to force horizontal letter collisions.
-- **Coupled Pooling**: MIP level is driven by the warp strength.
+**Scientific basis**: Bouma (1970) — crowding is a function of element spacing relative to eccentricity. Isolated targets in the periphery remain identifiable; crowded targets do not.
 
-**Shader Implementation**:
+**Implementation** (`peripheral.frag:498–502`):
 ```glsl
-// Tier 1.8.1: Lateral Smash
-float micro = snoise(uv * 900.0) * 0.004;
-float macro = snoise(uv * 20.0) * 0.01;
-vec2 warp = vec2(micro + macro);
-warp.x *= 6.0; // Lateral Smash
-vec4 color = textureLod(u_texture, uv + warp, mipLevel_from_warp);
+// Sigmoid gate on structure map density
+float densityCrowding = 1.0 / (1.0 + exp(-u_crowding_density_steepness *
+                        (lgn.density - u_crowding_density_threshold)));
+float crowdingFactor = mix(0.3, 1.0, densityCrowding);
+strength *= crowdingFactor;
 ```
-**Why This Is Better**:
-1. **No "Snow"**: Unlike jitter, this doesn't look like static. It looks like melted glass.
-2. **Bouma Breaking**: The lateral smash destroys the word shape while keeping the specific "text-like" texture.
 
+**Parameters** (uniforms):
+- `u_crowding_density_threshold = 0.2`: Density below this → minimal crowding
+- `u_crowding_density_steepness = 10.0`: Sigmoid sharpness
+- Floor = 0.3: Even isolated elements get some distortion (never fully sharp in periphery)
 
----
-
-### Tier 1.6: Unbound Color (Low Cost) ✅ IMPLEMENTED (v1.4.1)
-
-**Goal**: Simulate the "Magno/Parvo Split" where color (Parvo) resolution drops faster than luminance (Magno) resolution in the periphery.
-
-**Implementation**:
-- **Radial Offset**: Chromatic aberration pushes radially outward from the fovea (screen-space direction).
-- **Unbound Blur**: Chromatic channels are sampled at a higher MIP level (+2.0) than the luminance channel.
-- **Effect**: "Ghost" images appear as soft, watercolor-like bleeds, reducing the "sharp double image" artifact.
+**What this replaced**: The v1.4.1 "Lateral Smash" (fixed 6.0× X-axis distortion multiplier) was a blunt instrument — it applied uniformly regardless of content. Density gating makes the same biological prediction (crowding destroys identity) but gates it on actual content structure.
 
 ---
 
-### Tier 2: Contrast-Preserving Pooling (Medium Cost)
+### V1 Distortion Types (Current)
+
+The old spec described a single "Melter" mechanism. As of v2.0, there are **five distortion types** registered in `shared/modes.json`, selectable per aesthetic mode:
+
+| Type ID | Name | Description | Used By |
+|---------|------|-------------|---------|
+| 0 | `noise` | Radial/tangential anisotropic crowding (animated simplex) | Natural, Frosted |
+| 1 | `shatter` | Slow Wave — 0.1Hz sine warp (comfort mode) | Standard, Calm |
+| 2 | `none` | No geometric distortion | Blueprint |
+| 3 | `pixelate` | Saliency-guided block quantization (powers-of-2 block sizes) | Minecraft |
+| 4 | `polar_quantize` | Radial sector snapping (CMF-driven ring spacing, TTM-style) | Polar/Research |
+
+#### Type 0: Anisotropic Crowding (Default)
+The primary distortion mode. Replaced the v1.4.1 Lateral Smash.
+
+```glsl
+// Independent radial and tangential noise
+float microR = snoise(uv * 900.0 + vec2(t * 5.0));
+float macroR = snoise(uv * 20.0 + vec2(t * 0.1));
+float radialNoise = (microR * 0.004 + macroR * 0.01) * u_crowding_radial_bias;
+
+float microT = snoise(uv * 900.0 + vec2(t * 5.0, 43.17));
+float macroT = snoise(uv * 20.0 + vec2(t * 0.1, 71.91));
+float tangentialNoise = microT * 0.004 + macroT * 0.01;
+
+vec2 warp = radDir_uv * radialNoise + tanDir_uv * tangentialNoise;
+```
+
+Key differences from the old "Melter":
+- **Radial/tangential decomposition** (Toet & Levi 1992) — crowding is ~2:1 stronger radially than tangentially, controlled by `u_crowding_radial_bias`
+- **No fixed lateral multiplier** — anisotropy is directional relative to the fovea, not a flat X-axis boost
+- **Animated** via `u_v1_animate` uniform
+
+#### Type 3: Pixelate (Saliency-Guided)
+Quantizes UV space into power-of-2 blocks. Block size grows with eccentricity, shrinks with saliency/density. Includes velocity-gated glitch displacement for motion effects.
+
+#### Type 4: Polar Quantize
+TTM-style pooling regions: concentric rings with spoke sectors, sized by CMF. Per-sector MIP pooling with per-channel Oklab chromatic decay. Ring/spoke grid lines rendered at 6% darkening.
+
+---
+
+### Tier 1.6: Per-Channel Chromatic Pooling ✅ REIMPLEMENTED (v1.9)
+
+**Goal**: Simulate differential color channel resolution loss in the periphery.
+
+**Previous approach (v1.4.1)**: Simple chromatic aberration — radial offset with MIP+2.0 on chroma channels ("Unbound Color"). Produced ghost images.
+
+**Current approach (v1.9+)**: Per-channel decay based on contrast sensitivity measurements. Implemented in Oklab color space for perceptual uniformity.
+
+**Implementation** (`peripheral.frag:1134–1137`, polar quantize path):
+```glsl
+// Per-channel chromatic decay — tightened ranges for desktop viewing
+float ecc_deg = normEcc * 2.0;  // Convert to approximate degrees
+blended.y *= (1.0 - smoothstep(1.0, 12.0, ecc_deg) * 0.7);   // a* (RG) — decays faster
+blended.z *= (1.0 - smoothstep(3.0, 20.0, ecc_deg) * 0.35);  // b* (YV) — decays slower
+```
+
+**Scientific basis**:
+- RG (red-green) chromatic channel decays faster than YV (blue-yellow) — Mullen & Kingdom (2002)
+- Suprathreshold decay rates from Bowers et al. (2025)
+- castleCSF contrast sensitivity function provides per-band, per-channel frequency-dependent decay
+
+**Cross-reference**: See `docs/specs/implemented/chromatic_pooling.md` for the full chromatic pipeline spec.
+
+---
+
+## 4. Integration with Existing Pipeline
+
+### 4.1 Where It Fits
+The Mongrel system operates across **V1 (Geometry)** and **V4 (Aesthetics)** stages:
+
+```
+LGN (Gating) → V1 (Geometry) → V4 (Aesthetics)
+                    ↑                 ↑
+              Distortion types    MIP pooling,
+              (noise, pixelate,   chromatic decay,
+               polar, etc.)      contrast preservation
+```
+
+V1 produces geometric distortion (UV warping). V4 applies MIP-based pooling driven by V1's distortion strength (coupled pooling). Chromatic decay is applied in V4.
+
+### 4.2 Mode Selection
+Distortion type is selected per aesthetic mode in `shared/modes.json`:
+
+```json
+{
+  "v1_distortion_types": {
+    "0": { "name": "noise", "label": "Noise (Dynamic)" },
+    "1": { "name": "shatter", "label": "Slow Wave (Mongrel)" },
+    "2": { "name": "none", "label": "None" },
+    "3": { "name": "pixelate", "label": "Pixelate (Saliency-Guided)" },
+    "4": { "name": "polar_quantize", "label": "Polar Quantize (Radial Sectors)" }
+  }
+}
+```
+
+Each mode's `render_config` specifies `v1_distortion_type` (integer ID) along with `v1_strength_mult` and other pipeline parameters.
+
+### 4.3 Structure Map Interaction ✅ IMPLEMENTED (v2.0)
+Density-gated crowding reads the structure map's density channel to modulate V1 strength. See Tier 1.5 above.
+
+Additionally, saliency modulation dampens distortion in high-saliency regions:
+```glsl
+if (u_enable_saliency_modulation > 0.5) {
+    waveDampener = 1.0 - (lgn.saliency * 0.9);
+}
+```
+
+---
+
+## 5. Future Tiers
+
+### Tier 2: Contrast-Preserving Pooling (Medium Cost) — 📋 PLANNED
 
 **Goal**: Maintain local contrast variance while pooling, preventing the "washed out" look of standard MIP blur.
 
@@ -179,38 +264,9 @@ On frame capture (or throttled to every N frames), generate a secondary texture:
 | 3 | 1/8 | Same encoding |
 | 4 | 1/16 | Same encoding |
 
-**JavaScript (in `image-processor.js` or worker)**:
-```javascript
-function generateStatMIP(sourceCanvas, level) {
-  const blockSize = Math.pow(2, level); // 2, 4, 8, 16
-  const w = Math.ceil(sourceCanvas.width / blockSize);
-  const h = Math.ceil(sourceCanvas.height / blockSize);
-  
-  const statData = new Float32Array(w * h * 4);
-  
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const block = getBlock(sourceCanvas, x * blockSize, y * blockSize, blockSize);
-      const mean = computeMean(block);      // Average luminance
-      const stdDev = computeStdDev(block);  // Contrast energy
-      const orientation = computeOrientation(block); // Dominant edge direction
-      
-      const idx = (y * w + x) * 4;
-      statData[idx + 0] = mean;        // R: Mean luminance (0-1)
-      statData[idx + 1] = stdDev;      // G: Contrast (0-1 normalized)
-      statData[idx + 2] = orientation; // B: Orientation (0-1 = 0°-180°)
-      statData[idx + 3] = 1.0;
-    }
-  }
-  return statData;
-}
-```
-
 #### 2b. Shader Reconstruction
 ```glsl
-uniform sampler2D u_statTexture;  // Statistical MIP texture
-
-// Sample statistics at current eccentricity
+uniform sampler2D u_statTexture;
 float mipLevel = eccentricity * 4.0;
 vec4 stats = textureLod(u_statTexture, uv, mipLevel);
 
@@ -218,197 +274,88 @@ float meanL = stats.r;
 float contrast = stats.g;
 float orientation = stats.b;
 
-// Reconstruct: Apply mean color, then modulate with noise scaled by contrast
 vec3 meanColor = textureLod(u_texture, uv, mipLevel).rgb;
-
-// Add oriented noise to restore "texture feel"
 float noise = orientedNoise(uv * 100.0, orientation);
 vec3 mongrelColor = meanColor + (noise * contrast * 0.5);
 ```
 
-**Visual Effect**:
-- High-contrast regions (text, edges) remain "contrasty" even when pooled
-- Low-contrast regions (sky, backgrounds) stay smooth
-- Orientation-aligned noise hints at edge direction
-
-**Performance**: ~1-2ms (stat MIP generation can be throttled to every 3-5 frames and still look smooth due to temporal coherence).
+**Performance**: ~1-2ms (stat MIP generation can be throttled to every 3-5 frames).
 
 ---
 
-### Tier 2.5: Smooth Moment Metamer Synthesis (WebGPU Compute)
+### Tier 2.5: Smooth Moment Metamer Synthesis (WebGPU Compute) — 📋 FUTURE
 
-**Goal**: Real-time ventral metamers via Walton et al. (2021) approach — synthesize textures that match smooth moments of steerable filter responses within eccentricity-scaled pooling regions.
+**Goal**: Real-time ventral metamers via Walton et al. (2021) — synthesize textures that match smooth moments of steerable filter responses within eccentricity-scaled pooling regions.
 
 **Mechanism**:
-1. **Steerable filter decomposition**: Decompose the captured frame into oriented subbands (4 orientations × 4 scales) via steerable pyramid
-2. **Smooth moment computation**: Within each pooling region (sized by eccentricity), compute smooth weighted moments of filter response magnitudes
-3. **Metamer synthesis**: Reconstruct a texture that matches the computed moments — different from the original but perceptually equivalent in peripheral vision
+1. **Steerable filter decomposition**: 4 orientations × 4 scales via steerable pyramid
+2. **Smooth moment computation**: Weighted moments within CMF-sized pooling regions
+3. **Metamer synthesis**: Reconstruct texture matching computed moments
 
-**Why WebGPU?**: Fragment shaders cannot accumulate statistics over pooling regions. Compute shaders (WGSL `@compute`) provide:
-- Workgroup shared memory for efficient parallel reduction within pooling tiles
-- Read-write storage buffers for the steerable pyramid decomposition
-- Dispatch flexibility to handle variable-sized pooling regions
+**Why WebGPU?**: Fragment shaders cannot accumulate statistics over pooling regions. Compute shaders provide workgroup shared memory for parallel reduction and read-write storage buffers for the pyramid decomposition.
 
-**Prior art**: Walton et al. (2021) implemented this in CUDA/DirectX for VR foveated rendering. Porting to WGSL is the primary engineering task. Vacher & Briand (2021) provide a CPU reference implementation of full Portilla-Simoncelli synthesis for offline ground truth comparison.
+**Prior art**: Walton et al. (2021) in CUDA/DirectX for VR foveated rendering. Vacher & Briand (2021) provide CPU reference for offline ground truth.
 
-**Performance estimate**: ~2-3ms on modern GPU (M1+, discrete). The smooth moment approach is substantially cheaper than full Portilla-Simoncelli because it matches moments rather than iteratively optimizing all joint statistics.
-
-**Validation**: Compare output against Vacher & Briand C++ reference for perceptual equivalence. Measure SSIM within pooling regions between Tier 2.5 output and full P-S synthesis.
+**Performance estimate**: ~2-3ms on modern GPU (M1+, discrete).
 
 ---
 
-### Tier 3: Statistical Texture Replacement (WebGPU Path)
+### Tier 3: Statistical Texture Replacement (WebGPU Path) — 📋 FUTURE
 
-**Goal**: True Rosenholtz-style synthesis—replace pooling regions with procedural textures that match summary statistics.
+**Goal**: True Rosenholtz-style synthesis — replace pooling regions with procedural textures matching summary statistics.
 
-**Mechanism**: Compute shader analyzes each pooling tile and selects/generates a matching procedural texture.
-
-**Why WebGPU?**: Compute shaders allow efficient parallel processing of thousands of tiles. WebGL2 would require expensive GPGPU workarounds (render-to-texture ping-pong).
-
-#### 3a. Tile Atlas
-Pre-generate a **texture atlas** of procedural patterns:
-
-| Tile ID | Description | When Used |
-|---------|-------------|-----------|
-| 0 | Solid color | Low contrast (σ < 0.05) |
-| 1-4 | Horizontal stripes (various freq) | Orientation ~0°, high contrast |
-| 5-8 | Vertical stripes | Orientation ~90°, high contrast |
-| 9-12 | Diagonal stripes (45°, 135°) | Orientation ~45°/135° |
-| 13-16 | Noise patches (various freq) | High contrast, no dominant orientation |
-
-#### 3b. WebGPU Compute Shader (Pseudocode)
-```wgsl
-@compute @workgroup_size(8, 8)
-fn analyzeTile(@builtin(global_invocation_id) id: vec3<u32>) {
-    let tileX = id.x;
-    let tileY = id.y;
-    let tileSize = getTileSizeForEccentricity(tileX, tileY); // 4, 8, 16, 32...
-    
-    // Analyze tile
-    let stats = computeTileStats(tileX, tileY, tileSize);
-    // stats.mean, stats.variance, stats.orientation, stats.frequency
-    
-    // Select best-matching atlas tile
-    let atlasIndex = matchToAtlas(stats);
-    
-    // Write to output: (atlasIndex, tint color, noise seed)
-    tileMap[tileY * tilesX + tileX] = vec4(atlasIndex, stats.mean, randomSeed, 1.0);
-}
-```
-
-#### 3c. Fragment Shader Consumption
-```glsl
-// Read tile assignment
-vec4 tileInfo = texelFetch(u_tileMap, tileCoord, 0);
-int atlasIndex = int(tileInfo.r);
-vec3 tintColor = vec3(tileInfo.g); // Mean color
-float seed = tileInfo.b;
-
-// Sample procedural texture from atlas
-vec2 atlasUV = getAtlasUV(atlasIndex, localUV, seed);
-vec3 proceduralTex = texture(u_atlas, atlasUV).rgb;
-
-// Tint with mean color
-vec3 mongrelColor = proceduralTex * tintColor;
-```
+**Mechanism**: Compute shader analyzes each pooling tile and selects/generates a matching procedural texture from a pre-generated atlas.
 
 **Visual Effect**:
-- Peripheral regions genuinely look like "texture summaries"
 - Text becomes horizontal stripes. Faces become blobs. Logos become colored shapes.
 - Closest to Rosenholtz et al.'s published mongrel images
 
-**Performance**: ~3-4ms on modern discrete GPU. May need LOD/throttling on integrated graphics.
+**Performance**: ~3-4ms on modern discrete GPU.
 
 **Migration Path**:
-1. Implement Tier 1 & 2 in WebGL2 (current stack)
-2. Add WebGPU feature detection: `if (navigator.gpu)`
-3. Load Tier 3 compute pipeline when available
-4. Graceful fallback to Tier 2 on non-WebGPU browsers
+1. WebGPU feature detection: `if (navigator.gpu)`
+2. Load Tier 3 compute pipeline when available
+3. Graceful fallback to Tier 2 on non-WebGPU browsers
 
 ---
 
-## 4. Integration with Existing Pipeline
+## 6. Blueprint Mode Enhancement
 
-### 4.1 Where It Fits
-The Mongrel system operates in **V1 (Geometry)** stage of the neuro-architecture pipeline:
+### 6.1 Receptive Field Grid (Partially realized via Polar Quantize)
+The Polar Quantize distortion type (Type 4) now renders fovea-relative rings and spokes, visualizing pooling structure directly. Grid lines at 6% darkening show sector boundaries.
 
-```
-LGN (Gating) → V1 (Geometry/Mongrel) → V4 (Aesthetics)
-                     ↑
-              This is where Mongrel lives
-```
-
-### 4.2 Mode Selection
-Update `ModeConfig` to include Mongrel tier:
-
-```typescript
-interface ModeConfig {
-  v1_distortion: 'none' | 'noise' | 'shatter' | 'mongrel_t1' | 'mongrel_t2' | 'mongrel_t3';
-  // ...
-}
-
-// Mode mappings
-const MODES = {
-  'Natural': { v1_distortion: 'mongrel_t2' },  // Upgrade from 'shatter'
-  'Blueprint': { v1_distortion: 'none' },
-  'Research': { v1_distortion: 'mongrel_t3' }, // When WebGPU available
-};
-```
-
-### 4.3 Structure Map Interaction
-Mongrel pooling should respect the **Structure Map** density signal:
-- **Dense text regions**: Smaller effective tile size (more detail preserved)
-- **Empty whitespace**: Skip processing entirely (no visible change)
-
-```glsl
-float density = texture(u_structureMap, uv).g;
-float adjustedMipLevel = mipLevel * (1.0 - density * 0.3); // Dense areas get finer sampling
-```
-
----
-
-## 5. Blueprint Mode Enhancement
-
-### 5.1 New Sub-Mode: "Receptive Field Grid"
-Visualize the pooling structure itself:
-
-- **Fovea**: Tiny grid (or no grid—"I see everything")
-- **Parafovea**: 4x4 tile grid overlay
-- **Periphery**: 16x16 or larger tiles
-
-**Implementation**: Render tile boundaries as thin lines, color-coded by:
-- **Red intensity**: Contrast variance of tile
-- **Hue rotation**: Dominant orientation (horizontal = red, vertical = cyan)
-
-### 5.2 "Retinal Truth" Layer
-Add to `blueprint_mods.md`:
+### 6.2 "Retinal Truth" Layer
 
 | Layer | Name | Description |
 |-------|------|-------------|
 | 0 | DOM Truth | What the browser renders |
 | 1 | Structure Map | Semantic layout (text, image, interactive) |
-| 2 | **Retinal Truth** | Mongrel pooling—what the visual system actually perceives |
+| 2 | **Retinal Truth** | Mongrel pooling — what the visual system actually perceives |
 
 ---
 
-## 6. Performance Validation Plan
+## 7. Performance Validation Plan
 
-| Test | Tier 1 | Tier 2 | Tier 3 |
-|------|--------|--------|--------|
-| MacBook Pro M1 (WebGL2) | Target <1ms | Target <2ms | N/A (WebGPU TBD) |
-| MacBook Pro M1 (WebGPU) | - | - | Target <3ms |
-| Windows/Chrome (integrated) | <1ms | <2.5ms | <4ms |
-| Windows/Chrome (discrete) | <0.5ms | <1ms | <2ms |
+| Test | Tier 1 | Tier 1.5 | Tier 2 | Tier 3 |
+|------|--------|----------|--------|--------|
+| MacBook Pro M1 (WebGL2) | <1ms | <1ms | Target <2ms | N/A |
+| MacBook Pro M1 (WebGPU) | - | - | - | Target <3ms |
+| Windows/Chrome (integrated) | <1ms | <1ms | <2.5ms | <4ms |
+| Windows/Chrome (discrete) | <0.5ms | <0.5ms | <1ms | <2ms |
 
 **Measurement Method**: `EXT_disjoint_timer_query_webgl2` or `GPUComputePassTimestampWrites`.
 
 ---
 
-## 7. References
+## 8. References
 
 1. **Rosenholtz, R., Huang, J., & Ehinger, K. A.** (2012). *Rethinking the role of top-down attention in vision: Effects attributable to a lossy representation in peripheral vision*. Frontiers in Psychology.
 2. **Freeman, J., & Simoncelli, E. P.** (2011). *Metamers of the ventral stream*. Nature Neuroscience.
 3. **Balas, B., Nakano, L., & Rosenholtz, R.** (2009). *A summary-statistic representation in peripheral vision explains visual crowding*. Journal of Vision.
-4. **Walton, D. R., Dos Anjos, R. K., Friston, S., Swapp, D., Akşit, K., Steed, A., & Ritschel, T.** (2021). *Beyond Blur: Real-time Ventral Metamers for Foveated Rendering*. SIGGRAPH. Real-time smooth-moment synthesis on GPU compute. Tier 2.5 prior art.
-5. **Portilla, J. & Simoncelli, E. P.** (2000). *A Parametric Texture Model Based on Joint Statistics of Complex Wavelet Coefficients*. IJCV. Full texture model; CPU-bound iterative synthesis (~seconds/frame). Offline ground truth, not a real-time path.
-6. **Vacher, J. & Briand, T.** (2021). *Portilla-Simoncelli Texture Synthesis*. IPOL. C++ reference implementation (BSD-3). See `tbriand/portilla-simoncelli-ipol`.
+4. **Walton, D. R., Dos Anjos, R. K., Friston, S., Swapp, D., Akşit, K., Steed, A., & Ritschel, T.** (2021). *Beyond Blur: Real-time Ventral Metamers for Foveated Rendering*. SIGGRAPH.
+5. **Portilla, J. & Simoncelli, E. P.** (2000). *A Parametric Texture Model Based on Joint Statistics of Complex Wavelet Coefficients*. IJCV.
+6. **Vacher, J. & Briand, T.** (2021). *Portilla-Simoncelli Texture Synthesis*. IPOL. C++ reference (BSD-3). See `tbriand/portilla-simoncelli-ipol`.
+7. **Bouma, H.** (1970). *Interaction effects in parafoveal letter recognition*. Nature. Foundation for critical spacing / crowding distance.
+8. **Toet, A. & Levi, D. M.** (1992). *The two-dimensional shape of spatial interaction zones in the parafovea*. Vision Research. Radial/tangential crowding anisotropy (~2:1).
+9. **Mullen, K. T. & Kingdom, F. A. A.** (2002). *Differential distributions of red-green and blue-yellow cone opponency across the visual field*. Visual Neuroscience. Chromatic channel eccentricity-dependent decay.
+10. **Bowers, N. R. et al.** (2025). Suprathreshold chromatic contrast sensitivity measurements. Basis for castleCSF-derived decay rates.

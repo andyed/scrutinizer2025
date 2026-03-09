@@ -1,5 +1,7 @@
 # Brown et al. Dataflow Integration Spec
 
+> **Last updated:** 2026-03-07
+
 **Source:** Brown, DuTell, Walter, Rosenholtz, Shirley, McGuire, Luebke (2023). "Efficient Dataflow Modeling of Peripheral Encoding in the Human Visual System." ACM TAP. [doi:10.1145/3564605](https://dl.acm.org/doi/full/10.1145/3564605)
 **Code:** [PooledStatisticsMetamers](https://github.com/ProgramofComputerGraphics/PooledStatisticsMetamers) (Python/PyTorch, MIT license)
 **Related:** Vacher & Briand (2021). PS C++ implementation. [IPOL](https://www.ipol.im/pub/art/2021/324/) (BSD-3)

@@ -1,5 +1,7 @@
 # Blueprint Mods: Diagnostic Suite Specification
 
+> **Last updated:** 2025-12-13
+
 ## 1. Overview
 **Blueprint Mods** are a collection of practical diagnostic visualization modes designed for Vision Researchers, UI Designers, and UX Professionals.
 

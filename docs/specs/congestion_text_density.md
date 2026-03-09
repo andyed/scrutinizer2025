@@ -1,5 +1,7 @@
 # Congestion Gate: Text Density Enhancement
 
+> **Last updated:** 2026-03-08
+
 **Status:** Spec (v2.2 target)
 **Depends on:** Wave 5 Halverson findings (v2.1)
 **Goal:** Graduate Mode 9 (Congestion-Gated Pooling) from experimental to default

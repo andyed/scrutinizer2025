@@ -1,5 +1,7 @@
 # Density-Gated V1 Crowding Distortion
 
+> **Last updated:** 2026-03-08
+
 **Status**: Shipped (v1.9.1, 2026-03-07)
 **Created**: 2026-03-04
 **Diagnostic**: `reference-pages/crowding.html`, `reference-pages/crowding-stimulus.html`

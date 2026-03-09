@@ -1,5 +1,7 @@
 # Halverson & Hornof Active Vision Validation
 
+> **Last updated:** 2026-03-08
+
 **Status:** v2.1 — stimulus built, automated pipeline complete, **density gate granularity gap identified**
 **Priority:** High — behavioral validation of density gate and peripheral processing
 **Contact:** Tim Halverson pinged (Mar 2026); Air Force Research Laboratory, Applied Neuroscience Branch

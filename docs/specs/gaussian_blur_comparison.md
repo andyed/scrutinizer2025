@@ -1,5 +1,7 @@
 # Gaussian Blur Comparison: Frequency-Selective vs Uniform Degradation
 
+> **Last updated:** 2026-03-08
+
 **Status:** In progress — shader `u_gaussian_blur_mode` implemented, spatial-frequency data collected (inconclusive), expanding to chromatic + saliency stimuli
 **Priority:** High — central claim in arxiv paper lacks direct evidence on spatial frequency alone; multi-dimensional comparison needed
 **Tracks:** v2.1 validation gap

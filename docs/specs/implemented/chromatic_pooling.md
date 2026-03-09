@@ -1,5 +1,7 @@
 # Per-Channel Chromatic Pooling Across Eccentricity
 
+> **Last updated:** 2026-03-08
+
 Date: 2026-03-03
 Status: IMPLEMENTED (v1.9.0)
 Commits: a9051e3, aad22cf, 276e8de

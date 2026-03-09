@@ -1,5 +1,7 @@
 # Applied UI Saliency Validation (Wave 4b)
 
+> **Last updated:** 2026-03-08
+
 **Status:** Research phase
 **Priority:** High — bottom-up saliency is non-functional for UI elements <60px
 **Tracks:** v2.2+ validation expansion

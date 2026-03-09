@@ -1,5 +1,7 @@
 # Spec: Chrome Extension Support & Browser Niceties
 
+> **Last updated:** 2026-03-03
+
 ## Context
 
 Scrutinizer is a research tool, not a general-purpose browser — but users spend long sessions browsing with it. Without extension support, they can't bring ad blockers, password managers, or readability tools. Without basic browser niceties (find-in-page, downloads, bookmarks), every session has friction that a normal browser wouldn't.

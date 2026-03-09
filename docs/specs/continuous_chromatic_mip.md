@@ -1,5 +1,7 @@
 # Continuous Chromatic MIP Sampling
 
+> **Last updated:** 2026-03-07
+
 Date: 2026-03-05
 Revised: 2026-03-05
 Status: Phase 1 (pow fix) SHIPPED v1.9.0; Phase 2 (decay recalibration) IN PROGRESS; Phase 3 (continuous size dependence) DEFERRED

@@ -1,5 +1,7 @@
 # Wave 2: Spatial Acuity Validation
 
+> **Last updated:** 2026-03-07
+
 **Status**: Proposed
 **Created**: 2026-03-07
 **Dependencies**: `renderer/shaders/peripheral2.frag` (DoG band decomposition), `shared/modes.json`, Wave 1 infrastructure (`scripts/analyze-*.js`, `scripts/validate-*.js`, `scripts/report-*.js`)

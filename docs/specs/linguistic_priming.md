@@ -1,5 +1,7 @@
 # Specification: Semantic Guidance & Linguistic Priming Layer (v3)
 
+> **Last updated:** 2026-03-09
+
 > [!NOTE]
 > **Version 3.0** — Rewritten to align with the current Scrutinizer architecture (v2.1+). Replaces v2 spec. Grounded in existing pipeline components: `dom-adapter.js`, `saliency-worker.js`, `peripheral2.frag`, and the declarative mode registry.
 

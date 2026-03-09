@@ -1,5 +1,7 @@
 # Wave 3: Crowding Zone Validation
 
+> **Last updated:** 2026-03-07
+
 **Status**: Proposed
 **Created**: 2026-03-07
 **Dependencies**: `renderer/shaders/peripheral2.frag` (density-gated crowding, polar sectors), `renderer/config.js`, Wave 1-2 infrastructure, existing reference pages (`crowding.html`, `crowding-stimulus.html`)

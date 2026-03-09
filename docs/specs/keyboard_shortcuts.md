@@ -1,5 +1,7 @@
 # Keyboard Shortcuts for Scrutinizer
 
+> **Last updated:** 2026-03-09
+
 ## Motivation
 
 Scrutinizer's Simulation menu has 30+ toggles and mode switches, but only 2 keyboard shortcuts (`Cmd+E` toggle effects, `Cmd+Shift+F` toggle foveal). The most-used visualization controls — congestion report, saliency map, structure map, eccentricity overlay — require 3-level menu navigation.
