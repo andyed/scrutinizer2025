@@ -25,7 +25,7 @@ The simulation is grounded in vision science: cortical magnification functions, 
 
 ![Dashboard with foveated rendering](screenshots/v19_dashboard.png)
 
-*A dashboard viewed through Scrutinizer's v1.9 pipeline. The cursor (fixation point) is at center — spatial resolution falls off with eccentricity via DoG band decomposition, red-green chromatic detail fades before blue-yellow (castleCSF), and peripheral structure degrades proportional to local congestion.*
+*A dashboard viewed through Scrutinizer's pipeline. The cursor (fixation point) is at center — spatial resolution falls off with eccentricity via 8 half-octave DoG bands, red-green chromatic detail fades before blue-yellow (castleCSF), and peripheral structure degrades proportional to local congestion.*
 
 | Congestion Overlay | Chromatic Pooling | Article Page |
 |:--:|:--:|:--:|
@@ -95,7 +95,8 @@ Scrutinizer's rendering pipeline maps biological mechanisms to GPU-accelerated s
 
 ## Features
 
-### Rendering Pipeline (v1.9)
+### Rendering Pipeline (v2.1)
+- **8 half-octave DoG bands** — Difference-of-Gaussians peripheral reconstruction at √2 frequency spacing (5.66–0.5 cpd), validated against Rovamo & Virsu 1979
 - **Foveal/peripheral simulation** — eccentricity-dependent spatial pooling and chromatic filtering bound to cursor position
 - **[Analytical cortical magnification](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html)** — eccentricity falloff using the Schwartz (1980) log-mapping parameterization (mode 6), alongside legacy (mode 7) for comparison
 - **[Feature Congestion](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html) pipeline** — real-time visual clutter scoring with ComplexityHUD overlay (Score / Stats / Spatial tabs)
@@ -123,7 +124,28 @@ Scrutinizer's rendering pipeline maps biological mechanisms to GPU-accelerated s
 
 ## Validation & Reproducibility
 
-Scrutinizer maintains a validation infrastructure to catch regressions and cross-check against reference implementations.
+Scrutinizer validates each pipeline stage against published psychophysical data spanning 45 years of vision science.
+
+### Psychophysical validation (v2.1)
+
+Five waves test the shader against published human data. The pattern: render a known stimulus, measure output pixels at each eccentricity, compare against the original paper's measurements. Published data is digitized into machine-readable JSON in [`tests/validation/published-data/`](tests/validation/published-data/).
+
+| Wave | Domain | Published basis | Key result |
+|------|--------|-----------------|------------|
+| 1 | Chromatic decay | [Hansen 2009](tests/validation/published-data/hansen2009_color_naming.json), [Mullen & Kingdom 2002](tests/validation/published-data/mullen_kingdom2002_rg_by.json) | RG/YV channel separation matches opponent-channel predictions |
+| 2 | Spatial frequency | [Rovamo & Virsu 1979](tests/validation/published-data/rovamo_virsu1979_csf.json) | Frequency-selective attenuation (not uniform blur), r=0.600 composite |
+| 3 | Crowding geometry | Bouma 1970, Toet & Levi 1992 | R:T bug found and fixed; density gate validated at 3.3:1 |
+| 4 | Saliency protection | Itti & Koch 2001, Hershler 2005 | Face saliency 4.79× control; protection ratio 0.283 |
+| 5 | Mixed-density UI | Halverson & Hornof 2011 | Density gate predicts same sparse/dense pattern as EPIC model |
+
+15 HTML reference pages ship as open-source psychophysical stimuli. Each validation wave has a capture script (Electron headless) and an analysis script (pixel measurement). Blog post: [Measuring the Pipeline](https://andyed.github.io/scrutinizer-www/blog/2026-03-08-v2.1.html).
+
+```bash
+node scripts/capture-crowding.js        # Capture crowding stimuli through pipeline
+node scripts/analyze-dog-bands.js       # Band weight analysis (pure math, no GPU)
+```
+
+### Regression testing
 
 **Golden captures.** Automated screenshots at fixed viewport/URL/mode combinations, compared across versions using SSIM (≥0.98) and PSNR (≥35 dB) thresholds. The capture pipeline runs headlessly and produces paired comparison images stored in [`docs/golden/`](docs/golden/).
 
@@ -132,14 +154,12 @@ npm run capture-golden          # Generate reference captures
 npm run golden-compare          # Compare current output against references
 ```
 
-**[Feature Congestion](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html) validation.** The JavaScript implementation is cross-validated against the Python reference (Rosenholtz lab toolbox) on matched test images. Spearman rank correlation ρ=0.93. Both pipelines can be run:
+**[Feature Congestion](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html) validation.** The JavaScript implementation is cross-validated against the Python reference (Rosenholtz lab toolbox) on matched test images. Spearman rank correlation ρ=0.93.
 
 ```bash
 npm run validate:python         # Run Python reference (requires uv + Python 3.12)
 npm run validate:scrutinizer    # Run Scrutinizer's JS implementation
 ```
-
-**Attenuation table.** Per-eccentricity-band attenuation values are logged and compared against the FOVI-derived cortical magnification curve to verify the MIP-level selection produces the expected spatial frequency cutoffs.
 
 **Methodology note.** Following the cross-validation approach advocated by Bowers et al. (2025), each pipeline stage is tested against its reference independently before integration. The simulation does not claim biological accuracy — it claims fidelity to the cited models, which are themselves approximations.
 
@@ -313,6 +333,7 @@ claude mcp add scrutinizer-audit -- node cli/mcp/server.js
 - [How GPU MIP Chains Simulate Peripheral Vision](https://andyed.github.io/scrutinizer-www/blog/mip-chain-explainer.html) — blog post explaining the spatial decomposition pipeline
 - [FOVI & Cortical Magnification](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html) — blog post on the v1.7 CMF integration and chromatic attenuation
 - [Feature Congestion Scoring](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html) — blog post on the clutter metric
+- [v2.1: Measuring the Pipeline](https://andyed.github.io/scrutinizer-www/blog/2026-03-08-v2.1.html) — five-wave psychophysical validation, 8 half-octave DoG bands
 - [v1.8: Scientific Accuracy Audit](https://andyed.github.io/scrutinizer-www/blog/2026-03-03-v1.8.html) — blog post on M-scaling corrections and Feature Congestion launch
 - [Foveal Calibration Logic](docs/foveal-calibration-logic.md) — psychophysics of the calibration tool
 - [Simulation Limitations](docs/simulation-limitations.md) — detailed gap analysis
