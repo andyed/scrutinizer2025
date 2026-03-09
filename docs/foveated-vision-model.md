@@ -315,7 +315,13 @@ The structure map carries a density channel (`structure.g`) through the LGN sign
 
 ## 6. Universal Structure Map Pipeline (New in v2.0)
 
-To unify rendering across the Open Web (DOM) and Figma (Scene Graph), Scrutinizer v2.0 introduces an **Abstract Layout Provider** architecture. Instead of relying on ad-hoc heuristics, the renderer consumes a normalized data stream of layout blocks.
+### Why the renderer reads the DOM
+
+Pixel-only foveated renderers treat a paragraph of 14px text and a solid-color banner identically at the same eccentricity — both are just luminance and chrominance values. The visual system does not. Rosenholtz's Texture Tiling Model (2012) predicts that peripheral vision computes summary statistics over pooling regions that grow with eccentricity. What matters is the *content* of those regions: a pooling region covering dense text contains high local feature variance (many edges, mixed orientations, heterogeneous spacing), while one covering a banner contains low variance. The summary statistics differ, so peripheral discriminability differs.
+
+Scrutinizer exploits a structural advantage that pixel-only renderers lack: access to the DOM. The scanner knows that a block is text (not a texture), knows its line height, font weight, and spacing to neighbors. It groups adjacent text nodes into paragraph clusters using Gestalt proximity before the shader ever runs. This pre-grouping feeds the density channel that drives the V1 crowding gate — dense text clusters get full displacement, isolated elements are spared. The density signal is structural, computed from the node tree rather than inferred from pixel variance.
+
+To unify this across the Open Web (DOM) and Figma (Scene Graph), v2.0 introduces an **Abstract Layout Provider** architecture. Instead of ad-hoc heuristics, the renderer consumes a normalized data stream of layout blocks.
 
 ### The Data Model: `StructureBlock`
 Layout data is extracted into a flat array of lightweight objects:
@@ -465,14 +471,15 @@ The **Saliency Map** implements computational visual attention, predicting where
 
 ## Implementation
 
-## Implementation
-
 ### 1. Gestalt Grouping (Proximity)
 **File**: `renderer/scrutinizer.js`
 
-To simulate the brain's pre-attentive grouping of visual elements, the renderer processes the raw layout stream before generating maps.
--   **Text Merging**: Vertically adjacent text blocks are merged into single "paragraph" clusters.
+Before the structure map is rasterized, raw layout blocks pass through a grouping stage that implements Gestalt proximity. This matters because the density channel — which drives the V1 crowding gate — should reflect perceptual groups, not individual DOM nodes. A paragraph is one dense cluster, not thirty separate text nodes.
+
+-   **Text Merging**: Vertically adjacent text blocks are merged into single "paragraph" clusters. Two text blocks merge when their vertical gap is within 1.5× the current line height and they are horizontally aligned (x within 20px, width within 50px). The merged block inherits the combined bounding box.
 -   **Quantization**: Block coordinates are snapped to a grid (1px for text, 10px for UI) to prevent sub-pixel jitter from causing "flicker" in the periphery during micro-layout shifts.
+
+The grouping runs on every structure map scan (~60fps during scroll). The merge criteria are deliberately loose — false merges (joining two unrelated text blocks) produce a slightly larger density region, which biases toward more crowding. False splits (failing to merge a paragraph) produce isolated blocks that get less crowding than they should. The asymmetry favors the conservative error.
 
 ### 2. Saliency Map Generation (Phase 5: Gated Saliency)
 **File**: `renderer/saliency-worker.js`

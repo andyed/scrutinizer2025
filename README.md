@@ -48,7 +48,7 @@ The rendering pipeline mirrors how the brain's visual pathway actually works —
 
 Resolution falloff across all stages follows a [cortical magnification function](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html) — a log-mapping that describes how the brain allocates disproportionate processing power to the center of gaze.
 
-**DOM-aware rendering.** Most foveated renderers operate on pixels alone. Scrutinizer reads the live DOM — it groups adjacent text nodes into paragraph clusters (Gestalt proximity), measures local density from the node tree, and feeds that into the V1 crowding gate. A dense text column and an isolated heading at the same eccentricity get different treatment, because Rosenholtz's pooling regions would compute different summary statistics over them. The density signal comes from structure, not just pixel variance.
+**DOM-aware rendering.** Scrutinizer reads the live DOM — grouping adjacent text nodes into paragraph clusters (Gestalt proximity), measuring local density from the node tree, and feeding that into the V1 crowding gate. A dense text column and an isolated heading at the same eccentricity get different treatment, because Rosenholtz's pooling regions compute different summary statistics over them.
 
 **[Feature Congestion](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html)** scoring runs alongside the pipeline, measuring visual clutter (color variance, edge density, contrast) to produce a 0–100 complexity score per region. See [congestion-journey.md](docs/congestion-journey.md).
 
@@ -65,7 +65,7 @@ Resolution falloff across all stages follows a [cortical magnification function]
 - **[Feature Congestion](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html) pipeline** — real-time visual clutter scoring with ComplexityHUD overlay (Score / Stats / Spatial tabs)
 - **Congestion-gated pooling** (mode 9) — peripheral attenuation weighted by local visual complexity
 - **Saliency modulation** — allocates more peripheral bandwidth to salient regions (edges, contrast, high-importance areas)
-- **Structure map analysis** — reads the live DOM to detect text rhythm, element density, font weight, and semantic type (ARIA roles); unlike pixel-only renderers, the pipeline knows which elements are text, buttons, or images
+- **Structure map analysis** — reads the live DOM to detect text rhythm, element density, font weight, and semantic type (ARIA roles), feeding the crowding and saliency stages
 - **Visual memory simulation** — iconic memory decay across 5 modes (Off, Limited, Extended, Infinite, Fixation Buffer)
 
 ### Tools
