@@ -2,12 +2,15 @@
 
 Potential thesis/capstone projects for graduate students in HCI, Vision Science, UX Research, or Design. Each project builds on Scrutinizer's existing infrastructure — a real-time, gaze-contingent foveated rendering system running in Electron/WebGL2.
 
-The modular pipeline (GazeModel, VisualMemory, ContentAnalysis, pipeline orchestrator) means each module can be independently swapped, extended, or instrumented without touching the rest. As of v1.8, the system includes:
+The modular pipeline (GazeModel, VisualMemory, ContentAnalysis, pipeline orchestrator) means each module can be independently swapped, extended, or instrumented without touching the rest. As of v2.1, the system includes:
+- **8 half-octave DoG bands**: Difference-of-Gaussians peripheral reconstruction at √2 frequency spacing (5.66–0.5 cpd), validated against Rovamo & Virsu 1979 spatial frequency data
+- **Per-channel chromatic pooling**: castleCSF-based RG/YV decay in Oklab color space, validated against Hansen 2009 and Mullen & Kingdom 2002
+- **Density-gated crowding**: Sigmoid gate on structure density modulates V1 distortion, validated against Halverson & Hornof 2011 behavioral data
+- **Five-wave psychophysical validation**: Automated pipeline testing against published data — see [validation published data](https://github.com/andyed/scrutinizer2025/tree/main/tests/validation/published-data) and [v2.1 release notes](docs/release_notes_v2.1.0.md)
 - **Dual-worker content analysis**: Saliency worker (256 px, continuous ~4 Hz) + Congestion worker (1024 px, on-demand) running in Web Workers
 - **Feature Congestion scoring**: Rosenholtz et al. (2007) with fixed σ=2.5, validated at Spearman ρ=0.93 against the MIT reference implementation
-- **Congestion-gated pooling**: Rendering mode where high-congestion regions receive more aggressive peripheral simplification
 - **Visual Memory with Inhibition of Return**: Fixation-history masking with configurable decay
-- **8 aesthetic modes** with granular pipeline configuration (LGN gating → V1 distortion → V4 rendering)
+- **10 aesthetic modes** with granular pipeline configuration (LGN gating → V1 distortion → V4 rendering)
 - **`scrutinizer-audit` CLI**: Headless Playwright-based batch scoring with sitemap support, CI gating (`--fail-above`), and before/after comparison
 - **MCP server**: Exposes `analyze_url`, `analyze_urls`, `compare_pages` tools for AI-assisted design review via Model Context Protocol
 - **Scanpath replay** (spec: `docs/scanpath-replay-spec.md`): Common `ScanpathData` format with importers for 5 published eye-tracking datasets (UEyes, RecGaze, MIT1003, FixaTons, OneStop), `ScanpathPlayer` as a drop-in `GazeModel` replacement with minimum-jerk saccade interpolation, CLI replay with video recording, and 4 validation experiments
@@ -28,6 +31,7 @@ The modular pipeline (GazeModel, VisualMemory, ContentAnalysis, pipeline orchest
 **Effort**: Medium | **Novelty**: Medium-High
 **Spec exists**: `docs/specs/oriented_dog_bands.md`
 **Depends on**: 1.3 (Calibrated Visual Angles) for publishable psychophysical results
+**Validated baseline**: The isotropic 8-band DoG is validated in Wave 2 (spatial frequency, `docs/specs/wave2_spatial_acuity_validation.md`). Oriented phases should show measurable improvement in cardinal-direction edge retention within the same validation framework.
 
 The current DoG band decomposition is isotropic — all edge orientations attenuate equally with eccentricity. Real V1 cells are orientation-selective, and humans show ~30–50% better acuity for cardinal (horizontal/vertical) edges than oblique ones (Appelle, 1972). This project adds a 4-tap gradient analysis to modulate per-band M-scaling cutoffs by local edge orientation. Horizontal text strokes would persist ~50% further into the periphery than diagonal noise.
 
@@ -48,6 +52,7 @@ The current DoG band decomposition is isotropic — all edge orientations attenu
 **Effort**: Very High | **Novelty**: High
 **ROADMAP section**: Priority 2 — Mongrel Texture Synthesis
 **Spec exists**: `docs/specs/mongrel_textures.md` (Tier 1-3 roadmap)
+**Current approximation**: Density-gated crowding (`docs/specs/density_gated_crowding.md`) serves as the Tier 1 predecessor — modulating distortion strength by local density. Validated against Halverson & Hornof 2011 in Wave 5 (`docs/release_notes_v2.1.0.md#wave-5-halverson-mixed-density`). Mongrel synthesis replaces this strength-based proxy with actual statistical texture replacement.
 
 Replace blur-based peripheral rendering with texture synthesis that preserves summary statistics (mean color, orientation distribution, spatial frequency content) while destroying feature identity. This is the "gold standard" for simulating crowding (Rosenholtz et al., 2012) but has never been done in real-time for arbitrary web content.
 

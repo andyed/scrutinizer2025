@@ -26,7 +26,7 @@ v2.1 ships the validation infrastructure that grounds the arxiv paper's claims. 
 
 Each wave targets a different stage of the rendering pipeline and emulates a different class of psychophysical experiment:
 
-**Wave 1 — Chromatic decay** emulates a *color naming task* (Hansen et al. 2009). Colored singletons on a neutral background at increasing eccentricity. The question: does the Oklab RG/YV decomposition predict which colors lose identity first? This tests the V4 chromatic processing stage — the castleCSF contrast sensitivity functions and the suprathreshold correction. The key validation is channel assignment: green tracks the RG decay curve, not BY. A hue-rotation model would get this wrong; Oklab opponent channels get it right.
+**Wave 1 — Chromatic decay** emulates a *color naming task* (Hansen et al. 2009). Colored singletons on a neutral background at increasing eccentricity. The question: does the Oklab RG/YV decomposition predict which colors lose identity first? This tests the V4 chromatic processing stage — the castleCSF contrast sensitivity functions and the suprathreshold correction. What matters is channel assignment: green tracks the RG decay curve, not BY. A hue-rotation model would get this wrong; Oklab opponent channels get it right.
 
 **Wave 2 — Spatial frequency** emulates a *contrast sensitivity measurement* (Rovamo & Virsu 1979). Sine-wave gratings at known frequencies presented at increasing eccentricity. The question: does the DoG band decomposition attenuate each spatial frequency at the eccentricity predicted by M-scaling? This tests the retinal ganglion cell stage — the MIP chain as a Laplacian pyramid. The key finding is that the pipeline is frequency-selective (high frequencies drop before low), not uniformly degrading (as Gaussian blur would be).
 
@@ -34,7 +34,7 @@ Each wave targets a different stage of the rendering pipeline and emulates a dif
 
 **Wave 4 — Saliency protection** emulates a *visual search task* (Itti & Koch 2001) crossed with a *face detection task* (Hershler & Hochstein 2005). Singletons and faces at known locations, measured for preservation under peripheral rendering. The question: does the saliency-to-shader pipeline actually protect salient content? This tests the LGN gating stage end-to-end: bottom-up saliency (Oklab DoG), face detection (TinyFaceDetector), and the rendering bandwidth allocation.
 
-Together, the four waves cover the four biological stages in the pipeline: retinal GC (Wave 2), LGN gating (Wave 4), V1 crowding (Wave 3), and V4 color (Wave 1). Each wave uses the experimental design closest to the original published methodology, adapted from human observers to pixel measurement.
+The four waves map to the four biological stages: retinal GC (Wave 2), LGN gating (Wave 4), V1 crowding (Wave 3), V4 color (Wave 1).
 
 ### Validation Summary
 
@@ -58,7 +58,7 @@ Two patterns recur across all four waves:
 
 **Strength vs spacing.** The density-gated crowding model modulates distortion strength as a function of eccentricity, not spacing as a function of flanker distance. The pipeline cannot differentiate flankers at 0.2× vs 0.5× eccentricity spacing. This is an architectural limit of per-pixel fragment shaders.
 
-Both failure modes are honestly reported in the arxiv paper (Section 5, Open Problems) and in the validation reports.
+Both failure modes are documented in the arxiv paper (Section 5, Open Problems) and in the validation reports.
 
 ### Analysis Scripts
 
@@ -115,7 +115,7 @@ v2.1 adds a fifth validation wave targeting the density gate — the first wave 
 
 Halverson & Hornof (2011) built an EPIC cognitive architecture model of visual search in HCI. Their Text-Encoding Error (TEE) model found that peripheral encoding accuracy depends on local text density: 90% accuracy for sparse text (nearest neighbor ≥ 0.15°), 50% for dense text (< 0.15°). The perception region stays constant at 1° — it's encoding quality that drops with density.
 
-This is architecturally identical to Scrutinizer's density gate: the rendered region doesn't change with density, but distortion increases in dense areas. Wave 5 tests whether Scrutinizer's pipeline predicts the same density-dependent degradation pattern that Halverson validated against 24 participants' eye-tracking data.
+This is analogous to Scrutinizer's density gate: the rendered region doesn't change with density, but distortion increases in dense areas. Wave 5 tests whether Scrutinizer's pipeline predicts the same density-dependent degradation pattern that Halverson validated against 24 participants' eye-tracking data.
 
 ### Stimulus
 
