@@ -18,14 +18,14 @@ const CAPTURE_WIDTH = '1920';
 const CAPTURE_HEIGHT = '1080';
 
 const CAPTURES = [
-    // Oriented ON (default mode 0 now has dog_oriented=true)
-    { page: 'dashboard', id: 'dashboard_oriented', mode: '0' },
-    { page: 'article',   id: 'article_oriented',   mode: '0' },
-    { page: 'techmeme',  id: 'techmeme_oriented',  mode: '0' },
-    // Comparison: mode 7 (legacy v1.6, no oriented DoG)
-    { page: 'dashboard', id: 'dashboard_legacy',   mode: '7' },
-    { page: 'article',   id: 'article_legacy',     mode: '7' },
-    { page: 'techmeme',  id: 'techmeme_legacy',    mode: '7' },
+    // Oriented OFF (isotropic DoG — same mode 0 pipeline, orientation disabled)
+    { page: 'dashboard', id: 'dashboard_isotropic', mode: '0', dogOriented: 'false' },
+    { page: 'article',   id: 'article_isotropic',   mode: '0', dogOriented: 'false' },
+    { page: 'techmeme',  id: 'techmeme_isotropic',  mode: '0', dogOriented: 'false' },
+    // Oriented ON with exaggerated bias (2.0) to make difference visible in captures
+    { page: 'dashboard', id: 'dashboard_oriented',  mode: '0', dogOriented: 'true', orientBias: '2.0' },
+    { page: 'article',   id: 'article_oriented',    mode: '0', dogOriented: 'true', orientBias: '2.0' },
+    { page: 'techmeme',  id: 'techmeme_oriented',   mode: '0', dogOriented: 'true', orientBias: '2.0' },
 ];
 
 console.log(`\nOriented DoG Phase 1 — Interim Golden Captures`);
@@ -52,6 +52,8 @@ async function runCapture(capture) {
             TEST_HEIGHT: CAPTURE_HEIGHT,
             TEST_FIXATION_X: '0.5',
             TEST_FIXATION_Y: '0.5',
+            TEST_DOG_ORIENTED: capture.dogOriented,
+            TEST_DOG_ORIENT_BIAS: capture.orientBias || undefined,
             TEST_OUTPUT_FILENAME: filename,
             SCREENSHOT_MODE: 'update',
             ELECTRON_RUN_AS_NODE: undefined

@@ -162,9 +162,15 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     float normEcc = max(0.0, eccentricity) / max(fovea_radius, 0.001);           // spatial bands (V1 distortion-coupled)
     float chromNormEcc = max(0.0, visual_ecc) / max(fovea_radius, 0.001);        // chromatic decay (true gaze eccentricity)
 
-    // --- Oriented DoG: local gradient from 4-tap cross at MIP 1 ---
+    // --- Oriented DoG Phase 2: 4-orientation energy decomposition ---
     // Uses undistorted UV so gradient measures content orientation, not V1 warp artifacts.
     // MIP 1 averages 2x2 blocks — robust to pixel noise, captures stroke-level orientation.
+    //
+    // Phase 1 used cos(2θ) which lumps H and V together. Phase 2 decomposes gradient
+    // energy into 4 channels (H/V/D45/D135) matching V1 simple cell orientation tuning
+    // (Hubel & Wiesel 1962). This enables independent H vs V weighting — text-heavy pages
+    // are predominantly horizontal edges (baselines, ascenders) which can be favored over
+    // vertical edges (column borders) if needed.
     float orientBonus = 0.0;
     if (u_dog_oriented > 0.5) {
         vec2 px = 2.0 / u_resolution;  // MIP 1 texel size
@@ -178,17 +184,26 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
 
         float gx = lum_r - lum_l;
         float gy = lum_t - lum_b;
-
-        // Cardinal alignment via double-angle identity: cos(2θ) = |gx²−gy²| / (gx²+gy²)
-        // Maps both H and V to 1.0, obliques (45°/135°) to 0.0
         float g2 = gx * gx + gy * gy;
-        float cos2theta = (g2 > 1e-6) ? abs(gx * gx - gy * gy) / g2 : 0.0;
+
+        // 4-channel orientation energy decomposition (V1 simple cell model)
+        // Gradient (gx,gy) is perpendicular to the edge: a horizontal edge has gy >> gx.
+        float energy_h = gy * gy;                        // Horizontal edges → vertical gradient
+        float energy_v = gx * gx;                        // Vertical edges → horizontal gradient
+        float gd1 = (gx + gy) * 0.7071;                 // 45° projection (1/√2)
+        float gd2 = (gx - gy) * 0.7071;                 // 135° projection
+        float energy_d45  = gd1 * gd1;
+        float energy_d135 = gd2 * gd2;
+
+        // Normalize to get orientation distribution (sums to ~1.0)
+        float totalEnergy = energy_h + energy_v + energy_d45 + energy_d135 + 1e-6;
+        float cardinalFrac = (energy_h + energy_v) / totalEnergy;
 
         // Gradient magnitude gate — flat regions get no bonus (prevents noise amplification)
         float gradMag = sqrt(g2);
         float edgeGate = smoothstep(0.02, 0.08, gradMag);
 
-        orientBonus = cos2theta * edgeGate * u_dog_orient_bias;
+        orientBonus = cardinalFrac * edgeGate * u_dog_orient_bias;
     }
 
     // Sample 9 MIP levels at half-octave spacing (LOD 0.0 to 4.0 in 0.5 steps)
@@ -1502,7 +1517,7 @@ void main() {
             float tm = 0.4;
             bandCount += 1.0 - smoothstep(c_dbg - c_dbg * tm, c_dbg + c_dbg * tm, normEcc_dbg);
         }
-        // Gradient orientation (same computation as in sampleDoGReconstructed)
+        // 4-channel orientation energy (same computation as in sampleDoGReconstructed)
         vec2 px_dbg = 2.0 / u_resolution;
         vec3 lumaW_dbg = vec3(0.114, 0.587, 0.299); // BGRA-corrected luminance weights
         float lr = dot(textureLod(u_texture, uv + vec2(px_dbg.x, 0.0), 1.0).rgb, lumaW_dbg);
@@ -1511,32 +1526,38 @@ void main() {
         float lb = dot(textureLod(u_texture, uv - vec2(0.0, px_dbg.y), 1.0).rgb, lumaW_dbg);
         float gx_d = lr - ll; float gy_d = lt - lb;
         float g2_d = gx_d*gx_d + gy_d*gy_d;
-        float c2t = (g2_d > 1e-6) ? abs(gx_d*gx_d - gy_d*gy_d) / g2_d : 0.0;
+        float e_h = gy_d*gy_d; float e_v = gx_d*gx_d;
+        float totalE = e_h + e_v + 1e-6;
+        float cardFrac = (e_h + e_v) / (totalE + ((gx_d+gy_d)*0.7071)*((gx_d+gy_d)*0.7071) + ((gx_d-gy_d)*0.7071)*((gx_d-gy_d)*0.7071) + 1e-6);
         float eg = smoothstep(0.02, 0.08, sqrt(g2_d));
-        float ob = c2t * eg * u_dog_orient_bias;
+        float ob = cardFrac * eg * u_dog_orient_bias;
         float base = bandCount / 8.0;
         vec3 diagColor = vec3(base, base + ob * 0.3, base);
         // Blend to source inside fovea — all-white there is uninformative
         float foveaBlend = smoothstep(0.0, fovea_radius * 0.3, ecc_dbg);
         color.rgb = mix(sampleSource(uv).rgb, diagColor, foveaBlend);
     } else if (debugLevel > 3.5) {
-        // Debug 4: Gradient field overlay
-        // R = edge strength, G = cardinal (H/V) edges, B = oblique edges
-        vec2 px_dbg = 2.0 / u_resolution;
-        vec3 lumaW_dbg = vec3(0.114, 0.587, 0.299);
-        float lr = dot(textureLod(u_texture, uv + vec2(px_dbg.x, 0.0), 1.0).rgb, lumaW_dbg);
-        float ll = dot(textureLod(u_texture, uv - vec2(px_dbg.x, 0.0), 1.0).rgb, lumaW_dbg);
-        float lt = dot(textureLod(u_texture, uv + vec2(0.0, px_dbg.y), 1.0).rgb, lumaW_dbg);
-        float lb = dot(textureLod(u_texture, uv - vec2(0.0, px_dbg.y), 1.0).rgb, lumaW_dbg);
-        float gx_d = lr - ll; float gy_d = lt - lb;
-        float mag_d = sqrt(gx_d*gx_d + gy_d*gy_d);
-        float g2_d = gx_d*gx_d + gy_d*gy_d;
-        float c2t = (g2_d > 1e-6) ? abs(gx_d*gx_d - gy_d*gy_d) / g2_d : 0.0;
-        float eg = smoothstep(0.02, 0.08, mag_d);
+        // Debug 4: 4-channel orientation energy overlay
+        // R = horizontal edges, G = vertical edges, B = diagonal (45°+135°)
+        vec2 px_dbg4 = 2.0 / u_resolution;
+        vec3 lumaW4 = vec3(0.114, 0.587, 0.299);
+        float lr4 = dot(textureLod(u_texture, uv + vec2(px_dbg4.x, 0.0), 1.0).rgb, lumaW4);
+        float ll4 = dot(textureLod(u_texture, uv - vec2(px_dbg4.x, 0.0), 1.0).rgb, lumaW4);
+        float lt4 = dot(textureLod(u_texture, uv + vec2(0.0, px_dbg4.y), 1.0).rgb, lumaW4);
+        float lb4 = dot(textureLod(u_texture, uv - vec2(0.0, px_dbg4.y), 1.0).rgb, lumaW4);
+        float gx4 = lr4 - ll4; float gy4 = lt4 - lb4;
+        float mag4 = sqrt(gx4*gx4 + gy4*gy4);
+        // 4-channel energy
+        float eH = gy4*gy4;  // horizontal edges
+        float eV = gx4*gx4;  // vertical edges
+        float gd1_4 = (gx4+gy4)*0.7071; float gd2_4 = (gx4-gy4)*0.7071;
+        float eD = gd1_4*gd1_4 + gd2_4*gd2_4;  // diagonal edges (both)
+        float eTotal = eH + eV + eD + 1e-6;
+        float gate4 = smoothstep(0.02, 0.08, mag4);
         color.rgb = vec3(
-            smoothstep(0.0, 0.15, mag_d),   // R: edge strength
-            c2t * eg,                        // G: cardinal edges (bright green = H/V)
-            (1.0 - c2t) * eg                 // B: oblique edges (bright blue = diagonal)
+            (eH / eTotal) * gate4,   // R: horizontal edges (text baselines)
+            (eV / eTotal) * gate4,   // G: vertical edges (column borders)
+            (eD / eTotal) * gate4    // B: diagonal edges (no bonus)
         );
     } else if (debugLevel > 2.5) {
         float mask = texture(u_maskTexture, v_texCoord).r;

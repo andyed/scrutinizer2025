@@ -751,7 +751,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     click: () => { sendToOverlays('menu:set-debug-level', 0); }
                                 },
                                 {
-                                    label: 'Gradient Field (H/V vs Oblique)',
+                                    label: '4-Channel Energy (R=H, G=V, B=Diag)',
                                     type: 'radio',
                                     click: () => { sendToOverlays('menu:set-debug-level', 4); }
                                 },

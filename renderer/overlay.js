@@ -273,6 +273,14 @@
             scrutinizer.setDogE2(value);
         });
 
+        ipcRenderer.on('menu:toggle-dog-oriented', (e, enabled) => {
+            scrutinizer.setDogOriented(enabled);
+        });
+
+        ipcRenderer.on('menu:set-dog-orient-bias', (e, value) => {
+            scrutinizer.setDogOrientBias(value);
+        });
+
         ipcRenderer.on('menu:set-aesthetic-mode', (event, mode) => {
             if (scrutinizer) scrutinizer.setAestheticMode(mode);
         });

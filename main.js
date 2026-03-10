@@ -1491,9 +1491,9 @@ function runIntegrationTest() {
             loadResolved = true;
             console.log('[Test] Page loaded. Waiting for effects to stabilize...');
 
-            // Scroll to specified Y offset if TEST_SCROLL_Y is set
+            // Scroll to specified Y offset (default 0 = top of page)
             const scrollY = process.env.TEST_SCROLL_Y ? parseInt(process.env.TEST_SCROLL_Y, 10) : 0;
-            if (scrollY > 0) {
+            {
                 console.log(`[Test] Scrolling to Y offset: ${scrollY}px...`);
                 await mainWindow.scrutinizerView.webContents.executeJavaScript(`
                     window.scrollTo(0, ${scrollY});
@@ -1607,6 +1607,20 @@ function runIntegrationTest() {
                             const value = parseFloat(dogE2Override);
                             console.log(`[Test] DoG E2 override: ${value}`);
                             mainWindow.scrutinizerHud.webContents.send('menu:set-dog-e2', value);
+                        }
+
+                        const dogOrientedOverride = process.env.TEST_DOG_ORIENTED;
+                        if (dogOrientedOverride !== undefined) {
+                            const enabled = dogOrientedOverride === 'true';
+                            console.log(`[Test] DoG oriented override: ${enabled}`);
+                            mainWindow.scrutinizerHud.webContents.send('menu:toggle-dog-oriented', enabled);
+                        }
+
+                        const dogOrientBiasOverride = process.env.TEST_DOG_ORIENT_BIAS;
+                        if (dogOrientBiasOverride !== undefined) {
+                            const value = parseFloat(dogOrientBiasOverride);
+                            console.log(`[Test] DoG orient bias override: ${value}`);
+                            mainWindow.scrutinizerHud.webContents.send('menu:set-dog-orient-bias', value);
                         }
 
                         // Wait for render

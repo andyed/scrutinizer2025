@@ -450,6 +450,8 @@
                 const savedSaccadicBlindness = this._saccadicBlindnessOverride;
                 const savedGaussianBlurMode = this._gaussianBlurModeOverride;
                 const savedDogE2 = this._dogE2Override;
+                const savedDogOriented = this._dogOrientedOverride;
+                const savedDogOrientBias = this._dogOrientBiasOverride;
 
                 // Default: High-Key (0)
                 const defaults = {
@@ -525,6 +527,12 @@
                         }
                         if (savedDogE2 !== undefined) {
                             this.config.dog_e2 = savedDogE2;
+                        }
+                        if (savedDogOriented !== undefined) {
+                            this.config.dog_oriented = savedDogOriented;
+                        }
+                        if (savedDogOrientBias !== undefined) {
+                            this.config.dog_orient_bias = savedDogOrientBias;
                         }
                         return;
                     }

@@ -541,6 +541,22 @@
             }
         }
 
+        setDogOriented(enabled) {
+            if (this.renderer) {
+                this.renderer.config.dog_oriented = enabled;
+                this.renderer._dogOrientedOverride = enabled;
+                ipcRenderer.send('log:renderer', `[Scrutinizer] DoG oriented override: ${enabled}`);
+            }
+        }
+
+        setDogOrientBias(value) {
+            if (this.renderer) {
+                this.renderer.config.dog_orient_bias = value;
+                this.renderer._dogOrientBiasOverride = value;
+                ipcRenderer.send('log:renderer', `[Scrutinizer] DoG orient bias override: ${value}`);
+            }
+        }
+
         // Delegate to VisualMemory
         setVisualMemoryLimit(limit) {
             ipcRenderer.send('log:renderer', `[Scrutinizer] setVisualMemoryLimit called with: ${limit}`);
