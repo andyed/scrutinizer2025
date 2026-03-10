@@ -1542,8 +1542,14 @@ function runIntegrationTest() {
             setTimeout(async () => {
                 console.log('[Test] Positioning fovea...');
 
+                // Convert content-relative coordinates to screen coordinates
+                // browser:mousemove handler subtracts window.screenX/Y to get local coords
+                const winBounds = mainWindow.getBounds();
+                const screenTargetX = winBounds.x + targetX;
+                const screenTargetY = winBounds.y + targetY;
+
                 // Simulate mouse move to target
-                mainWindow.scrutinizerHud.webContents.send('browser:mousemove', targetX, targetY, 1.0);
+                mainWindow.scrutinizerHud.webContents.send('browser:mousemove', screenTargetX, screenTargetY, 1.0);
 
                 // Apply overrides if present
                 if (testRadius !== null) {
@@ -1586,6 +1592,9 @@ function runIntegrationTest() {
                             mainWindow.scrutinizerHud.webContents.send('menu:set-aesthetic-mode', mode);
                         }
 
+                        // Wait for mode switch to complete config reload before applying overrides
+                        await new Promise(resolve => setTimeout(resolve, 500));
+
                         // Override chromatic pooling AFTER mode switch
                         // (mode switch reloads config from modes.json, overwriting manual toggle)
                         const chromaticPoolingOverride = process.env.TEST_CHROMATIC_POOLING;
@@ -1623,8 +1632,15 @@ function runIntegrationTest() {
                             mainWindow.scrutinizerHud.webContents.send('menu:set-dog-orient-bias', value);
                         }
 
-                        // Wait for render
-                        await new Promise(resolve => setTimeout(resolve, 500));
+                        const debugLevelOverride = process.env.TEST_DEBUG_LEVEL;
+                        if (debugLevelOverride !== undefined) {
+                            const level = parseInt(debugLevelOverride, 10);
+                            console.log(`[Test] Debug level override: ${level}`);
+                            mainWindow.scrutinizerHud.webContents.send('menu:set-debug-level', level);
+                        }
+
+                        // Wait for render — 1500ms to ensure IPC settles after mode switch + overrides
+                        await new Promise(resolve => setTimeout(resolve, 1500));
 
                         console.log(`[Test] Capturing screenshot for Mode ${mode}...`);
                         try {

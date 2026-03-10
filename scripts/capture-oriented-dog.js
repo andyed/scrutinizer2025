@@ -19,13 +19,22 @@ const CAPTURE_HEIGHT = '1080';
 
 const CAPTURES = [
     // Oriented OFF (isotropic DoG — same mode 0 pipeline, orientation disabled)
-    { page: 'dashboard', id: 'dashboard_isotropic', mode: '0', dogOriented: 'false' },
-    { page: 'article',   id: 'article_isotropic',   mode: '0', dogOriented: 'false' },
-    { page: 'techmeme',  id: 'techmeme_isotropic',  mode: '0', dogOriented: 'false' },
-    // Oriented ON with exaggerated bias (2.0) to make difference visible in captures
-    { page: 'dashboard', id: 'dashboard_oriented',  mode: '0', dogOriented: 'true', orientBias: '2.0' },
-    { page: 'article',   id: 'article_oriented',    mode: '0', dogOriented: 'true', orientBias: '2.0' },
-    { page: 'techmeme',  id: 'techmeme_oriented',   mode: '0', dogOriented: 'true', orientBias: '2.0' },
+    { page: 'dashboard',   id: 'dashboard_isotropic',   mode: '0', dogOriented: 'false' },
+    { page: 'article',     id: 'article_isotropic',     mode: '0', dogOriented: 'false' },
+    { page: 'techmeme',    id: 'techmeme_isotropic',    mode: '0', dogOriented: 'false' },
+    { page: 'dense-table',    id: 'dense-table_isotropic',    mode: '0', dogOriented: 'false', fixX: '0.15', fixY: '0.12' },
+    { page: 'checkout-form', id: 'checkout-form_isotropic', mode: '0', dogOriented: 'false', fixX: '0.35', fixY: '0.25' },
+    // Oriented ON with biological bias (2.0) — subtle effect, visible in careful comparison
+    { page: 'dashboard',     id: 'dashboard_oriented',     mode: '0', dogOriented: 'true', orientBias: '2.0' },
+    { page: 'article',       id: 'article_oriented',       mode: '0', dogOriented: 'true', orientBias: '2.0' },
+    { page: 'techmeme',      id: 'techmeme_oriented',      mode: '0', dogOriented: 'true', orientBias: '2.0' },
+    { page: 'dense-table',   id: 'dense-table_oriented',   mode: '0', dogOriented: 'true', orientBias: '2.0', fixX: '0.15', fixY: '0.12' },
+    { page: 'checkout-form', id: 'checkout-form_oriented',  mode: '0', dogOriented: 'true', orientBias: '2.0', fixX: '0.35', fixY: '0.25' },
+    // Exaggerated (bias=4, eccFade bypassed) — for blog demo captures
+    { page: 'orientation-grid', id: 'grid_isotropic',  mode: '0', dogOriented: 'false' },
+    { page: 'orientation-grid', id: 'grid_oriented_4x', mode: '0', dogOriented: 'true', orientBias: '4.0' },
+    { page: 'spiderweb',       id: 'web_isotropic',    mode: '0', dogOriented: 'false' },
+    { page: 'spiderweb',       id: 'web_oriented_4x',  mode: '0', dogOriented: 'true', orientBias: '4.0' },
 ];
 
 console.log(`\nOriented DoG Phase 1 — Interim Golden Captures`);
@@ -50,10 +59,11 @@ async function runCapture(capture) {
             TEST_RADIUS: CAPTURE_FOVEA_RADIUS,
             TEST_WIDTH: CAPTURE_WIDTH,
             TEST_HEIGHT: CAPTURE_HEIGHT,
-            TEST_FIXATION_X: '0.5',
-            TEST_FIXATION_Y: '0.5',
+            TEST_FIXATION_X: capture.fixX || '0.5',
+            TEST_FIXATION_Y: capture.fixY || '0.5',
             TEST_DOG_ORIENTED: capture.dogOriented,
             TEST_DOG_ORIENT_BIAS: capture.orientBias || undefined,
+            TEST_OVERLAY: capture.overlay || process.env.TEST_OVERLAY || undefined,
             TEST_OUTPUT_FILENAME: filename,
             SCREENSHOT_MODE: 'update',
             ELECTRON_RUN_AS_NODE: undefined

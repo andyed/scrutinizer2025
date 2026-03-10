@@ -195,13 +195,21 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         float energy_d45  = gd1 * gd1;
         float energy_d135 = gd2 * gd2;
 
-        // Normalize to get orientation distribution (sums to ~1.0)
-        float totalEnergy = energy_h + energy_v + energy_d45 + energy_d135 + 1e-6;
-        float cardinalFrac = (energy_h + energy_v) / totalEnergy;
+        // Cardinal selectivity: |H - V energy| vs total gradient energy
+        // Phase 1 cos(2θ) was correct but couldn't distinguish H from V.
+        // Phase 2 keeps 4-channel decomposition for debug/future asymmetric H/V,
+        // but uses max(H,V) vs max(D45,D135) for the cardinal fraction.
+        // This avoids the degenerate cardinalFrac≡0.5 from summing overlapping projections.
+        float cardinalMax = max(energy_h, energy_v);
+        float obliqueMax = max(energy_d45, energy_d135);
+        float cardinalFrac = cardinalMax / (cardinalMax + obliqueMax + 1e-6);
 
         // Gradient magnitude gate — flat regions get no bonus (prevents noise amplification)
+        // Thresholds tuned for web UI: 1px borders between #fff and #e9ecef produce
+        // gradMag ~0.01 at MIP 1. Lower gate to catch real UI edges while still
+        // rejecting JPEG noise and flat regions.
         float gradMag = sqrt(g2);
-        float edgeGate = smoothstep(0.02, 0.08, gradMag);
+        float edgeGate = smoothstep(0.005, 0.03, gradMag);
 
         orientBonus = cardinalFrac * edgeGate * u_dog_orient_bias;
 
@@ -303,8 +311,29 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     // Finest bands (k=0) get up to 50% boost, coarsest (k=7) get 10% — fine detail
     // benefits most from the oblique effect, coarse structure is already robust.
     // When orientBonus=0 (disabled or flat region), all boosts are 1.0 — no change.
+    //
+    // Eccentricity fade: the oblique effect diminishes with retinal eccentricity.
+    // Fine bands lose the cardinal advantage by ~10° (Berkley et al. 1975),
+    // coarse bands retain it to ~25° (Essock 1990). Rate depends on spatial frequency.
+    // fovea_radius ≈ 2° of visual angle → px_per_deg ≈ fovea_radius / 2.0
+    float px_per_deg = max(fovea_radius / 2.0, 1.0);
+    float visual_ecc_deg = visual_ecc / px_per_deg;
+
     for (int k = 0; k < 8; k++) {
-        float boost = 1.0 + orientBonus * mix(0.5, 0.1, float(k) / 7.0);
+        // Per-band eccentricity fade:
+        //   Band 0 (finest, >4 cpd): fades 3°–10° (Berkley 1975: gone by 8–18°)
+        //   Band 7 (coarsest, <0.25 cpd): fades 8°–25° (Essock 1990: persists to 40°)
+        float fadeStart = mix(3.0, 8.0, float(k) / 7.0);
+        float fadeEnd   = mix(10.0, 25.0, float(k) / 7.0);
+        float eccFade   = 1.0 - smoothstep(fadeStart, fadeEnd, visual_ecc_deg);
+
+        // For exaggerated demo/capture mode (bias > 3), bypass eccFade so the
+        // orient bonus is visible at typical viewport scales. At biological
+        // levels (bias ≤ 2), the eccFade is correct but produces sub-pixel
+        // differences that don't survive JPEG compression.
+        float effectiveEccFade = u_dog_orient_bias > 3.0 ? 1.0 : eccFade;
+
+        float boost = 1.0 + orientBonus * effectiveEccFade * mix(0.5, 0.1, float(k) / 7.0);
         c[k] *= boost;
     }
 
@@ -366,6 +395,7 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         result.r = result.b;
         result.b = temp;
     }
+
 
     return result;
 }
@@ -998,11 +1028,23 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         float caSuppression = 1.0 - scrambleStrength;
         caFactor *= caSuppression;
         
+        // CA: Simulate lateral chromatic aberration on the PROCESSED output.
+        // Previous impl sampled raw source, destroying DoG pipeline results.
+        // New approach: shift processed luminance per channel. Since we can't
+        // re-read neighboring processed pixels in a single pass, we approximate
+        // by shifting the fovea/periphery blend boundary per channel — red sees
+        // a slightly closer fovea edge, blue a slightly further one. This creates
+        // a color fringe at the fovea boundary without overwriting DoG output.
         if (caFactor > 0.01) {
-            float offset = 0.005 * caFactor; 
-            vec2 caOffset = vec2(offset, 0.0);
-            col.r = sampleSource(v1.distortedUV + caOffset).r;
-            col.b = sampleSource(v1.distortedUV - caOffset).b;
+            float offset = 0.005 * caFactor;
+            // Shift eccentricity per channel: red pulls inward, blue pushes outward
+            float eccR = max(0.0, eccentricity - offset * fovea_radius * 4.0);
+            float eccB = eccentricity + offset * fovea_radius * 4.0;
+            float blendR = smoothstep(0.0, fovea_radius * 0.5, eccR) * u_intensity;
+            float blendB = smoothstep(0.0, fovea_radius * 0.5, eccB) * u_intensity;
+            // Re-blend R and B channels with shifted eccentricity
+            col.r = mix(foveaCol.r, pooledCol.r, blendR);
+            col.b = mix(foveaCol.b, pooledCol.b, blendB);
         }
 
         // 2. Oklab Conversion
@@ -1558,9 +1600,11 @@ void main() {
         float gx_d = lr - ll; float gy_d = lt - lb;
         float g2_d = gx_d*gx_d + gy_d*gy_d;
         float e_h = gy_d*gy_d; float e_v = gx_d*gx_d;
-        float totalE = e_h + e_v + 1e-6;
-        float cardFrac = (e_h + e_v) / (totalE + ((gx_d+gy_d)*0.7071)*((gx_d+gy_d)*0.7071) + ((gx_d-gy_d)*0.7071)*((gx_d-gy_d)*0.7071) + 1e-6);
-        float eg = smoothstep(0.02, 0.08, sqrt(g2_d));
+        float gd1_d = (gx_d+gy_d)*0.7071; float gd2_d = (gx_d-gy_d)*0.7071;
+        float cardMax_d = max(e_h, e_v);
+        float oblMax_d = max(gd1_d*gd1_d, gd2_d*gd2_d);
+        float cardFrac = cardMax_d / (cardMax_d + oblMax_d + 1e-6);
+        float eg = smoothstep(0.005, 0.03, sqrt(g2_d));
         float ob = cardFrac * eg * u_dog_orient_bias;
         float base = bandCount / 8.0;
         vec3 diagColor = vec3(base, base + ob * 0.3, base);
@@ -1584,7 +1628,7 @@ void main() {
         float gd1_4 = (gx4+gy4)*0.7071; float gd2_4 = (gx4-gy4)*0.7071;
         float eD = gd1_4*gd1_4 + gd2_4*gd2_4;  // diagonal edges (both)
         float eTotal = eH + eV + eD + 1e-6;
-        float gate4 = smoothstep(0.02, 0.08, mag4);
+        float gate4 = smoothstep(0.005, 0.03, mag4);
         color.rgb = vec3(
             (eH / eTotal) * gate4,   // R: horizontal edges (text baselines)
             (eV / eTotal) * gate4,   // G: vertical edges (column borders)
