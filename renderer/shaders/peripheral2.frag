@@ -204,6 +204,37 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         float edgeGate = smoothstep(0.02, 0.08, gradMag);
 
         orientBonus = cardinalFrac * edgeGate * u_dog_orient_bias;
+
+        // --- Phase 3: Radial-tangential anisotropy (Toet & Levi 1992) ---
+        // Crowding is ~2x stronger along the radial axis (toward/away from fovea).
+        // Tangential edges (perpendicular to eccentricity vector) survive further.
+        // Radial edges (parallel to eccentricity vector) get a penalty.
+        if (u_dog_radial_bias > 0.001) {
+            vec2 foveaUV = u_mouse / u_resolution;
+            vec2 toFovea = undistortedUV - foveaUV;
+            float dist = length(toFovea);
+            if (dist > 1e-4) {
+                vec2 radialDir = toFovea / dist;
+                // Edge direction is perpendicular to gradient
+                vec2 edgeDir = vec2(-gy, gx);
+                float edgeMag = length(edgeDir);
+                if (edgeMag > 1e-6) {
+                    edgeDir /= edgeMag;
+                    // Tangential direction = perpendicular to radial
+                    vec2 tangDir = vec2(-radialDir.y, radialDir.x);
+                    float tangentialAlign = abs(dot(edgeDir, tangDir));
+                    // tangentialAlign: 1.0 = edge runs tangentially (survives longer)
+                    //                  0.0 = edge runs radially (crowded more)
+                    // Modulate orientBonus: tangential gets up to +30%, radial gets -15%
+                    float radialMod = mix(
+                        1.0 - u_dog_radial_bias * 0.15,  // radial penalty
+                        1.0 + u_dog_radial_bias * 0.3,   // tangential bonus
+                        tangentialAlign
+                    );
+                    orientBonus *= radialMod;
+                }
+            }
+        }
     }
 
     // Sample 9 MIP levels at half-octave spacing (LOD 0.0 to 4.0 in 0.5 steps)

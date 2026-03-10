@@ -3,7 +3,7 @@
 > **Last updated:** 2026-03-08
 
 Date: 2026-02-28
-Status: IN PROGRESS (Phase 2 implemented — 4-channel orientation energy)
+Status: COMPLETE (Phase 1-3 implemented)
 Dependencies: DoG band decomposition (v1.6, implemented), V1 crowding pipeline (implemented)
 
 ## 1. Problem Statement
