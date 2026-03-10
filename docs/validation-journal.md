@@ -119,7 +119,7 @@ Metric: spread ratio = stddev of 2D cyan target positions, crowded / isolated. V
 | 6° | 2.542 (peak) | 1.863 | Strong crowding — Bouma range |
 | 10° | 1.256 | 0.859 | Continued crowding (post-fix) |
 
-Growth factor calibration (V1 `farScale` in `peripheral2.frag:594`):
+Growth factor calibration (V1 `farScale` in `peripheral.frag:594`):
 
 | Factor | 3° spread | 6° peak | 10° peak | Checks |
 |---|---|---|---|---|
@@ -161,7 +161,7 @@ V1 Lateral Smash is eccentricity-dependent but not spacing-dependent — `warpAm
 **Stimulus**: [saliency-popout.html](https://andyed.github.io/scrutinizer-www/reference-pages/saliency-popout.html) — four regions: color singleton (red among green), luminance singleton (white among dark), inline base64 face, homogeneous control (blue squares)
 **Existing**: [face-test.html](https://andyed.github.io/scrutinizer-www/reference-pages/face-test.html) — Ada Lovelace portrait for face detection validation
 **Scripts**: [capture-saliency.js](../scripts/capture-saliency.js) · [analyze-saliency.js](../scripts/analyze-saliency.js)
-**Shader**: [peripheral2.frag:565](../renderer/shaders/peripheral2.frag) — `suppressionFactor *= mix(1.0, 0.3, saliency)`
+**Shader**: [peripheral.frag:565](../renderer/shaders/peripheral.frag) — `suppressionFactor *= mix(1.0, 0.3, saliency)`
 **Worker**: [saliency-worker.js:393-449](../renderer/saliency-worker.js) — DoG on I/RG/BY (Oklab), W_I=0.3, W_RG=0.35, W_BY=0.35, W_FACE=2.0
 
 ### 4A — Pop-Out Detection

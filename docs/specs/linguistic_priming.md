@@ -3,7 +3,7 @@
 > **Last updated:** 2026-03-09
 
 > [!NOTE]
-> **Version 3.0** — Rewritten to align with the current Scrutinizer architecture (v2.1+). Replaces v2 spec. Grounded in existing pipeline components: `dom-adapter.js`, `saliency-worker.js`, `peripheral2.frag`, and the declarative mode registry.
+> **Version 3.0** — Rewritten to align with the current Scrutinizer architecture (v2.1+). Replaces v2 spec. Grounded in existing pipeline components: `dom-adapter.js`, `saliency-worker.js`, `peripheral.frag`, and the declarative mode registry.
 
 > [!IMPORTANT]
 > **Implementation Status: PLANNED**
@@ -121,7 +121,7 @@ A new `scent-worker.js` runs alongside the existing `saliency-worker.js`. They c
                      (TEXTURE3)
                            │
                            ▼
-                  peripheral2.frag
+                  peripheral.frag
                   (LGN saliency gate)
 ```
 

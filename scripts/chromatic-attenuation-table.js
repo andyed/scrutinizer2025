@@ -2,7 +2,7 @@
 /**
  * Compute chromatic attenuation values at specific eccentricities.
  *
- * Reproduces the shader math from peripheral2.frag so we can verify
+ * Reproduces the shader math from peripheral.frag so we can verify
  * what the GPU is actually computing vs. published psychophysical data.
  *
  * Usage:

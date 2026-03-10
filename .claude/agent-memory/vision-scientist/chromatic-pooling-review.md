@@ -49,7 +49,7 @@ These are THRESHOLD sensitivity values. The model explicitly says "smallest cont
 ## Two Bugs in Current Implementation
 
 ### Bug 1: Red Kill Switch not guarded by chromatic pooling flag
-Lines 806-813 of peripheral2.frag apply up to 95% additional RG/YV attenuation in mode 0,
+Lines 806-813 of peripheral.frag apply up to 95% additional RG/YV attenuation in mode 0,
 even when chromatic pooling is already handling differential decay. The guard on line 794
 only protects the uniform desaturation path, not the Red Kill Switch.
 

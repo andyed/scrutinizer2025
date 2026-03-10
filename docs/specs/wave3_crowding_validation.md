@@ -4,7 +4,7 @@
 
 **Status**: Proposed
 **Created**: 2026-03-07
-**Dependencies**: `renderer/shaders/peripheral2.frag` (density-gated crowding, polar sectors), `renderer/config.js`, Wave 1-2 infrastructure, existing reference pages (`crowding.html`, `crowding-stimulus.html`)
+**Dependencies**: `renderer/shaders/peripheral.frag` (density-gated crowding, polar sectors), `renderer/config.js`, Wave 1-2 infrastructure, existing reference pages (`crowding.html`, `crowding-stimulus.html`)
 
 ## Context
 
@@ -34,7 +34,7 @@ The critical spacing zone is **not circular** — it extends ~2x further radiall
 
 ### Prediction A: MIP pooling regions grow linearly with eccentricity
 
-The MIP level computation `computeMipLevel()` (peripheral2.frag:277-291) should produce pooling region sizes that grow approximately linearly with eccentricity, matching Bouma's proportional scaling.
+The MIP level computation `computeMipLevel()` (peripheral.frag:277-291) should produce pooling region sizes that grow approximately linearly with eccentricity, matching Bouma's proportional scaling.
 
 Each MIP level doubles the averaging area: MIP 0 = 1px, MIP 1 = 2px, MIP 2 = 4px, MIP 3 = 8px, MIP 4 = 16px. The effective pooling diameter at eccentricity e should approximate:
 
@@ -46,7 +46,7 @@ pooling_diameter_px ≈ 2^mipLevel(e)
 
 ### Prediction B: Polar sector radial extent matches Bouma critical spacing
 
-The polar sector computation (peripheral2.frag:310-349) produces sectors with:
+The polar sector computation (peripheral.frag:310-349) produces sectors with:
 - Ring width: `ring_outer - ring_inner = r * (ef^bias - 1)` where ef=1.007, bias=2.0
 - At `r = parafovea_radius` (≈225px at medium): ring width ≈ 3.2px
 - At `r = 0.3` (≈10° at medium): ring width ≈ 4.2px
@@ -55,7 +55,7 @@ The polar sector computation (peripheral2.frag:310-349) produces sectors with:
 
 ### Prediction C: Density gating differentiates crowded vs isolated
 
-The crowding reference page (`crowding.html`) places crowded (flanked) and isolated versions of the same letter at the same eccentricities. The density-gated sigmoid (peripheral2.frag:599-604) should produce measurably different `crowdingFactor` values:
+The crowding reference page (`crowding.html`) places crowded (flanked) and isolated versions of the same letter at the same eccentricities. The density-gated sigmoid (peripheral.frag:599-604) should produce measurably different `crowdingFactor` values:
 
 - **Crowded group** (density ~0.53): `crowdingFactor` → ~0.85-1.0
 - **Isolated letter** (density ~0.44): `crowdingFactor` → ~0.35-0.50

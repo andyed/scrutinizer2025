@@ -142,9 +142,9 @@ The removal of the parafoveal saturation boost (`mix(vec3(luma), col, 1.2)`) exp
 
 | Area | Files |
 | --- | --- |
-| **M-Scaling** | `renderer/shaders/peripheral2.frag`, `shared/modes.json`, `docs/foveated-vision-model.md` |
-| **Laplacian Qualification** | `docs/arxiv-paper/scrutinizer-system-paper.tex`, `docs/arxiv-paper/references.bib`, `docs/foveated-vision-model.md`, `docs/developers_guide.md`, `docs/release_notes_v1.6.0.md`, `CHANGELOG.md`, `ROADMAP.md`, `renderer/shaders/peripheral2.frag` |
-| **Congestion Pipeline** | `renderer/congestion-core.js`, `renderer/congestion-worker.js`, `renderer/saliency-worker.js`, `renderer/content-analysis.js`, `renderer/shaders/peripheral2.frag`, `renderer/webgl-renderer.js` |
+| **M-Scaling** | `renderer/shaders/peripheral.frag`, `shared/modes.json`, `docs/foveated-vision-model.md` |
+| **Laplacian Qualification** | `docs/arxiv-paper/scrutinizer-system-paper.tex`, `docs/arxiv-paper/references.bib`, `docs/foveated-vision-model.md`, `docs/developers_guide.md`, `docs/release_notes_v1.6.0.md`, `CHANGELOG.md`, `ROADMAP.md`, `renderer/shaders/peripheral.frag` |
+| **Congestion Pipeline** | `renderer/congestion-core.js`, `renderer/congestion-worker.js`, `renderer/saliency-worker.js`, `renderer/content-analysis.js`, `renderer/shaders/peripheral.frag`, `renderer/webgl-renderer.js` |
 | **ComplexityHUD** | `renderer/complexity-hud.js`, `renderer/overlay.html`, `renderer/overlay.js`, `renderer/scrutinizer.js`, `renderer/toolbar.js`, `renderer/styles.css`, `main.js` |
 | **Mode 9** | `shared/modes.json`, `menu-template.js` |
 | **Validation** | `scripts/validate-congestion.py`, `scripts/extract-congestion.js`, `scripts/compare-congestion.js`, `package.json`, `pyproject.toml` |

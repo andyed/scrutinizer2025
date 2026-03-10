@@ -23,7 +23,7 @@ Scrutinizer simulates what your visual system actually does to the 95% of your s
 **Why it matters:** If you can't read that sidebar label through Scrutinizer, your users' visual systems can't resolve it either. The simulation makes the invisible degradation visible, giving designers and researchers a tool for reasoning about what the periphery actually delivers to perception.
 
 ## Scrutinizer Project Architecture
-- Foveated vision renderer in WebGL (fragment shader: `renderer/shaders/peripheral2.frag`)
+- Foveated vision renderer in WebGL (fragment shader: `renderer/shaders/peripheral.frag`)
 - Neuro-architecture pipeline: LGN (gating) -> V1 (geometry/distortion) -> V4 (aesthetics)
 - DoG band decomposition (v1.6+): exploits hardware MIP chain for eccentricity-dependent spatial frequency attenuation
 - Key doc: `docs/foveated-vision-model.md`
@@ -83,7 +83,7 @@ Comparison images live in `docs/golden/chromatic-comparison/`. The script (`scri
 ## Foveal Size Calibration
 
 ### The Core Problem
-The shader hardcodes `fovea_deg = 2.0` in 6 places in `peripheral2.frag`. This maps `normEcc` (pixels / fovea_radius) to degrees via `ecc_deg = normEcc * 2.0`. With default `foveaRadius: 180px` on a 1536×914 viewport, the horizontal edge maps to only ~8.5° — far less than the ~40-50° half-field of a real monitor. This is why chromatic pooling color loss isn't visible at viewport edges.
+The shader hardcodes `fovea_deg = 2.0` in 6 places in `peripheral.frag`. This maps `normEcc` (pixels / fovea_radius) to degrees via `ecc_deg = normEcc * 2.0`. With default `foveaRadius: 180px` on a 1536×914 viewport, the horizontal edge maps to only ~8.5° — far less than the ~40-50° half-field of a real monitor. This is why chromatic pooling color loss isn't visible at viewport edges.
 
 ### Foveal Size in Pixels (Reference)
 Formula: `S_px = 2 × D × tan(θ/2) × (resolution / screen_width_cm)`

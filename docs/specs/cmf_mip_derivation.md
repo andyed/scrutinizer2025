@@ -29,7 +29,7 @@ Round 3 (after our second response proposing `k = maxMipLevel / ln(1 + r_max/a)`
 
 ## The Current (Buggy) Code
 
-`peripheral2.frag` lines 192, 217:
+`peripheral.frag` lines 192, 217:
 ```glsl
 mipLevel = clamp(log2(max(1.0, (r_deg + u_cmf_a) / u_cmf_a)), 0.0, maxMipLevel);
 ```
@@ -118,7 +118,7 @@ At every eccentricity, we're nearly 50% too aggressive. MIP level 2.2 (≈5× co
 
 ## Corrected Code
 
-### Shader: `peripheral2.frag`
+### Shader: `peripheral.frag`
 
 New uniform:
 ```glsl
@@ -176,7 +176,7 @@ Update CMF mode description (line 172):
 
 | File | Change |
 |------|--------|
-| `renderer/shaders/peripheral2.frag` | Add `u_cortical_max` uniform; rewrite 2 MIP equations + 4 DoG cutoffs |
+| `renderer/shaders/peripheral.frag` | Add `u_cortical_max` uniform; rewrite 2 MIP equations + 4 DoG cutoffs |
 | `renderer/webgl-renderer.js` | Add location, compute `cortical_max`, upload, log on change |
 | `shared/modes.json` | Fix CMF mode description |
 

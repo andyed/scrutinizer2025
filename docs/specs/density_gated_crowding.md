@@ -46,7 +46,7 @@ These are tunable via dev tools / modes.json so we can A/B test against the crow
 ### 2. Modify V1 strength calculation in both fragment shaders
 
 **File:** `renderer/shaders/peripheral.frag` — line 426
-**File:** `renderer/shaders/peripheral2.frag` — line 514
+**File:** `renderer/shaders/peripheral.frag` — line 514
 
 Current:
 ```glsl
@@ -90,7 +90,7 @@ Add `crowding_density_threshold` and `crowding_density_steepness` to mode config
 | File | Change |
 |------|--------|
 | `renderer/shaders/peripheral.frag` | Add density sigmoid + crowdingFactor at line 426 |
-| `renderer/shaders/peripheral2.frag` | Same change at line 514 |
+| `renderer/shaders/peripheral.frag` | Same change at line 514 |
 | `renderer/config.js` | Add uniform declarations for threshold + steepness |
 | `renderer/scrutinizer-renderer.js` | Pass new uniforms to shader |
 | `renderer/modes.json` | Add crowding_density defaults per mode (optional) |

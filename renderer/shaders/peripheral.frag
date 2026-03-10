@@ -5,7 +5,7 @@ precision mediump float;
 uniform sampler2D u_texture;      // Captured browser frame (Live)
 uniform sampler2D u_maskTexture;  // Visual memory mask
 uniform sampler2D u_structureMap; // Structure Map (R=Rhythm, G=Density, B=Type)
-uniform sampler2D u_saliencyMap;  // Saliency Map (R=Saliency, grayscale)
+uniform sampler2D u_saliencyMap;  // Saliency Map (R=Saliency, G=Congestion, B=EdgeDensity)
 uniform float u_useMask;
 
 uniform vec2  u_resolution;
@@ -22,14 +22,10 @@ uniform float u_has_structure;
 uniform float u_enable_saliency_modulation;
 uniform float u_time; // Time in seconds for animation
 uniform float u_velocity;         // Mouse velocity in px/ms
-uniform float u_saccadic_blindness; // 0.0=off, 1.0=suppress fovea during saccades
-uniform float u_blurRadius;       // Simulated Pupil Aperture (0.0 = Sharp, 10.0 = Blurry)
+uniform float u_blurRadius;       // Simulated Pupil Aperture
 uniform float u_mongrel_mode;     // 0.0 = Noise, 1.0 = Shatter
 uniform float u_crowding_radial_bias; // Radial:tangential crowding ratio (default 2.0)
 
-// Density-gated crowding (Bouma 1970 approximation)
-uniform float u_crowding_density_threshold; // Density below this = minimal crowding (default 0.2)
-uniform float u_crowding_density_steepness; // Sigmoid sharpness (default 10.0)
 
 // === GRANULAR CONFIGURATION UNIFORMS ===
 uniform float u_lgn_use_structure_mask;
@@ -40,14 +36,59 @@ uniform int   u_v4_style_id;
 uniform float u_lgn_ramp_end_mult;
 uniform float u_v1_animate;
 
+// DoG (Difference-of-Gaussians) peripheral reconstruction uniforms
+uniform float u_dog_enabled;     // 0.0 = legacy MIP, 1.0 = DoG reconstruction
+uniform float u_dog_e2;          // M-scaling E2 (half-resolution eccentricity)
+uniform float u_dog_sharpness;   // Band rolloff sharpness (0=biological, 1=sharp)
+
+// Oriented DoG — orientation-selective band attenuation (Appelle 1972, Toet & Levi 1992)
+uniform float u_dog_oriented;      // 0.0 = isotropic (legacy), 1.0 = oriented
+uniform float u_dog_orient_bias;   // Oblique effect strength (0=none, 1=biological ~50%, 2=exaggerated)
+uniform float u_dog_radial_bias;   // Radial-tangential anisotropy (0=off, Phase 3)
+
+// Gaussian blur comparison mode — eccentricity-scaled MIP blur without band decomposition
+uniform float u_gaussian_blur_mode; // 0.0 = normal, 1.0 = comparison Gaussian
+
+// FOVI (Cortical Magnification) uniforms — Blauch, Alvarez & Konkle (2026)
+uniform float u_cmf_enabled;     // 0.0 = legacy linear, 1.0 = CMF logarithmic
+uniform float u_cmf_a;            // Cortical magnification constant (default 2.78)
+uniform float u_cortical_max;     // ln(r_max+a) - ln(a), precomputed on JS side
+uniform float u_cmf_color_sigma; // Gaussian color decay sigma (0.0 = disabled)
+uniform float u_ecc_scaling;     // Pooling growth rate (Brown et al. 2023, Bouma scaling, default 0.75)
+uniform float u_desat_floor;      // Min desaturation multiplier in salient regions (1.0 = full desat, 0.85 = 15% cap)
+
+// Chromatic pooling — per-channel RG/YV eccentricity decay (castleCSF; Ashraf et al. 2024)
+// NOTE: castleCSF k_e values are *detection threshold* decay rates. Suprathreshold
+// color appearance decays more slowly — Jiang, Shooner & Mullen (2022) found power-law
+// exponent ~0.5 maps threshold sensitivity to perceived saturation at high contrasts.
+uniform float u_saccadic_blindness; // 0.0=off, 1.0=suppress fovea during saccades
+uniform float u_chromatic_pooling;  // 0.0=off (legacy uniform desat), 1.0=on
+uniform float u_rg_decay;           // RG (L-M) eccentricity decay k_e (default 0.072, Bowers et al. 2025 suprathreshold)
+uniform float u_rg_freq_decay;      // RG frequency-dependent decay k_ef (default 0.003)
+uniform float u_yv_decay;           // YV S-(L+M) base decay k_e (default 0.014, Bowers et al. 2025 suprathreshold)
+uniform float u_yv_freq_decay;      // YV frequency-dependent decay k_ef (default 0.008)
+uniform float u_supra_exponent;     // Threshold→appearance compression (default 0.5; 1.0=raw threshold)
+
+// Congestion overlay (Rosenholtz et al. 2007)
+uniform int u_show_congestion;    // 0=off, 1=overlay, 2=solo
+
+// Congestion-gated pooling (hypothesis mode)
+uniform float u_congestion_pooling; // 0.0=off, 1.0=on
+
+// Density-gated crowding (Bouma 1970 approximation)
+// Dense content (text clusters) gets full V1 distortion; sparse content (isolated elements) is spared.
+uniform float u_crowding_density_threshold; // Density below this = minimal crowding (default 0.2)
+uniform float u_crowding_density_steepness; // Sigmoid sharpness (default 10.0)
+
+// High-resolution congestion map (from dedicated congestion worker)
+// R=congestion, G=edgeDensity — higher quality than u_saliencyMap.gb at 256px
+uniform sampler2D u_congestionMap;
+uniform float u_hasCongestionMap; // 0.0=not available, 1.0=use high-res data
+
 in vec2 v_texCoord;
 out vec4 fragColor;
 
 // === HELPER: SOURCE SAMPLER (The "True View") ===
-// Centralizes sampling of the source capture to ensure consistent color handling.
-// Electron captures are BGRA, but WebGL treats them as RGBA.
-// We MUST swap R and B here to get the correct color.
-// Uses textureLod(0) for consistency with MIP-based pooling (avoids subtle filtering differences).
 vec4 sampleSource(vec2 uv) {
     vec4 col = textureLod(u_texture, uv, 0.0);
     float temp = col.r;
@@ -56,7 +97,19 @@ vec4 sampleSource(vec2 uv) {
     return col;
 }
 
+// === GRADIENT-AWARE SAMPLER (Mipmap Collapse Fix) ===
+vec4 sampleSourceGrad(vec2 distortedUV, vec2 duvdx, vec2 duvdy) {
+    vec4 col = textureGrad(u_texture, distortedUV, duvdx, duvdy);
+    float temp = col.r;
+    col.r = col.b;
+    col.b = temp;
+    return col;
+}
+
 // === LOD-AWARE SAMPLER (Sector-area averaging) ===
+// Samples at a specific MIP level for area-averaged coverage.
+// Used by polar pooling to average across the sector area instead of
+// point-sampling the center (which misses thin features like toolbars).
 vec4 sampleSourceLod(vec2 uv, float lod) {
     vec4 col = textureLod(u_texture, uv, lod);
     float temp = col.r;
@@ -66,8 +119,6 @@ vec4 sampleSourceLod(vec2 uv, float lod) {
 }
 
 // === HELPER: VARIABLE BLUR ===
-// Approximates Gaussian blur with variable radius using a 5-tap pattern.
-// Radius is in pixels.
 vec4 sampleBlurred(vec2 uv, float radius) {
     if (radius < 0.5) return sampleSource(uv);
     
@@ -80,7 +131,6 @@ vec4 sampleBlurred(vec2 uv, float radius) {
     totalWeight += 0.4;
     
     // 4 Cardinal Neighbors
-    // Stride increases with radius
     float stride = radius; 
     vec2 off1 = vec2(stride, 0.0) * pixelSize;
     vec2 off2 = vec2(-stride, 0.0) * pixelSize;
@@ -96,19 +146,294 @@ vec4 sampleBlurred(vec2 uv, float radius) {
     return sum / totalWeight;
 }
 
+// Forward declaration — defined after Oklab conversion functions
+vec4 chromaticAttenuate(vec4 color, float rg_atten, float yv_atten);
+
+// === DoG PERIPHERAL RECONSTRUCTION ===
+// Decomposes the hardware MIP chain into an approximate Laplacian pyramid.
+// Hardware mipmaps use box/bilinear filtering (not Gaussian convolution), so band
+// differences are Difference-of-Boxes — an approximation of true DoG with some
+// spectral leakage between bands. See Burt & Adelson (1983) for true Laplacian pyramids.
+// Biology: retinal ganglion cells have center-surround RFs ≈ DoG filters.
+// Field size grows with eccentricity. At fovea: all bands. In periphery: only low-freq survives.
+vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
+                             float dog_e2, float dog_sharpness, float visual_ecc,
+                             vec2 undistortedUV) {
+    float normEcc = max(0.0, eccentricity) / max(fovea_radius, 0.001);           // spatial bands (V1 distortion-coupled)
+    float chromNormEcc = max(0.0, visual_ecc) / max(fovea_radius, 0.001);        // chromatic decay (true gaze eccentricity)
+
+    // --- Oriented DoG Phase 2: 4-orientation energy decomposition ---
+    // Uses undistorted UV so gradient measures content orientation, not V1 warp artifacts.
+    // MIP 1 averages 2x2 blocks — robust to pixel noise, captures stroke-level orientation.
+    //
+    // Phase 1 used cos(2θ) which lumps H and V together. Phase 2 decomposes gradient
+    // energy into 4 channels (H/V/D45/D135) matching V1 simple cell orientation tuning
+    // (Hubel & Wiesel 1962). This enables independent H vs V weighting — text-heavy pages
+    // are predominantly horizontal edges (baselines, ascenders) which can be favored over
+    // vertical edges (column borders) if needed.
+    float orientBonus = 0.0;
+    if (u_dog_oriented > 0.5) {
+        vec2 px = 2.0 / u_resolution;  // MIP 1 texel size
+        // Luminance from BGRA-ordered texture: .b=Red, .g=Green, .r=Blue
+        // Correct luma weights: 0.299*R(.b) + 0.587*G(.g) + 0.114*B(.r)
+        vec3 lumaW = vec3(0.114, 0.587, 0.299);
+        float lum_r = dot(textureLod(u_texture, undistortedUV + vec2(px.x, 0.0), 1.0).rgb, lumaW);
+        float lum_l = dot(textureLod(u_texture, undistortedUV - vec2(px.x, 0.0), 1.0).rgb, lumaW);
+        float lum_t = dot(textureLod(u_texture, undistortedUV + vec2(0.0, px.y), 1.0).rgb, lumaW);
+        float lum_b = dot(textureLod(u_texture, undistortedUV - vec2(0.0, px.y), 1.0).rgb, lumaW);
+
+        float gx = lum_r - lum_l;
+        float gy = lum_t - lum_b;
+        float g2 = gx * gx + gy * gy;
+
+        // 4-channel orientation energy decomposition (V1 simple cell model)
+        // Gradient (gx,gy) is perpendicular to the edge: a horizontal edge has gy >> gx.
+        float energy_h = gy * gy;                        // Horizontal edges → vertical gradient
+        float energy_v = gx * gx;                        // Vertical edges → horizontal gradient
+        float gd1 = (gx + gy) * 0.7071;                 // 45° projection (1/√2)
+        float gd2 = (gx - gy) * 0.7071;                 // 135° projection
+        float energy_d45  = gd1 * gd1;
+        float energy_d135 = gd2 * gd2;
+
+        // Cardinal selectivity: |H - V energy| vs total gradient energy
+        // Phase 1 cos(2θ) was correct but couldn't distinguish H from V.
+        // Phase 2 keeps 4-channel decomposition for debug/future asymmetric H/V,
+        // but uses max(H,V) vs max(D45,D135) for the cardinal fraction.
+        // This avoids the degenerate cardinalFrac≡0.5 from summing overlapping projections.
+        float cardinalMax = max(energy_h, energy_v);
+        float obliqueMax = max(energy_d45, energy_d135);
+        float cardinalFrac = cardinalMax / (cardinalMax + obliqueMax + 1e-6);
+
+        // Gradient magnitude gate — flat regions get no bonus (prevents noise amplification)
+        // Thresholds tuned for web UI: 1px borders between #fff and #e9ecef produce
+        // gradMag ~0.01 at MIP 1. Lower gate to catch real UI edges while still
+        // rejecting JPEG noise and flat regions.
+        float gradMag = sqrt(g2);
+        float edgeGate = smoothstep(0.005, 0.03, gradMag);
+
+        orientBonus = cardinalFrac * edgeGate * u_dog_orient_bias;
+
+        // --- Phase 3: Radial-tangential anisotropy (Toet & Levi 1992) ---
+        // Crowding is ~2x stronger along the radial axis (toward/away from fovea).
+        // Tangential edges (perpendicular to eccentricity vector) survive further.
+        // Radial edges (parallel to eccentricity vector) get a penalty.
+        if (u_dog_radial_bias > 0.001) {
+            vec2 foveaUV = u_mouse / u_resolution;
+            vec2 toFovea = undistortedUV - foveaUV;
+            float dist = length(toFovea);
+            if (dist > 1e-4) {
+                vec2 radialDir = toFovea / dist;
+                // Edge direction is perpendicular to gradient
+                vec2 edgeDir = vec2(-gy, gx);
+                float edgeMag = length(edgeDir);
+                if (edgeMag > 1e-6) {
+                    edgeDir /= edgeMag;
+                    // Tangential direction = perpendicular to radial
+                    vec2 tangDir = vec2(-radialDir.y, radialDir.x);
+                    float tangentialAlign = abs(dot(edgeDir, tangDir));
+                    // tangentialAlign: 1.0 = edge runs tangentially (survives longer)
+                    //                  0.0 = edge runs radially (crowded more)
+                    // Modulate orientBonus: tangential gets up to +30%, radial gets -15%
+                    float radialMod = mix(
+                        1.0 - u_dog_radial_bias * 0.15,  // radial penalty
+                        1.0 + u_dog_radial_bias * 0.3,   // tangential bonus
+                        tangentialAlign
+                    );
+                    orientBonus *= radialMod;
+                }
+            }
+        }
+    }
+
+    // Sample 9 MIP levels at half-octave spacing (LOD 0.0 to 4.0 in 0.5 steps)
+    // Half-integer LODs trigger hardware trilinear interpolation (2 bilinear reads + lerp),
+    // giving us the half-octave Gaussian we need. 9 samples = 13 bilinear lookups total.
+    vec4 mip[9];
+    mip[0] = textureLod(u_texture, uv, 0.0);
+    mip[1] = textureLod(u_texture, uv, 0.5);
+    mip[2] = textureLod(u_texture, uv, 1.0);
+    mip[3] = textureLod(u_texture, uv, 1.5);
+    mip[4] = textureLod(u_texture, uv, 2.0);
+    mip[5] = textureLod(u_texture, uv, 2.5);
+    mip[6] = textureLod(u_texture, uv, 3.0);
+    mip[7] = textureLod(u_texture, uv, 3.5);
+    mip[8] = textureLod(u_texture, uv, 4.0);
+
+    // 8 half-octave DoG bands — geometric sqrt(2) spacing
+    // Odd-indexed new cutoffs match old 4-band anchors exactly.
+    // At intermediate eccentricities, 3-4 bands carry distinct fractional weights
+    // simultaneously — measurable frequency-selective behavior that single-sample
+    // Gaussian blur cannot reproduce.
+    vec4 band[8];
+    band[0] = mip[0] - mip[1];  // ~5.66 cpd  (finest detail, serifs)
+    band[1] = mip[1] - mip[2];  // ~4.0 cpd   (thin strokes)
+    band[2] = mip[2] - mip[3];  // ~2.83 cpd  (letter bodies)
+    band[3] = mip[3] - mip[4];  // ~2.0 cpd   (small icons)
+    band[4] = mip[4] - mip[5];  // ~1.41 cpd  (words, UI labels)
+    band[5] = mip[5] - mip[6];  // ~1.0 cpd   (word groups)
+    band[6] = mip[6] - mip[7];  // ~0.71 cpd  (buttons, panels)
+    band[7] = mip[7] - mip[8];  // ~0.5 cpd   (layout blocks)
+    // residual = mip[8]         // ~0.35 cpd  (DC, always preserved)
+
+    // Per-band cutoff eccentricities — half-octave M-scaling
+    // cutoff_k = E2 × (2^(k/2) − 1) for linear path
+    // Odd-indexed cutoffs (c[1], c[3], c[5], c[7]) match old 4-band cutoffs exactly:
+    //   c[1]=E2*1.0, c[3]=E2*3.0, c[5]=E2*7.0, c[7]=E2*15.0
+    float c[8];
+    float e2 = max(dog_e2, 0.01);
+    if (u_cmf_enabled > 0.5) {
+        // CMF-derived: c_k = cmf_a × (exp(k×0.5×scale) − 1) / fovea_deg
+        // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
+        float fovea_deg = 2.0;
+        float maxMipLevel = 4.0;
+        float scale = u_cortical_max / maxMipLevel / (u_ecc_scaling / 0.75);
+        c[0] = u_cmf_a * (exp(0.5 * scale) - 1.0) / fovea_deg;
+        c[1] = u_cmf_a * (exp(1.0 * scale) - 1.0) / fovea_deg;  // == old c0
+        c[2] = u_cmf_a * (exp(1.5 * scale) - 1.0) / fovea_deg;
+        c[3] = u_cmf_a * (exp(2.0 * scale) - 1.0) / fovea_deg;  // == old c1
+        c[4] = u_cmf_a * (exp(2.5 * scale) - 1.0) / fovea_deg;
+        c[5] = u_cmf_a * (exp(3.0 * scale) - 1.0) / fovea_deg;  // == old c2
+        c[6] = u_cmf_a * (exp(3.5 * scale) - 1.0) / fovea_deg;
+        c[7] = u_cmf_a * (exp(4.0 * scale) - 1.0) / fovea_deg;  // == old c3
+    } else {
+        // Linear M-scaling: cutoff_k = E2 * (2^(k/2) - 1), k=1..8
+        c[0] = e2 * 0.41421;   // sqrt(2) - 1
+        c[1] = e2 * 1.0;       // == old c0
+        c[2] = e2 * 1.82843;   // 2*sqrt(2) - 1
+        c[3] = e2 * 3.0;       // == old c1
+        c[4] = e2 * 4.65685;   // 4*sqrt(2) - 1
+        c[5] = e2 * 7.0;       // == old c2
+        c[6] = e2 * 10.31371;  // 8*sqrt(2) - 1
+        c[7] = e2 * 15.0;      // == old c3
+    }
+
+    // Oriented DoG: push cutoffs outward for cardinal-aligned content
+    // Finest bands (k=0) get up to 50% boost, coarsest (k=7) get 10% — fine detail
+    // benefits most from the oblique effect, coarse structure is already robust.
+    // When orientBonus=0 (disabled or flat region), all boosts are 1.0 — no change.
+    //
+    // Eccentricity fade: the oblique effect diminishes with retinal eccentricity.
+    // Fine bands lose the cardinal advantage by ~10° (Berkley et al. 1975),
+    // coarse bands retain it to ~25° (Essock 1990). Rate depends on spatial frequency.
+    // fovea_radius ≈ 2° of visual angle → px_per_deg ≈ fovea_radius / 2.0
+    float px_per_deg = max(fovea_radius / 2.0, 1.0);
+    float visual_ecc_deg = visual_ecc / px_per_deg;
+
+    for (int k = 0; k < 8; k++) {
+        // Per-band eccentricity fade:
+        //   Band 0 (finest, >4 cpd): fades 3°–10° (Berkley 1975: gone by 8–18°)
+        //   Band 7 (coarsest, <0.25 cpd): fades 8°–25° (Essock 1990: persists to 40°)
+        float fadeStart = mix(3.0, 8.0, float(k) / 7.0);
+        float fadeEnd   = mix(10.0, 25.0, float(k) / 7.0);
+        float eccFade   = 1.0 - smoothstep(fadeStart, fadeEnd, visual_ecc_deg);
+
+        // For exaggerated demo/capture mode (bias > 3), bypass eccFade so the
+        // orient bonus is visible at typical viewport scales. At biological
+        // levels (bias ≤ 2), the eccFade is correct but produces sub-pixel
+        // differences that don't survive JPEG compression.
+        float effectiveEccFade = u_dog_orient_bias > 3.0 ? 1.0 : eccFade;
+
+        float boost = 1.0 + orientBonus * effectiveEccFade * mix(0.5, 0.1, float(k) / 7.0);
+        c[k] *= boost;
+    }
+
+    // Transition width: biological (wide, gradual) vs sharp (narrow, crisp)
+    float transMult = mix(0.4, 0.05, dog_sharpness);
+
+    // Per-band weights via smoothstep rolloff
+    float w[8];
+    for (int k = 0; k < 8; k++) {
+        w[k] = 1.0 - smoothstep(c[k] - c[k] * transMult, c[k] + c[k] * transMult, normEcc);
+    }
+
+    // Reconstruct: residual (always full) + weighted bands
+    // Clamp to [0,1] — band differences can be negative, partial attenuation
+    // may produce out-of-range values
+    vec4 result;
+
+    if (u_chromatic_pooling > 0.5) {
+        // Per-band chromatic attenuation (castleCSF; Ashraf et al. 2024)
+        // RG (L-M): steep base decay + weak freq dependence (suprathreshold spatial summation)
+        // YV S-(L+M): slow base decay + strong freq dependence (coarse bands persist)
+        float fovea_deg = 2.0;
+        float ecc_deg = chromNormEcc * fovea_deg;
+
+        // Threshold sensitivity → appearance compression (Jiang, Shooner & Mullen 2022)
+        float supra = max(u_supra_exponent, 0.01);
+
+        // Half-octave band center frequencies (cpd)
+        // 9 values: 8 bands + 1 residual (mip[8])
+        const float bandFreq[9] = float[9](5.657, 4.0, 2.828, 2.0, 1.414, 1.0, 0.707, 0.5, 0.354);
+
+        // Per-band RG and YV attenuation
+        float rg_atten[9], yv_atten[9];
+        for (int k = 0; k < 9; k++) {
+            rg_atten[k] = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * bandFreq[k]) * ecc_deg), supra);
+            yv_atten[k] = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * bandFreq[k]) * ecc_deg), supra);
+        }
+
+        // BGRA → RGBA before Oklab round-trips (Electron capture quirk)
+        // chromaticAttenuate() uses rgbToOklab() which assumes RGB channel order
+        mip[8] = mip[8].bgra;
+        for (int k = 0; k < 8; k++) { band[k] = band[k].bgra; }
+
+        // Reconstruct with per-band Oklab chromatic attenuation
+        result = chromaticAttenuate(mip[8], rg_atten[8], yv_atten[8]);
+        for (int k = 7; k >= 0; k--) {
+            result += chromaticAttenuate(band[k], rg_atten[k], yv_atten[k]) * w[k];
+        }
+        result = clamp(result, 0.0, 1.0);
+        // Already in RGBA — skip the swap below
+    } else {
+        // Legacy: luminance-only reconstruction (no per-channel decay)
+        result = mip[8];
+        for (int k = 0; k < 8; k++) { result += band[k] * w[k]; }
+        result = clamp(result, 0.0, 1.0);
+
+        // BGRA → RGBA (Electron capture quirk)
+        float temp = result.r;
+        result.r = result.b;
+        result.b = temp;
+    }
+
+
+    return result;
+}
+
+// === CMF MIP LEVEL COMPUTATION ===
+// Shared by MIP pooling, Minecraft block sizing, and any eccentricity→resolution mapping.
+// Returns 0.0 at fovea, up to maxMipLevel (4.0) in far periphery.
+float computeMipLevel(float eccentricity, float fovea_radius) {
+    float normalizedEcc = max(0.0, eccentricity) / fovea_radius;
+    float maxMipLevel = 4.0;
+    if (u_cmf_enabled > 0.5) {
+        // Cortical distance: d(r) = log(1 + r/a), numerically stable form
+        // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
+        float r_deg = normalizedEcc * 2.0;
+        float cortical_dist = log(1.0 + r_deg / u_cmf_a);
+        // ecc_scaling modulates pooling zone growth rate (Brown et al. 2023).
+        // Normalized so 0.75 (their default) = no change from base CMF curve.
+        float eccScale = u_ecc_scaling / 0.75;
+        return clamp(maxMipLevel * cortical_dist / u_cortical_max * eccScale, 0.0, maxMipLevel);
+    }
+    return clamp(normalizedEcc * 2.5, 0.0, maxMipLevel);
+}
+
 // === POLAR SECTOR COMPUTATION ===
 // Shared by V1 type 4 (polar quantize) and V4 style 8 (polar pooling).
+// Computes which radial sector a fragment belongs to: ring index, spoke index,
+// and the UV-space center of that sector.
 struct PolarSector {
-    float r;
-    float angle;
+    float r;           // distance from fovea (aspect-corrected)
+    float angle;       // -PI to PI
     float ring_inner;
     float ring_outer;
     float ring_center;
     float spokeCount;
     float spokeWidth;
     float spoke_center;
-    float n_idx;
-    vec2 mouse_c;
+    float n_idx;       // ring index
+    vec2 mouse_c;      // aspect-corrected mouse position (needed for UV reconstruction)
 };
 
 PolarSector computePolarSector(vec2 uv, float parafovea_radius) {
@@ -125,7 +450,8 @@ PolarSector computePolarSector(vec2 uv, float parafovea_radius) {
     s.angle = atan(diff_scaled.y, diff_scaled.x);
 
     // CMF-density ring spacing: ef=1.007 with bias=2.0 gives ring width ≈ r × 1.4%.
-    // Tracks CMF block sizes: ~8px at mipLevel 1, ~16px at mipLevel 2.
+    // This tracks CMF block sizes: ~8px at mipLevel 1, ~16px at mipLevel 2.
+    // ef=1.03 was 4× too coarse in the far periphery (65px vs CMF's 16px).
     float r0 = parafovea_radius;
     float ef = 1.007;
     float bias = u_crowding_radial_bias;
@@ -138,12 +464,13 @@ PolarSector computePolarSector(vec2 uv, float parafovea_radius) {
     s.ring_center = (s.ring_inner + s.ring_outer) * 0.5;
 
     // Spoke count derived from ring geometry: arc length ≈ ring width.
+    // This makes sectors approximately square before bias elongation.
     // With bias=2.0, radial extent is 2× tangential → 2:1 aspect ratio.
     // Use unbiased ring width for spoke count so radial bias creates 2:1 R:T sectors
     // (biased ringWidth = ring_outer - ring_inner is wider; dividing by it neutralized the elongation)
     float unbiasedWidth = s.ring_center * (ef - 1.0);
     s.spokeCount = max(6.0, floor(6.28318530718 * s.ring_center / unbiasedWidth));
-    s.spokeCount = floor(s.spokeCount / 2.0) * 2.0;
+    s.spokeCount = floor(s.spokeCount / 2.0) * 2.0; // keep even
     s.spokeWidth = 6.28318530718 / s.spokeCount;
 
     float spoke_idx = floor((s.angle + 3.14159265359) / s.spokeWidth);
@@ -152,42 +479,29 @@ PolarSector computePolarSector(vec2 uv, float parafovea_radius) {
     return s;
 }
 
-// === HELPER: MIP-BASED POOLING (Mongrel Tier 1) ===
-// Uses hardware MIP-maps to approximate biological receptive field pooling.
-// As eccentricity increases, we sample from lower-resolution MIP levels,
-// simulating the larger pooling regions in peripheral vision.
-// 
-// Unlike blur, MIP pooling:
-// - Genuinely averages larger areas (not just weighted samples)
-// - Is essentially free (hardware-accelerated)
-// - Provides consistent "pooling region" sizes at each eccentricity
-//
-// mipLevel: 0 = full resolution (fovea), ~4 = 16x16 pooling (far periphery)
+// === LEGACY: Simple MIP pooling (used when DoG disabled) ===
 vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
-    // Calculate MIP level based on eccentricity
-    // Eccentricity is normalized distance from fovea edge
-    // At fovea edge (eccentricity=0): mipLevel=0 (full res)
-    // At far periphery (eccentricity~0.5): mipLevel=4 (16x16 pooling)
-    
-    float normalizedEcc = max(0.0, eccentricity) / fovea_radius;
-    
-    // Biological: receptive field size doubles every ~2° of eccentricity
-    // We map this to MIP levels: each level doubles pooling region
-    // Scaling factor adjusts how quickly we reach max pooling
-    float mipScaling = 2.5; // Tune: higher = faster pooling growth
-    float maxMipLevel = 4.0; // Cap at 16x16 pooling (level 4)
-    
-    float mipLevel = clamp(normalizedEcc * mipScaling, 0.0, maxMipLevel);
-    
-    // Sample using textureLod with computed MIP level
-    // Note: textureLod performs trilinear filtering between MIP levels
+    float mipLevel = computeMipLevel(eccentricity, fovea_radius);
+
     vec4 col = textureLod(u_texture, uv, mipLevel);
-    
-    // Apply BGRA -> RGBA swap (same as sampleSource)
+
     float temp = col.r;
     col.r = col.b;
     col.b = temp;
-    
+
+    return col;
+}
+
+// === GRADIENT-AWARE MIP POOLING ===
+vec4 sampleMIPPooledGrad(vec2 uv, vec2 duvdx, vec2 duvdy, float eccentricity, float fovea_radius) {
+    float mipLevel = computeMipLevel(eccentricity, fovea_radius);
+
+    vec4 col = textureGrad(u_texture, uv, duvdx * pow(2.0, mipLevel), duvdy * pow(2.0, mipLevel));
+
+    float temp = col.r;
+    col.r = col.b;
+    col.b = temp;
+
     return col;
 }
 
@@ -238,158 +552,96 @@ float sobel(vec2 uv) {
 }
 
 // === OKLAB COLOR SPACE CONVERSION ===
-// Based on Björn Ottosson's Oklab specification
-// https://bottosson.github.io/posts/oklab/
-
-// Convert sRGB component to linear RGB
 float srgbToLinear(float c) {
-    if (c <= 0.04045) {
-        return c / 12.92;
-    } else {
-        return pow((c + 0.055) / 1.055, 2.4);
-    }
+    if (c <= 0.04045) { return c / 12.92; } else { return pow((c + 0.055) / 1.055, 2.4); }
 }
-
-// Convert linear RGB component to sRGB
 float linearToSrgb(float c) {
-    if (c <= 0.0031308) {
-        return c * 12.92;
-    } else {
-        return 1.055 * pow(c, 1.0 / 2.4) - 0.055;
-    }
+    if (c <= 0.0031308) { return c * 12.92; } else { return 1.055 * pow(c, 1.0 / 2.4) - 0.055; }
 }
-
-// Convert sRGB vec3 to linear RGB
 vec3 srgbToLinearVec(vec3 srgb) {
-    return vec3(
-        srgbToLinear(srgb.r),
-        srgbToLinear(srgb.g),
-        srgbToLinear(srgb.b)
-    );
+    return vec3(srgbToLinear(srgb.r), srgbToLinear(srgb.g), srgbToLinear(srgb.b));
 }
-
-// Convert linear RGB vec3 to sRGB
 vec3 linearToSrgbVec(vec3 linear) {
-    return vec3(
-        linearToSrgb(linear.r),
-        linearToSrgb(linear.g),
-        linearToSrgb(linear.b)
-    );
+    return vec3(linearToSrgb(linear.r), linearToSrgb(linear.g), linearToSrgb(linear.b));
 }
-
-// Convert linear sRGB to Oklab
 vec3 linearSrgbToOklab(vec3 rgb) {
-    // Convert linear sRGB to LMS cone response (M1 matrix)
     float l = 0.4122214708 * rgb.r + 0.5363325363 * rgb.g + 0.0514459929 * rgb.b;
     float m = 0.2119034982 * rgb.r + 0.6806995451 * rgb.g + 0.1073969566 * rgb.b;
     float s = 0.0883024619 * rgb.r + 0.2817188376 * rgb.g + 0.6299787005 * rgb.b;
-
-    // Apply non-linearity (cube root)
-    float l_ = pow(l, 1.0 / 3.0);
-    float m_ = pow(m, 1.0 / 3.0);
-    float s_ = pow(s, 1.0 / 3.0);
-
-    // Convert to Lab coordinates (M2 matrix)
+    // Sign-preserving cube root: pow(x, 1/3) is undefined for x<0 in GLSL ES 3.0.
+    // Band differences (mip_k - mip_{k+1}) produce negative LMS values.
+    float l_ = sign(l) * pow(abs(l), 1.0 / 3.0);
+    float m_ = sign(m) * pow(abs(m), 1.0 / 3.0);
+    float s_ = sign(s) * pow(abs(s), 1.0 / 3.0);
     return vec3(
         0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
         1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
         0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
     );
 }
-
-// Convert Oklab to linear sRGB
 vec3 oklabToLinearSrgb(vec3 lab) {
-    // Convert Lab to LMS (inverse M2)
     float l_ = lab.x + 0.3963377774 * lab.y + 0.2158037573 * lab.z;
     float m_ = lab.x - 0.1055613458 * lab.y - 0.0638541728 * lab.z;
     float s_ = lab.x - 0.0894841775 * lab.y - 1.2914855480 * lab.z;
-
-    // Apply inverse non-linearity (cube)
-    float l = l_ * l_ * l_;
-    float m = m_ * m_ * m_;
-    float s = s_ * s_ * s_;
-
-    // Convert LMS to linear sRGB (inverse M1)
+    float l = l_ * l_ * l_; float m = m_ * m_ * m_; float s = s_ * s_ * s_;
     return vec3(
         +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
         -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
         -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
     );
 }
-
-// Convert sRGB (0-1) to Oklab
 vec3 rgbToOklab(vec3 srgb) {
     vec3 linear = srgbToLinearVec(srgb);
     return linearSrgbToOklab(linear);
 }
-
-// Convert Oklab to sRGB (0-1), clamped
 vec3 oklabToRgb(vec3 lab) {
     vec3 linear = oklabToLinearSrgb(lab);
     vec3 srgb = linearToSrgbVec(linear);
     return clamp(srgb, 0.0, 1.0);
 }
 
+// === CHROMATIC ATTENUATION (castleCSF per-channel decay) ===
+// Attenuates Oklab a (red-green) and b (blue-yellow) independently.
+// RG is a foveal specialization (L-M opponent channel) that collapses ~2.5× faster
+// than achromatic sensitivity. YV (S-(L+M)) persists far into periphery.
+// Bowers, Gegenfurtner & Goettker (2025): at 15°, RG≈29%, YV≈79%.
+vec4 chromaticAttenuate(vec4 color, float rg_atten, float yv_atten) {
+    vec3 lab = rgbToOklab(color.rgb);
+    lab.y *= rg_atten;   // a channel (red-green)
+    lab.z *= yv_atten;   // b channel (blue-yellow)
+    return vec4(oklabToRgb(lab), color.a);
+}
+
 // === STATIC MONGREL SAMPLER ===
+// Robust hash function (Gold Noise variant)
 vec2 hash22(vec2 p) {
-    vec3 p3 = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973));
-    p3 += dot(p3, p3.yzx + 33.33);
-    return fract((p3.xx + p3.yz) * p3.zy);
+    p = fract(p * vec2(5.3983, 5.4427));
+    p += dot(p.yx, p.xy + vec2(21.5351, 14.3137));
+    return fract(vec2(p.x * p.y * 95.4337, p.x * p.y * 97.597));
 }
 
 float rand(vec2 co){
     return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
 }
 
-vec4 sampleMongrel(sampler2D tex, vec2 uv, float strength, float intensity, float rhythm) {
-    if (strength <= 0.01) return sampleSource(uv);
-
-    // Modulate Y-frequency based on Line Height (rhythm)
-    // rhythm = 0.0 (small/none) -> High Freq (Shimmer)
-    // rhythm = 1.0 (large) -> Low Freq (Wobble)
-    
-    float baseDensity = 120.0;
-    // If rhythm is present (>0), scale density down. 
-    // rhythm 0.5 (50px) -> density ~ 20.0
-    float densityY = mix(baseDensity, 10.0, rhythm);
-    float densityX = baseDensity; // Keep X high freq to maintain horizontal shredding feel? Or scale both?
-    // User said "lower the Y-frequency", implying X might stay high or scale differently.
-    // Let's scale X slightly too but less aggressive.
-    densityX = mix(baseDensity, 40.0, rhythm);
-
-    float xID = floor(uv.x * densityX);
-    float yID = floor(uv.y * densityY);
-
-    // Strength only affects the AMPLITUDE of the jitter, not the grid structure
-    float jitterScale = 0.04 * strength * intensity;
-    
-    // Hash based on fixed grid IDs
-    float offX = (hash22(vec2(yID, xID)).x - 0.5) * jitterScale;
-    float offY = (hash22(vec2(xID, yID + 13.0)).x - 0.5) * jitterScale;
-
-    vec2 shatteredUV = uv + vec2(offX, offY);
-    
-    vec4 clean = sampleSource(shatteredUV);
-    vec4 ghost = sampleSource(shatteredUV + vec2(0.01 * strength, 0.0));
-    
-    return mix(clean, ghost, 0.3);
-}
-
 // === NEURO-ARCHITECTURE PIPELINE ===
 
 struct ModeConfig {
-    bool lgn_use_structure_mask; // Should whitespace be protected?
-    bool lgn_use_saliency_gate;  // Should high saliency be protected?
-    int  v1_distortion_type;     // 0=Noise (Curves), 1=Shatter (Mongrel), 2=None
-    float v1_strength_mult;      // Multiplier for distortion
-    int  v4_style_id;            // 0=HighKey, 1=Lab, 2=Frosted, 3=Blueprint, 4=Minecraft, 5=Double Vision
-    float lgn_ramp_end_mult;     // Multiplier for fovea_radius to determine ramp end
-    bool v1_animate;             // Should distortion move over time?
+    bool lgn_use_structure_mask;
+    bool lgn_use_saliency_gate;
+    int  v1_distortion_type;
+    float v1_strength_mult;
+    int  v4_style_id;
+    float lgn_ramp_end_mult;
+    bool v1_animate;
+    bool cmf_enabled;
 };
 
 struct LGN_Signal {
-    float suppressionFactor; // 0.0 = Full Suppression, 1.0 = Full Effect
+    float suppressionFactor;
     float saliency;
+    float congestion;   // Feature Congestion (Rosenholtz 2007) — local feature variance
+    float edgeDensity;  // Edge Density — local Sobel magnitude density
     float density;
     float rhythm;
     float type;
@@ -405,57 +657,54 @@ struct V1_Signal {
 LGN_Signal processLGN(vec2 uv, ModeConfig config, float dist, float fovea_radius) {
     LGN_Signal signal;
     
-    // 1. Read Maps
-    // Note: Structure and saliency maps are lower resolution than main texture
-    // GL_LINEAR filtering handles upscaling smoothly
     vec4 structure = texture(u_structureMap, uv);
     signal.density = structure.g;
     signal.rhythm = structure.r;
     signal.type = structure.b;
-    signal.saliency = texture(u_saliencyMap, uv).r;
+
+    // Saliency texture: R=saliency, G=feature congestion, B=edge density
+    vec4 salTex = texture(u_saliencyMap, uv);
+    signal.saliency    = salTex.r;
+
+    // Congestion + edge density: prefer high-res dedicated worker when available
+    if (u_hasCongestionMap > 0.5) {
+        vec4 congTex = texture(u_congestionMap, uv);
+        signal.congestion  = congTex.r;
+        signal.edgeDensity = congTex.g;
+    } else {
+        signal.congestion  = salTex.g;
+        signal.edgeDensity = salTex.b;
+    }
     
-    // 2. Calculate Base Suppression (Foveal Protection)
-    // Ramp from fovea_radius to fovea_radius * ramp_mult
     float rampEnd = fovea_radius * config.lgn_ramp_end_mult;
     signal.suppressionFactor = smoothstep(fovea_radius, rampEnd, dist);
     
-    // Removed pow(0.5) boost to restore nuance/linear falloff
-    
-    // 3. Structure Masking (Whitespace Protection)
     if (config.lgn_use_structure_mask) {
         if (u_has_structure > 0.5 && signal.density < 0.1) {
             signal.suppressionFactor = 0.0;
         }
     }
     
-    // 4. Saliency Gating (Selective resource allocation)
-    // High-saliency regions receive more processing bandwidth (less peripheral filtering).
-    // Even at saliency=1.0, the floor is 0.3 — only the fovea gets full bandwidth.
+    // Saliency Gating (Selective resource allocation)
+    // High-saliency regions get more processing bandwidth (less peripheral filtering).
     // Mirrors biological compute demand management: retina → optic nerve bottleneck.
     if (config.lgn_use_saliency_gate && u_enable_saliency_modulation > 0.5) {
+        // NOTE: At saliency=1.0, suppression drops to 0.3 (text gets 70% bandwidth).
+        // We override this in processV1 for the scramble zone.
         signal.suppressionFactor *= mix(1.0, 0.3, signal.saliency);
     }
     
-    // 5. Inhibition of Return (Gating Suppression)
-    // If u_useMask == 2.0, we are in Inhibition Mode.
-    // Visited areas (high mask value) should be SUPPRESSED (hidden from LGN).
-    // This removes their structural/salient protection, making them subject to full distortion.
     if (u_useMask > 1.5) {
         float rawMask = texture(u_maskTexture, uv).r;
         float inhibition = smoothstep(0.0, 0.5, rawMask);
-        
-        // Suppress signals based on inhibition level
         signal.saliency *= (1.0 - inhibition);
         signal.density *= (1.0 - inhibition);
         signal.rhythm *= (1.0 - inhibition);
-        // We do NOT suppress suppressionFactor itself yet, because that is pure foveal distance.
-        // But by killing saliency/density, we ensure "Structure Masking" and "Saliency Gating" fail.
     }
 
     return signal;
 }
 
-// --- STAGE 2: V1 (Geometry & Distortion) ---
 // --- STAGE 2: V1 (Geometry & Distortion) ---
 V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig config, float dist, vec2 delta_dir, float fovea_radius, float parafovea_radius, bool isFarPeriphery, bool isParafovea, float memoryStrength) {
     V1_Signal signal;
@@ -463,32 +712,17 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     signal.distortionStrength = 0.0;
     signal.displacement = vec2(0.0);
     
-    // Eccentricity-Based Scaling: Parafovea vs Far Periphery
-    // Parafovea (3-5°): Mild positional uncertainty, preserve geometry
-    // Far Periphery (>8°): Aggressive scatter and dissolution
-    // Parafovea (3-5°): Mild positional uncertainty, preserve geometry
-    // Far Periphery (>8°): Aggressive scatter and dissolution
-    // Eccentricity-Based Scaling: Parafovea vs Far Periphery
-    // Parafovea (3-5°): Mild positional uncertainty, preserve geometry
-    // Far Periphery (>8°): Aggressive scatter and dissolution
-    // FIX: Replaced hard jump (0.15 -> 1.0) with smooth ramp to prevent "ring" artifact
-    
-    // We ramp from 0.15 (Parafovea level) to 1.0 (Periphery level)
-    // Transition zone: Start of Far Periphery -> +30% raidus
     float transitionWidth = parafovea_radius * 0.3;
     float boundaryProgress = smoothstep(parafovea_radius, parafovea_radius + transitionWidth, dist);
-    float eccentricityScale = mix(0.15, 1.0, boundaryProgress); 
+    // Ramp distortion gradually through parafovea instead of flat 0.15
+    // Inner parafovea stays sharp — parafoveal acuity is ~50% of foveal,
+    // not a blurry mess. Rayner (1998): word-length cues must survive here.
+    float parafoveaRamp = smoothstep(fovea_radius * 1.5, parafovea_radius, dist);
+    float eccentricityScale = mix(0.0, 0.15, parafoveaRamp);
+    // Continue growth beyond parafovea at reduced rate to avoid plateau
+    float farScale = 1.0 + max(0.0, (dist - parafovea_radius) / parafovea_radius) * 1.5;
+    eccentricityScale = mix(eccentricityScale, farScale, boundaryProgress);
     
-    // FAR PERIPHERY DISTORTION BOOST
-    // Continue increasing distortion linearly beyond the transition zone
-    // to prevent the effect from plateauing at screen edges.
-    if (boundaryProgress >= 1.0) {
-        float deepDist = max(0.0, dist - (parafovea_radius + transitionWidth));
-        eccentricityScale += deepDist * 2.5; // 2.5x linear increase
-    }
-    
-    // Minecraft/Wireframe Override: We want structural distortion (blocks) to start immediately
-    // in the parafovea to create a strong "tech" aesthetic.
     if (config.v4_style_id == 4 || config.v4_style_id == 8) {
         eccentricityScale = 1.0;
     }
@@ -497,34 +731,24 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
 
     // Density-gated crowding: dense content gets full V1 distortion,
     // sparse/isolated elements get reduced distortion (Bouma 1970).
+    // Floor at 0.3 — isolated elements still lose acuity, just not full crowding.
     float densityCrowding = 1.0 / (1.0 + exp(-u_crowding_density_steepness * (lgn.density - u_crowding_density_threshold)));
     float crowdingFactor = mix(0.3, 1.0, densityCrowding);
     strength *= crowdingFactor;
 
-    // VISUAL MEMORY MODULATION
-    // If this area is remembered (memoryStrength > 0), we must reduce distortion
-    // to ensure the underlying geometry aligns with the clear overlay.
-    // ONLY APPLY IN STANDARD MODE (1.0). In Inhibition mode (2.0), we want distortion!
     if (u_useMask < 1.5) {
         strength *= (1.0 - memoryStrength);
     }
-    
+
     signal.distortionStrength = strength;
-    
-    signal.distortionStrength = strength;
-    
-    // === DOUBLE VISION MODE (Flowing Wave) ===
+
     if (config.v4_style_id == 5) {
-        // Flowing Wave: Faster, stronger, more fluid than "Slow Wave"
+        // Double Vision Mode
         float waveSpeed = 0.5; 
         float waveFreq = 3.0;
-        
         float waveX = sin(uv.y * waveFreq + u_time * waveSpeed);
         float waveY = cos(uv.x * waveFreq + u_time * waveSpeed * 0.7);
-        
-        // Higher amplitude for "Double Vision" feel
         vec2 waveOffset = vec2(waveX, waveY) * 0.015 * strength * u_intensity;
-        
         signal.displacement = waveOffset;
         signal.distortedUV = uv + signal.displacement;
         signal.distortionStrength = strength;
@@ -532,128 +756,157 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     }
 
     if (config.v1_distortion_type == 2) {
-        // None (but strength is passed to V4)
         return signal;
     }
     
+    // === TIER 3: NUCLEAR SCRAMBLE (The Shredder) ===
     if (config.v1_distortion_type == 1) {
-        // === SHATTER (Mongrel) -> REPLACED WITH SLOW WAVE (Comfort Mode) ===
-        // User requested to remove rapid glitching.
-        // We replace the high-freq jitter with a slow, smooth sine wave warp.
         
-        // Slow Wave Distortion
-        // Frequency: Very Low (0.1 Hz) - barely moving
-        // Amplitude: Reduced for subtlety
+        // 1. Base Fractal Warp (The "Bender")
+        // Use uv_corrected for aspect-correct noise shapes
+        vec2 warpUV = uv_corrected; 
         
-        float waveSpeed = 0.1; // Was 0.5
-        float waveFreq = 2.0;  // Was 4.0
+        // High-frequency noise to create "heat haze" foundation
+        // FIX: Removed u_time to kill jitter/animation. Static distortion only.
+        // FIX: Reduced freq (800->150) to remove "fuzz/grain". Now more "glassy".
+        float n1 = snoise(warpUV * 150.0); 
+        float n2 = snoise(warpUV * 300.0) * 0.5;
         
-        // Create a slow rolling wave
-        float waveX = sin(uv.y * waveFreq + u_time * waveSpeed);
-        float waveY = cos(uv.x * waveFreq + u_time * waveSpeed * 0.8);
+        // Amplitude modulated by standard strength (initially)
+        // FIX: Reduced base amp (0.003 -> 0.0024) to "turn down all distortion by 20%"
+        vec2 fractalWarp = vec2(n1 + n2) * 0.0024 * strength * u_intensity;
         
-        // Amplitude scales with strength (eccentricity)
-        // Parafovea: Tiny warp
-        // Periphery: Larger warp
+        // Anisotropic Smash: 2x Horizontal Bias (Was 8x - too strong compared to scramble)
+        fractalWarp.x *= 2.0; 
+
+        // 2. Discrete Scramble (The "Cutter")
+        // ZONE TUNING: Start immediately at Parafovea edge (1.0) -> Full by 1.5
+        float scrambleZone = smoothstep(parafovea_radius * 1.0, parafovea_radius * 1.5, dist);
         
-        // Saliency Stabilization
-        // Dampen wave amplitude in high-saliency areas to prevent "breathing" artifacts on faces/text.
-        float waveDampener = 1.0;
-        if (u_enable_saliency_modulation > 0.5) {
-            // Reduce wave by up to 90% in highly salient areas
-            waveDampener = 1.0 - (lgn.saliency * 0.9);
+        vec2 discreteScramble = vec2(0.0);
+        
+        if (scrambleZone > 0.01) {
+            // GRID TUNING: 400x300 (Was 800x300).
+            // 800 was creating 2px cells -> Fuzz. 400 is ~4px cells -> Shreds.
+            vec2 cellFreq = vec2(400.0, 300.0); 
+            // Use uv_corrected for consistent square-ish cells.
+            vec2 cellID = floor(uv_corrected * cellFreq);
+            
+            // Generate stable random offset per cell using Gold Noise
+            vec2 jitter = hash22(cellID) - 0.5;
+            
+            // SCRAMBLE AMPLITUDE
+            // Horizontal: +/- 0.8% (~16px) base (Was 1.0%)
+            // Vertical: +/- 0.16% (~3px) base (Was 0.2%)
+            // Edge density modulation: high-edge regions crowd more strongly
+            float edgeCrowdMult = 1.0 + lgn.edgeDensity * 0.4;
+            vec2 throwDist = vec2(0.008, 0.0016) * u_intensity * edgeCrowdMult;
+            
+            // PROGRESSIVE SCALING: Grow distortion with eccentricity
+            // At 1.5 radii (start of full scramble): 1.0x
+            // At 4.0 radii (far edge): ~2.0x+
+            // This prevents the effect from plateauing/maxing out too early.
+            float progressive = 1.0 + max(0.0, (dist - parafovea_radius * 1.5) / parafovea_radius);
+            throwDist *= progressive;
+            
+            // Apply quadratic falloff so it ramps in aggressively
+            discreteScramble = jitter * throwDist * scrambleZone * scrambleZone;
+        }
+
+        // 3. The Replacement Logic (Mix)
+        // Transition from "Bending" (Parafovea) to "Shredding" (Periphery)
+        // FIX: Removed +fractalWarp. User wants STABLE (static) periphery, not boiling.
+        signal.displacement = mix(fractalWarp, discreteScramble, scrambleZone);
+        
+        signal.distortedUV = uv + signal.displacement;
+        
+        // 4. Bypass Strength Gating in Scramble Zone
+        // CRITICAL FIX: If we are in the scramble zone, ignore saliency gating.
+        // Saliency would otherwise allocate bandwidth to text, keeping it readable.
+        if (scrambleZone > 0.5) {
+             signal.distortionStrength = 1.0; // Force full effect
+        } else {
+             signal.distortionStrength = strength;
         }
         
-        vec2 waveOffset = vec2(waveX, waveY) * 0.001 * strength * u_intensity * waveDampener; // Reduced from 0.005
-        
-        signal.displacement = waveOffset;
-        signal.distortedUV = uv + signal.displacement;
-        signal.distortionStrength = strength;
-        
     } else if (config.v1_distortion_type == 0) {
-        // === RADIAL/TANGENTIAL ANISOTROPIC CROWDING (Animated) ===
+        // === RADIAL/TANGENTIAL ANISOTROPIC CROWDING ===
         // Crowding ~2:1 stronger radially (Toet & Levi 1992, Pelli et al. 2004).
         // Independent noise per axis to avoid correlation artifacts.
 
-        vec2 uv_corrected_anim = vec2(uv.x * u_fovea_aspect_ratio, uv.y);
-        float t = u_time * u_v1_animate;
+        vec2 uv_corrected_local = vec2(uv.x * u_fovea_aspect_ratio, uv.y);
 
+        float zoneA = smoothstep(fovea_radius, parafovea_radius, dist);
+        float zoneB = smoothstep(parafovea_radius, parafovea_radius * 2.0, dist);
+
+        // Radial/tangential basis from fovea
         vec2 radDir = delta_dir;
         vec2 tanDir = vec2(-delta_dir.y, delta_dir.x);
 
-        // Independent radial and tangential noise (animated)
-        float microR = snoise(uv_corrected_anim * 900.0 + vec2(t * 5.0));
-        float macroR = snoise(uv_corrected_anim * 20.0 + vec2(t * 0.1));
-        float radialNoise = (microR * 0.004 + macroR * 0.01) * u_crowding_radial_bias;
+        // Independent noise for each axis (offset seed decorrelates tangential)
+        float nR1 = snoise(uv_corrected_local * 800.0);
+        float nR2 = snoise(uv_corrected_local * 1600.0);
+        float radialNoise = nR1 + (nR2 * 0.5 * zoneB);
 
-        float microT = snoise(uv_corrected_anim * 900.0 + vec2(t * 5.0, 43.17));
-        float macroT = snoise(uv_corrected_anim * 20.0 + vec2(t * 0.1, 71.91));
-        float tangentialNoise = microT * 0.004 + macroT * 0.01;
+        float nT1 = snoise(uv_corrected_local * 800.0 + vec2(43.17, 71.91));
+        float nT2 = snoise(uv_corrected_local * 1600.0 + vec2(43.17, 71.91));
+        float tangentialNoise = nT1 + (nT2 * 0.5 * zoneB);
 
-        // Project back to UV space
+        float warpAmp = mix(0.006, 0.024, zoneB);
+
+        float radialDisp = radialNoise * warpAmp * u_crowding_radial_bias;
+        float tangentialDisp = tangentialNoise * warpAmp;
+
+        // Project back to UV space (undo aspect corrections on direction vectors)
         float aspect = u_resolution.x / u_resolution.y;
         float xScale = u_fovea_aspect_ratio / aspect;
         vec2 radDir_uv = vec2(radDir.x * xScale, radDir.y);
         vec2 tanDir_uv = vec2(tanDir.x * xScale, tanDir.y);
 
-        vec2 warp = radDir_uv * radialNoise + tanDir_uv * tangentialNoise;
+        vec2 finalWarp = radDir_uv * radialDisp + tanDir_uv * tangentialDisp;
 
-        signal.displacement = warp * strength * u_intensity;
+        // Secondary distortion (shear/chop) projected tangentially
+        float shearNoise = sin(uv.x * 200.0) * 0.003;
+        float chopNoise = snoise(vec2(uv.x * 400.0, uv.y * 50.0)) * 0.020;
+        float verticalDistortion = mix(shearNoise, chopNoise, zoneB);
+        finalWarp += tanDir_uv * verticalDistortion;
+
+        float effectiveStrength = max(strength, zoneB * 0.8);
+        signal.displacement = finalWarp * effectiveStrength * u_intensity;
         signal.distortedUV = uv + signal.displacement;
-        signal.distortionStrength = strength;
+        signal.distortionStrength = effectiveStrength;
+
     } else if (config.v1_distortion_type == 3) {
-        // === PIXELATE (Saliency-Guided) ===
-        // Variable block size based on content density/saliency
-        float combinedMetric = max(lgn.saliency, lgn.density);
-        // Stepped metric for distinct block levels
-        float steppedMetric = floor(combinedMetric * 4.0) / 4.0;
-        
-        // Target Max Block Size: HUGE blocks for "Minecraft" look
-        float targetMaxBlock = 192.0;
-        float targetMinBlock = 32.0; 
-        
-        // Minecraft: larger blocks
-        if (config.v4_style_id == 4) {
-            targetMaxBlock = 1200.0; // Massive blocks (was 800)
-            targetMinBlock = 160.0;  // Big start (was 128)
-        }
-        
-        float limitBlockSize = mix(targetMaxBlock, targetMinBlock, steppedMetric);
-        
-        // Modulate ACTUAL block size by strength (distance from fovea)
-        // "Squarified Pixels": Quantize block size to powers of 2 to avoid radial moire.
-        // This creates distinct "rings" of resolution (1, 2, 4, 8, 16...) instead of a smooth warp.
-        float logMax = log2(limitBlockSize);
-        float logCurrent = strength * logMax;
-        float currentBlockSize = exp2(floor(logCurrent));
-        
-        currentBlockSize = max(1.0, currentBlockSize);
-        
-        vec2 pixelSize = vec2(currentBlockSize) / u_resolution;
-        vec2 quantizedUV = floor(uv / pixelSize) * pixelSize + pixelSize * 0.5;
-        
-        // Glitch Displacement (Big Blocky Shifts)
-        float motionGate = smoothstep(0.1, 5.0, u_velocity); 
-        
-        if (strength > 0.5 && steppedMetric < 0.5 && motionGate > 0.01) {
-            float blockNoise = rand(quantizedUV + vec2(floor(u_time * 10.0))); 
-            float threshold = 0.92 + (1.0 - motionGate) * 0.08; 
-            
-            if (blockNoise > threshold) { 
-                float shift = (blockNoise - threshold) * 2.0; 
-                quantizedUV.x += shift * 0.2 * strength * motionGate; 
-            }
-        }
-        
-        // Optimization: If strength is effectively zero (fovea), use exact UVs
-        if (strength < 0.01) {
+        // === MINECRAFT: CMF-driven block sizing ===
+        // Block size = exp2(floor(mipLevel) + 2) → discrete steps: 4, 8, 16, 32, 64px.
+        // Makes the CMF resolution curve visible as geometry — blocks grow
+        // logarithmically from gaze outward.
+        // Blocks blend in at parafovea edge to avoid distracting grid shift on mouse move.
+        float mipLevel = computeMipLevel(max(0.0, dist - fovea_radius), fovea_radius);
+
+        // No blocks inside parafovea — blend in from parafovea edge outward
+        float blockBlend = smoothstep(parafovea_radius, parafovea_radius * 1.5, dist);
+
+        if (blockBlend < 0.001) {
             signal.distortedUV = uv;
+            signal.distortionStrength = 0.0;
         } else {
-            signal.distortedUV = quantizedUV;
+            float blockPx = exp2(floor(mipLevel) + 2.0); // 4, 8, 16, 32, 64
+            vec2 pixelSize = vec2(blockPx) / u_resolution;
+
+            // Fixed screen-space grid — blocks don't shift with cursor movement.
+            // Peripheral vision is extremely sensitive to coherent motion; a
+            // fovea-relative grid causes visible jitter on every mouse move.
+            vec2 quantizedUV = floor(uv / pixelSize) * pixelSize + pixelSize * 0.5;
+
+            signal.distortedUV = mix(uv, quantizedUV, blockBlend);
+            signal.distortionStrength = strength;
         }
-        signal.distortionStrength = strength;
     } else if (config.v1_distortion_type == 4) {
         // === POLAR QUANTIZE: Radial sector snapping (TTM pooling regions) ===
+        // Unlike Cartesian Minecraft (type 3) which uses a fixed screen-space grid,
+        // this variant is fovea-relative by design — polar grids don't cause
+        // coherent edge motion like Cartesian grids do.
         float blockBlend = smoothstep(parafovea_radius, parafovea_radius * 1.5, dist);
 
         if (blockBlend < 0.001) {
@@ -663,8 +916,13 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
             PolarSector ps = computePolarSector(uv, parafovea_radius);
             float aspect = u_resolution.x / u_resolution.y;
 
+            // Reconstruct UV from sector center:
+            // 1. Polar → Cartesian in the scaled space (fovea_aspect_ratio-divided x)
+            // 2. Undo fovea_aspect_ratio to get back to aspect-corrected space
+            // 3. Undo aspect to get back to UV space
             vec2 sector_offset = ps.ring_center *
                 vec2(cos(ps.spoke_center), sin(ps.spoke_center));
+            // Undo the fovea_aspect_ratio scaling on x
             sector_offset.x *= u_fovea_aspect_ratio;
             vec2 quantized_c = ps.mouse_c + sector_offset;
             vec2 quantizedUV = vec2(quantized_c.x / aspect, quantized_c.y);
@@ -679,237 +937,191 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
 
 // --- STAGE 3: V4 (Aesthetics) ---
 vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float parafovea_radius, float saccadeFactor) {
-    // === MIP-BASED POOLING (Mongrel Tier 1) ===
-    // Uses hardware MIP-maps to approximate biological receptive field growth.
-    // Replaces the previous 5-tap blur with true pooling.
-    
     float eccentricity = max(0.0, dist - fovea_radius);
     
-    // Always sample at MIP level 0 for fovea (guaranteed sharp)
-    vec3 foveaCol = sampleSource(v1.distortedUV).rgb;
+    vec2 duvdx = dFdx(uv);
+    vec2 duvdy = dFdy(uv);
     
-    // For periphery, use MIP pooling
-    // Intensity modulates the pooling strength (lower intensity = less aggressive pooling)
+    vec3 foveaCol = sampleSourceGrad(v1.distortedUV, duvdx, duvdy).rgb;
+    
     // TIER 1.8: COUPLED POOLING
-    // We link the blur radius (MIP level) directly to the distortion strength.
-    // This ensures that if Saliency/LGN suppresses the warp, the blur also vanishes.
-    // MODIFIED for Saccadic Suppression:
-    // Scale the effective eccentricity by u_blurRadius.
-    // u_blurRadius range: 2.0 (Gather) -> 10.0 (Hunt)
-    // Old Baseline: 2.0
-    // New Gather: 2.0 * 0.3 + 1.0 = 1.6 (Slightly sharper than baseline, rewarding focus)
-    // New Hunt:  10.0 * 0.3 + 1.0 = 4.0 (Double baseline, creating tunnel vision)
     float blurMult = 1.0 + (u_blurRadius * 0.3);
     float coupledEccentricity = v1.distortionStrength * u_intensity * fovea_radius * blurMult;
-    vec3 pooledCol = sampleMIPPooled(v1.distortedUV, coupledEccentricity, fovea_radius).rgb;
+
+    // Congestion-gated pooling: high congestion → stronger blur (more aggressive MIP)
+    // Biological rationale: cluttered regions are already pooled by peripheral vision
+    // into summary statistics — this makes the simulation match that prediction.
+    // Rosenholtz et al. (2007) clutter + Rosenholtz et al. (2012) peripheral pooling.
+    if (u_congestion_pooling > 0.5) {
+        // congestion 0.0 → 1.0x MIP (no change)
+        // congestion 1.0 → 2.0x MIP (double pooling)
+        float congestionBoost = 1.0 + lgn.congestion * 1.0;
+        coupledEccentricity *= congestionBoost;
+    }
+
+    vec3 pooledCol;
+    if (u_gaussian_blur_mode > 0.5) {
+        // Eccentricity-scaled Gaussian blur via MIP chain (no band decomposition).
+        // Same M-scaling curve as DoG, but uniform frequency degradation.
+        pooledCol = sampleMIPPooled(v1.distortedUV, coupledEccentricity, fovea_radius).rgb;
+    } else if (u_dog_enabled > 0.5) {
+        pooledCol = sampleDoGReconstructed(
+            v1.distortedUV, coupledEccentricity, fovea_radius,
+            u_dog_e2, u_dog_sharpness, eccentricity,
+            uv  // undistorted UV for orientation gradient (not V1-warped)
+        ).rgb;
+    } else {
+        pooledCol = sampleMIPPooledGrad(v1.distortedUV, duvdx, duvdy, coupledEccentricity, fovea_radius).rgb;
+    }
     
-    // Smooth blend from fovea to periphery to eliminate visible boundary
-    // Blend zone: from fovea_radius to fovea_radius * 1.1 (10% transition band)
-    // Intensity also modulates the blend factor to reduce pooling at low settings
-    float baseBlend = smoothstep(0.0, fovea_radius * 0.1, eccentricity);
+    // Gradual blend across inner parafovea — was 0.1 (completed in ~15px),
+    // now 0.5 (~75px) so MIP pooling doesn't step in abruptly
+    float baseBlend = smoothstep(0.0, fovea_radius * 0.5, eccentricity);
     float blendFactor = baseBlend * u_intensity;
+
     vec3 col = mix(foveaCol, pooledCol, blendFactor);
     
     // === MAGNOCELLULAR PATHWAY: Luminance Contrast Preservation ===
-    // M-cells are highly sensitive to luminance (brightness) but blind to color/detail.
-    // Even when the image is heavily distorted, the M-pathway preserves contrast.
-    // This ensures a blue link on white background stays clearly distinct.
-    // Note: Uses smooth ramp instead of hard boundary to avoid visible ring artifacts.
     if (eccentricity > 0.001) {
-        vec3 cleanSample = sampleSource(uv).rgb; // Original, undistorted
+        vec3 cleanSample = sampleSource(uv).rgb;
         float cleanLuma = dot(cleanSample, vec3(0.299, 0.587, 0.114));
         float distortedLuma = dot(col, vec3(0.299, 0.587, 0.114));
         
-        // Prevent division by zero
         float lumaRatio = cleanLuma / max(distortedLuma, 0.01);
         
-        // Smooth contrast preservation: ramp in over same blend zone as MIP pooling
-        // This ensures no additional visible boundary
         float contrastRamp = smoothstep(0.0, fovea_radius * 0.1, eccentricity);
         
-        // Gradually reduce preservation strength with distance
-        float contrastPreservation = mix(0.6, 0.3, smoothstep(0.0, parafovea_radius - fovea_radius, eccentricity));
+        // CRITICAL FIX: Kill contrast in far periphery to ensure ghostly text
+        // mix(0.6, 0.1, ...) -> Starts at 60% preservation, drops to 10% in far periphery (was 0.0 which caused gray fog)
+        float contrastPreservation = mix(0.6, 0.1, smoothstep(0.0, parafovea_radius - fovea_radius, eccentricity));
+        
         col *= mix(1.0, lumaRatio, contrastPreservation * contrastRamp);
     }
     
     // === ARCHITECTURAL GUARANTEE: FOVEA PROTECTION ===
-    // The fovea must remain 100% authentic to the source.
-    // We enforce a hard bypass if we are within the foveal radius.
-    // Use 50% of fovea_radius as safety margin to ensure the transition
-    // starts well outside the critical vision area.
-    // We enforce a hard bypass if we are within the foveal radius.
-    // Use 50% of fovea_radius as safety margin to ensure the transition
-    // starts well outside the critical vision area.
     if (dist < fovea_radius * 0.5) {
         return col;
     }
 
-    float effectFactor = v1.distortionStrength; // Use the actual applied strength
-    
-    // Smooth Transition from Hard Bypass
-    // The bypass ends at fovea_radius * 0.5. We must ramp the effect up from there
-    // to avoid a hard jump in intensity (since effectFactor is likely high there).
+    float effectFactor = v1.distortionStrength; 
     float bypassTransition = smoothstep(fovea_radius * 0.5, fovea_radius * 0.7, dist);
 
-    if (config.v4_style_id == 0) { // High-Key (Now: Desaturated)
-        
-        // === CHROMATIC ABERRATION (CA) ===
-        // User Formula: distDithered = dist + noise * 0.3
-        // caStrength = smoothstep(periphery_start, periphery_start + 0.25, distDithered)
-        
-        // === SALIENCY DAMPENING (Partial Protection) ===
-        // High saliency/structure gets LESS desaturation/CA, but not zero.
-        // We mix from 1.0 (full effect) to 0.85 (high effect) based on protection level.
-        // Was 0.5, which let too much color through for thumbnails.
+    if (config.v4_style_id <= 1) { // Research Modes: 0=Usability, 1=Biological(Purkinje)
+    
+        // === SHARED BIOLOGICAL PIPELINE ===
+        float noiseVal = (rand(uv) - 0.5);
         float protection = max(lgn.saliency, lgn.density);
-        float dampener = mix(1.0, 0.85, protection);
+        float dampener = mix(1.0, u_desat_floor, protection);
         
-        // Combined Strength Multiplier
-        // Controlled by global intensity slider AND local saliency
-        // REMAPPED: Desaturation reaches full strength at 0.6 intensity
-        // This ensures strong "Rod Vision" even at moderate distortion levels.
         float desatIntensity = smoothstep(0.0, 0.6, u_intensity);
         float strengthMult = desatIntensity * dampener;
-
-        float noiseVal = (rand(uv) - 0.5);
-        float distDithered = dist + noiseVal * 0.3;
         
-        // Recalculate periphery_start (radius_norm * 1.2)
-        float periphery_start = fovea_radius * 1.2;
-        
-        // CRITICAL FIX: Use clean dist for CA, not dithered
-        // Dithered distance was causing CA to appear in random vertical lines
-        float caFactor = smoothstep(periphery_start, periphery_start + 0.25, dist);
-        
-        // Apply Strength Modulation to CA
-        caFactor *= strengthMult;
-        
-        // Apply CA if factor > 0
-        if (caFactor > 0.01) {
-            // Use ungated factor for CA strength too, or just the calculated caFactor
-            // Let's use caFactor directly as it's distance based.
-            float offset = 0.005 * caFactor; 
-            vec2 caOffset = vec2(offset, 0.0); 
-            
-            col.r = sampleSource(v1.distortedUV + caOffset).r;
-            col.b = sampleSource(v1.distortedUV - caOffset).b;
-        }
-
-        // === ROD VISION AESTHETIC (OKLAB) ===
-        // Convert to Oklab for perceptually uniform desaturation
-        vec3 lab = rgbToOklab(col);
-        
-        // 1. Contrast Boost on Lightness
-        // Rods have high contrast sensitivity
-        float contrast = 1.2;
-        float L_contrasted = (lab.x - 0.5) * contrast + 0.5;
-        L_contrasted = clamp(L_contrasted, 0.0, 1.0);
-        
-        // 2. Eigengrau Tint in Oklab Space
-        // Eigengrau (dark blue-gray) in Oklab: L ≈ 0.1, a ≈ 0, b ≈ -0.05 (blue shift)
-        vec3 eigengrauLab = vec3(0.1, 0.0, -0.05);
-        vec3 whiteLab = vec3(1.0, 0.0, 0.0);
-        
-        // Map lightness: dark → eigengrau, bright → white
-        vec3 rodColorLab = mix(eigengrauLab, whiteLab, L_contrasted);
-        
-        // Convert rod color back to RGB for grain
-        vec3 rodColor = oklabToRgb(rodColorLab);
-        
-        // 3. Grain (applied in RGB space)
-        float grainStrength = 0.08;
-        rodColor += noiseVal * grainStrength;
-        rodColor = clamp(rodColor, 0.0, 1.0);
-        
-        // === DECOUPLED DESATURATION (OKLAB) ===
-        // Calculate desaturation strength purely based on distance, IGNORING LGN gating.
-        // This ensures "Rod Vision" applies to everything in the periphery (including Reddit logo).
-        float rampEnd = fovea_radius * config.lgn_ramp_end_mult;
-        float desaturationFactor = smoothstep(fovea_radius, rampEnd, dist);
-        
-        // Apply Strength Modulation to Desaturation
-        desaturationFactor *= strengthMult;
-        
-        // Saliency Modulation (Phase 3): Conservative rod vision relief
-        // Far-periphery only, leverages temporal smoothing
-        if (u_enable_saliency_modulation > 0.5 && dist > parafovea_radius) {
-            float s = lgn.saliency;
-            // 15% max reduction in desaturation at maximum saliency
-            // Allows salient areas to retain slightly more color
-            float rodMod = mix(1.0, 0.85, s);
-            desaturationFactor *= rodMod;
-        }
-        
-        // Desaturate in Oklab space by reducing chrominance
-        vec3 desaturatedLab = lab;
-        desaturatedLab.y *= (1.0 - desaturationFactor * bypassTransition); // a component
-        desaturatedLab.z *= (1.0 - desaturationFactor * bypassTransition); // b component
-        
-        // Convert desaturated color back to RGB
-        vec3 desaturatedColor = oklabToRgb(desaturatedLab);
-        
-        // Mix between desaturated color and rod color (eigengrau-tinted)
-        // Higher desaturation factor → more rod color influence
-        vec3 finalColor = mix(desaturatedColor, rodColor, desaturationFactor * bypassTransition * 0.3);
-        return finalColor;
-        
-    } else if (config.v4_style_id == 1) { // Oklab (formerly "Lab")
-        // === CHROMATIC ABERRATION (Copied from Default) ===
-        float noiseVal = (rand(uv) - 0.5);
-        
-        // Saliency Dampening for CA
-        float protection = max(lgn.saliency, lgn.density);
-        float dampener = mix(1.0, 0.85, protection);
-        float strengthMult = smoothstep(0.0, 0.6, u_intensity) * dampener;
-        
+        // 1. Chromatic Aberration
         float periphery_start = fovea_radius * 1.2;
         float caFactor = smoothstep(periphery_start, periphery_start + 0.25, dist);
         caFactor *= strengthMult;
         
+        // CA Suppression (Parafovea) - High Scramble = Low CA
+        float scrambleOnset = parafovea_radius * 1.0;
+        float scrambleFull = parafovea_radius * 1.5;
+        float scrambleStrength = smoothstep(scrambleOnset, scrambleFull, dist);
+        float caSuppression = 1.0 - scrambleStrength;
+        caFactor *= caSuppression;
+        
+        // CA: Simulate lateral chromatic aberration on the PROCESSED output.
+        // Previous impl sampled raw source, destroying DoG pipeline results.
+        // New approach: shift processed luminance per channel. Since we can't
+        // re-read neighboring processed pixels in a single pass, we approximate
+        // by shifting the fovea/periphery blend boundary per channel — red sees
+        // a slightly closer fovea edge, blue a slightly further one. This creates
+        // a color fringe at the fovea boundary without overwriting DoG output.
         if (caFactor > 0.01) {
-            float offset = 0.005 * caFactor; 
-            vec2 caOffset = vec2(offset, 0.0); 
-            
-            col.r = sampleSource(v1.distortedUV + caOffset).r;
-            col.b = sampleSource(v1.distortedUV - caOffset).b;
+            float offset = 0.005 * caFactor;
+            // Shift eccentricity per channel: red pulls inward, blue pushes outward
+            float eccR = max(0.0, eccentricity - offset * fovea_radius * 4.0);
+            float eccB = eccentricity + offset * fovea_radius * 4.0;
+            float blendR = smoothstep(0.0, fovea_radius * 0.5, eccR) * u_intensity;
+            float blendB = smoothstep(0.0, fovea_radius * 0.5, eccB) * u_intensity;
+            // Re-blend R and B channels with shifted eccentricity
+            col.r = mix(foveaCol.r, pooledCol.r, blendR);
+            col.b = mix(foveaCol.b, pooledCol.b, blendB);
         }
 
-        // Use actual Oklab color space for desaturation
+        // 2. Oklab Conversion
         vec3 lab = rgbToOklab(col);
         
-        // Create rod-like color in Oklab space
-        // Dark blue-gray tint with preserved lightness
-        vec3 rodColorLab = vec3(
-            lab.x * 0.96, // Slightly reduce lightness
-            0.0,          // No green-red
-            -0.05         // Slight blue shift
-        );
-        
-        // Convert to RGB and add grain
-        vec3 rodColor = oklabToRgb(rodColorLab);
-        rodColor += (rand(uv) - 0.5) * 0.1;
-        
-        // Saccade suppression (darken during rapid eye movement)
-        rodColor = mix(rodColor, vec3(0.01), saccadeFactor * 0.9);
-        
-        // DECOUPLED DESATURATION (Like Default)
-        // Use distance-based ramp instead of geometry strength
+        // 3. Rod Desaturation Factor
+        // Smoothstep ramp (modes 0 & 1): S-curve between fovea and ramp end
         float rampEnd = fovea_radius * config.lgn_ramp_end_mult;
         float desaturationFactor = smoothstep(fovea_radius, rampEnd, dist);
         desaturationFactor *= strengthMult;
         
-        // Saliency Modulation
-        if (u_enable_saliency_modulation > 0.5 && dist > parafovea_radius) {
-            float s = lgn.saliency;
-            float rodMod = mix(1.0, 0.85, s);
-            desaturationFactor *= rodMod;
-        }
+        float fade = desaturationFactor * bypassTransition;
         
-        // Mix based on desaturation factor
-        return mix(col, rodColor, desaturationFactor);
+        // Apply Base Desaturation (Chrominance only)
+        // Always runs: removes overall chroma with eccentricity (rod dominance).
+        // When chromatic pooling + DoG are active, sampleDoGReconstructed() applies
+        // differential RG/YV decay upstream — the two are complementary:
+        //   per-band: castleCSF threshold model (supra-corrected) → handles frequency-dependent differential
+        //   base desat: smoothstep/Gaussian ramp → ensures sufficient total chroma loss
+        // Combined at corner (~10°): per-band (50%) × base (20%) ≈ 10% residual warmth.
+        lab.y *= (1.0 - fade);
+        lab.z *= (1.0 - fade);
+        
+        // === DIVERGENCE: USABILITY VS BIOLOGY ===
+        
+        if (config.v4_style_id == 0) {
+            // === MODE 0: USABILITY (High-Key Ghosting) ===
+            // Goal: Red buttons turn Grey (structural retention), not Black (invisible).
+            
+            // Red Kill Switch (Prevent Mustard)
+            // Per-band RG decay handles red suppression when chromatic pooling is active.
+            // Only apply this blunt kill when falling back to base desaturation.
+            if (u_chromatic_pooling < 0.5 || u_dog_enabled < 0.5) {
+                float rednessFactor = max(0.0, lab.y);
+                if (rednessFactor > 0.0) {
+                     float peripheralFade = smoothstep(parafovea_radius, periphery_start + (fovea_radius * 2.0), dist);
+                     float desatStrength = peripheralFade * 0.95;
+                     lab.y = mix(lab.y, 0.0, desatStrength); // Kill a (Red)
+                     lab.z = mix(lab.z, 0.0, desatStrength); // Kill b (Yellow)
+                }
+            }
+            
+            // Standard Rod Color Mix (Visual consistency / Fog)
+            vec3 finalCol = oklabToRgb(lab);
+            
+            // Generate clean rod base (Eigengrau-ish)
+            vec3 rodColorLab = vec3(0.96 * lab.x, 0.0, -0.05); 
+            vec3 rodColor = oklabToRgb(rodColorLab);
+            rodColor += noiseVal * 0.08;
+            rodColor = clamp(rodColor, 0.0, 1.0);
+            
+            return mix(finalCol, rodColor, desaturationFactor * bypassTransition * 0.3);
+            
+        } else {
+            // === MODE 1: BIOLOGICAL (Purkinje Darkening) ===
+            // Goal: Simulation accuracy. Red objects vanish into shadows.
+            
+            // Purkinje Shift + Optical Vignette
+            float deepPeriphery = smoothstep(parafovea_radius, periphery_start + (fovea_radius * 0.8), dist);
+            float rednessFactor = max(0.0, lab.y * 2.0); // Boosted sensitivity
+             
+            if (rednessFactor > 0.0) {
+                float purkinjeDarkness = deepPeriphery * rednessFactor;
+                lab.y = mix(lab.y, 0.0, purkinjeDarkness);
+                lab.z = mix(lab.z, 0.0, purkinjeDarkness);
+                lab.x = mix(lab.x, 0.02, purkinjeDarkness); // Kill Light (Simulate Rod Blank)
+            }
+            
+            // Safe Global Vignette (Contrast Dimming)
+            // Lowers brightness/contrast at edges without creating a "tunnel"
+            float globalDim = deepPeriphery * 0.4;
+            lab.x = mix(lab.x, lab.x * 0.6, globalDim);
+            
+            return oklabToRgb(lab);
+        }
         
     } else if (config.v4_style_id == 2) { // Frosted
-        // Simple blur/desaturate
         vec3 frosted = mix(col, vec3(0.9), 0.3);
         return mix(col, frosted, effectFactor * 0.7 * bypassTransition);
         
@@ -922,7 +1134,9 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
 
         vec4 salTex = texture(u_saliencyMap, v1.distortedUV);
         float saliency = salTex.r;
-        float congestion = salTex.g;
+        float congestion = (u_hasCongestionMap > 0.5)
+            ? texture(u_congestionMap, v1.distortedUV).r
+            : salTex.g;
 
         bool hasStructure = (density > 0.05 || type < 0.95);
 
@@ -957,6 +1171,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         else if (roleId == 11) roleColor = vec3(0.5, 0.7, 1.0);  // header: light blue
         else if (roleId == 12) roleColor = vec3(0.5, 0.6, 0.7);  // footer: gray-blue
         else {
+            // Fallback: use type channel for unknown roles
             if (type > 0.8) roleColor = vec3(0.6, 0.8, 1.0);      // text: cyan
             else if (type > 0.3) roleColor = vec3(1.0, 0.6, 0.2); // media: orange
             else roleColor = vec3(0.2, 0.8, 0.4);                  // UI: green
@@ -994,37 +1209,75 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         return mix(fovealBlend, wireframe, blueprintFade);
 
     } else if (config.v4_style_id == 4) { // Minecraft (Block Pooling)
-            // Pixelation is handled in V1 (now with larger blocks).
+            // Channel-independent neighbor color averaging in Oklab space.
+            // Similar colors merge between blocks while distinct boundaries persist.
+            // Blend strengths per channel reflect castleCSF chromatic pooling rates:
+            //   L (luminance): moderate — spatial pooling
+            //   a (RG): strongest — L-M opponent channel attenuates ~2.5× faster
+            //   b (YV): weakest — S-(L+M) persists further into periphery
+            // Effect blends in at parafovea edge (matching V1 block onset).
+            float blockBlend = smoothstep(parafovea_radius, parafovea_radius * 1.5, dist);
+
+            if (blockBlend < 0.001) {
+                return col;
+            }
+
+            float mipLevel = computeMipLevel(max(0.0, dist - fovea_radius), fovea_radius);
+            float blockPx = exp2(floor(mipLevel) + 2.0);
+            vec2 pixelSize = vec2(blockPx) / u_resolution;
+
+            // Sample 4 cardinal neighbors at block-center offsets
+            vec3 labCenter = rgbToOklab(col);
+            vec3 labN = rgbToOklab(sampleSourceGrad(v1.distortedUV + vec2(0.0, pixelSize.y), dFdx(uv), dFdy(uv)).rgb);
+            vec3 labS = rgbToOklab(sampleSourceGrad(v1.distortedUV - vec2(0.0, pixelSize.y), dFdx(uv), dFdy(uv)).rgb);
+            vec3 labE = rgbToOklab(sampleSourceGrad(v1.distortedUV + vec2(pixelSize.x, 0.0), dFdx(uv), dFdy(uv)).rgb);
+            vec3 labW = rgbToOklab(sampleSourceGrad(v1.distortedUV - vec2(pixelSize.x, 0.0), dFdx(uv), dFdy(uv)).rgb);
+            vec3 neighborAvg = (labN + labS + labE + labW) * 0.25;
+
+            // Per-channel blend: 0 at parafovea → max at far periphery
+            float t = clamp(mipLevel / 4.0, 0.0, 1.0);
+            float blendL  = t * 0.4;  // luminance: moderate spatial pooling
+            float blendA  = t * 0.6;  // RG: strongest — foveal specialization collapses
+            float blendB  = t * 0.25; // YV: weakest — persists into periphery
+
+            vec3 blended;
+            blended.x = mix(labCenter.x, neighborAvg.x, blendL);
+            blended.y = mix(labCenter.y, neighborAvg.y, blendA);
+            blended.z = mix(labCenter.z, neighborAvg.z, blendB);
+
+            // Per-channel chromatic decay directly in Oklab — a and b channels
+            // ARE the L-M and S-(L+M) opponent axes. No RGB decomposition needed.
+            // Suprathreshold ramps (Shooner, Jiang & Mullen 2022; Hansen et al. 2009):
+            //   RG (a): foveal specialization, steep early onset, caps at 70%
+            //   YV (b): NOT foveal-specific, slow onset, caps at 35%
+            // Per-channel caps make the differential visible: red-green boundaries
+            // dissolve while blue-yellow persists at the same eccentricity.
+            float normEcc = max(0.0, dist - fovea_radius) / max(fovea_radius, 0.001);
+            float ecc_deg = normEcc * 2.0;
+            float rgFade = smoothstep(1.0, 12.0, ecc_deg) * 0.7;  // a: 70% max
+            float yvFade = smoothstep(3.0, 20.0, ecc_deg) * 0.35; // b: 35% max
+            blended.y *= (1.0 - rgFade); // a channel (red-green) fades first
+            blended.z *= (1.0 - yvFade); // b channel (blue-yellow) persists
+
+            vec3 result = oklabToRgb(blended);
+
+            // Subtle grid line darkening (6%) for block visibility
+            vec2 blockFrac = fract(uv / pixelSize);
+            float edgeDist = min(min(blockFrac.x, 1.0 - blockFrac.x), min(blockFrac.y, 1.0 - blockFrac.y));
+            float gridLine = 1.0 - 0.06 * (1.0 - smoothstep(0.0, 0.08, edgeDist));
+            result *= gridLine;
+
+            return mix(col, result, blockBlend * effectFactor * bypassTransition);
             
-            // Clean up Fovea
-            float cleanFactor = smoothstep(0.4, 0.8, effectFactor);
-            
-            // 1. Solid Fill (Halftone-ish)
-            // Boost saturation significantly for that "Neon" look
-            float luma = dot(col, vec3(0.299, 0.587, 0.114));
-            vec3 saturated = mix(vec3(luma), col, 1.8); 
-            
-            // 2. Progressive Contrast Boost
-            // "Ideally we'd do so progressively from the parafovea outward"
-            // Ramp contrast from 1.0 (fovea) to 2.0 (periphery)
-            float contrastRamp = smoothstep(fovea_radius, parafovea_radius * 2.0, dist);
-            float contrastAmount = mix(1.0, 2.5, contrastRamp); // Strong contrast in periphery
-            
-            vec3 contrasted = (saturated - 0.5) * contrastAmount + 0.5;
-            
-            // 3. Halftone / Texture
-            // Simple dot pattern or noise
-            vec2 pixelUV = uv * u_resolution;
-            float dotPattern = sin(pixelUV.x * 0.5) * sin(pixelUV.y * 0.5); // High freq grid
-            
-            // Mix texture: mostly solid (0.9), tiny bit of texture (0.1)
-            vec3 textured = contrasted * (0.95 + 0.05 * dotPattern);
-            
-            // Clamp results
-            vec3 finalColor = clamp(textured, 0.0, 1.0);
-            
-            // Apply bypassTransition to ensure smooth start
-            return mix(col, finalColor, cleanFactor * bypassTransition);
+    } else if (config.v4_style_id == 5) { // Double Vision
+        float luma = dot(col, vec3(0.299, 0.587, 0.114));
+        vec3 saturated = mix(vec3(luma), col, 1.6);
+        vec2 warpUV = v1.distortedUV * 2.0;
+        float n = snoise(warpUV + vec2(u_time * 0.1));
+        float subtleNoise = n * 0.05 * effectFactor;
+        vec3 finalColor = clamp(saturated + subtleNoise, 0.0, 1.0);
+        return mix(col, finalColor, effectFactor * bypassTransition);
+
     } else if (config.v4_style_id == 7) { // Pooling Grid — educational polar overlay
         // Compute own eccentricity ramp (not dependent on V1 distortion strength)
         float gridFade = smoothstep(fovea_radius, fovea_radius * 2.0, dist) * bypassTransition;
@@ -1034,6 +1287,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         col = mix(col, vec3(lum), gridFade * 0.4);
 
         // Polar grid: concentric rings (log-spaced) + radial spokes
+        // Fade in from parafovea edge outward
         float gridOnset = smoothstep(fovea_radius, parafovea_radius, dist);
 
         if (gridOnset > 0.001) {
@@ -1044,7 +1298,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             vec2 diff = uv_c - mouse_c;
             float angle = atan(diff.y, diff.x);
 
-            // Log-spaced rings starting at parafovea
+            // Log-spaced rings starting at parafovea — matches CMF scaling
             float r0 = parafovea_radius;
             float expansionFactor = 1.3;
             float n = log(dist / r0) / log(expansionFactor);
@@ -1054,33 +1308,38 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             float ringWidth = 0.015;
             float ringAlpha = 1.0 - smoothstep(0.0, ringWidth, dist_to_ring);
 
-            // Spoke count decreases with eccentricity
+            // Radial spokes — more spokes near fovea (16), thinning out
+            // Spoke count decreases with eccentricity: pooling regions are wider tangentially at distance
             float spokeCount = mix(16.0, 8.0, smoothstep(parafovea_radius, parafovea_radius * 4.0, dist));
             float spokeWidth = smoothstep(0.99, 0.995, cos(angle * spokeCount));
 
-            // Parafovea ring boundary
+            // Parafovea ring boundary (solid)
             float paraRingDist = abs(dist - parafovea_radius);
             float fw = fwidth(paraRingDist);
             float paraRing = 1.0 - smoothstep(0.0, fw * 2.5, paraRingDist);
 
             float gridAlpha = max(max(ringAlpha, spokeWidth), paraRing);
 
+            // Grid color: cyan, subtle — page content shows through
             vec3 gridColor = vec3(0.0, 0.75, 0.9);
             float opacity = gridOnset * 0.25;
             col = mix(col, gridColor, gridAlpha * opacity);
-            col += gridColor * gridAlpha * opacity * 0.15;
+            col += gridColor * gridAlpha * opacity * 0.15; // Slight additive glow
         }
 
         return col;
 
     } else if (config.v4_style_id == 8) { // Minecraft Eyeball (Polar Pooling)
+        // Radial variant of Minecraft: wedge-shaped polar sectors sized by CMF,
+        // emanating from gaze. Same Oklab chromatic decay as Minecraft (style 4).
         float blockBlend = smoothstep(parafovea_radius, parafovea_radius * 1.5, dist);
         if (blockBlend < 0.001) return col;
 
         PolarSector ps = computePolarSector(uv, parafovea_radius);
         float aspect = u_resolution.x / u_resolution.y;
 
-        // Radial/tangential neighbor sampling
+        // --- RADIAL/TANGENTIAL NEIGHBOR SAMPLING ---
+        // 2 radial (inner/outer ring centers) + 2 tangential (adjacent spokes)
         float ef = 1.007;
         float bias = u_crowding_radial_bias;
         float ring_inner_prev = ps.ring_inner / pow(ef, bias);
@@ -1091,7 +1350,9 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         float spoke_left  = ps.spoke_center - ps.spokeWidth;
         float spoke_right = ps.spoke_center + ps.spokeWidth;
 
-        // Undo fovea_aspect_ratio scaling on x when converting back to UV
+        // Convert neighbor polar coords to UV.
+        // Sector offsets are in the scaled space (fovea_aspect_ratio-divided x),
+        // so we undo that scaling before converting back to UV.
         vec2 offRI = ring_center_inner * vec2(cos(ps.spoke_center), sin(ps.spoke_center));
         offRI.x *= u_fovea_aspect_ratio;
         vec2 uvRI = vec2((ps.mouse_c + offRI).x / aspect, (ps.mouse_c + offRI).y);
@@ -1108,40 +1369,63 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         offTR.x *= u_fovea_aspect_ratio;
         vec2 uvTR = vec2((ps.mouse_c + offTR).x / aspect, (ps.mouse_c + offTR).y);
 
-        // Sector-area MIP sampling: use MIP level matching ring width in pixels.
-        // Point sampling (MIP 0) misses thin features when sector center lands
-        // on empty space. Hardware MIP averaging catches them.
+        // Multi-sample radial grid: 3 samples across the ring's radial extent
+        // (inner third, center, outer third), each at MIP matching 1/3 of the
+        // ring width. Thin horizontal features (toolbars, logos) that occupy
+        // only part of the ring can't be missed — at least one sample hits them.
         float ringWidthUV = ps.ring_outer - ps.ring_inner;
         float ringWidthPx = ringWidthUV * u_resolution.y;
         float maxMip = floor(log2(max(u_resolution.x, u_resolution.y)));
-        float sectorMip = clamp(log2(max(ringWidthPx, 1.0)), 0.0, maxMip);
+        float subMip = clamp(log2(max(ringWidthPx / 3.0, 1.0)), 0.0, maxMip);
 
-        vec3 labCenter = rgbToOklab(sampleSourceLod(v1.distortedUV, sectorMip).rgb);
+        // 3 radial positions: centers of inner, middle, outer thirds
+        float rInner = ps.ring_inner + ringWidthUV * (1.0 / 6.0);
+        float rOuter = ps.ring_outer - ringWidthUV * (1.0 / 6.0);
+
+        // Convert inner/outer radial positions to UV (same polar→UV pattern)
+        vec2 offInner = rInner * vec2(cos(ps.spoke_center), sin(ps.spoke_center));
+        offInner.x *= u_fovea_aspect_ratio;
+        vec2 uvInner = vec2((ps.mouse_c + offInner).x / aspect, (ps.mouse_c + offInner).y);
+
+        vec2 offOuter = rOuter * vec2(cos(ps.spoke_center), sin(ps.spoke_center));
+        offOuter.x *= u_fovea_aspect_ratio;
+        vec2 uvOuter = vec2((ps.mouse_c + offOuter).x / aspect, (ps.mouse_c + offOuter).y);
+
+        // Average 3 radial sub-samples for center color
+        vec3 labCenter = (rgbToOklab(sampleSourceLod(uvInner, subMip).rgb)
+                        + rgbToOklab(sampleSourceLod(v1.distortedUV, subMip).rgb)
+                        + rgbToOklab(sampleSourceLod(uvOuter, subMip).rgb)) / 3.0;
+
+        // Neighbors: single sample at sector-wide MIP (they're for blending, not display)
+        float sectorMip = clamp(log2(max(ringWidthPx, 1.0)), 0.0, maxMip);
         vec3 neighborAvg = (rgbToOklab(sampleSourceLod(uvRI, sectorMip).rgb)
                           + rgbToOklab(sampleSourceLod(uvRO, sectorMip).rgb)
                           + rgbToOklab(sampleSourceLod(uvTL, sectorMip).rgb)
                           + rgbToOklab(sampleSourceLod(uvTR, sectorMip).rgb)) * 0.25;
 
-        // Per-channel blend (same rates as Minecraft)
-        float normEcc = max(0.0, dist - fovea_radius) / max(fovea_radius, 0.001);
-        float mipLevel = clamp(normEcc * 2.5, 0.0, 4.0);
+        // Per-channel blend (same rates as Minecraft style 4)
+        float mipLevel = computeMipLevel(max(0.0, dist - fovea_radius), fovea_radius);
         float t = clamp(mipLevel / 4.0, 0.0, 1.0);
         vec3 blended;
-        blended.x = mix(labCenter.x, neighborAvg.x, t * 0.4);
-        blended.y = mix(labCenter.y, neighborAvg.y, t * 0.6);
-        blended.z = mix(labCenter.z, neighborAvg.z, t * 0.25);
+        blended.x = mix(labCenter.x, neighborAvg.x, t * 0.4);   // L
+        blended.y = mix(labCenter.y, neighborAvg.y, t * 0.6);   // a (RG)
+        blended.z = mix(labCenter.z, neighborAvg.z, t * 0.25);  // b (YV)
 
-        // Per-channel chromatic decay — tightened ranges for desktop viewing
+        // Per-channel chromatic decay.
+        // The smoothstep ranges (1→28°, 5→45°) from Minecraft style 4 were designed
+        // for wide visual fields but barely engage on a desktop screen (~15° max ecc).
+        // Tighten to match the actual ecc_deg range so desaturation is visible.
+        float normEcc = max(0.0, dist - fovea_radius) / max(fovea_radius, 0.001);
         float ecc_deg = normEcc * 2.0;
         blended.y *= (1.0 - smoothstep(1.0, 12.0, ecc_deg) * 0.7);
         blended.z *= (1.0 - smoothstep(3.0, 20.0, ecc_deg) * 0.35);
 
         vec3 result = oklabToRgb(blended);
 
-        // Ring/spoke grid lines (6% darkening)
-        float ringW = ps.ring_outer - ps.ring_inner;
+        // --- RING/SPOKE GRID LINES (6% darkening, same weight as Minecraft) ---
+        float ringWidth = ps.ring_outer - ps.ring_inner;
         float ringEdgeDist = min(abs(ps.r - ps.ring_inner), abs(ps.r - ps.ring_outer));
-        float ringEdge = 1.0 - 0.06 * (1.0 - smoothstep(0.0, ringW * 0.08, ringEdgeDist));
+        float ringEdge = 1.0 - 0.06 * (1.0 - smoothstep(0.0, ringWidth * 0.08, ringEdgeDist));
 
         float angle_in_spoke = mod(ps.angle + 3.14159265359, ps.spokeWidth);
         float spokeDist = min(angle_in_spoke, ps.spokeWidth - angle_in_spoke);
@@ -1151,26 +1435,47 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
 
         return mix(col, result, blockBlend * effectFactor * bypassTransition);
 
-    } else if (config.v4_style_id == 5) { // Double Vision (Fractal/Ooze)
-        // CLEAN DOUBLE VISION: Just the flowing wave + saturation boost
-        // Removed the "Oil Slick" (Red/Green) pattern as requested.
-        
-        // 1. Saturation Boost
-        float luma = dot(col, vec3(0.299, 0.587, 0.114));
-        vec3 saturated = mix(vec3(luma), col, 1.6); // Strong saturation
-        
-        // 2. Subtle Fractal Noise Overlay (Optional, keeping it very subtle)
-        // Use distorted UVs for organic feel
-        vec2 warpUV = v1.distortedUV * 2.0;
-        float n = snoise(warpUV + vec2(u_time * 0.1));
-        float subtleNoise = n * 0.05 * effectFactor;
-        
-        vec3 finalColor = clamp(saturated + subtleNoise, 0.0, 1.0);
-        
-        return mix(col, finalColor, effectFactor * bypassTransition);
+    } else if (config.v4_style_id == 6) { // FOVI: Gaussian color decay (rod-cone transition)
+        if (u_cmf_color_sigma > 0.01) {
+            float fovea_deg = 2.0;
+            float normEcc = max(0.0, eccentricity) / max(fovea_radius, 0.001);
+            float r_deg = normEcc * fovea_deg;
+            float decay = exp(-r_deg / max(u_cmf_color_sigma, 0.1));
+            float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+            col = mix(vec3(lum), col, decay);
+        }
+        return col;
     }
-    
+
     return col;
+}
+
+// === SALIENCY HEATMAP (for side-by-side comparison) ===
+// Dark indigo (low) → Purple/Magenta (mid) → White (high)
+// Cool palette contrasts with congestion's warm blue→yellow→red
+vec3 saliencyHeatmap(float t) {
+    t = clamp(t, 0.0, 1.0);
+    if (t < 0.5) {
+        float s = t * 2.0;
+        return mix(vec3(0.05, 0.0, 0.15), vec3(0.7, 0.0, 0.7), s);
+    } else {
+        float s = (t - 0.5) * 2.0;
+        return mix(vec3(0.7, 0.0, 0.7), vec3(1.0, 1.0, 1.0), s);
+    }
+}
+
+// === CONGESTION HEATMAP (Rosenholtz 2007 visualization) ===
+// Blue (low) → Yellow (mid) → Red (high) — perceptually ordered
+vec3 congestionHeatmap(float t) {
+    t = clamp(t, 0.0, 1.0);
+    // 3-stop gradient: blue → yellow → red
+    if (t < 0.5) {
+        float s = t * 2.0; // 0..1 over first half
+        return mix(vec3(0.1, 0.1, 0.8), vec3(1.0, 1.0, 0.0), s);
+    } else {
+        float s = (t - 0.5) * 2.0; // 0..1 over second half
+        return mix(vec3(1.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), s);
+    }
 }
 
 void main() {
@@ -1185,7 +1490,6 @@ void main() {
     delta.x /= u_fovea_aspect_ratio; 
     float dist = length(delta); 
 
-    // Stable Mouse
     vec2 mouse_stable_uv = u_mouse_stable / u_resolution;
     vec2 mouse_stable_corrected = vec2(mouse_stable_uv.x * aspect, mouse_stable_uv.y);
     vec2 delta_stable = uv_corrected - mouse_stable_corrected;
@@ -1194,7 +1498,7 @@ void main() {
 
     float radius_norm = u_foveaRadius / u_resolution.y;
     float fovea_radius = radius_norm;
-    float parafovea_radius = radius_norm * 2.5; // Macula: 0-5° (2.5x fovea)
+    float parafovea_radius = radius_norm * 2.5;
 
     // Saccadic blindness: shrink foveal region during movement
     float saccadeFactor = smoothstep(4.0, 10.0, u_velocity);
@@ -1206,10 +1510,7 @@ void main() {
     bool isParafovea = dist_stable > fovea_radius && dist_stable <= parafovea_radius;
     bool isFarPeriphery = dist_stable > parafovea_radius; 
     
-    // --- CONFIGURATION (The "Hooks") ---
     ModeConfig config;
-    
-    // Map Uniforms to Config Struct
     config.lgn_use_structure_mask = u_lgn_use_structure_mask > 0.5;
     config.lgn_use_saliency_gate = u_lgn_use_saliency_gate > 0.5;
     config.v1_distortion_type = u_v1_distortion_type;
@@ -1217,162 +1518,154 @@ void main() {
     config.v4_style_id = u_v4_style_id;
     config.lgn_ramp_end_mult = u_lgn_ramp_end_mult;
     config.v1_animate = u_v1_animate > 0.5;
-    
-    // === DOUBLE VISION MODE OVERRIDE ===
-    // "Psychologically plausible as LGN is the stream separator"
-    // In a psychedelic state, the LGN's gating function is compromised, leading to
-    // a flood of unfiltered information (stream integration).
+    config.cmf_enabled = u_cmf_enabled > 0.5;
+
     if (config.v4_style_id == 5) {
         config.lgn_use_structure_mask = false;
         config.lgn_use_saliency_gate = false;
     }
     
-    // Override V1 type if Mongrel Mode uniform says so (Legacy Toggle Support)
-    // Only applies if we are in a "standard" mode (Shatter/Noise) to avoid breaking Minecraft/Blueprint
     if (config.v4_style_id != 5 && config.v1_distortion_type != 2 && config.v1_distortion_type != 3 && config.v1_distortion_type != 4) {
         if (u_mongrel_mode < 0.5) {
-            config.v1_distortion_type = 0; // Noise
+            config.v1_distortion_type = 0; 
         }
-        else config.v1_distortion_type = 1; // Shatter
+        else config.v1_distortion_type = 1; 
     }
     
-    // Blueprint mode: no geometric distortion
     if (config.v4_style_id == 3) {
         config.v1_distortion_type = 2; // No distortion for Blueprint
     }
 
-    // --- PIPELINE EXECUTION ---
-    
-    // 0. Early Mask Sampling (Visual Memory)
-    // We need this for LGN gating AND V1 modulation
     float memoryStrength = 0.0;
     if (u_useMask > 0.5) {
         float rawMask = texture(u_maskTexture, v_texCoord).r;
-        // Apply gain to snap to 1.0 (anti-ghosting)
         memoryStrength = smoothstep(0.0, 0.5, rawMask);
     }
 
-    // 1. LGN: Analysis & Gating
-    // Pass memoryStrength to LGN (we'll need to update the struct/function signature or just pass it)
-    // Actually, let's just pass it to V1 directly since it's a geometric constraint.
     LGN_Signal lgn = processLGN(uv, config, dist, fovea_radius);
 
     // Safe radial direction — fallback at fovea center (displacement is zero there anyway)
     vec2 radial_dir = dist_stable > 0.001 ? delta_stable / dist_stable : vec2(0.0, 1.0);
 
-    // 2. V1: Geometry
-    // Modulate V1 with memoryStrength to prevent "unremembering" (discontinuity)
     V1_Signal v1 = processV1(uv, uv_corrected, lgn, config, dist_stable, radial_dir, fovea_radius, parafovea_radius, isFarPeriphery, isParafovea, memoryStrength);
     
-    // 3. V4: Aesthetics
     vec3 finalRGB = processV4(uv, v1, lgn, config, dist, fovea_radius, parafovea_radius, saccadeFactor);
-    
-    // === PARAFOVEAL ENHANCEMENTS (Pivot) ===
-    // 1. Saturation Boost (2-5° region)
-    // Boost saturation to compensate for lower acuity and guide attention.
-    if (isParafovea) {
-        vec3 col = finalRGB;
-        float luma = dot(col, vec3(0.299, 0.587, 0.114));
-        // Boost saturation by mixing away from grayscale
-        // 20% boost seems appropriate for "slightly boost"
-        finalRGB = mix(vec3(luma), col, 1.2); 
-    }
-
-    // 2. Peripheral Vignetting (>5°)
-    // REMOVED: User feedback indicated this was an antipattern (dimming).
-    // Keeping the block commented out for reference or future toggle.
-    /*
-    if (isFarPeriphery) {
-        float vignetteDist = dist - parafovea_radius;
-        float vignetteFactor = smoothstep(0.0, 0.5, vignetteDist);
-        finalRGB *= mix(1.0, 0.7, vignetteFactor);
-    }
-    */
-    
-    // --- POST-PROCESSING (Rod Vision, Masking, Debug) ---
     
     vec4 color = vec4(finalRGB, 1.0);
 
-    // Rod Vision / Scrollbar Check
     float scrollbarWidth = 17.0;
     float distFromRightEdge = u_resolution.x - (uv.x * u_resolution.x);
     bool isScrollbar = distFromRightEdge < scrollbarWidth;
     
     if (!isScrollbar) {
-        // Visual Memory Mask (Post-Process Overlay)
-        // We still overlay the clear image to ensure pixel-perfect clarity,
-        // but now the underlying distortion (v1) should align with it.
-        // ONLY IN STANDARD MODE (u_useMask < 1.5) and NOT IN DEBUG MODE
-        // We disable visual memory during structure debug so the overlay isn't washed out by the clear image.
         if (u_useMask < 1.5 && u_useMask > 0.5 && u_debug_structure < 0.5) {
             if (memoryStrength > 0.9) {
-            // Use sampleSource for guaranteed correct color
-            vec4 clearColor = sampleSource(uv);
-            color.rgb = clearColor.rgb;
-        } else if (memoryStrength > 0.0) {
-            vec4 clearColor = sampleSource(uv);
-            color.rgb = mix(color.rgb, clearColor.rgb, memoryStrength);
-        }
+                vec4 clearColor = sampleSource(uv);
+                color.rgb = clearColor.rgb;
+            } else if (memoryStrength > 0.0) {
+                vec4 clearColor = sampleSource(uv);
+                color.rgb = mix(color.rgb, clearColor.rgb, memoryStrength);
+            }
         }
     }
     
-    // Force Debug OFF for Minecraft
     float debugLevel = u_debug_structure;
     if (config.v4_style_id == 4) debugLevel = 0.0;
     
-    // DEBUG VIEW STANDARDIZATION:
-    // If debugging, we replace the simulated/foveated view with the CLEAN source.
-    // This ensures:
-    // 1. Uniform brightness (no foveal "holes" in the overlay).
-    // 2. Perfect alignment (Structure Map overlay matches undistorted Page).
     if (debugLevel > 0.5) {
         color = sampleSource(uv);
     }
     
-    // Debug Visualization
-    if (debugLevel > 2.5) {
+    if (debugLevel > 4.5) {
+        // Debug 5: Oriented DoG band weight overlay
+        // Brighter = more bands preserved. Green tint = orientation bonus active.
+        float dist_dbg = length(uv_corrected - mouse_corrected);
+        float ecc_dbg = max(0.0, dist_dbg - fovea_radius);
+        float normEcc_dbg = ecc_dbg / max(fovea_radius, 0.001);
+        float e2_dbg = max(u_dog_e2, 0.01);
+        // Recompute band weights at this eccentricity (simplified — isotropic baseline)
+        float bandCount = 0.0;
+        for (int k = 0; k < 8; k++) {
+            float c_dbg = e2_dbg * float[8](0.41421, 1.0, 1.82843, 3.0, 4.65685, 7.0, 10.31371, 15.0)[k];
+            float tm = 0.4;
+            bandCount += 1.0 - smoothstep(c_dbg - c_dbg * tm, c_dbg + c_dbg * tm, normEcc_dbg);
+        }
+        // 4-channel orientation energy (same computation as in sampleDoGReconstructed)
+        vec2 px_dbg = 2.0 / u_resolution;
+        vec3 lumaW_dbg = vec3(0.114, 0.587, 0.299); // BGRA-corrected luminance weights
+        float lr = dot(textureLod(u_texture, uv + vec2(px_dbg.x, 0.0), 1.0).rgb, lumaW_dbg);
+        float ll = dot(textureLod(u_texture, uv - vec2(px_dbg.x, 0.0), 1.0).rgb, lumaW_dbg);
+        float lt = dot(textureLod(u_texture, uv + vec2(0.0, px_dbg.y), 1.0).rgb, lumaW_dbg);
+        float lb = dot(textureLod(u_texture, uv - vec2(0.0, px_dbg.y), 1.0).rgb, lumaW_dbg);
+        float gx_d = lr - ll; float gy_d = lt - lb;
+        float g2_d = gx_d*gx_d + gy_d*gy_d;
+        float e_h = gy_d*gy_d; float e_v = gx_d*gx_d;
+        float gd1_d = (gx_d+gy_d)*0.7071; float gd2_d = (gx_d-gy_d)*0.7071;
+        float cardMax_d = max(e_h, e_v);
+        float oblMax_d = max(gd1_d*gd1_d, gd2_d*gd2_d);
+        float cardFrac = cardMax_d / (cardMax_d + oblMax_d + 1e-6);
+        float eg = smoothstep(0.005, 0.03, sqrt(g2_d));
+        float ob = cardFrac * eg * u_dog_orient_bias;
+        float base = bandCount / 8.0;
+        vec3 diagColor = vec3(base, base + ob * 0.3, base);
+        // Blend to source inside fovea — all-white there is uninformative
+        float foveaBlend = smoothstep(0.0, fovea_radius * 0.3, ecc_dbg);
+        color.rgb = mix(sampleSource(uv).rgb, diagColor, foveaBlend);
+    } else if (debugLevel > 3.5) {
+        // Debug 4: 4-channel orientation energy overlay
+        // R = horizontal edges, G = vertical edges, B = diagonal (45°+135°)
+        vec2 px_dbg4 = 2.0 / u_resolution;
+        vec3 lumaW4 = vec3(0.114, 0.587, 0.299);
+        float lr4 = dot(textureLod(u_texture, uv + vec2(px_dbg4.x, 0.0), 1.0).rgb, lumaW4);
+        float ll4 = dot(textureLod(u_texture, uv - vec2(px_dbg4.x, 0.0), 1.0).rgb, lumaW4);
+        float lt4 = dot(textureLod(u_texture, uv + vec2(0.0, px_dbg4.y), 1.0).rgb, lumaW4);
+        float lb4 = dot(textureLod(u_texture, uv - vec2(0.0, px_dbg4.y), 1.0).rgb, lumaW4);
+        float gx4 = lr4 - ll4; float gy4 = lt4 - lb4;
+        float mag4 = sqrt(gx4*gx4 + gy4*gy4);
+        // 4-channel energy
+        float eH = gy4*gy4;  // horizontal edges
+        float eV = gx4*gx4;  // vertical edges
+        float gd1_4 = (gx4+gy4)*0.7071; float gd2_4 = (gx4-gy4)*0.7071;
+        float eD = gd1_4*gd1_4 + gd2_4*gd2_4;  // diagonal edges (both)
+        float eTotal = eH + eV + eD + 1e-6;
+        float gate4 = smoothstep(0.005, 0.03, mag4);
+        color.rgb = vec3(
+            (eH / eTotal) * gate4,   // R: horizontal edges (text baselines)
+            (eV / eTotal) * gate4,   // G: vertical edges (column borders)
+            (eD / eTotal) * gate4    // B: diagonal edges (no bonus)
+        );
+    } else if (debugLevel > 2.5) {
         float mask = texture(u_maskTexture, v_texCoord).r;
         color.rgb = vec3(mask);
     } else if (debugLevel > 1.5) {
-        // Heatmap for Saliency (Grayscale)
-        // User Preference: Pure B&W is clearer for polarity
-        // Use RAW saliency to bypass LGN inhibition/gating
         float s = texture(u_saliencyMap, v_texCoord).r;
         color.rgb = vec3(s);
     } else if (debugLevel > 0.5) {
-        // Use RAW structure density to bypass LGN inhibition ("holes")
         float rawDensity = texture(u_structureMap, v_texCoord).g;
         if (rawDensity > 0.0) {
             color.rgb = mix(color.rgb, vec3(1.0, 0.0, 0.0), 0.5 * rawDensity);
         }
     }
     
-    // Debug Boundary
     if (u_debug_boundary > 0.5) {
         vec2 diff = uv_corrected - mouse_corrected;
         float angle = atan(diff.y, diff.x);
         
-        // --- MODE 1: BASIC FOVEAL OVERLAY ---
         if (u_debug_boundary > 0.5) { 
             float fw = fwidth(dist);
             
-            // 1. Light Continuous Oval Stroke
             float borderDist = abs(dist - fovea_radius);
             float borderAlpha = 1.0 - smoothstep(0.0, fw * 2.0, borderDist);
             if (borderAlpha > 0.0) {
                 color.rgb = mix(color.rgb, vec3(0.0, 1.0, 1.0), borderAlpha * 0.4);
             }
 
-            // 2. Outward Ticks
-            float tickLength = 0.015; // Longer ticks
-            // Only draw outside fovea
+            float tickLength = 0.015; 
             if (dist > fovea_radius && dist < fovea_radius + tickLength) {
                 float tickRadial = 1.0; 
-                // Fade out at tip
                 tickRadial *= (1.0 - smoothstep(fovea_radius + tickLength * 0.5, fovea_radius + tickLength, dist));
                 
-                // Angular gaps
-                float tickWidth = smoothstep(0.97, 0.98, cos(angle * 12.0)); // 12 ticks
+                float tickWidth = smoothstep(0.97, 0.98, cos(angle * 12.0)); 
                 
                 float tickAlpha = tickRadial * tickWidth;
                 if (tickAlpha > 0.0) {
@@ -1381,17 +1674,13 @@ void main() {
             }
         }
 
-        // --- MODE 2: PARAFOVEAL BOUNDARY ---
         if (u_debug_boundary > 1.5) { 
             float visualParafoveaRadius = parafovea_radius; 
             float parafoveaDist = abs(dist - visualParafoveaRadius);
             float fw = fwidth(parafoveaDist);
             
-            // "More Ink": Thicker line and smaller gaps
-            // Thicker: fw * 3.0
             float ringPresence = 1.0 - smoothstep(0.0, fw * 3.0, parafoveaDist);
             
-            // Dashed pattern: sin(angle * 60) > -0.2 (Less gap)
             float dashPattern = smoothstep(-0.2, 0.1, sin(angle * 60.0));
             
             float ringAlpha = ringPresence * dashPattern;
@@ -1401,42 +1690,73 @@ void main() {
             }
         }
 
-        // --- MODE 3: SCIENTIFIC RADIAL GRID (HI-TECH) ---
         if (u_debug_boundary > 2.5) {
-             // Grid starts at parafovea
              if (dist > parafovea_radius) {
-                // A. Exponential Rings
-                // dist = r0 * k^n  =>  n = log(dist/r0) / log(k)
                 float r0 = parafovea_radius;
-                float expansionFactor = 1.4; // How fast rings grow
+                float expansionFactor = 1.4; 
                 
                 float n = log(dist / r0) / log(expansionFactor);
                 float n_idx = round(n);
                 float dist_to_ring = abs(n - n_idx);
                 
-                // Ring thickness
-                float ringWidth = 0.02; // In "log space"
+                float ringWidth = 0.02; 
                 float ringAlpha = 1.0 - smoothstep(0.0, ringWidth, dist_to_ring);
                 
-                // B. Radial Spokes
-                // 16 spokes
                 float spokeWidth = smoothstep(0.995, 0.998, cos(angle * 16.0));
                 
-                // Combine Grid
                 float gridAlpha = max(ringAlpha, spokeWidth);
                 
-                // Distance Fade (optional, keep it clean for now)
-                // Make it look "Hi-Tech" -> Low Alpha, Cyan/Blue
-                vec3 gridColor = vec3(0.0, 0.8, 1.0); // Cyan-ish
+                vec3 gridColor = vec3(0.0, 0.8, 1.0); 
                 
                 if (gridAlpha > 0.0) {
-                    // Subtle additive overlay
                     color.rgb = mix(color.rgb, gridColor, gridAlpha * 0.15);
-                    color.rgb += gridColor * gridAlpha * 0.1; // Additive bloom
+                    color.rgb += gridColor * gridAlpha * 0.1; 
                 }
              }
         }
     }
     
+    // === CONGESTION REPORT (Rosenholtz 2007) ===
+    // Follows same pattern as structure/saliency debug views:
+    // reset to source image, then paint the visualization on top.
+    // This works independently of whether the foveal effect is active.
+    if (u_show_congestion == 1) {
+        // Full-screen congestion heatmap overlay
+        float congestion = 0.0;
+        if (u_hasCongestionMap > 0.5) {
+            congestion = texture(u_congestionMap, v_texCoord).r;
+        } else {
+            congestion = texture(u_saliencyMap, v_texCoord).g;
+        }
+        vec3 heatmapColor = congestionHeatmap(congestion);
+        vec3 src = sampleSource(uv).rgb;
+        color.rgb = mix(src, heatmapColor, 0.85);
+    } else if (u_show_congestion == 2) {
+        // Side-by-side: Saliency (left) vs Congestion (right)
+        // Saliency = "what pops out?" (center-surround contrast)
+        // Congestion = "how cluttered?" (local feature variance)
+        vec3 src = sampleSource(uv).rgb;
+        float midpoint = 0.5;
+        float dividerWidth = 1.5 / u_resolution.x; // ~2px white line
+
+        if (abs(v_texCoord.x - midpoint) < dividerWidth) {
+            // Center divider
+            color.rgb = vec3(1.0);
+        } else if (v_texCoord.x < midpoint) {
+            // Left half: saliency (cool purple palette)
+            float sal = texture(u_saliencyMap, v_texCoord).r;
+            color.rgb = mix(src, saliencyHeatmap(sal), 0.85);
+        } else {
+            // Right half: congestion (warm blue→yellow→red palette)
+            float cong = 0.0;
+            if (u_hasCongestionMap > 0.5) {
+                cong = texture(u_congestionMap, v_texCoord).r;
+            } else {
+                cong = texture(u_saliencyMap, v_texCoord).g;
+            }
+            color.rgb = mix(src, congestionHeatmap(cong), 0.85);
+        }
+    }
+
     fragColor = color;
 }

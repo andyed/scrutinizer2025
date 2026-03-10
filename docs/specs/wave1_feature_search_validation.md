@@ -12,7 +12,7 @@ Scrutinizer's chromatic decay model uses castleCSF parameters (Ashraf et al. 202
 
 ## 1. Falsifiable Predictions
 
-All predictions derived from the shader attenuation formula in `renderer/shaders/peripheral2.frag` (lines 232-243):
+All predictions derived from the shader attenuation formula in `renderer/shaders/peripheral.frag` (lines 232-243):
 
 ```
 appearance = pow(10^(-(k_e + k_ef * freq) * ecc_deg), supra_exponent)

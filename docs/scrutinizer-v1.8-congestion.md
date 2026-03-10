@@ -163,7 +163,7 @@ renderer/congestion-worker.js      # High-res on-demand worker
 renderer/saliency-worker.js        # 256px real-time worker
 renderer/content-analysis.js       # Dual-worker orchestrator
 renderer/complexity-hud.js         # Interactive display
-renderer/shaders/peripheral2.frag  # Reads u_congestionMap
+renderer/shaders/peripheral.frag  # Reads u_congestionMap
 shared/modes.json                  # Mode 9 definition
 scripts/validate-congestion.py     # Python reference
 scripts/extract-congestion.js      # Node.js validation

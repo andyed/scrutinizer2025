@@ -77,7 +77,7 @@ Both failure modes are documented in the arxiv paper (Section 5, Open Problems) 
 Three bugs found and fixed through the validation pipeline:
 
 ### Polar Sector R:T Ratio (Wave 3)
-`peripheral.frag` computed spoke count from biased ring width, cancelling the intended 2:1 radial elongation. Fix: compute from unbiased width `s.ring_center * (ef - 1.0)`. `peripheral2.frag` already had the correct formula. Toet & Levi (1992) measured ~2:1 radial:tangential aspect ratio; the bug produced ~1:1.
+`peripheral.frag` computed spoke count from biased ring width, cancelling the intended 2:1 radial elongation. Fix: compute from unbiased width `s.ring_center * (ef - 1.0)`. `peripheral.frag` already had the correct formula. Toet & Levi (1992) measured ~2:1 radial:tangential aspect ratio; the bug produced ~1:1.
 
 ### V1 Far-Peripheral Growth (Wave 3)
 V1 displacement plateaued beyond the parafovea because eccentricity scaling stopped at the foveal boundary. Growth factor tuned from 0.5 to 1.5 via capture-analyze loop against crowding reference pages. The 6° eccentricity displacement now reaches ~69px for dense content (Bouma predicts 135px; ratio 0.51×).
@@ -169,7 +169,7 @@ Halverson, T. & Hornof, A.J. (2011). A Computational Model of "Active Vision" fo
 
 ## 8 Half-Octave DoG Bands
 
-The DoG peripheral reconstruction in `peripheral2.frag` now uses 8 half-octave bands instead of 4 octave-spaced bands.
+The DoG peripheral reconstruction in `peripheral.frag` now uses 8 half-octave bands instead of 4 octave-spaced bands.
 
 ### What changed
 

@@ -15,7 +15,7 @@ Validation: **Wave 1 — Chromatic Decay** (`docs/specs/wave1_feature_search_val
 The current V4 pipeline reduces all chrominance equally with eccentricity. A single `desaturationFactor` ramps from 0 (fovea) to 1 (far periphery) and attenuates Oklab opponent channels uniformly:
 
 ```glsl
-// peripheral2.frag ~line 695
+// peripheral.frag ~line 695
 vec3 lab = rgbToOklab(col);
 float fade = desaturationFactor * bypassTransition;
 // Both a and b channels attenuated by the same factor

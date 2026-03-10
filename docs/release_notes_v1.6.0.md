@@ -116,7 +116,7 @@ Two directions under consideration for v1.7:
 | Area | Files |
 | --- | --- |
 | **Architecture** | `renderer/scrutinizer.js`, `renderer/gaze-model.js`, `renderer/visual-memory.js`, `renderer/content-analysis.js` |
-| **DoG Shader** | `renderer/shaders/peripheral2.frag` |
+| **DoG Shader** | `renderer/shaders/peripheral.frag` |
 | **DoG Plumbing** | `renderer/webgl-renderer.js`, `renderer/config.js`, `shared/modes.json` |
 | **Golden Captures** | `scripts/capture-golden.js`, `main.js` |
 | **Documentation** | `docs/foveated-vision-model.md`, `docs/developers_guide.md`, `ROADMAP.md` |

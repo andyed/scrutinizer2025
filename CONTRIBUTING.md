@@ -23,7 +23,7 @@ scrutinizer.js (Pipeline Orchestrator)
   ├── visual-memory.js     → Visuospatial working memory
   ├── content-analysis.js  → Pre-cortical feature extraction (LGN)
   └── webgl-renderer.js    → V1/V4 shader pipeline
-        └── peripheral2.frag (888-line GLSL fragment shader)
+        └── peripheral.frag (888-line GLSL fragment shader)
 ```
 
 See [`docs/developers_guide.md`](docs/developers_guide.md) for the full module dependency graph, coordinate system docs, and the hybrid CommonJS/Window module pattern.
@@ -65,7 +65,7 @@ Looking for a thesis or capstone project? See [`docs/grad-student-projects.md`](
 
 The biological grounding matters. If you're adding or modifying a pipeline stage:
 
-- Cite the relevant neuroscience in shader comments (see existing patterns in `peripheral2.frag`)
+- Cite the relevant neuroscience in shader comments (see existing patterns in `peripheral.frag`)
 - Update [`docs/foveated-vision-model.md`](docs/foveated-vision-model.md) with the biology → computation mapping
 - Use the "compute demand management" framing — the system selectively allocates bandwidth, it doesn't degrade-then-restore
 
@@ -73,7 +73,7 @@ The biological grounding matters. If you're adding or modifying a pipeline stage
 
 | File | What it does |
 |---|---|
-| `renderer/shaders/peripheral2.frag` | Main fragment shader (LGN → V1 → V4 pipeline) |
+| `renderer/shaders/peripheral.frag` | Main fragment shader (LGN → V1 → V4 pipeline) |
 | `renderer/webgl-renderer.js` | WebGL 2.0 context, uniform management, texture uploads |
 | `renderer/scrutinizer.js` | Pipeline orchestrator, render loop |
 | `shared/modes.json` | Declarative pipeline configuration per aesthetic mode |

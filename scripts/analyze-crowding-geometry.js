@@ -170,7 +170,7 @@ const sectorResults = eccentricities_deg.map(ecc_deg => {
 });
 
 console.log(`\nFINDING: Polar sector R:T ratio is ${sectorResults[0]?.rt_ratio_current.toFixed(2)}:1 (current), not ${CROWDING_RADIAL_BIAS.toFixed(1)}:1 as intended.`);
-console.log(`The shader comment (peripheral2.frag:338-339) claims bias=2.0 gives 2:1 aspect ratio,`);
+console.log(`The shader comment (peripheral.frag:338-339) claims bias=2.0 gives 2:1 aspect ratio,`);
 console.log(`but spokeCount is computed from the biased ring width, neutralizing the elongation.`);
 console.log(`Fix: compute spokeCount from unbiased ring width (ef^1, not ef^bias). This gives R:T = ${sectorResults[0]?.rt_ratio_fixed.toFixed(2)}:1.\n`);
 

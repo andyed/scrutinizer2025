@@ -219,7 +219,7 @@ Following the v2.2 Claim/Basis/Result structure:
 ## 6. Files
 
 ### Implementation
-- `renderer/shaders/peripheral2.frag` — eccentricity fade in band boost loop
+- `renderer/shaders/peripheral.frag` — eccentricity fade in band boost loop
 - `renderer/webgl-renderer.js` — no changes needed (visual_ecc already passed)
 
 ### Validation stimuli

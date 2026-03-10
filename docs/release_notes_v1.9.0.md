@@ -62,7 +62,7 @@ References: Ashraf et al. 2024 (castleCSF), Bowers, Gegenfurtner & Goettker 2025
 Modulates the strength of peripheral spatial pooling based on local feature congestion. High-congestion regions (cluttered UI, dense text grids, product listings) get up to 2× stronger MIP pooling, while low-congestion regions (hero images, whitespace, isolated elements) receive standard eccentricity-only pooling.
 
 ```glsl
-// peripheral2.frag — congestion boost applied before DoG reconstruction
+// peripheral.frag — congestion boost applied before DoG reconstruction
 float congestionBoost = 1.0 + lgn.congestion * 1.0;  // 1.0× – 2.0×
 coupledEccentricity *= congestionBoost;
 ```
@@ -152,7 +152,7 @@ A page with a clean hero and a dense product grid illustrates the difference. Th
 
 | Component | Change |
 |-----------|--------|
-| `peripheral2.frag` | New `show_congestion == 2` branch: split-screen with separate palettes and divider line |
+| `peripheral.frag` | New `show_congestion == 2` branch: split-screen with separate palettes and divider line |
 | `scrutinizer.js` | Congestion mode 3 → shader uniform 2. DOM labels overlay with "SALIENCY / What pops out?" and "CONGESTION / How cluttered?" |
 | `menu-template.js` | New radio item in Congestion Report submenu |
 | `webgl-renderer.js` | `show_congestion` uniform range extended to 0–2 |
@@ -311,9 +311,9 @@ No new dependencies in the main Electron app.
 | **Shared Scoring** | `renderer/congestion-core.js` (+`computeEdgeDensity`, `computeCompositeScore`, `RATINGS`) |
 | **CLI** | `cli/scrutinizer-audit.js`, `cli/lib/analyzer.js`, `cli/lib/crawler.js`, `cli/lib/reporter.js`, `cli/lib/sitemap-parser.js`, `cli/lib/url-resolver.js`, `cli/lib/viewport-profiles.js`, `cli/lib/scroll-strategy.js`, `cli/package.json` |
 | **MCP Server** | `cli/mcp/server.js` |
-| **Split View** | `renderer/shaders/peripheral2.frag`, `renderer/scrutinizer.js`, `renderer/webgl-renderer.js`, `menu-template.js` |
-| **Chromatic Pooling** | `renderer/shaders/peripheral2.frag` (+`chromaticAttenuate`, per-band RG/YV decay, decoupled `visual_ecc` for chromatic eccentricity), `renderer/webgl-renderer.js` (6 uniforms), `shared/modes.json`, `menu-template.js`, `main.js`, `renderer/scrutinizer.js`, `renderer/overlay.js` |
-| **Saccadic Blindness** | `renderer/shaders/peripheral2.frag` (+`u_saccadic_blindness`, fovea shrink), `renderer/shaders/peripheral.frag` (same), `renderer/webgl-renderer.js` (uniform), `renderer/scrutinizer.js` (+`toggleSaccadicBlindness`), `renderer/overlay.js` (IPC handler), `menu-template.js` (checkbox) |
+| **Split View** | `renderer/shaders/peripheral.frag`, `renderer/scrutinizer.js`, `renderer/webgl-renderer.js`, `menu-template.js` |
+| **Chromatic Pooling** | `renderer/shaders/peripheral.frag` (+`chromaticAttenuate`, per-band RG/YV decay, decoupled `visual_ecc` for chromatic eccentricity), `renderer/webgl-renderer.js` (6 uniforms), `shared/modes.json`, `menu-template.js`, `main.js`, `renderer/scrutinizer.js`, `renderer/overlay.js` |
+| **Saccadic Blindness** | `renderer/shaders/peripheral.frag` (+`u_saccadic_blindness`, fovea shrink), `renderer/shaders/peripheral.frag` (same), `renderer/webgl-renderer.js` (uniform), `renderer/scrutinizer.js` (+`toggleSaccadicBlindness`), `renderer/overlay.js` (IPC handler), `menu-template.js` (checkbox) |
 | **Crowding Diagnostics** | `scripts/capture-golden.js` (crowding capture tasks), `menu-template.js` (reference page menu items), `docs/simulation-limitations.md`, `docs/specs/density_gated_crowding.md` |
 | **Reference Pages** | `scrutinizer-www/src/reference-pages/crowding.html`, `scrutinizer-www/src/reference-pages/crowding-stimulus.html` |
 | **Validation** | `scripts/extract-congestion.js` (updated to use shared edge density + composite score), `scripts/capture-golden.js` (chromatic pooling on/off variants) |

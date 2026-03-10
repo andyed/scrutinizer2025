@@ -2,7 +2,7 @@
 
 ## Files Reviewed
 - `/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/docs/foveated-vision-model.md` (Section 5.1)
-- `/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/renderer/shaders/peripheral2.frag` (sampleDoGReconstructed, lines 92-141)
+- `/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/renderer/shaders/peripheral.frag` (sampleDoGReconstructed, lines 92-141)
 
 ## Key Issues
 

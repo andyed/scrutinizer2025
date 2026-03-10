@@ -1,10 +1,10 @@
 # Vision Scientist Agent Memory
 
 ## Scrutinizer Codebase Facts (verified 2026-03-01)
-- Active shader: `peripheral2.frag` (946 lines), loaded by webgl-renderer.js line 44
+- Active shader: `peripheral.frag` (946 lines), loaded by webgl-renderer.js line 44
 - Legacy shader: `peripheral.frag` (1157 lines) -- NOT used, does NOT contain DoG bands
-- peripheral2.frag has 34 uniforms (including 4 samplers), peripheral.frag has 28
-- DoG band decomposition, FOVI CMF, and Gaussian color decay are ONLY in peripheral2.frag
+- peripheral.frag has 34 uniforms (including 4 samplers), peripheral.frag has 28
+- DoG band decomposition, FOVI CMF, and Gaussian color decay are ONLY in peripheral.frag
 - FOVI equation in shader: `log2((r_deg + a) / a)` which equals `log2(1 + e/a)` -- correct
 - Unit tests: 3 test files, ~110 test cases total (43+35+32), NOT 138
 - 23 JS modules in renderer/, not 4

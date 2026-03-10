@@ -4,7 +4,7 @@
 
 **Status**: Proposed
 **Created**: 2026-03-07
-**Dependencies**: `renderer/shaders/peripheral2.frag` (DoG band decomposition), `shared/modes.json`, Wave 1 infrastructure (`scripts/analyze-*.js`, `scripts/validate-*.js`, `scripts/report-*.js`)
+**Dependencies**: `renderer/shaders/peripheral.frag` (DoG band decomposition), `shared/modes.json`, Wave 1 infrastructure (`scripts/analyze-*.js`, `scripts/validate-*.js`, `scripts/report-*.js`)
 
 ## Context
 
@@ -14,7 +14,7 @@ Scrutinizer's peripheral shader decomposes the rendered page into 5 spatial freq
 
 ### The Shader's Spatial Model
 
-The DoG decomposition in `peripheral2.frag` (lines 164-176) extracts 5 bands:
+The DoG decomposition in `peripheral.frag` (lines 164-176) extracts 5 bands:
 
 | Band | MIP Levels | Spatial Freq | Content | Cutoff (norm_ecc) |
 |------|-----------|-------------|---------|-------------------|

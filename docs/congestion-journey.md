@@ -143,7 +143,7 @@ capturePage → saliencyWorker (256px)    → saliency texture (R channel)
 | `renderer/congestion-worker.js` | **New** — Dedicated Web Worker, imports congestion-core.js |
 | `renderer/content-analysis.js` | Added congestion worker lifecycle, dual-tier stats tracking |
 | `renderer/webgl-renderer.js` | Added `u_congestionMap` texture on TEXTURE4 |
-| `renderer/shaders/peripheral2.frag` | Reads from high-res texture when available |
+| `renderer/shaders/peripheral.frag` | Reads from high-res texture when available |
 | `renderer/scrutinizer.js` | Toggle flow, trigger-aware resubmission |
 | `renderer/complexity-hud.js` | Pending state with spinner, score formula |
 | `renderer/preload.js` | Tagged structure-update IPC with trigger type |

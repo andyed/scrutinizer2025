@@ -533,7 +533,7 @@ To prevent "flicker" and "dropouts" during rapid content updates (e.g., video pl
 -   **Sampling**: `float saliency = texture2D(u_saliencyMap, uv).r;`
 
 ### 4. Saliency Gating Formula
-**File**: `renderer/shaders/peripheral2.frag` (in `processLGN` function)
+**File**: `renderer/shaders/peripheral.frag` (in `processLGN` function)
 
 ```glsl
 // Sample saliency at current pixel

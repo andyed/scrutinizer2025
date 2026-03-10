@@ -42,7 +42,7 @@ overlay.js
         │     └── color-saliency-map.js → Chromatic attention → u_saliencyMap
         │
         └─→ webgl-renderer.js (WebGL2 Pipeline)
-              └── peripheral2.frag (LGN → V1 → V4 shader stages)
+              └── peripheral.frag (LGN → V1 → V4 shader stages)
 ```
 
 **Design principles:**
@@ -339,7 +339,7 @@ col *= mix(1.0, lumaRatio, contrastPreservation);
 
 **Solution**: The shader shrinks `fovea_radius` and `parafovea_radius` proportionally to velocity via `smoothstep(4.0, 10.0, u_velocity)`. At 10+ px/ms, the fovea collapses to near-zero — the entire viewport renders as periphery.
 *   **Menu**: Simulation → Saccadic Blindness (checkbox, off by default)
-*   **Files**: `peripheral2.frag`, `peripheral.frag` (uniform + fovea shrink), `webgl-renderer.js` (uniform binding), `scrutinizer.js` (`toggleSaccadicBlindness()` + suppression bypass)
+*   **Files**: `peripheral.frag`, `peripheral.frag` (uniform + fovea shrink), `webgl-renderer.js` (uniform binding), `scrutinizer.js` (`toggleSaccadicBlindness()` + suppression bypass)
 *   **Limitation**: Mouse velocity is a noisy proxy for saccadic state. Real saccades are ballistic (200-500°/s, 30-80ms). The velocity thresholds are tuned for visual effect, not biological fidelity.
 
 #### 2. Web Worker Saliency

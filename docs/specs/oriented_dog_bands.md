@@ -10,7 +10,7 @@ Dependencies: DoG band decomposition (v1.6, implemented), V1 crowding pipeline (
 
 ### The Isotropic Assumption
 
-The current DoG band decomposition in `peripheral2.frag:92-143` treats all orientations equally — each band's weight is a single scalar rolloff based on eccentricity:
+The current DoG band decomposition in `peripheral.frag:92-143` treats all orientations equally — each band's weight is a single scalar rolloff based on eccentricity:
 
 ```glsl
 float w0 = 1.0 - smoothstep(c0 - c0*transMult, c0 + c0*transMult, normEcc);
@@ -28,7 +28,7 @@ V1 simple cells are orientation-tuned (Hubel & Wiesel, 1962). Key facts:
 
 2. **Cortical Magnification Anisotropy**: More cortical area is devoted to cardinal orientations (Furmanski & Engel, 2000). Cardinal-tuned neurons are more numerous and have smaller receptive fields.
 
-3. **Crowding Asymmetry**: The V1 distortion code already models horizontal crowding asymmetry — `fractalWarp.x *= 2.0` at `peripheral2.frag:401`. But the V4 DoG pooling path doesn't match. A horizontal word boundary that survives V1 distortion gets isotropically blurred in V4, negating the asymmetry.
+3. **Crowding Asymmetry**: The V1 distortion code already models horizontal crowding asymmetry — `fractalWarp.x *= 2.0` at `peripheral.frag:401`. But the V4 DoG pooling path doesn't match. A horizontal word boundary that survives V1 distortion gets isotropically blurred in V4, negating the asymmetry.
 
 4. **Radial-Tangential Anisotropy** (Toet & Levi, 1992): Crowding is stronger for flankers arranged along the radial axis (toward/away from fovea) than the tangential axis. Content aligned tangentially to the fovea persists further into the periphery.
 
@@ -65,7 +65,7 @@ V1 simple cells are orientation-tuned (Hubel & Wiesel, 1962). Key facts:
 Isotropic DoG as implemented. Serves as comparison target.
 
 ```glsl
-// peripheral2.frag — current code (v2.1: 8 half-octave bands)
+// peripheral.frag — current code (v2.1: 8 half-octave bands)
 vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
                              float dog_e2, float dog_sharpness, float visual_ecc) {
     // ... 9 MIP samples (LOD 0.0–4.0 in 0.5 steps), 8 bands, smoothstep rolloff ...
@@ -281,7 +281,7 @@ float c0 = c0_base * boost0 * radialBias;
 
 ## 5. Integration Points
 
-### 5.1 `renderer/shaders/peripheral2.frag`
+### 5.1 `renderer/shaders/peripheral.frag`
 
 | Location | Change |
 |----------|--------|

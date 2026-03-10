@@ -27,7 +27,7 @@ Two fundamentally different operations that the original D1 spec conflated:
 
 **What Scrutinizer does today (CMF path):**
 ```glsl
-// peripheral2.frag:266-267 (sampleMIPPooled), also :293-294 (sampleMIPPooledGrad)
+// peripheral.frag:266-267 (sampleMIPPooled), also :293-294 (sampleMIPPooledGrad)
 float cortical_dist = log(1.0 + r_deg / u_cmf_a);
 mipLevel = clamp(maxMipLevel * cortical_dist / u_cortical_max, 0.0, maxMipLevel);
 // Then: textureLod(u_texture, uv, mipLevel)  — SAME UV, different blur
@@ -41,7 +41,7 @@ const cmfA = this.config.cmf_a || 2.78;               // :620
 const corticalMax = Math.log1p(rMaxDeg / cmfA);         // :621
 ```
 
-DoG band cutoffs are derived from the same CMF by inverting the MIP formula (`peripheral2.frag:162-171`):
+DoG band cutoffs are derived from the same CMF by inverting the MIP formula (`peripheral.frag:162-171`):
 ```glsl
 float scale = u_cortical_max / maxMipLevel;
 c0 = u_cmf_a * (exp(1.0 * scale) - 1.0) / fovea_deg;  // MIP 1 boundary
@@ -101,11 +101,11 @@ It preserves the spatial layout — every pixel still has a unique UV. True log-
 
 #### D1c. Add `u_ecc_scaling` Uniform
 
-**Status:** SHIPPED. Uniform added to `peripheral2.frag`, wired in `webgl-renderer.js`, defaults set in all CMF-enabled modes.
+**Status:** SHIPPED. Uniform added to `peripheral.frag`, wired in `webgl-renderer.js`, defaults set in all CMF-enabled modes.
 
 **What:** Brown et al. parameterize pooling zone growth as `scaling × eccentricity` where `scaling = 0.75` (their default, derived from Bouma's law). Expose this as a tunable uniform that scales MIP output, allowing per-mode control of how aggressively blur increases with eccentricity.
 
-**Uniform declaration** (add to `peripheral2.frag` after line 47):
+**Uniform declaration** (add to `peripheral.frag` after line 47):
 ```glsl
 uniform float u_ecc_scaling;      // Pooling growth rate (Bouma scaling, default 0.75)
 ```
@@ -121,7 +121,7 @@ mipLevel = clamp(maxMipLevel * cortical_dist / u_cortical_max * (u_ecc_scaling /
 
 The `/ 0.75` normalizes so that the default value (0.75) produces no change from current behavior. Values > 0.75 increase peripheral blur (larger pooling zones); values < 0.75 decrease it.
 
-**DoG band cutoff propagation** — the CMF-derived cutoffs at `peripheral2.frag:167-171` must also scale:
+**DoG band cutoff propagation** — the CMF-derived cutoffs at `peripheral.frag:167-171` must also scale:
 ```glsl
 // Current:
 float scale = u_cortical_max / maxMipLevel;

@@ -36,7 +36,7 @@ The DoG band decomposition already sorts content by spatial frequency. Per-band 
 
 ## Implementation Details
 
-### Step 1: Add shader uniforms (`peripheral2.frag`)
+### Step 1: Add shader uniforms (`peripheral.frag`)
 
 Add after existing FOVI uniforms (line ~48):
 
@@ -183,7 +183,7 @@ Add a checkbox to the Simulation > Behavior submenu:
 
 | File | Change |
 |------|--------|
-| `renderer/shaders/peripheral2.frag` | Add 4 uniforms, `chromaticAttenuate()` function, per-band chromatic path in `sampleDoGReconstructed()`, V4 desat guard |
+| `renderer/shaders/peripheral.frag` | Add 4 uniforms, `chromaticAttenuate()` function, per-band chromatic path in `sampleDoGReconstructed()`, V4 desat guard |
 | `renderer/webgl-renderer.js` | Add 4 uniform locations, config defaults, lookup, upload, mode loading |
 | `shared/modes.json` | Add `chromatic_pooling`, `rg_decay`, `yv_decay`, `yv_freq_decay` to modes 0, 1, 9 |
 | `main-process/menu-builder.js` | Add "Chromatic Pooling" toggle checkbox (optional) |
@@ -225,6 +225,6 @@ No new textures, no new passes, no CPU-side computation. Pure fragment shader co
 
 ### Red Kill Switch Double-Attenuation (Mar 4 2026)
 
-**Problem**: The "Red Kill Switch" in V4 (lines ~806-813 of peripheral2.frag) applies up to 95% attenuation to Oklab `a` (red-green) channel in the far periphery. When chromatic pooling was also active, red got hit twice: once in sampleDoGReconstructed() and again in the Red Kill Switch.
+**Problem**: The "Red Kill Switch" in V4 (lines ~806-813 of peripheral.frag) applies up to 95% attenuation to Oklab `a` (red-green) channel in the far periphery. When chromatic pooling was also active, red got hit twice: once in sampleDoGReconstructed() and again in the Red Kill Switch.
 
 **Fix**: Wrapped Red Kill Switch in `if (u_chromatic_pooling < 0.5)` guard, same pattern as the base V4 chrominance path.

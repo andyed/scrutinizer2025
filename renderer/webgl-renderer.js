@@ -41,7 +41,7 @@
 
                 // Load shaders from file
                 const vsSource = fs.readFileSync(path.join(__dirname, 'shaders', 'peripheral.vert'), 'utf8');
-                const fsSource = fs.readFileSync(path.join(__dirname, 'shaders', 'peripheral2.frag'), 'utf8');
+                const fsSource = fs.readFileSync(path.join(__dirname, 'shaders', 'peripheral.frag'), 'utf8');
 
                 const { ipcRenderer } = require('electron');
                 ipcRenderer.send('log:renderer', `[WebGLRenderer] WebGL context created: ${this.gl.constructor.name}`);

@@ -90,7 +90,7 @@ This means a user can have a generous 180px clear zone without lying to the ecce
 - [ ] Separate comfort clear zone mask from eccentricity computation
 - [ ] Blind spot calibration as second anchor point (~15° eccentricity)
 
-**Files:** `peripheral2.frag`, `webgl-renderer.js`, `scrutinizer.js`, `foveal-calibration.js`, `settings-manager.js`
+**Files:** `peripheral.frag`, `webgl-renderer.js`, `scrutinizer.js`, `foveal-calibration.js`, `settings-manager.js`
 
 ---
 
