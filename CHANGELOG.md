@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.2.0] - 2026-03-09
+
+### Added
+- **Oriented DoG Bands (Phase 1-3)**: Orientation-selective band attenuation in `peripheral2.frag`. Phase 1: oblique effect — cardinal edges get M-scaling cutoffs pushed ~50% further (Appelle 1972). Phase 2: 4-channel V1 simple cell energy decomposition (H/V/D45/D135) replacing `cos(2θ)` (Hubel & Wiesel 1962). Phase 3: radial-tangential anisotropy — tangential edges +30%, radial -15% (Toet & Levi 1992). 3 uniforms: `u_dog_oriented`, `u_dog_orient_bias`, `u_dog_radial_bias`. 4-tap MIP-1 gradient with BGRA-corrected luminance, gradient magnitude gate. Enabled on modes 0 and 1.
+- **Orientation Diagnostics**: Debug level 4 (4-channel energy: R=H, G=V, B=diagonal) and debug level 5 (band weights + orientation tint with fovea blend). Menu: Simulation → Utility → Orientation Diagnostics.
+- **Keyboard Shortcuts**: Direct keyboard access to visualization modes via Simulation menu accelerators.
+- **Oriented DoG Capture Script**: A/B capture comparing oriented vs isotropic DoG output across reference pages. `TEST_DOG_ORIENTED` and `TEST_DOG_ORIENT_BIAS` env vars for parametric testing.
+- **Validation Report Format**: Claim/Basis/Result structure with pass/partial/fail badge pills, replacing Published/Validation/Result.
+
+### Changed
+- **Mongrel textures spec**: Updated for v2.1 with timestamps added to all specs.
+- **Roadmap**: Spec index table with status triage added. Linguistic priming spec refreshed to v3, roadmap condensed.
+
+### Fixed
+- **Debug 5 fovea circle**: White fovea circle in orientation diagnostics mode corrected.
+- **Toolbar clipping**: Fixed toolbar clipping in visualization mode keyboard shortcut additions.
+- **Scroll-to-top in captures**: Capture scripts now scroll to page top before capture, eliminating scroll-position variation.
+- **Arxiv table overflow**: Fixed table overflow in two-column layout.
+
+### Docs
+- README: DOM-aware rendering rationale, LGN/V1/V4 pipeline table with deep links, structure map as DOM analysis, validation case study, psychophysical validation section with published data table.
+- Arxiv paper: Gaussian comparison conditions added to saliency and color-search analysis. Communications review fixes.
+- Release notes (v2.1): Undefined technical terms defined inline. Blog post links, published data links, grad student project cross-links added.
+
 ## [2.1.0] - 2026-03-08
 
 ### Added

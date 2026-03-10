@@ -1,6 +1,6 @@
 # Scrutinizer Roadmap
 
-Last updated: 2026-03-09 (v2.1)
+Last updated: 2026-03-09 (v2.2)
 
 ## Specs
 
@@ -9,7 +9,7 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 | Spec | Topic | Status |
 |------|-------|--------|
 | [linguistic_priming.md](docs/specs/linguistic_priming.md) | Goal embeddings → scent map → saliency gating | **Planned** |
-| [oriented_dog_bands.md](docs/specs/oriented_dog_bands.md) | Orientation-selective band attenuation, radial-tangential bias | **In progress** (Phase 1) |
+| [oriented_dog_bands.md](docs/specs/oriented_dog_bands.md) | Orientation-selective band attenuation, radial-tangential bias | **Shipped** (v2.2) |
 | [mongrel_textures.md](docs/specs/mongrel_textures.md) | Statistical texture synthesis (WebGPU tiered path) | **Planned** |
 | [congestion_text_density.md](docs/specs/congestion_text_density.md) | Congestion gate enhancement for text density | **Planned** |
 | [gaussian_blur_comparison.md](docs/specs/gaussian_blur_comparison.md) | DoG vs Gaussian frequency/saliency comparison | In progress |
@@ -120,13 +120,15 @@ Top-down attentional control via goal embeddings. User specifies intent ("find t
 ---
 
 ### Oriented DoG Bands
-**Status:** Specced ([`docs/specs/oriented_dog_bands.md`](docs/specs/oriented_dog_bands.md))
+**Status:** Shipped v2.2 ([`docs/specs/oriented_dog_bands.md`](docs/specs/oriented_dog_bands.md))
 
 Cardinal (H/V) edges get M-scaling cutoffs pushed ~50% further than oblique edges, modeling the oblique effect (Appelle, 1972). Radial-tangential bias: tangential content persists further per Toet & Levi (1992).
 
 **Work:**
-- [ ] Orientation-selective band attenuation in `peripheral2.frag`
-- [ ] Radial-tangential bias based on gaze-relative angle
+- [x] Phase 1: Oblique effect — 4-tap MIP-1 gradient, cos(2θ) cardinal alignment, gradient magnitude gate
+- [x] Phase 2: 4-channel V1 energy decomposition (H/V/D45/D135) replacing cos(2θ)
+- [x] Phase 3: Radial-tangential anisotropy — tangential +30%, radial -15%
+- [x] Debug overlays (levels 4, 5) + menu integration
 - [ ] Validation against oblique effect psychophysical data
 
 ---

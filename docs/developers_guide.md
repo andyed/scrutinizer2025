@@ -973,28 +973,50 @@ node cli/scrutinizer-audit.js https://example.com --output after.json --quiet
 node cli/scrutinizer-audit.js --compare before.json after.json
 ```
 
-### MCP Server (Claude Code Integration)
+### MCP Server (LLM Integration)
 
-The MCP server exposes three tools via stdio transport so Claude Code can query visual complexity on demand.
+The MCP server exposes tools via stdio transport so AI assistants (Claude, Cursor, Windsurf) can query visual complexity on demand.
 
-#### Setup
+#### Setup Instructions
 
-```bash
-claude mcp add scrutinizer-audit -- node /path/to/scrutinizer2025/cli/mcp/server.js
+**1. Claude Desktop**
+Add the following to your `claude_desktop_config.json` (usually at `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+```json
+{
+  "mcpServers": {
+    "scrutinizer-audit": {
+      "command": "node",
+      "args": ["/absolute/path/to/scrutinizer2025/cli/mcp/server.js"]
+    }
+  }
+}
 ```
 
-#### Tools
+**2. Cursor or Windsurf**
+Go to Settings -> Features -> MCP (or MCP Servers) and add a new server:
+- **Type**: `command`
+- **Name**: `scrutinizer-audit`
+- **Command**: `node /absolute/path/to/scrutinizer2025/cli/mcp/server.js`
+
+**3. Claude Code (CLI)**
+```bash
+claude mcp add scrutinizer-audit -- node /absolute/path/to/scrutinizer2025/cli/mcp/server.js
+```
+
+#### Available Tools
 
 | Tool | Input | Output |
 |------|-------|--------|
 | `analyze_url` | `{ url, viewport?, scroll? }` | Score, rating, congestion, edgeDensity |
 | `analyze_urls` | `{ urls[], viewport? }` | Summary + per-page breakdown |
 | `compare_pages` | `{ urlA, urlB, viewport? }` | Side-by-side metrics + delta |
+| `capture_vision` | `{ url, x, y, radius, mode }` | Base64 PNG simulating foveated vision at the given point |
 
-Example from Claude Code:
+Example from Claude Desktop or Cursor:
 
 ```
 > Use scrutinizer-audit to compare apple.com vs amazon.com
+> Capture the vision of techmeme.com looking at the top-left logo (0.15, 0.15)
 ```
 
 The MCP server launches headless Chromium, captures screenshots, runs the congestion pipeline, and returns structured JSON — same scores as the CLI and HUD.

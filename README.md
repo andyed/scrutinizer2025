@@ -71,7 +71,7 @@ Resolution falloff across all stages follows a [cortical magnification function]
 ### Tools
 - **Foveal Calibrator** — [online tool](https://andyed.github.io/scrutinizer-www/foveal-calibration.html) measuring perceptual foveal spread via Motion Silence psychophysics
 - **scrutinizer-audit CLI** — headless Playwright-based site auditor: Feature Congestion scoring, batch URL evaluation, sitemap crawling, CI gating (`--fail-above N`), heatmap export
-- **MCP server** — AI-assisted design review via `analyze_url`, `analyze_urls`, `compare_pages` tools for Claude Code integration
+- **MCP server** — AI-assisted design review via `analyze_url`, `compare_pages`, and `capture_vision` tools (compatible with Claude Desktop, Cursor, and Windsurf)
 - **Golden capture pipeline** — automated screenshot capture and SSIM/PSNR regression testing across versions
 
 ### Interface
@@ -199,8 +199,9 @@ npm test                        # Run test suite
 node cli/scrutinizer-audit.js https://example.com
 node cli/scrutinizer-audit.js --sitemap https://example.com/sitemap.xml --fail-above 70
 
-# MCP server — AI-assisted design review
-claude mcp add scrutinizer-audit -- node cli/mcp/server.js
+# MCP server — AI-assisted design review. Works with Claude Desktop, Cursor, Windsurf, etc.
+# Use the absolute path to `server.js` when configuring your LLM client.
+# Example for Cursor/Windsurf: Command: `node /absolute/path/to/cli/mcp/server.js`
 ```
 
 ---

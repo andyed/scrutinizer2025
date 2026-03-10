@@ -92,6 +92,36 @@ const TOOLS = [
             },
             required: ['urlA', 'urlB']
         }
+    },
+    {
+        name: 'capture_vision',
+        description: 'Take a screenshot of a web page WITH the Scrutinizer visual effect (foveal blur, color degradation, etc) applied at a specific fixation point. Returns a base64 PNG image block. Use this when the user wants to SEE what a page looks like to someone with visual impairments.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                url: {
+                    type: 'string',
+                    description: 'URL to capture'
+                },
+                x: {
+                    type: 'number',
+                    description: 'Normalized X fixation point (0.0 to 1.0, e.g., 0.5 for center)'
+                },
+                y: {
+                    type: 'number',
+                    description: 'Normalized Y fixation point (0.0 to 1.0, e.g., 0.5 for center)'
+                },
+                mode: {
+                    type: 'string',
+                    description: 'Aesthetic mode ID (0=Default, 1=Red/Cyan, etc). Default is 0.'
+                },
+                radius: {
+                    type: 'number',
+                    description: 'Foveal radius in pixels. Default is 180.'
+                }
+            },
+            required: ['url']
+        }
     }
 ];
 
@@ -247,6 +277,74 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         }, null, 2)
                     }]
                 };
+            }
+
+            case 'capture_vision': {
+                const { spawn } = require('child_process');
+                const path = require('path');
+                const fs = require('fs');
+
+                const appDir = path.join(__dirname, '..', '..');
+                const filename = `mcp_capture_${Date.now()}.png`;
+
+                return new Promise((resolve) => {
+                    const env = Object.assign({}, process.env, {
+                        TEST_MODE: 'true',
+                        TEST_URL: args.url,
+                        TEST_FIXATION_X: args.x !== undefined ? String(args.x) : '0.5',
+                        TEST_FIXATION_Y: args.y !== undefined ? String(args.y) : '0.5',
+                        TEST_MODES: args.mode !== undefined ? String(args.mode) : '0',
+                        TEST_RADIUS: args.radius !== undefined ? String(args.radius) : '180',
+                        TEST_OUTPUT_FILENAME: filename,
+                        ELECTRON_RUN_AS_NODE: undefined // Force execution as app
+                    });
+
+                    // Launch Electron to capture
+                    const child = spawn('node', ['scripts/run-electron.js', '.'], {
+                        cwd: appDir,
+                        env: env,
+                        stdio: 'ignore'
+                    });
+
+                    child.on('close', (code) => {
+                        try {
+                            const pkgVersion = require('../../package.json').version.replace(/\.\d+$/, '');
+                            const outPath = path.join(appDir, 'tests', 'golden-captures', `v${pkgVersion}`, filename);
+
+                            if (fs.existsSync(outPath)) {
+                                const buffer = fs.readFileSync(outPath);
+                                const base64 = buffer.toString('base64');
+                                fs.unlinkSync(outPath); // Cleanup
+
+                                resolve({
+                                    content: [{
+                                        type: 'image',
+                                        data: base64,
+                                        mimeType: 'image/png'
+                                    }]
+                                });
+                            } else {
+                                resolve({
+                                    content: [{ type: 'text', text: `Error: capture output file not found at ${outPath}. Electron exited with code ${code}` }],
+                                    isError: true
+                                });
+                            }
+                        } catch (e) {
+                            resolve({
+                                content: [{ type: 'text', text: 'Error reading capture: ' + e.message }],
+                                isError: true
+                            });
+                        }
+                    });
+
+                    setTimeout(() => {
+                        child.kill();
+                        resolve({
+                            content: [{ type: 'text', text: 'Error: capture process timed out.' }],
+                            isError: true
+                        });
+                    }, 25000);
+                });
             }
 
             default:

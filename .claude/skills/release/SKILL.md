@@ -60,14 +60,15 @@ Run each step sequentially. After each step, verify before proceeding. **STOP on
 - Create `docs/release_notes_v{VERSION}.md` following existing format (see `docs/release_notes_v1.5.0.md`, `docs/release_notes_v1.6.0.md`)
 - Ask user for highlights or summarize from commits
 
-### 7. Update CHANGELOG.md and ROADMAP.md
+### 7. Update CHANGELOG.md, ROADMAP.md, and README.md
 - Add version entry to `CHANGELOG.md`
 - Move completed items in `ROADMAP.md` from "Next" to their feature sections
+- Update `README.md`: version badge and download link (`v{PREV}` → `v{VERSION}`)
 
 ### 8. Commit release
 - Stage:
   ```bash
-  git add package.json docs/release_notes_v{VERSION}.md CHANGELOG.md ROADMAP.md tests/golden-captures/v{VERSION}/
+  git add package.json docs/release_notes_v{VERSION}.md CHANGELOG.md ROADMAP.md README.md tests/golden-captures/v{VERSION}/
   ```
   Also stage mode comparison captures if they exist:
   ```bash
