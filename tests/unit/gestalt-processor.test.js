@@ -15,7 +15,7 @@
 'use strict';
 
 const path = require('path');
-const { describe, it, assert } = require('./test-runner');
+// The describe and it globals are provided by Jest.
 
 const GestaltProcessor = require(
     path.resolve(__dirname, '../../renderer/gestalt-processor.js')
@@ -50,32 +50,32 @@ describe('GestaltProcessor.process', () => {
     it('process_emptyArray_returnsEmptyArray', () => {
         const gp = new GestaltProcessor();
         const result = gp.process([]);
-        assert.deepStrictEqual(result, []);
+        expect(result).toEqual([]);
     });
 
     it('process_nullInput_returnsEmptyArray', () => {
         const gp = new GestaltProcessor();
         const result = gp.process(null);
-        assert.deepStrictEqual(result, []);
+        expect(result).toEqual([]);
     });
 
     it('process_undefinedInput_returnsEmptyArray', () => {
         const gp = new GestaltProcessor();
         const result = gp.process(undefined);
-        assert.deepStrictEqual(result, []);
+        expect(result).toEqual([]);
     });
 
     it('process_singleBlock_returnsSingleBlock', () => {
         const gp = new GestaltProcessor();
         const block = makeBlock(100, 100, 50, 20);
         const result = gp.process([block]);
-        assert.strictEqual(result.length, 1, 'should return exactly 1 block');
+        expect(result.length).toBe(1);
     });
 
     it('process_returnsArray', () => {
         const gp = new GestaltProcessor();
         const result = gp.process([makeBlock(0, 0, 10, 10)]);
-        assert.ok(Array.isArray(result), 'process() must return an Array');
+        expect(Array.isArray(result)).toBeTruthy();
     });
 
     it('process_adjacentBlocks_mergesIntoFewerResults', () => {
@@ -87,8 +87,7 @@ describe('GestaltProcessor.process', () => {
         ];
         const result = gp.process(blocks);
         // They should be merged into a single cluster (one output block)
-        assert.strictEqual(result.length, 1,
-            `expected 1 merged block, got ${result.length}`);
+        expect(result.length).toBe(1);
     });
 
     it('process_widelySpacedBlocks_keepsThemSeparate', () => {
@@ -100,18 +99,17 @@ describe('GestaltProcessor.process', () => {
         ];
         const result = gp.process(blocks);
         // Each block should remain as its own cluster/noise point
-        assert.strictEqual(result.length, 2,
-            `expected 2 separate blocks, got ${result.length}`);
+        expect(result.length).toBe(2);
     });
 
     it('process_outputBlocksHaveBoundingBoxProperties', () => {
         const gp = new GestaltProcessor();
         const result = gp.process([makeBlock(10, 20, 30, 40)]);
         const block = result[0];
-        assert.ok('x' in block, 'missing x');
-        assert.ok('y' in block, 'missing y');
-        assert.ok('w' in block, 'missing w');
-        assert.ok('h' in block, 'missing h');
+        expect('x' in block).toBeTruthy();
+        expect('y' in block).toBeTruthy();
+        expect('w' in block).toBeTruthy();
+        expect('h' in block).toBeTruthy();
     });
 });
 
@@ -123,7 +121,7 @@ describe('GestaltProcessor.regionQuery', () => {
         const block = makeBlock(0, 0, 50, 50);
         // A block always neighbours itself (distance = 0)
         const neighbors = gp.regionQuery([block], block, 10, 10);
-        assert.ok(neighbors.includes(0), 'block should neighbor itself');
+        expect(neighbors.includes(0)).toBeTruthy();
     });
 
     it('regionQuery_touchingBlock_isIncluded', () => {
@@ -133,7 +131,7 @@ describe('GestaltProcessor.regionQuery', () => {
         const b = makeBlock(50, 0, 50, 20);
         const neighbors = gp.regionQuery([a, b], a, 1, 1);
         // Edge gap is 0 which is < epsX=1, so b should be included
-        assert.ok(neighbors.includes(1), 'touching block should be a neighbor');
+        expect(neighbors.includes(1)).toBeTruthy();
     });
 
     it('regionQuery_gapBeyondEps_blockExcluded', () => {
@@ -142,7 +140,7 @@ describe('GestaltProcessor.regionQuery', () => {
         const a = makeBlock(0,   0, 50, 20);
         const b = makeBlock(200, 0, 50, 20);
         const neighbors = gp.regionQuery([a, b], a, 50, 50);
-        assert.ok(!neighbors.includes(1), 'far block should not be a neighbor');
+        expect(neighbors.includes(1)).toBeFalsy();
     });
 
     it('regionQuery_overlappingBlocks_alwaysNeighbors', () => {
@@ -151,7 +149,7 @@ describe('GestaltProcessor.regionQuery', () => {
         const a = makeBlock(0,  0, 100, 50);
         const b = makeBlock(50, 0, 100, 50);
         const neighbors = gp.regionQuery([a, b], a, 0.1, 0.1);
-        assert.ok(neighbors.includes(1), 'overlapping blocks must always be neighbors');
+        expect(neighbors.includes(1)).toBeTruthy();
     });
 
     it('regionQuery_withinEpsX_butBeyondEpsY_excluded', () => {
@@ -161,15 +159,14 @@ describe('GestaltProcessor.regionQuery', () => {
         const b = makeBlock(10, 200, 50, 20);
         const neighbors = gp.regionQuery([a, b], a, 100, 10);
         // Vertical gap ≈ 180px > epsY=10
-        assert.ok(!neighbors.includes(1),
-            'block far in Y should not be neighbor even if close in X');
+        expect(neighbors.includes(1)).toBeFalsy();
     });
 
     it('regionQuery_emptyPoints_returnsEmptyArray', () => {
         const gp = new GestaltProcessor();
         const core = makeBlock(0, 0, 10, 10);
         const result = gp.regionQuery([], core, 100, 100);
-        assert.deepStrictEqual(result, []);
+        expect(result).toEqual([]);
     });
 });
 
@@ -179,7 +176,7 @@ describe('GestaltProcessor.runDBSCAN', () => {
     it('runDBSCAN_emptyInput_returnsEmptyClusters', () => {
         const gp = new GestaltProcessor();
         const clusters = gp.runDBSCAN([], 60, 32);
-        assert.deepStrictEqual(clusters, []);
+        expect(clusters).toEqual([]);
     });
 
     it('runDBSCAN_singlePoint_treatedAsNoiseSingleItemCluster', () => {
@@ -188,8 +185,8 @@ describe('GestaltProcessor.runDBSCAN', () => {
         // Noise points are kept as single-item clusters.
         const block = makeBlock(0, 0, 50, 20);
         const clusters = gp.runDBSCAN([block], 60, 32);
-        assert.strictEqual(clusters.length, 1, 'single block → 1 cluster');
-        assert.strictEqual(clusters[0].length, 1, 'cluster contains the 1 block');
+        expect(clusters.length).toBe(1);
+        expect(clusters[0].length).toBe(1);
     });
 
     it('runDBSCAN_twoAdjacentBlocks_formOneCluster', () => {
@@ -202,8 +199,7 @@ describe('GestaltProcessor.runDBSCAN', () => {
         const clusters = gp.runDBSCAN(blocks, 60, 32);
         // Both blocks should end up in the same cluster
         const clusterSizes = clusters.map(c => c.length);
-        assert.ok(clusterSizes.includes(2),
-            `expected a cluster of size 2, got sizes [${clusterSizes}]`);
+        expect(clusterSizes.includes(2)).toBeTruthy();
     });
 
     it('runDBSCAN_twoDistantBlocks_formTwoClusters', () => {
@@ -214,10 +210,9 @@ describe('GestaltProcessor.runDBSCAN', () => {
             makeBlock(400, 0, 50, 20),
         ];
         const clusters = gp.runDBSCAN(blocks, 60, 32);
-        assert.strictEqual(clusters.length, 2,
-            `expected 2 clusters, got ${clusters.length}`);
+        expect(clusters.length).toBe(2);
         clusters.forEach((c, i) => {
-            assert.strictEqual(c.length, 1, `cluster[${i}] should have 1 item`);
+            expect(c.length).toBe(1);
         });
     });
 
@@ -233,10 +228,8 @@ describe('GestaltProcessor.runDBSCAN', () => {
         const clusters = gp.runDBSCAN(blocks, 60, 32);
         // All three should be in one cluster
         const biggest = Math.max(...clusters.map(c => c.length));
-        assert.strictEqual(biggest, 3,
-            `expected largest cluster to have 3 members, got ${biggest}`);
-        assert.strictEqual(clusters.length, 1,
-            `expected 1 cluster total, got ${clusters.length}`);
+        expect(biggest).toBe(3);
+        expect(clusters.length).toBe(1);
     });
 
     it('runDBSCAN_largeEpsilon_mergesAllBlocks', () => {
@@ -248,8 +241,7 @@ describe('GestaltProcessor.runDBSCAN', () => {
             makeBlock(200, 0, 50, 20),
         ];
         const clusters = gp.runDBSCAN(blocks, 1000, 1000);
-        assert.strictEqual(clusters.length, 1,
-            'with huge epsilon, all blocks should form 1 cluster');
+        expect(clusters.length).toBe(1);
     });
 
     it('runDBSCAN_zeroEpsilon_eachBlockIsIsolated', () => {
@@ -262,8 +254,7 @@ describe('GestaltProcessor.runDBSCAN', () => {
         ];
         const clusters = gp.runDBSCAN(blocks, 0, 0);
         // Each block should be its own noise cluster
-        assert.strictEqual(clusters.length, 2,
-            `expected 2 isolated clusters with eps=0, got ${clusters.length}`);
+        expect(clusters.length).toBe(2);
     });
 });
 
@@ -284,8 +275,7 @@ describe('GestaltProcessor.expandCluster', () => {
 
         // Verify no duplicate objects in cluster
         const unique = new Set(cluster);
-        assert.strictEqual(unique.size, cluster.length,
-            `cluster has duplicates: ${cluster.length} items but ${unique.size} unique`);
+        expect(unique.size).toBe(cluster.length);
     });
 });
 
@@ -294,15 +284,14 @@ describe('GestaltProcessor.expandCluster', () => {
 describe('GestaltProcessor.mergeClusters', () => {
     it('mergeClusters_emptyInput_returnsEmptyArray', () => {
         const gp = new GestaltProcessor();
-        assert.deepStrictEqual(gp.mergeClusters([]), []);
+        expect(gp.mergeClusters([])).toEqual([]);
     });
 
     it('mergeClusters_singleItemCluster_returnsOriginalBlock', () => {
         const gp = new GestaltProcessor();
         const block = makeBlock(10, 20, 30, 40);
         const result = gp.mergeClusters([[block]]);
-        assert.strictEqual(result[0], block,
-            'single-item cluster should return the original block reference');
+        expect(result[0]).toBe(block);
     });
 
     it('mergeClusters_twoBlocks_boundingBoxUnion', () => {
@@ -313,10 +302,10 @@ describe('GestaltProcessor.mergeClusters', () => {
         const b = makeBlock(60, 10, 40, 30);
         const result = gp.mergeClusters([[a, b]]);
 
-        assert.strictEqual(result[0].x, 0,   'merged x should be minimum x');
-        assert.strictEqual(result[0].y, 0,   'merged y should be minimum y');
-        assert.strictEqual(result[0].w, 100, 'merged w should span both blocks (0 to 100)');
-        assert.strictEqual(result[0].h, 40,  'merged h should span both blocks (0 to 40)');
+        expect(result[0].x).toBe(0);
+        expect(result[0].y).toBe(0);
+        expect(result[0].w).toBe(100);
+        expect(result[0].h).toBe(40);
     });
 
     it('mergeClusters_typeFlagPromotion_interactiveWinsOverText', () => {
@@ -327,8 +316,7 @@ describe('GestaltProcessor.mergeClusters', () => {
         const link  = makeBlock(55, 0, 50, 20, { type: 0.0 });
         const text2 = makeBlock(110,0, 50, 20, { type: 1.0 });
         const result = gp.mergeClusters([[text1, link, text2]]);
-        assert.strictEqual(result[0].type, 0.0,
-            'merged cluster with any interactive element should have type=0.0');
+        expect(result[0].type).toBe(0.0);
     });
 
     it('mergeClusters_allTextBlocks_typeRemainsText', () => {
@@ -336,8 +324,7 @@ describe('GestaltProcessor.mergeClusters', () => {
         const a = makeBlock(0,  0, 50, 20, { type: 1.0 });
         const b = makeBlock(55, 0, 50, 20, { type: 1.0 });
         const result = gp.mergeClusters([[a, b]]);
-        assert.strictEqual(result[0].type, 1.0,
-            'cluster of only text blocks should have type=1.0');
+        expect(result[0].type).toBe(1.0);
     });
 
     it('mergeClusters_density_cappedAtOne', () => {
@@ -346,8 +333,7 @@ describe('GestaltProcessor.mergeClusters', () => {
         const a = makeBlock(0,  0, 50, 20, { density: 1.0 });
         const b = makeBlock(55, 0, 50, 20, { density: 1.0 });
         const result = gp.mergeClusters([[a, b]]);
-        assert.ok(result[0].density <= 1.0,
-            `density must not exceed 1.0, got ${result[0].density}`);
+        expect(result[0].density).toBeLessThanOrEqual(1.0);
     });
 
     it('mergeClusters_density_averagedWithGroupBoost', () => {
@@ -358,8 +344,7 @@ describe('GestaltProcessor.mergeClusters', () => {
         const result = gp.mergeClusters([[a, b]]);
         const expectedDensity = Math.min(1.0, 0.5 * 1.2);
         // Allow floating-point tolerance
-        assert.ok(Math.abs(result[0].density - expectedDensity) < 1e-9,
-            `expected density ${expectedDensity}, got ${result[0].density}`);
+        expect(Math.abs(result[0].density - expectedDensity)).toBeLessThan(1e-9);
     });
 
     it('mergeClusters_lineHeight_isAveragedAcrossCluster', () => {
@@ -367,8 +352,7 @@ describe('GestaltProcessor.mergeClusters', () => {
         const a = makeBlock(0,  0, 50, 20, { lineHeight: 10 });
         const b = makeBlock(55, 0, 50, 20, { lineHeight: 20 });
         const result = gp.mergeClusters([[a, b]]);
-        assert.strictEqual(result[0].lineHeight, 15,
-            'lineHeight should be the average of cluster members');
+        expect(result[0].lineHeight).toBe(15);
     });
 
     it('mergeClusters_multipleClusters_processedIndependently', () => {
@@ -376,7 +360,7 @@ describe('GestaltProcessor.mergeClusters', () => {
         const cluster1 = [makeBlock(0, 0, 50, 20), makeBlock(55, 0, 50, 20)];
         const cluster2 = [makeBlock(500, 0, 80, 30)];
         const result = gp.mergeClusters([cluster1, cluster2]);
-        assert.strictEqual(result.length, 2, 'two clusters → two output blocks');
+        expect(result.length).toBe(2);
     });
 
     it('mergeClusters_outputHasRequiredProperties', () => {
@@ -386,7 +370,7 @@ describe('GestaltProcessor.mergeClusters', () => {
         const result = gp.mergeClusters([[a, b]]);
         const merged = result[0];
         ['x', 'y', 'w', 'h', 'type', 'density', 'lineHeight'].forEach(prop => {
-            assert.ok(prop in merged, `merged block missing property: ${prop}`);
+            expect(prop in merged).toBeTruthy();
         });
     });
 });
@@ -396,21 +380,20 @@ describe('GestaltProcessor.mergeClusters', () => {
 describe('GestaltProcessor.defaultConfig', () => {
     it('defaultConfig_hasExpectedEpsilonValues', () => {
         const gp = new GestaltProcessor();
-        assert.strictEqual(gp.config.textEpsilonX, 60);
-        assert.strictEqual(gp.config.textEpsilonY, 32);
-        assert.strictEqual(gp.config.minPts, 2);
+        expect(gp.config.textEpsilonX).toBe(60);
+        expect(gp.config.textEpsilonY).toBe(32);
+        expect(gp.config.minPts).toBe(2);
     });
 
     it('defaultConfig_paddingIsPositive', () => {
         const gp = new GestaltProcessor();
-        assert.ok(gp.config.padding > 0, 'padding must be positive');
+        expect(gp.config.padding).toBeGreaterThan(0);
     });
 
     it('constructor_createsIndependentConfigPerInstance', () => {
         const gp1 = new GestaltProcessor();
         const gp2 = new GestaltProcessor();
         gp1.config.textEpsilonX = 999;
-        assert.notStrictEqual(gp2.config.textEpsilonX, 999,
-            'instances should not share config objects');
+        expect(gp2.config.textEpsilonX).not.toBe(999);
     });
 });

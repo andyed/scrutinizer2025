@@ -140,7 +140,8 @@
                     visualMemoryLimit: 2,
                     debugBoundary: 0,
                     mongrelMode: 0,
-                    aestheticMode: 0
+                    aestheticMode: 0,
+                    dwellTimeThreshold: 50 // Required. Defaults to 150 in Scrutinizer if omitted.
                 };
 
                 const scrutinizer = new window.Scrutinizer(config);
@@ -150,6 +151,32 @@
                 // Helper to tick
                 const tick = (ms) => {
                     virtualTime += ms;
+                };
+
+                const simulateDwell = (duration, x, y) => {
+                    const step = 16;
+                    const steps = duration / step;
+
+                    scrutinizer.mouseX = x; scrutinizer.mouseY = y;
+                    scrutinizer.targetMouseX = x; scrutinizer.targetMouseY = y;
+                    scrutinizer.lastMouseX = x; scrutinizer.lastMouseY = y;
+                    scrutinizer.currentVelocity = 0;
+
+                    for (let i = 0; i < steps; i++) {
+                        tick(step);
+                        scrutinizer.render();
+                    }
+                };
+
+                const simulateMove = (x, y) => {
+                    scrutinizer.currentVelocity = 50.0;
+                    tick(16);
+                    scrutinizer.render();
+
+                    scrutinizer.mouseX = x; scrutinizer.mouseY = y;
+                    scrutinizer.targetMouseX = x; scrutinizer.targetMouseY = y;
+                    scrutinizer.lastMouseX = x; scrutinizer.lastMouseY = y;
+                    scrutinizer.currentVelocity = 0;
                 };
 
                 // --- TEST CASE 1: Fixation Logic ---
@@ -189,19 +216,10 @@
                 log('Test 2: FIFO Eviction (Limit 2)', 'info');
 
                 // Move to B (400, 400)
-                // Simulate movement velocity to break fixation (Threshold is 20.0, so use 50.0)
-                scrutinizer.currentVelocity = 50.0;
-                tick(100);
-                scrutinizer.render();
-
-                scrutinizer.mouseX = 400; scrutinizer.mouseY = 400;
-                scrutinizer.targetMouseX = 400; scrutinizer.targetMouseY = 400;
-                scrutinizer.lastMouseX = 400; scrutinizer.lastMouseY = 400;
-                scrutinizer.currentVelocity = 0;
+                simulateMove(400, 400);
 
                 // Dwell at B
-                tick(200); // > 50ms
-                scrutinizer.render();
+                simulateDwell(200, 400, 400);
 
                 if (scrutinizer.visualMemoryBuffer.length === 2) {
                     log('PASS: Buffer has 2 items (A, B)', 'pass');
@@ -210,18 +228,10 @@
                 }
 
                 // Move to C (500, 500) -> Should evict A
-                scrutinizer.currentVelocity = 50.0;
-                tick(100);
-                scrutinizer.render();
-
-                scrutinizer.mouseX = 500; scrutinizer.mouseY = 500;
-                scrutinizer.targetMouseX = 500; scrutinizer.targetMouseY = 500;
-                scrutinizer.lastMouseX = 500; scrutinizer.lastMouseY = 500;
-                scrutinizer.currentVelocity = 0;
+                simulateMove(500, 500);
 
                 // Dwell at C
-                tick(200);
-                scrutinizer.render();
+                simulateDwell(200, 500, 500);
 
                 if (scrutinizer.visualMemoryBuffer.length === 2) {
                     const p1 = scrutinizer.visualMemoryBuffer[0]; // Should be B (400,400)
@@ -254,19 +264,8 @@
                 const points = [[100, 100], [200, 200], [300, 300]];
 
                 for (const p of points) {
-                    // Move
-                    scrutinizer.currentVelocity = 50.0;
-                    tick(100);
-                    scrutinizer.render();
-
-                    scrutinizer.mouseX = p[0]; scrutinizer.mouseY = p[1];
-                    scrutinizer.targetMouseX = p[0]; scrutinizer.targetMouseY = p[1];
-                    scrutinizer.lastMouseX = p[0]; scrutinizer.lastMouseY = p[1];
-                    scrutinizer.currentVelocity = 0;
-
-                    // Dwell
-                    tick(2500);
-                    scrutinizer.render();
+                    simulateMove(p[0], p[1]);
+                    simulateDwell(200, p[0], p[1]);
                 }
 
                 if (scrutinizer.visualMemoryBuffer.length === 3) {

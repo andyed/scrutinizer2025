@@ -677,12 +677,12 @@
 
             const intScrutinizer = new window.Scrutinizer(integrityConfig);
 
+            intScrutinizer.enable();
+
             // MANUALLY FIX MASK SIZE FOR TEST (IPC 'get-window-size' won't reply in this env)
             // This ensures the mask texture has the correct aspect ratio (matching the 800x600 canvas)
-            intScrutinizer.maskCanvas.width = Math.ceil(width * 0.25);
-            intScrutinizer.maskCanvas.height = Math.ceil(height * 0.25);
-
-            intScrutinizer.enable();
+            intScrutinizer.visualMemory.maskCanvas.width = Math.ceil(width * 0.25);
+            intScrutinizer.visualMemory.maskCanvas.height = Math.ceil(height * 0.25);
 
             // Mock Time
             let intVirtualTime = 40000;

@@ -23,7 +23,7 @@
 
 'use strict';
 
-const { describe, it, assert } = require('./test-runner');
+// The describe and it globals are provided by Jest.
 
 // ─── Reference implementation (mirrors the GLSL shader) ─────────────────────
 
@@ -56,8 +56,8 @@ function mipToEcc(mip, a, rMax, maxMip) {
 
 function assertClose(actual, expected, tol, label) {
     const msg = `${label}: expected ${expected}, got ${actual} (tol ±${tol})`;
-    assert.ok(isFinite(actual), `${label}: value is not finite (${actual})`);
-    assert.ok(Math.abs(actual - expected) <= tol, msg);
+    expect(Number.isFinite(actual)).toBeTruthy();
+    expect(Math.abs(actual - expected)).toBeLessThanOrEqual(tol);
 }
 
 // ─── Default parameters ─────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ describe('CMF → MIP level mapping', function () {
         let prev = -1;
         for (let r = 0; r <= R_MAX; r += 0.1) {
             const m = mipCorrect(r, A, R_MAX, MAX_MIP);
-            assert.ok(m >= prev, `monotonicity violated at r=${r}: ${m} < ${prev}`);
+            expect(m).toBeGreaterThanOrEqual(prev);
             prev = m;
         }
     });
@@ -97,8 +97,7 @@ describe('CMF → MIP level mapping', function () {
     it('output is always in [0, maxMip] for any eccentricity in [0, r_max]', function () {
         for (let r = 0; r <= R_MAX; r += 0.05) {
             const m = mipCorrect(r, A, R_MAX, MAX_MIP);
-            assert.ok(m >= 0 && m <= MAX_MIP,
-                `out of bounds at r=${r}: mip=${m}`);
+            expect(m >= 0 && m <= MAX_MIP).toBeTruthy();
         }
     });
 
@@ -134,9 +133,7 @@ describe('CMF → MIP level mapping', function () {
         const correct = mipCorrect(r, A, R_MAX, MAX_MIP);
         const buggy   = mipBuggy(r, A);
         const diff = Math.abs(correct - buggy);
-        assert.ok(diff > 0.5,
-            `buggy and correct should diverge significantly at r=${r}: ` +
-            `correct=${correct.toFixed(3)}, buggy=${buggy.toFixed(3)}, diff=${diff.toFixed(3)}`);
+        expect(diff > 0.5).toBeTruthy();
     });
 
     // ── Inversion round-trip ────────────────────────────────────────────
@@ -156,9 +153,7 @@ describe('CMF → MIP level mapping', function () {
         const r = 5;
         const mip_steep = mipCorrect(r, 1.0, R_MAX, MAX_MIP);  // small a
         const mip_flat  = mipCorrect(r, 5.0, R_MAX, MAX_MIP);  // large a
-        assert.ok(mip_steep > mip_flat,
-            `a=1.0 should produce higher MIP than a=5.0 at r=${r}: ` +
-            `${mip_steep.toFixed(3)} vs ${mip_flat.toFixed(3)}`);
+        expect(mip_steep > mip_flat).toBeTruthy();
     });
 
     it('different maxMip scales output proportionally', function () {

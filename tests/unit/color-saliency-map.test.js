@@ -19,7 +19,7 @@
 'use strict';
 
 const path   = require('path');
-const { describe, it, assert } = require('./test-runner');
+// The describe and it globals are provided by Jest.
 
 // ─── Minimal Canvas/DOM mock ───────────────────────────────────────────────────
 // Must be set up BEFORE require()'ing color-saliency-map.js
@@ -142,45 +142,43 @@ describe('ColorSaliencyMap.resize', () => {
     it('resize_smallImage_scalesDownToTargetMax256', () => {
         const csm = new ColorSaliencyMap();
         csm.resize(1024, 768); // max dim = 1024 → scale = 256/1024 = 0.25
-        assert.ok(isFinite(csm.scale) && csm.scale > 0, 'scale must be finite and positive');
-        assert.ok(csm.width  <= 256, `width ${csm.width} should be ≤ 256`);
-        assert.ok(csm.height <= 256, `height ${csm.height} should be ≤ 256`);
+        expect(Number.isFinite(csm.scale) && csm.scale > 0).toBeTruthy();
+        expect(csm.width).toBeLessThanOrEqual(256);
+        expect(csm.height).toBeLessThanOrEqual(256);
     });
 
     it('resize_tinyImage_doesNotUpscale_scaleCapOnePoint0', () => {
         const csm = new ColorSaliencyMap();
         csm.resize(64, 64); // max dim = 64 → 256/64 = 4.0, capped at 1.0
-        assert.ok(csm.scale <= 1.0, `scale should never exceed 1.0, got ${csm.scale}`);
+        expect(csm.scale).toBeLessThanOrEqual(1.0);
     });
 
     it('resize_squareImage_widthEqualsHeight', () => {
         const csm = new ColorSaliencyMap();
         csm.resize(512, 512);
-        assert.strictEqual(csm.width, csm.height,
-            'square source should produce square internal canvas');
+        expect(csm.width).toBe(csm.height);
     });
 
     it('resize_zeroDimension_usesFallbackScale', () => {
         const csm = new ColorSaliencyMap();
         // width=0 means maxDim=0 — guard prevents div-by-zero → scale defaults to 0.25
         csm.resize(0, 0);
-        assert.ok(isFinite(csm.scale), 'scale must be finite for zero-dimension input');
-        assert.ok(csm.scale > 0, 'scale must be positive for zero-dimension input');
+        expect(Number.isFinite(csm.scale)).toBeTruthy();
+        expect(csm.scale).toBeGreaterThan(0);
     });
 
     it('resize_landscapeImage_scaleBasedOnLargestDimension', () => {
         const csm = new ColorSaliencyMap();
         csm.resize(1920, 400); // max dim = 1920 → scale = 256/1920 ≈ 0.1333
         const expectedScale = 256 / 1920;
-        assert.ok(Math.abs(csm.scale - expectedScale) < 1e-6,
-            `expected scale ≈ ${expectedScale.toFixed(4)}, got ${csm.scale}`);
+        expect(Math.abs(csm.scale - expectedScale)).toBeLessThan(1e-6);
     });
 
     it('resize_setsWidthAndHeightOnInternalCanvas', () => {
         const csm = new ColorSaliencyMap();
         csm.resize(800, 600);
-        assert.ok(csm.width  > 0, 'internal width must be set after resize');
-        assert.ok(csm.height > 0, 'internal height must be set after resize');
+        expect(csm.width).toBeGreaterThan(0);
+        expect(csm.height).toBeGreaterThan(0);
     });
 });
 
@@ -204,26 +202,24 @@ describe('ColorSaliencyMap.computeFromImage_blackPixels', () => {
     it('computeFromImage_blackImage_returnsAllZeroSaliency', () => {
         const { result } = makeCSMWithColor(0, 0, 0);
         const allZero = Array.from(result.data).every(v => v === 0);
-        assert.ok(allZero, 'all-black image should produce zero saliency everywhere');
+        expect(allZero).toBeTruthy();
     });
 
     it('computeFromImage_returnsExpectedShape', () => {
         const { result } = makeCSMWithColor(0, 0, 0, 4);
-        assert.strictEqual(result.width,  4, 'width mismatch');
-        assert.strictEqual(result.height, 4, 'height mismatch');
-        assert.strictEqual(result.data.length, 16, 'data length should be w×h');
+        expect(result.width).toBe(4);
+        expect(result.height).toBe(4);
+        expect(result.data.length).toBe(16);
     });
 
     it('computeFromImage_returnsFloat32Array', () => {
         const { result } = makeCSMWithColor(128, 128, 128);
-        assert.ok(result.data instanceof Float32Array,
-            'saliency data should be a Float32Array');
+        expect(result.data instanceof Float32Array).toBeTruthy();
     });
 
     it('computeFromImage_returnsMaxVal', () => {
         const { result } = makeCSMWithColor(200, 100, 50);
-        assert.ok(isFinite(result.maxVal) && result.maxVal > 0,
-            'maxVal should be a finite positive number for non-black image');
+        expect(Number.isFinite(result.maxVal) && result.maxVal > 0).toBeTruthy();
     });
 });
 
@@ -243,8 +239,7 @@ describe('ColorSaliencyMap.computeFromImage_uniformFields', () => {
         const result = computeUniform(255, 0, 0);
         const first = result.data[0];
         const allSame = Array.from(result.data).every(v => Math.abs(v - first) < 1e-6);
-        assert.ok(allSame,
-            'uniform-colour image should produce identical saliency at every pixel');
+        expect(allSame).toBeTruthy();
     });
 
     it('computeFromImage_uniformField_allValuesEqualMaxVal', () => {
@@ -255,14 +250,13 @@ describe('ColorSaliencyMap.computeFromImage_uniformFields', () => {
         const allEqualMax = Array.from(result.data).every(
             v => Math.abs(v - result.maxVal) < 1e-6
         );
-        assert.ok(allEqualMax,
-            `uniform field: every data value should equal maxVal (${result.maxVal})`);
+        expect(allEqualMax).toBeTruthy();
     });
 
     it('computeFromImage_whiteImage_hasPositiveSaliency', () => {
         // White: intensity=1, rg=0, by=0 → raw = W_I * 1 = 0.3 > 0
         const result = computeUniform(255, 255, 255);
-        assert.ok(result.data[0] > 0, 'white image should have positive saliency (intensity contribution)');
+        expect(result.data[0]).toBeGreaterThan(0);
     });
 
     it('computeFromImage_pureGrey_hasLowerSaliency_thanPureRed', () => {
@@ -272,8 +266,7 @@ describe('ColorSaliencyMap.computeFromImage_uniformFields', () => {
         // Instead compare maxVal (the un-normalised peak).
         const greyResult = computeUniform(128, 128, 128);
         const redResult  = computeUniform(255, 0,   0);
-        assert.ok(redResult.maxVal > greyResult.maxVal,
-            `red maxVal (${redResult.maxVal}) should exceed grey maxVal (${greyResult.maxVal})`);
+        expect(redResult.maxVal).toBeGreaterThan(greyResult.maxVal);
     });
 });
 
@@ -282,22 +275,20 @@ describe('ColorSaliencyMap.computeFromImage_uniformFields', () => {
 describe('ColorSaliencyMap_pureMath_saliencyFormulas', () => {
     it('rawSaliency_black_isZero', () => {
         const val = rawSaliency(0, 0, 0);
-        assert.ok(Math.abs(val) < 1e-9, `expected 0, got ${val}`);
+        expect(Math.abs(val)).toBeLessThan(1e-9);
     });
 
     it('rawSaliency_white_isIntensityWeightOnly', () => {
         // White: r=g=b=1 → rg=0, by=0 → val = W_I * 1
         const val      = rawSaliency(255, 255, 255);
         const expected = 0.3 * (0.2126 + 0.7152 + 0.0722); // 0.3 × 1.0
-        assert.ok(Math.abs(val - expected) < 1e-6,
-            `white saliency: expected ${expected}, got ${val}`);
+        expect(Math.abs(val - expected)).toBeLessThan(1e-6);
     });
 
     it('rawSaliency_pureRed_higherThan_pureGrey', () => {
         const grey = rawSaliency(128, 128, 128);
         const red  = rawSaliency(255, 0,   0);
-        assert.ok(red > grey,
-            `pure red (${red}) should have higher raw saliency than grey (${grey})`);
+        expect(red).toBeGreaterThan(grey);
     });
 
     it('rawSaliency_pureCyan_highBYOpponency', () => {
@@ -305,8 +296,7 @@ describe('ColorSaliencyMap_pureMath_saliencyFormulas', () => {
         // by = |b - (r+g)/2| = |1 - 0.5| = 0.5 — high blue-yellow opponency
         const val = rawSaliency(0, 255, 255);
         const expected = 0.3 * (0.7152 + 0.0722) + 0.35 * 1.0 + 0.35 * 0.5;
-        assert.ok(Math.abs(val - expected) < 1e-5,
-            `cyan saliency: expected ${expected}, got ${val}`);
+        expect(Math.abs(val - expected)).toBeLessThan(1e-5);
     });
 
     it('rawSaliency_pureRed_correctRGOpponency', () => {
@@ -316,8 +306,7 @@ describe('ColorSaliencyMap_pureMath_saliencyFormulas', () => {
         // by = |0 - (1+0)/2| = 0.5
         const val      = rawSaliency(255, 0, 0);
         const expected = 0.3 * 0.2126 + 0.35 * 1.0 + 0.35 * 0.5;
-        assert.ok(Math.abs(val - expected) < 1e-5,
-            `pure red saliency: expected ${expected}, got ${val}`);
+        expect(Math.abs(val - expected)).toBeLessThan(1e-5);
     });
 
     it('rawSaliency_isAlwaysFinite', () => {
@@ -327,24 +316,22 @@ describe('ColorSaliencyMap_pureMath_saliencyFormulas', () => {
         ];
         testColors.forEach(([r,g,b]) => {
             const val = rawSaliency(r,g,b);
-            assert.ok(isFinite(val),
-                `rawSaliency(${r},${g},${b}) must be finite, got ${val}`);
+            expect(Number.isFinite(val)).toBeTruthy();
         });
     });
 
     it('contrastBoost_zero_remainsZero', () => {
-        assert.ok(Math.abs(contrastBoosted(0) - 0) < 1e-9);
+        expect(Math.abs(contrastBoosted(0) - 0)).toBeLessThan(1e-9);
     });
 
     it('contrastBoost_one_remainsOne', () => {
-        assert.ok(Math.abs(contrastBoosted(1) - 1) < 1e-9);
+        expect(Math.abs(contrastBoosted(1) - 1)).toBeLessThan(1e-9);
     });
 
     it('contrastBoost_midValue_increasedTowardOne', () => {
         // Power < 1 expands the range toward 1 (brightens mid-tones)
         const mid = 0.5;
-        assert.ok(contrastBoosted(mid) > mid,
-            `contrast boost of ${mid} should produce a larger value (got ${contrastBoosted(mid)})`);
+        expect(contrastBoosted(mid)).toBeGreaterThan(mid);
     });
 });
 
@@ -354,15 +341,15 @@ describe('ColorSaliencyMap.getCanvas_and_clear', () => {
     it('getCanvas_returnsFakeCanvasObject', () => {
         const csm = new ColorSaliencyMap();
         const canvas = csm.getCanvas();
-        assert.ok(canvas !== null && canvas !== undefined,
-            'getCanvas() must return a non-null object');
+        expect(canvas).not.toBeNull();
+        expect(canvas).not.toBeUndefined();
     });
 
     it('getCanvas_returnsSameCanvasAcrossCalls', () => {
         const csm    = new ColorSaliencyMap();
         const first  = csm.getCanvas();
         const second = csm.getCanvas();
-        assert.strictEqual(first, second, 'getCanvas() must return the same canvas object');
+        expect(first).toBe(second);
     });
 
     it('clear_callsFillRect', () => {
@@ -371,15 +358,14 @@ describe('ColorSaliencyMap.getCanvas_and_clear', () => {
         csm.clear();
         // The mock context stores fillRect calls; verify at least one was made.
         const rects = csm.ctx._fillRects;
-        assert.ok(rects.length >= 1, 'clear() should call fillRect on the context');
+        expect(rects.length).toBeGreaterThanOrEqual(1);
     });
 
     it('clear_setsFillStyleToBlack', () => {
         const csm = new ColorSaliencyMap();
         csm.resize(10, 10);
         csm.clear();
-        assert.strictEqual(csm.ctx.fillStyle, 'black',
-            "clear() should set fillStyle to 'black'");
+        expect(csm.ctx.fillStyle).toBe('black');
     });
 });
 
@@ -388,28 +374,27 @@ describe('ColorSaliencyMap.getCanvas_and_clear', () => {
 describe('ColorSaliencyMap.constructor', () => {
     it('constructor_initialScaleIsQuarter', () => {
         const csm = new ColorSaliencyMap();
-        assert.strictEqual(csm.scale, 0.25, 'default scale should be 0.25');
+        expect(csm.scale).toBe(0.25);
     });
 
     it('constructor_initialDimensionsAreZero', () => {
         const csm = new ColorSaliencyMap();
-        assert.strictEqual(csm.width,  0, 'initial width should be 0');
-        assert.strictEqual(csm.height, 0, 'initial height should be 0');
+        expect(csm.width).toBe(0);
+        expect(csm.height).toBe(0);
     });
 
     it('constructor_exposesCanvasProperty', () => {
         const csm = new ColorSaliencyMap();
-        assert.ok(csm.canvas !== undefined, 'canvas property must be set by constructor');
+        expect(csm.canvas).toBeDefined();
     });
 
     it('constructor_exposesCtxProperty', () => {
         const csm = new ColorSaliencyMap();
-        assert.ok(csm.ctx !== undefined, 'ctx property must be set by constructor');
+        expect(csm.ctx).toBeDefined();
     });
 
     it('constructor_ctxImageSmoothingDisabled', () => {
         const csm = new ColorSaliencyMap();
-        assert.strictEqual(csm.ctx.imageSmoothingEnabled, false,
-            'imageSmoothingEnabled should be set to false');
+        expect(csm.ctx.imageSmoothingEnabled).toBe(false);
     });
 });
