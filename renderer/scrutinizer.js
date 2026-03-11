@@ -84,6 +84,10 @@
                 config: this.config
             });
 
+            // ── Frame Timer (zero-alloc rolling-window perf tracker) ──
+            const TimerClass = (typeof FrameTimer !== 'undefined') ? FrameTimer : (typeof window !== 'undefined' ? window.FrameTimer : null);
+            this.frameTimer = TimerClass ? new TimerClass(120) : null;
+
             // ── Frame state ──────────────────────────────────────────
             this.lastFrameBitmap = null;
             this.aestheticMode = 0;
@@ -155,7 +159,7 @@
                         }
                         clearTimeout(this._congestionScrollTimer);
                         this._congestionScrollTimer = setTimeout(() => {
-                            this._submitCongestionFrame();
+                            this._submitCongestionFrame(true); // Viewport changed
                         }, 600);
                     } else {
                         // DOM mutation = content changed but viewport didn't move.
@@ -170,7 +174,7 @@
                             clearTimeout(this._congestionMutationTimer);
                             const remaining = 5000 - timeSinceLastResult;
                             this._congestionMutationTimer = setTimeout(() => {
-                                this._submitCongestionFrame();
+                                this._submitCongestionFrame(true); // DOM changed
                             }, remaining + 300); // +300ms settle time after cooldown
                         } else {
                             // Cooldown expired — recompute with gentle pending.
@@ -179,7 +183,7 @@
                             }
                             clearTimeout(this._congestionMutationTimer);
                             this._congestionMutationTimer = setTimeout(() => {
-                                this._submitCongestionFrame();
+                                this._submitCongestionFrame(true); // DOM changed
                             }, 800);
                         }
                     }
@@ -202,6 +206,9 @@
 
             // Re-submit to congestion worker on navigation (if report mode or congestion pooling is active)
             ipcRenderer.on('browser:did-navigate', () => {
+                // New page — reset all dirty checks so first frame goes through
+                this.contentAnalysis.resetDirtyChecks();
+
                 if (this._congestionReportMode > 0 || this.renderer?.config.congestion_pooling) {
                     // Clear stale heatmap immediately — old page's overlay shouldn't linger
                     if (this._congestionReportMode >= 2 && this.renderer) {
@@ -212,7 +219,7 @@
                     // Delay to let the page render before capturing
                     clearTimeout(this._congestionNavTimer);
                     this._congestionNavTimer = setTimeout(() => {
-                        this._submitCongestionFrame();
+                        this._submitCongestionFrame(true); // New page
                     }, 500);
                 }
             });
@@ -347,11 +354,13 @@
         render() {
             if (!this.renderer) return;
             const now = performance.now();
+            if (this.frameTimer) this.frameTimer.beginFrame();
 
             // 1. Update gaze model (smoothing + velocity)
             this.gazeModel.update(now);
             const gaze = this.gazeModel.getPosition();
             const velocity = this.gazeModel.getVelocity();
+            if (this.frameTimer) this.frameTimer.mark('gaze');
 
             // 2. Determine effective foveal radius
             const effectiveRadius = this.enabled ? this.config.fovealRadius : 5000.0;
@@ -362,12 +371,14 @@
                 this.visualMemory.update(now, gaze.x, gaze.y, velocity, effectiveRadius);
                 this.visualMemory.renderMask(this.renderer);
             }
+            if (this.frameTimer) this.frameTimer.mark('memory');
 
             // 4. Update content analysis (saliency + congestion smoothing)
             this.contentAnalysis.updateSaliencySmoothing(this.renderer);
             if (this._congestionReportMode > 0 || this.renderer.config.congestion_pooling) {
                 this.contentAnalysis.updateCongestionSmoothing(this.renderer);
             }
+            if (this.frameTimer) this.frameTimer.mark('saliency');
 
             // 5. Compose render state
             const aspectRatio = this.config.fovealAspectRatio || 1.33;
@@ -411,7 +422,8 @@
                 ipcRenderer.send('overlay:congestion-processing', false);
             }
             if (this.complexityHud) {
-                this.complexityHud.update(contentState.congestionStats, contentState.edgeDensityStats);
+                const perfStats = this.frameTimer ? this.frameTimer.getStats() : null;
+                this.complexityHud.update(contentState.congestionStats, contentState.edgeDensityStats, perfStats);
             }
 
             // 8. Render (single call to WebGL with all composed state)
@@ -439,10 +451,18 @@
                 this.config.scrollbarWidth
             );
 
+            if (this.frameTimer) this.frameTimer.mark('render');
+            if (this.frameTimer) this.frameTimer.endFrame();
+
             // Occasional debug logging
             if (Math.random() < 0.005) {
                 console.log(`[Scrutinizer] Render: Enabled=${this.enabled}, Radius=${effectiveRadius}, Mem=${this.visualMemory.getLimit()}, Vel=${velocity.toFixed(3)}`);
             }
+        }
+
+        /** @returns {Object|null} Current frame timing stats from FrameTimer */
+        getFrameStats() {
+            return this.frameTimer ? this.frameTimer.getStats() : null;
         }
 
         // ── Public API (delegating to modules) ───────────────────────
@@ -506,6 +526,14 @@
 
         toggleEnableStructureMap(enabled) {
             this.contentAnalysis.toggleEnableStructureMap(enabled);
+        }
+
+        toggleCongestionPooling(enabled) {
+            if (this.renderer) {
+                this.renderer.config.congestion_pooling = enabled;
+                this.renderer._congestionPoolingOverride = enabled;
+                ipcRenderer.send('log:renderer', `[Scrutinizer] Congestion-gated pooling: ${enabled}`);
+            }
         }
 
         toggleChromaticPooling(enabled) {
@@ -642,17 +670,28 @@
 
         /**
          * Submit current frame buffer to the high-res congestion worker.
+         * @param {boolean} [force=false] - Bypass dirty check (scroll/mutation/navigation)
          * @private
          */
-        _submitCongestionFrame() {
+        _submitCongestionFrame(force = false) {
             if (this.imageDataBuffer && this.imageData) {
                 this.contentAnalysis.submitForCongestion(
                     this.imageDataBuffer,
                     this.imageData.width,
-                    this.imageData.height
+                    this.imageData.height,
+                    force
                 );
                 ipcRenderer.send('overlay:congestion-processing', true);
             }
+        }
+
+        /**
+         * Set saliency worker resolution.
+         * Higher res improves congestion ranking for pooling (ρ=0.69 at 256 → ~0.85 at 512).
+         * @param {number} maxDim - 256 or 512
+         */
+        setSaliencyResolution(maxDim) {
+            this.contentAnalysis.setSaliencyResolution(maxDim);
         }
 
         /**
@@ -663,7 +702,7 @@
             this.contentAnalysis.setCongestionResolution(maxDim);
             // Re-submit if report is active to get updated results at new resolution
             if (this._congestionReportMode > 0) {
-                this._submitCongestionFrame();
+                this._submitCongestionFrame(true); // Resolution changed
             }
         }
 

@@ -220,7 +220,7 @@ node cli/scrutinizer-audit.js --sitemap https://example.com/sitemap.xml --fail-a
 |------------|----------|
 | **Behavior** | Visual Memory (5 modes), Structure Map, Saliency Modulation |
 | **Foveal** | Toggle, Radius (6 sizes), Shape (4 aspect ratios) |
-| **Peripheral** | Intensity (5 levels), Effect Type, Chromatic Aberration |
+| **Peripheral** | Intensity (5 levels), Chromatic Aberration |
 | **Utility** | Rendering modes, Structure Map view, Saliency Map view, Eccentricity Overlay |
 
 ### Keyboard Shortcuts

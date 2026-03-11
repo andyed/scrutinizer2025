@@ -32,7 +32,8 @@
                 "yv_freq_decay": 0.008,
                 "supra_exponent": 0.5,
                 "crowding_density_threshold": 0.6,
-                "crowding_density_steepness": 20.0
+                "crowding_density_steepness": 20.0,
+                "congestion_pooling": true
             },
             "tests": [
                 "structure_masking",
@@ -75,7 +76,8 @@
                 "yv_freq_decay": 0.008,
                 "supra_exponent": 0.5,
                 "crowding_density_threshold": 0.6,
-                "crowding_density_steepness": 20.0
+                "crowding_density_steepness": 20.0,
+                "congestion_pooling": true
             },
             "tests": [
                 "purkinje_shift",

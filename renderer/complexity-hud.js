@@ -46,6 +46,7 @@
             this.activeTab = 'score';
             this._lastCStats = null;
             this._lastEStats = null;
+            this._lastPerfStats = null;
             this._pending = false;
             this._dragging = false;
 
@@ -84,8 +85,8 @@
                 cursor: grab;
             `;
 
-            const tabs = ['score', 'stats', 'spatial'];
-            const tabLabels = { score: 'Score', stats: 'Stats', spatial: 'Spatial' };
+            const tabs = ['score', 'stats', 'spatial', 'perf'];
+            const tabLabels = { score: 'Score', stats: 'Stats', spatial: 'Spatial', perf: 'Perf' };
             this.tabButtons = {};
 
             for (const tab of tabs) {
@@ -334,12 +335,13 @@
          * @param {Object|null} congestionStats - { mean, p90, p10, max, quadrants }
          * @param {Object|null} edgeDensityStats - same shape
          */
-        update(congestionStats, edgeDensityStats) {
+        update(congestionStats, edgeDensityStats, perfStats) {
             if (!this.container || !this.contentArea) return;
 
             // Keep last valid stats across page loads — only overwrite with real data
             if (congestionStats) this._lastCStats = congestionStats;
             if (edgeDensityStats) this._lastEStats = edgeDensityStats;
+            if (perfStats) this._lastPerfStats = perfStats;
             this._rerender();
         }
 
@@ -370,6 +372,9 @@
                     break;
                 case 'spatial':
                     this._renderSpatial(c, e);
+                    break;
+                case 'perf':
+                    this._renderPerf();
                     break;
             }
         }
@@ -452,9 +457,50 @@
             `;
         }
 
+        _renderPerf() {
+            const s = this._lastPerfStats;
+            if (!s || s.fps === 0) {
+                this.contentArea.innerHTML = '<span style="color:#aaa">Waiting for frames...</span>';
+                return;
+            }
+
+            // FPS color: green ≥55, yellow ≥30, red <30
+            const fpsColor = s.fps >= 55 ? '#43a047' : s.fps >= 30 ? '#f9a825' : '#d32f2f';
+            const fmt = (v) => v.toFixed(2);
+
+            // Phase breakdown bars
+            const phaseColors = {
+                gaze: '#43a047', memory: '#42a5f5', saliency: '#f9a825',
+                congestion: '#ef6c00', render: '#d32f2f'
+            };
+            const phaseOrder = ['gaze', 'memory', 'saliency', 'congestion', 'render'];
+            const totalAvg = s.avg || 1;
+
+            let barsHtml = '';
+            let legendHtml = '';
+            for (const name of phaseOrder) {
+                const p = s.phases[name];
+                if (!p) continue;
+                const pct = Math.max(1, (p.avg / totalAvg) * 100);
+                const col = phaseColors[name] || '#888';
+                barsHtml += `<div style="width:${pct}%;height:12px;background:${col};" title="${name}: ${fmt(p.avg)}ms avg"></div>`;
+                legendHtml += `<span style="color:${col};margin-right:6px;">${name[0].toUpperCase()} ${fmt(p.avg)}</span>`;
+            }
+
+            this.contentArea.innerHTML = `
+                <div style="margin-bottom:4px;color:#ccc;font-size:10px;letter-spacing:0.3px;">PERFORMANCE</div>
+                <div style="font-size:28px;font-weight:bold;color:${fpsColor};line-height:1;">${Math.round(s.fps)}<span style="font-size:11px;color:#888;font-weight:normal;"> fps</span></div>
+                <div style="margin:4px 0 2px;font-size:9px;color:#aaa;">
+                    avg ${fmt(s.avg)}ms &nbsp; p95 ${fmt(s.p95)}ms &nbsp; max ${fmt(s.max)}ms
+                </div>
+                <div style="display:flex;height:12px;border-radius:2px;overflow:hidden;margin:4px 0;">${barsHtml}</div>
+                <div style="font-size:8px;color:#aaa;line-height:1.4;">${legendHtml}</div>
+            `;
+        }
+
         /** Set a specific tab by name. */
         setTab(tab) {
-            const valid = ['score', 'stats', 'spatial'];
+            const valid = ['score', 'stats', 'spatial', 'perf'];
             if (valid.includes(tab)) {
                 this._setActiveTab(tab);
                 this._rerender();
@@ -463,7 +509,7 @@
 
         /** Cycle to next tab (for keyboard shortcut). */
         nextTab() {
-            const tabs = ['score', 'stats', 'spatial'];
+            const tabs = ['score', 'stats', 'spatial', 'perf'];
             const idx = tabs.indexOf(this.activeTab);
             this._setActiveTab(tabs[(idx + 1) % tabs.length]);
             this._rerender();

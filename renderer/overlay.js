@@ -257,6 +257,11 @@
             if (scrutinizer) scrutinizer.setMongrelMode(mode);
         });
 
+        ipcRenderer.on('menu:toggle-congestion-pooling', (event, enabled) => {
+            log(`[Overlay] IPC received menu:toggle-congestion-pooling: ${enabled}`);
+            if (scrutinizer) scrutinizer.toggleCongestionPooling(enabled);
+        });
+
         ipcRenderer.on('menu:toggle-chromatic-pooling', (e, enabled) => {
             scrutinizer.toggleChromaticPooling(enabled);
         });
@@ -288,6 +293,16 @@
         ipcRenderer.on('menu:set-show-congestion', (event, mode) => {
             log(`[Overlay] IPC received menu:set-show-congestion: ${mode}`);
             if (scrutinizer) scrutinizer.setShowCongestion(mode);
+        });
+
+        ipcRenderer.on('menu:set-saliency-resolution', (event, maxDim) => {
+            log(`[Overlay] IPC received menu:set-saliency-resolution: ${maxDim}`);
+            if (scrutinizer) scrutinizer.setSaliencyResolution(maxDim);
+        });
+
+        ipcRenderer.on('menu:set-congestion-resolution', (event, maxDim) => {
+            log(`[Overlay] IPC received menu:set-congestion-resolution: ${maxDim}`);
+            if (scrutinizer) scrutinizer.setCongestionResolution(maxDim);
         });
 
         // Toggle congestion report (from menu keyboard shortcut)

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Performance Test — Congestion Pooling A/B</title>
+</head>
+
+<body>
+    <canvas id="overlay-canvas" width="800" height="600"></canvas>
+    <div id="debug-overlay"></div>
+    <div id="complexity-hud"></div>
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        // ── Helpers ─────────────────────────────────────────────────
+        const log = (msg) => ipcRenderer.send('log', msg);
+        const fail = (msg, details) => ipcRenderer.send('test-result', { success: false, message: msg, details });
+        const pass = (msg) => ipcRenderer.send('test-result', { success: true, message: msg });
+
+        try {
+            // Load modules
+            const FrameTimer = require('../renderer/frame-timer.js');
+            require('../renderer/gaze-model.js');
+            require('../renderer/visual-memory.js');
+            require('../renderer/svg-overlay.js');
+            require('../renderer/content-analysis.js');
+            require('../renderer/complexity-hud.js');
+            require('../renderer/scrutinizer.js');
+
+            const width = 800;
+            const height = 600;
+
+            // Save real performance.now — FrameTimer must use wall-clock time
+            const realNow = performance.now.bind(performance);
+
+            // ── Create checkerboard texture ─────────────────────────
+            const buffer = new Uint8ClampedArray(width * height * 4);
+            for (let i = 0; i < buffer.length; i += 4) {
+                const x = (i / 4) % width;
+                const y = Math.floor((i / 4) / width);
+                const check = ((Math.floor(x / 20) + Math.floor(y / 20)) % 2 === 0) ? 255 : 0;
+                buffer[i] = check;
+                buffer[i + 1] = check;
+                buffer[i + 2] = check;
+                buffer[i + 3] = 255;
+            }
+            const imageData = new ImageData(buffer, width, height);
+
+            // ── Single Scrutinizer instance (reused across all runs) ─
+            const config = {
+                fovealRadius: 100,
+                intensity: 0.5,
+                debugBoundary: 0,
+                mongrelMode: 0,
+                aestheticMode: 0,
+                visualMemoryLimit: 0
+            };
+
+            const scrutinizer = new window.Scrutinizer(config);
+            scrutinizer.enable();
+            scrutinizer.renderer.uploadTexture(imageData);
+
+            // ── Mouse trajectories ──────────────────────────────────
+            const FRAMES = 300;
+            const WARMUP = 60;
+
+            const trajectories = {
+                static: (frame) => ({ x: width / 2, y: height / 2 }),
+                drift: (frame) => ({
+                    x: (frame / FRAMES) * width,
+                    y: height / 2 + Math.sin(frame * 0.02) * 50
+                }),
+                saccade: (frame) => {
+                    const side = Math.floor(frame / 30) % 2;
+                    return { x: side ? width * 0.75 : width * 0.25, y: height / 2 };
+                },
+                circle: (frame) => ({
+                    x: width / 2 + Math.cos(frame * 0.04) * 200,
+                    y: height / 2 + Math.sin(frame * 0.04) * 150
+                })
+            };
+
+            // ── Seed congestion smoothing canvases at max resolution ─
+            // Real congestion worker outputs at up to 1024px max dimension.
+            // For a 1920x1080 viewport: 1024x576. We simulate that worst case.
+            const CONGESTION_W = 1024;
+            const CONGESTION_H = 576;
+
+            function seedCongestion(ca) {
+                if (!ca.congestionTargetCanvas) {
+                    ca.congestionTargetCanvas = document.createElement('canvas');
+                    ca.congestionTargetCanvas.width = CONGESTION_W;
+                    ca.congestionTargetCanvas.height = CONGESTION_H;
+                    const tCtx = ca.congestionTargetCanvas.getContext('2d', { alpha: false });
+                    // Paint a gradient so drawImage blending does real work
+                    const grad = tCtx.createLinearGradient(0, 0, CONGESTION_W, CONGESTION_H);
+                    grad.addColorStop(0, '#ff4400');
+                    grad.addColorStop(1, '#004400');
+                    tCtx.fillStyle = grad;
+                    tCtx.fillRect(0, 0, CONGESTION_W, CONGESTION_H);
+                }
+                if (!ca.congestionCurrentCanvas) {
+                    ca.congestionCurrentCanvas = document.createElement('canvas');
+                    ca.congestionCurrentCanvas.width = CONGESTION_W;
+                    ca.congestionCurrentCanvas.height = CONGESTION_H;
+                    const cCtx = ca.congestionCurrentCanvas.getContext('2d', { alpha: false });
+                    cCtx.fillStyle = '#222';
+                    cCtx.fillRect(0, 0, CONGESTION_W, CONGESTION_H);
+                }
+                ca.congestionUpdateCountdown = 999;
+            }
+
+            // ── Run a single trajectory (reuses the shared scrutinizer) ─
+            function runTrajectory(name, trajFn, poolingEnabled) {
+                // Toggle pooling
+                scrutinizer.renderer.config.congestion_pooling = poolingEnabled;
+
+                if (poolingEnabled) {
+                    seedCongestion(scrutinizer.contentAnalysis);
+                } else {
+                    scrutinizer.contentAnalysis.congestionUpdateCountdown = 0;
+                }
+
+                // Mock performance.now for GazeModel's time-based smoothing,
+                // but FrameTimer uses realNow captured above.
+                let virtualTime = 50000;
+                performance.now = () => virtualTime;
+
+                // Use a separate FrameTimer that calls realNow
+                const timer = new FrameTimer(FRAMES);
+
+                // Warmup
+                for (let i = 0; i < WARMUP; i++) {
+                    const pos = trajFn(i);
+                    scrutinizer.gazeModel.targetMouseX = pos.x;
+                    scrutinizer.gazeModel.targetMouseY = pos.y;
+                    virtualTime += 16;
+                    scrutinizer.render();
+                }
+
+                // Reset the scrutinizer's own frameTimer to not pollute
+                if (scrutinizer.frameTimer) scrutinizer.frameTimer.reset();
+
+                // Timed run — use realNow for measurement
+                timer.reset();
+                for (let i = 0; i < FRAMES; i++) {
+                    const pos = trajFn(i);
+                    scrutinizer.gazeModel.targetMouseX = pos.x;
+                    scrutinizer.gazeModel.targetMouseY = pos.y;
+                    virtualTime += 16;
+
+                    // Re-seed countdown each frame so congestion path stays active
+                    if (poolingEnabled) {
+                        scrutinizer.contentAnalysis.congestionUpdateCountdown = 999;
+                    }
+
+                    const t0 = realNow();
+                    scrutinizer.render();
+                    const t1 = realNow();
+
+                    // Manual timing (bypass FrameTimer's internal performance.now which is mocked)
+                    timer.totals[timer.cursor] = t1 - t0;
+                    timer.cursor = (timer.cursor + 1) % timer.windowSize;
+                    if (timer.filled < timer.windowSize) timer.filled++;
+                }
+
+                performance.now = realNow;
+                return timer.getStats();
+            }
+
+            // ── Run all trajectories ────────────────────────────────
+            const results = [];
+            let allPass = true;
+            let worstDelta = 0;
+            let worstName = '';
+
+            for (const [name, trajFn] of Object.entries(trajectories)) {
+                const statsOff = runTrajectory(name, trajFn, false);
+                const statsOn = runTrajectory(name, trajFn, true);
+
+                const deltaP95 = statsOn.p95 - statsOff.p95;
+                const deltaPct = statsOff.p95 > 0 ? (deltaP95 / statsOff.p95 * 100) : 0;
+
+                const status = deltaP95 > 2.0 ? 'FAIL' : deltaP95 > 1.0 ? 'WARN' : 'PASS';
+                if (deltaP95 > 2.0) allPass = false;
+                if (deltaP95 > worstDelta) {
+                    worstDelta = deltaP95;
+                    worstName = name;
+                }
+
+                const line = `[Perf] ${name.padEnd(8)} | OFF: avg=${statsOff.avg.toFixed(2)}ms p95=${statsOff.p95.toFixed(2)}ms | ON: avg=${statsOn.avg.toFixed(2)}ms p95=${statsOn.p95.toFixed(2)}ms | delta: ${deltaP95 >= 0 ? '+' : ''}${deltaP95.toFixed(2)}ms (${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)}%) [${status}]`;
+                log(line);
+                results.push({ name, statsOff, statsOn, deltaP95, status });
+            }
+
+            // ── FrameTimer unit check ───────────────────────────────
+            log('[Perf] FrameTimer unit check...');
+            // Ensure real performance.now is restored
+            performance.now = realNow;
+            const ft = new FrameTimer(10);
+            // Simulate a frame with a small busy-wait to get non-zero timing
+            ft.beginFrame();
+            const busyEnd = realNow() + 0.1; // ~100us
+            while (realNow() < busyEnd) { /* spin */ }
+            ft.mark('a');
+            ft.mark('b');
+            ft.endFrame();
+            const s = ft.getStats();
+            if (s.avg === 0 || !s.phases.a || !s.phases.b) {
+                fail('FrameTimer unit check failed: missing phases or zero avg');
+            } else {
+                log(`[Perf] FrameTimer OK: avg=${s.avg.toFixed(3)}ms, phases=${Object.keys(s.phases).join(',')}`);
+            }
+
+            // ── Verdict ─────────────────────────────────────────────
+            if (allPass) {
+                pass(`All trajectories PASS. Worst p95 delta: +${worstDelta.toFixed(2)}ms (${worstName})`);
+            } else {
+                const failedNames = results.filter(r => r.status === 'FAIL').map(r => r.name).join(', ');
+                fail(`Perf regression detected in: ${failedNames}. Worst p95 delta: +${worstDelta.toFixed(2)}ms`);
+            }
+
+        } catch (err) {
+            fail(err.message, err.stack);
+        }
+    </script>
+</body>
+
+</html>

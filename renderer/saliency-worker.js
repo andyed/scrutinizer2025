@@ -204,12 +204,12 @@ function drawFaceBlob(faceMap, width, height, box) {
 }
 
 self.onmessage = async function (e) {
-    const { imageBitmap, id } = e.data;
+    const { imageBitmap, id, maxDimension } = e.data;
 
     if (!imageBitmap) return;
 
-    // Adaptive Resolution Scaling
-    const SALIENCY_MAX_DIM = 256;
+    // Adaptive Resolution Scaling — configurable via ContentAnalysis.setSaliencyResolution()
+    const SALIENCY_MAX_DIM = maxDimension || 256;
     const FACE_DETECT_MAX_DIM = 640; // Higher res for small face detection
 
     const srcW = imageBitmap.width;

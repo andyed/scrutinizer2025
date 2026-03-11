@@ -56,9 +56,10 @@ app.whenReady().then(() => {
 
     win.loadFile(path.resolve(process.cwd(), testFile));
 
-    // Timeout
+    // Timeout — perf tests need longer for multiple trajectory runs
+    const timeout = testFile.includes('perf') ? 30000 : 10000;
     setTimeout(() => {
         console.error('TEST TIMED OUT');
         app.exit(1);
-    }, 10000);
+    }, timeout);
 });

@@ -72,7 +72,7 @@ The following comparisons show the improvement in peripheral rendering:
 
 ### 💅 UI Polish
 - **Less Distracting URL Bar**: The toolbar URL input is now dimmer and semi-transparent by default, reducing visual competition with the canvas. It automatically brightens on hover or focus.
-- **Menu Terminology**: "Mongrel Mode" has been renamed to "**Effect Type**" to better reflect its function. "Shatter" is now "**Mongrel Approximation**".
+- ~~**Menu Terminology**: "Mongrel Mode" renamed to "Effect Type". Removed in v2.2 — mongrelMode is now set per-mode via modes.json.~~
 - **Visual Fidelity (v1.4.1)**:
   - **Coupled Warp + MIP Pooling (Tier 1.5)**: Physically simulates peripheral crowding by scaling position jitter with the integration field size.
   - **Unbound Color (Tier 1.6)**: Simulates Parvocellular resolution loss by blurring chromatic fringes ("watercolor bleed") and ensuring radial offset direction.

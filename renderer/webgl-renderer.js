@@ -146,7 +146,7 @@
                     yv_freq_decay: 0.008, // castleCSF k_ef for YV
                     supra_exponent: 0.5, // Threshold→appearance compression (Jiang et al. 2022)
                     show_congestion: 0,  // 0=off, 1=congestion heatmap, 2=saliency vs congestion
-                    congestion_pooling: false,
+                    congestion_pooling: true,
                     saccadic_blindness: false
                 };
 
@@ -447,6 +447,7 @@
                 // chromatic_pooling can be overridden by menu toggle or TEST_CHROMATIC_POOLING.
                 // Only preserve if explicitly overridden (flag set by toggleChromaticPooling).
                 const savedChromaticOverride = this._chromaticPoolingOverride;
+                const savedCongestionPooling = this._congestionPoolingOverride;
                 const savedSaccadicBlindness = this._saccadicBlindnessOverride;
                 const savedGaussianBlurMode = this._gaussianBlurModeOverride;
                 const savedDogE2 = this._dogE2Override;
@@ -472,7 +473,7 @@
                     cmf_enabled: false,
                     cmf_a: 2.78,
                     cmf_color_sigma: 0.0,
-                    congestion_pooling: false
+                    congestion_pooling: true
                 };
 
                 this.config = { ...defaults };
@@ -518,6 +519,9 @@
                         // Restore manual chromatic pooling override if set
                         if (savedChromaticOverride !== undefined) {
                             this.config.chromatic_pooling = savedChromaticOverride;
+                        }
+                        if (savedCongestionPooling !== undefined) {
+                            this.config.congestion_pooling = savedCongestionPooling;
                         }
                         if (savedSaccadicBlindness !== undefined) {
                             this.config.saccadic_blindness = savedSaccadicBlindness;

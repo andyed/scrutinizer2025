@@ -7,11 +7,16 @@
 
 1. [Oriented DoG Bands (Phase 1-3)](#oriented-dog-bands-phase-1-3) — Orientation-selective band attenuation across three phases: oblique effect, 4-channel V1 energy decomposition, radial-tangential anisotropy. 3 uniforms, 4-tap gradient.
 2. [Orientation Diagnostics](#orientation-diagnostics) — Debug levels 4 and 5 for visualizing orientation energy channels and band weights with fovea blend.
-3. [Keyboard Shortcuts](#keyboard-shortcuts) — Direct keyboard access to visualization modes.
-4. [Test Harness Improvements](#test-harness-improvements) — Env vars for oriented DoG testing, scroll-to-top fix, A/B capture script.
-5. [Validation Report Format](#validation-report-format) — Claim/Basis/Result replacing Published/Validation/Result with badge pills.
-6. [Docs](#docs) — README restructure, arxiv paper reframe, spec updates.
-7. [MCP Server Expansion](#mcp-server-expansion) — Added new `capture_vision` tool for LLM agents to request foveated screenshots of URLs. Expanded setup documentation for Claude Desktop, Cursor, and Windsurf.
+3. [Static Page Optimization](#static-page-optimization) — Checksum-based dirty check eliminates redundant worker submissions on static pages.
+4. [Congestion-Gated Pooling Default](#congestion-gated-pooling-default) — Enabled by default in research modes with verified zero performance regression.
+5. [Resolution Controls](#resolution-controls) — Saliency and congestion resolution menus with persistent settings.
+6. [Menu Cleanup](#menu-cleanup) — Peripheral menu relabeled around simulation fidelity; Effect Type removed.
+7. [Performance Infrastructure](#performance-infrastructure) — FrameTimer, Perf HUD tab, automated A/B perf test.
+8. [Keyboard Shortcuts](#keyboard-shortcuts) — Direct keyboard access to visualization modes.
+9. [Test Harness Improvements](#test-harness-improvements) — Env vars for oriented DoG testing, scroll-to-top fix, A/B capture script.
+10. [Validation Report Format](#validation-report-format) — Claim/Basis/Result replacing Published/Validation/Result with badge pills.
+11. [Docs](#docs) — README restructure, arxiv paper reframe, content analysis pipeline spec.
+12. [MCP Server Expansion](#mcp-server-expansion) — Added new `capture_vision` tool for LLM agents to request foveated screenshots of URLs. Expanded setup documentation for Claude Desktop, Cursor, and Windsurf.
 
 ---
 
@@ -64,6 +69,75 @@ Two new debug visualization levels accessible via Simulation > Utility > Orienta
 
 ---
 
+## Static Page Optimization
+
+Worker submissions are now gated by a fast pixel-sample checksum. On a static page, both saliency and congestion workers drop to zero submissions after the initial computation settles.
+
+`_computeFrameChecksum()` samples ~1024 evenly-spaced pixels from the raw buffer (~0.01ms). If the checksum matches the previous submission, the entire worker path is skipped — no BGRA→RGBA copy, no `createImageBitmap`, no `postMessage`. Independent checksums for each worker so resolution or mode changes on one path don't force recomputation on the other.
+
+The congestion path accepts a `force` parameter — scroll, DOM mutation, and navigation events bypass the dirty check because viewport content may have changed even if sampled pixels happen to match.
+
+---
+
+## Congestion-Gated Pooling Default
+
+Congestion-gated pooling is now enabled by default in Mode 0 (High-Key) and Mode 1 (Biological). Previously it required switching to Mode 9.
+
+Automated A/B testing (`npm run test:perf`) across four synthetic mouse trajectories at maximum congestion resolution (1024×576) confirms p95 delta < 0.1ms. The smoothing countdown architecture (30 frames of `drawImage` + `texImage2D`, then early return) means zero per-frame cost on settled content.
+
+The menu item is now a checkbox reflecting actual config state, checked at launch, with an override that survives mode switches.
+
+---
+
+## Resolution Controls
+
+New menus under Debug > Analysis:
+
+- **Saliency Resolution**: 256px (fast) / 512px (detailed) / 1024px (maximum). Default 256px.
+- **Congestion Resolution**: 256 / 512 / 768 / 1024px. Default 512px.
+
+Both settings now persist across launches via `settingsManager`.
+
+---
+
+## Menu Cleanup
+
+### Peripheral > Degradation Strength (was "Intensity")
+
+Relabeled from percentage-based scale to simulation-fidelity anchored labels:
+
+| Old | New | Value |
+|-----|-----|-------|
+| Off (0%) | Off | 0.0 |
+| Subtle (30%) | Reduced | 0.3 |
+| Moderate (60%) | **Reference** | 0.6 |
+| Strong (80%) | Amplified | 0.8 |
+| Maximum (100%) | Maximum | 1.0 |
+
+"Reference" is the anchor — the value that best approximates real peripheral vision degradation. Labels communicate deviation from the reference, not arbitrary intensity percentages.
+
+### Effect Type — Removed
+
+The Peripheral > Effect Type submenu has been removed. `mongrelMode` is set per-mode in `modes.json` — the manual toggle was overridden on every mode switch.
+
+---
+
+## Performance Infrastructure
+
+### FrameTimer (`renderer/frame-timer.js`)
+
+Zero-allocation rolling-window timer with pre-allocated `Float64Array` buffers. Reports fps, avg, p95, max, and per-phase breakdown. No per-frame GC pressure.
+
+### Perf Tab in ComplexityHUD
+
+New fourth tab showing live FPS (color-coded), frame time stats (avg/p95/max), and phase breakdown as stacked bars (gaze, memory, saliency, congestion, render). Access via ComplexityHUD > Perf tab.
+
+### Automated Perf Test (`npm run test:perf`)
+
+Synthetic mouse trajectory A/B test (pooling on/off) at maximum congestion resolution. Four trajectories, 300 frames each. Pass threshold: p95 delta < 2ms.
+
+---
+
 ## Keyboard Shortcuts
 
 Visualization modes are now accessible via keyboard shortcuts. Added in the Simulation menu with standard accelerator bindings.
@@ -95,6 +169,7 @@ The format separates claims grounded in published data from those based on archi
 
 - **README restructured**: Added DOM-aware rendering rationale to pipeline docs. Pipeline table with LGN/V1/V4 deep links. Structure map clarified as DOM analysis. Validation case study and psychophysical validation section with published data table added to AI-assisted section.
 - **Arxiv paper reframed**: Added Gaussian comparison conditions to saliency and color-search capture/analysis. Communications review fixes applied. Table overflow fix for two-column layout.
+- **Content analysis pipeline spec** (`docs/specs/content_analysis_pipeline.md`): Full architecture doc covering worker submission, five performance gates, resolution settings, trigger debouncing, texture slots, buffer reuse, and FrameTimer integration.
 - **Specs updated**: Mongrel textures spec updated for v2.1. Timestamps added to all specs. Spec index table with status triage added to roadmap. Linguistic priming spec refreshed to v3, roadmap condensed.
 - **Release notes (v2.1)**: Undefined technical terms defined inline. Blog post links, published validation data links, and grad student project cross-links added.
 

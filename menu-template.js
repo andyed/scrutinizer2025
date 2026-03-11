@@ -2,7 +2,7 @@ const { app, shell } = require('electron');
 
 const { RADIUS_OPTIONS, ASPECT_OPTIONS, INTENSITY_OPTIONS } = require('./shared/constants.json');
 
-function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10, currentMobileEmulation = false, currentAestheticMode = 0, currentCongestionMode = 0, currentEccentricityMode = 0, currentSaliencyMapOn = false, currentStructureMapOn = false) {
+function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10, currentMobileEmulation = false, currentAestheticMode = 0, currentCongestionMode = 0, currentEccentricityMode = 0, currentSaliencyMapOn = false, currentStructureMapOn = false, currentSaliencyResolution = 256, currentCongestionResolution = 512) {
     const isMac = process.platform === 'darwin';
     const { BrowserWindow } = require('electron');
 
@@ -511,9 +511,9 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         { type: 'separator' },
                         {
                             label: 'Congestion-Gated Pooling',
-                            type: 'radio',
-                            checked: currentAestheticMode === 9,
-                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 9); app.emit('aesthetic-mode-changed', 9); }
+                            type: 'checkbox',
+                            checked: true,
+                            click: (menuItem) => sendToOverlays('menu:toggle-congestion-pooling', menuItem.checked)
                         }
                     ]
                 },
@@ -613,56 +613,42 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     label: 'Peripheral',
                     submenu: [
                         {
-                            label: 'Intensity',
+                            label: 'Degradation Strength',
                             submenu: [
                                 {
-                                    label: 'Off (0%)',
+                                    label: 'Off',
                                     type: 'radio',
                                     checked: isClosest(INTENSITY_OPTIONS[0], 'intensity'),
                                     click: () => sendToOverlays('menu:set-intensity', INTENSITY_OPTIONS[0])
                                 },
                                 {
-                                    label: 'Subtle (30%)',
+                                    label: 'Reduced',
                                     type: 'radio',
                                     checked: isClosest(INTENSITY_OPTIONS[1], 'intensity'),
                                     click: () => sendToOverlays('menu:set-intensity', INTENSITY_OPTIONS[1])
                                 },
                                 {
-                                    label: 'Moderate (60%)',
+                                    label: 'Reference',
                                     type: 'radio',
                                     checked: isClosest(INTENSITY_OPTIONS[2], 'intensity'),
                                     click: () => sendToOverlays('menu:set-intensity', INTENSITY_OPTIONS[2])
                                 },
                                 {
-                                    label: 'Strong (80%)',
+                                    label: 'Amplified',
                                     type: 'radio',
                                     checked: isClosest(INTENSITY_OPTIONS[3], 'intensity'),
                                     click: () => sendToOverlays('menu:set-intensity', INTENSITY_OPTIONS[3])
                                 },
                                 {
-                                    label: 'Maximum (100%)',
+                                    label: 'Maximum',
                                     type: 'radio',
                                     checked: isClosest(INTENSITY_OPTIONS[4], 'intensity'),
                                     click: () => sendToOverlays('menu:set-intensity', INTENSITY_OPTIONS[4])
                                 }
                             ]
                         },
-                        {
-                            label: 'Effect Type',
-                            submenu: [
-                                {
-                                    label: 'Mongrel Approximation',
-                                    type: 'radio',
-                                    checked: true,
-                                    click: () => sendToOverlays('menu:set-mongrel-mode', 1)
-                                },
-                                {
-                                    label: 'Noise (Dynamic)',
-                                    type: 'radio',
-                                    click: () => sendToOverlays('menu:set-mongrel-mode', 0)
-                                }
-                            ]
-                        },
+                        // Effect Type disabled — mongrelMode is set per-mode via modes.json,
+                        // manual toggle was confusing and overridden on mode switch anyway.
                         {
                             label: 'Chromatic Aberration',
                             type: 'checkbox',
@@ -789,6 +775,58 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     type: 'radio',
                                     checked: currentCongestionMode === 3,
                                     click: () => { sendToOverlays('menu:set-show-congestion', 3); app.emit('congestion-mode-changed', 3); }
+                                }
+                            ]
+                        },
+                        {
+                            label: 'Saliency Resolution',
+                            submenu: [
+                                {
+                                    label: '256px (fast)',
+                                    type: 'radio',
+                                    checked: currentSaliencyResolution === 256,
+                                    click: () => { sendToOverlays('menu:set-saliency-resolution', 256); app.emit('saliency-resolution-changed', 256); }
+                                },
+                                {
+                                    label: '512px',
+                                    type: 'radio',
+                                    checked: currentSaliencyResolution === 512,
+                                    click: () => { sendToOverlays('menu:set-saliency-resolution', 512); app.emit('saliency-resolution-changed', 512); }
+                                },
+                                {
+                                    label: '1024px (detailed)',
+                                    type: 'radio',
+                                    checked: currentSaliencyResolution === 1024,
+                                    click: () => { sendToOverlays('menu:set-saliency-resolution', 1024); app.emit('saliency-resolution-changed', 1024); }
+                                }
+                            ]
+                        },
+                        {
+                            label: 'Congestion Resolution',
+                            submenu: [
+                                {
+                                    label: '256px (fast)',
+                                    type: 'radio',
+                                    checked: currentCongestionResolution === 256,
+                                    click: () => { sendToOverlays('menu:set-congestion-resolution', 256); app.emit('congestion-resolution-changed', 256); }
+                                },
+                                {
+                                    label: '512px',
+                                    type: 'radio',
+                                    checked: currentCongestionResolution === 512,
+                                    click: () => { sendToOverlays('menu:set-congestion-resolution', 512); app.emit('congestion-resolution-changed', 512); }
+                                },
+                                {
+                                    label: '1024px',
+                                    type: 'radio',
+                                    checked: currentCongestionResolution === 1024,
+                                    click: () => { sendToOverlays('menu:set-congestion-resolution', 1024); app.emit('congestion-resolution-changed', 1024); }
+                                },
+                                {
+                                    label: '2048px (detailed)',
+                                    type: 'radio',
+                                    checked: currentCongestionResolution === 2048,
+                                    click: () => { sendToOverlays('menu:set-congestion-resolution', 2048); app.emit('congestion-resolution-changed', 2048); }
                                 }
                             ]
                         }

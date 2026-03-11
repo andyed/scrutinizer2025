@@ -45,18 +45,19 @@
             this.saliencyUpdateCountdown = 0;
             this.saliencyFrameCounter = 0;
             this.saliencyWorker = null;
+            this.saliencyMaxDimension = 256; // Configurable: 256/512
 
             this._initSaliencyWorker();
 
-            // ── High-Res Congestion Worker (on-demand, 768px default) ─
+            // ── High-Res Congestion Worker (on-demand, 1024px default) ─
             // Separate worker for accurate congestion when report is toggled on.
-            // 256px saliency worker congestion stays for pooling modifier (good enough).
+            // Saliency worker congestion (256/512px) stays for real-time pooling modifier.
             this.congestionWorker = null;
             this._congestionWorkerBusy = false;
             this.congestionTargetCanvas = document.createElement('canvas');
             this.congestionCurrentCanvas = null;
             this.congestionUpdateCountdown = 0;
-            this.congestionMaxDimension = 1024; // Configurable: 512/768/1024
+            this.congestionMaxDimension = 512; // Configurable: 256/512/1024/2048
 
             this._initCongestionWorker();
 
@@ -72,6 +73,11 @@
             this.edgeDensityStats = null;
             // Generation counter: incremented each time congestion worker delivers fresh results
             this.congestionGeneration = 0;
+
+            // ── Dirty-check checksums (skip redundant worker submissions) ──
+            this._lastSaliencyChecksum = -1;
+            this._lastCongestionChecksum = -1;
+            this._saliencySkipCount = 0;
 
             // ── Debug / Visualization ────────────────────────────────
             this.showStructureMap = false;
@@ -195,9 +201,15 @@
          * @param {Uint8ClampedArray} imageDataBuffer - Raw BGRA pixel buffer
          * @param {number} width
          * @param {number} height
+         * @param {boolean} [force=false] - Bypass dirty check (scroll/mutation/navigation)
          */
-        submitForCongestion(imageDataBuffer, width, height) {
+        submitForCongestion(imageDataBuffer, width, height, force = false) {
             if (!this.congestionWorker || this._congestionWorkerBusy || width <= 0 || height <= 0) return;
+
+            // Dirty check: skip if frame content hasn't changed (unless forced)
+            const congestionChecksum = this._computeFrameChecksum(imageDataBuffer, imageDataBuffer.length);
+            if (!force && congestionChecksum === this._lastCongestionChecksum) return;
+            this._lastCongestionChecksum = congestionChecksum;
 
             this._congestionWorkerBusy = true;
 
@@ -262,11 +274,24 @@
         }
 
         /**
+         * Set saliency worker resolution.
+         * Higher resolution improves congestion ranking accuracy for pooling
+         * but costs ~4x more compute per frame at 512 vs 256.
+         * @param {number} maxDim - Maximum dimension (256 or 512)
+         */
+        setSaliencyResolution(maxDim) {
+            this.saliencyMaxDimension = maxDim;
+            this._lastSaliencyChecksum = -1; // Force recompute at new resolution
+            console.log(`[ContentAnalysis] Saliency resolution set to: ${maxDim}px`);
+        }
+
+        /**
          * Set congestion worker resolution.
-         * @param {number} maxDim - Maximum dimension (512, 768, or 1024)
+         * @param {number} maxDim - Maximum dimension (256, 512, 1024, or 2048)
          */
         setCongestionResolution(maxDim) {
             this.congestionMaxDimension = maxDim;
+            this._lastCongestionChecksum = -1; // Force recompute at new resolution
             console.log(`[ContentAnalysis] Congestion resolution set to: ${maxDim}px`);
         }
 
@@ -285,6 +310,21 @@
             // Throttle: compute every 15 frames (~250ms at 60fps)
             if (this.saliencyFrameCounter % 15 !== 0) return;
 
+            // Dirty check: skip if frame content hasn't changed since last submission
+            const saliencyChecksum = this._computeFrameChecksum(imageDataBuffer, imageDataBuffer.length);
+            if (saliencyChecksum === this._lastSaliencyChecksum) {
+                this._saliencySkipCount++;
+                if (this._saliencySkipCount === 10) {
+                    Logger.log('[ContentAnalysis] Saliency: skipping unchanged frames');
+                }
+                return;
+            }
+            this._lastSaliencyChecksum = saliencyChecksum;
+            if (this._saliencySkipCount > 0) {
+                Logger.log(`[ContentAnalysis] Saliency: resumed after ${this._saliencySkipCount} skipped`);
+                this._saliencySkipCount = 0;
+            }
+
             // Create a copy for the async worker (main buffer is reused each frame)
             // Fix BGRA→RGBA: Electron's capturePage returns BGRA byte order,
             // but ImageData expects RGBA. Swap R↔B to get correct color features.
@@ -301,7 +341,8 @@
                     imageBitmap: bitmap,
                     id: this.saliencyFrameCounter,
                     structureData: this.lastGroupedBlocks || this.lastBlocks,
-                    dpr: window.devicePixelRatio || 1
+                    dpr: window.devicePixelRatio || 1,
+                    maxDimension: this.saliencyMaxDimension
                 }, [bitmap]);
             });
         }
@@ -513,6 +554,36 @@
         }
 
         // ── Utility ──────────────────────────────────────────────────
+
+        /**
+         * Fast pixel-sample checksum for content-change detection.
+         * Samples ~1024 evenly-spaced pixels from a raw BGRA/RGBA buffer
+         * and returns a checksum. Cost: ~0.01ms on a 1920x1080 frame.
+         * @param {Uint8ClampedArray} buffer - Raw pixel buffer
+         * @param {number} length - Buffer byte length
+         * @returns {number} 32-bit checksum (two 16-bit halves packed)
+         * @private
+         */
+        _computeFrameChecksum(buffer, length) {
+            const SAMPLE_COUNT = 1024;
+            const stride = Math.max(4, Math.floor(length / (SAMPLE_COUNT * 4)) * 4);
+            let sumA = 0;
+            let sumB = 0;
+            for (let i = 0; i < length; i += stride) {
+                sumA = (sumA + buffer[i] + buffer[i + 1]) | 0;
+                sumB = (sumB + buffer[i + 2]) | 0;
+            }
+            return ((sumA & 0xFFFF) << 16) | (sumB & 0xFFFF);
+        }
+
+        /**
+         * Reset dirty-check checksums (call on navigation or resolution change).
+         * Forces next submission to go through regardless of content.
+         */
+        resetDirtyChecks() {
+            this._lastSaliencyChecksum = -1;
+            this._lastCongestionChecksum = -1;
+        }
 
         /**
          * Compare two block arrays for equality (skip redundant updates).

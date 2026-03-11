@@ -28,6 +28,8 @@ let currentCongestionMode = 0;   // 0=Off, 1=Stats, 2=Heatmap, 3=Saliency vs Con
 let currentEccentricityMode = 0; // 0=Off, 1=Fovea, 2=+Parafovea, 3=+Periphery
 let currentSaliencyMapOn = false;
 let currentStructureMapOn = false;
+let currentSaliencyResolution = 256; // 256, 512, or 1024
+let currentCongestionResolution = 512; // 256, 512, 1024, or 2048
 
 let mainWindow;
 let splashWindow;
@@ -69,7 +71,7 @@ function rebuildMenu() {
     // Ensure settings are initialized
     const radius = currentRadius || 180;
     const blur = currentBlur || 10;
-    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur, currentMobileEmulation, currentAestheticMode, currentCongestionMode, currentEccentricityMode, currentSaliencyMapOn, currentStructureMapOn));
+    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur, currentMobileEmulation, currentAestheticMode, currentCongestionMode, currentEccentricityMode, currentSaliencyMapOn, currentStructureMapOn, currentSaliencyResolution, currentCongestionResolution));
     Menu.setApplicationMenu(menu);
 
     // Explicitly set for all non-HUD windows (Windows/Linux)
@@ -145,6 +147,18 @@ app.on('eccentricity-mode-changed', (mode) => {
 
 app.on('saliency-map-changed', (on) => {
     currentSaliencyMapOn = on;
+    rebuildMenu();
+});
+
+app.on('saliency-resolution-changed', (res) => {
+    currentSaliencyResolution = res;
+    settingsManager.set('saliencyResolution', res);
+    rebuildMenu();
+});
+
+app.on('congestion-resolution-changed', (res) => {
+    currentCongestionResolution = res;
+    settingsManager.set('congestionResolution', res);
     rebuildMenu();
 });
 
@@ -1320,6 +1334,8 @@ function createWindow() {
     currentBlur = settingsManager.get('blur');
     currentIntensity = settingsManager.get('intensity');
     currentVisualMemory = settingsManager.get('visualMemory'); // Load saved visual memory setting
+    currentSaliencyResolution = settingsManager.get('saliencyResolution') || 256;
+    currentCongestionResolution = settingsManager.get('congestionResolution') || 512;
     currentMobileEmulation = settingsManager.get('mobileEmulation') || false;
     currentEnabled = true; // Force enabled for debugging
     // currentEnabled = settingsManager.get('enabled') !== undefined ? settingsManager.get('enabled') : true; // Default to true for debugging
