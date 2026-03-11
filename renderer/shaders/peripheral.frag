@@ -77,13 +77,14 @@ uniform float u_congestion_pooling; // 0.0=off, 1.0=on
 
 // Density-gated crowding (Bouma 1970 approximation)
 // Dense content (text clusters) gets full V1 distortion; sparse content (isolated elements) is spared.
-uniform float u_crowding_density_threshold; // Density below this = minimal crowding (default 0.2)
+uniform float u_crowding_density_threshold; // Density below this = minimal crowding (default 0.3)
 uniform float u_crowding_density_steepness; // Sigmoid sharpness (default 10.0)
 
 // High-resolution congestion map (from dedicated congestion worker)
 // R=congestion, G=edgeDensity — higher quality than u_saliencyMap.gb at 256px
 uniform sampler2D u_congestionMap;
 uniform float u_hasCongestionMap; // 0.0=not available, 1.0=use high-res data
+uniform vec2 u_congestionMapSize; // Width/height of congestion map texture (for Bouma LOD)
 
 in vec2 v_texCoord;
 out vec4 fragColor;
@@ -398,6 +399,41 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
 
 
     return result;
+}
+
+// === BOUMA-SCALED EDGE DENSITY ===
+// Samples the congestion map's edge density channel (G) at a MIP level matching
+// Bouma's critical spacing (0.5 × eccentricity in degrees). This integrates edge
+// density over a Bouma-sized neighborhood — high values mean flankers are packed
+// within the critical spacing window, triggering crowding distortion.
+//
+// The GPU MIP chain does the spatial integration for free: textureLod at LOD N
+// averages over a 2^N × 2^N texel neighborhood, approximating the pooling region.
+//
+// dist: pixel distance from fovea center
+// fovea_radius: fovea radius in pixels (~2° of visual angle)
+// uv: texture coordinate to sample
+float sampleBoumaEdgeDensity(float dist, float fovea_radius, vec2 uv) {
+    float px_per_deg = max(fovea_radius / 2.0, 1.0);
+    float ecc_deg = max(0.0, dist - fovea_radius) / px_per_deg;
+
+    // Bouma's law: critical spacing ≈ 0.5 × eccentricity (Bouma 1970)
+    float boumaRadiusDeg = 0.5 * ecc_deg;
+    float boumaRadiusPx = boumaRadiusDeg * px_per_deg;
+
+    // Convert pixel radius to congestion map texels
+    float mapDim = max(u_congestionMapSize.x, 1.0);
+    float boumaRadiusTexels = boumaRadiusPx * (mapDim / u_resolution.x);
+
+    // LOD = log2(diameter) — how many MIP levels to traverse for this pooling window
+    float boumaLOD = clamp(log2(max(1.0, 2.0 * boumaRadiusTexels)), 0.0, 5.0);
+
+    if (u_hasCongestionMap > 0.5) {
+        return textureLod(u_congestionMap, uv, boumaLOD).g;
+    } else {
+        // Fallback: saliency map edge density (B channel), coarser but functional
+        return textureLod(u_saliencyMap, uv, min(boumaLOD, 3.0)).b;
+    }
 }
 
 // === CMF MIP LEVEL COMPUTATION ===
@@ -729,9 +765,11 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     
     float strength = lgn.suppressionFactor * config.v1_strength_mult * eccentricityScale;
 
-    // Density-gated crowding: dense content gets full V1 distortion,
-    // sparse/isolated elements get reduced distortion (Bouma 1970).
-    // Floor at 0.3 — isolated elements still lose acuity, just not full crowding.
+    // V1 crowding gate: DOM density determines whether V1 displacement fires.
+    // Text regions (density ≥ 0.3) get full V1 distortion; sparse/isolated elements
+    // are spared. This is a coarse "is this content?" gate — fine-grained spacing
+    // discrimination is handled by the Bouma-scaled MIP gate (processV4, line ~1000).
+    // Floor at 0.3 so isolated elements still lose some acuity, just not full crowding.
     float densityCrowding = 1.0 / (1.0 + exp(-u_crowding_density_steepness * (lgn.density - u_crowding_density_threshold)));
     float crowdingFactor = mix(0.3, 1.0, densityCrowding);
     strength *= crowdingFactor;
@@ -948,14 +986,15 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     float blurMult = 1.0 + (u_blurRadius * 0.3);
     float coupledEccentricity = v1.distortionStrength * u_intensity * fovea_radius * blurMult;
 
-    // Congestion-gated pooling: high congestion → stronger blur (more aggressive MIP)
-    // Biological rationale: cluttered regions are already pooled by peripheral vision
-    // into summary statistics — this makes the simulation match that prediction.
-    // Rosenholtz et al. (2007) clutter + Rosenholtz et al. (2012) peripheral pooling.
+    // Congestion-gated pooling: Bouma-scaled edge density modulates MIP blur.
+    // Dense flankers within critical spacing → stronger pooling (information loss).
+    // Isolated elements → less blur, preserving identifiability.
+    // Rosenholtz et al. (2007, 2012): clutter and crowding share pooling substrate.
     if (u_congestion_pooling > 0.5) {
-        // congestion 0.0 → 1.0x MIP (no change)
-        // congestion 1.0 → 2.0x MIP (double pooling)
-        float congestionBoost = 1.0 + lgn.congestion * 1.0;
+        float boumaEdge = sampleBoumaEdgeDensity(dist, fovea_radius, uv);
+        // Edge density 0.0 → 1.0x MIP (no change)
+        // Edge density 1.0 → 2.0x MIP (double pooling)
+        float congestionBoost = 1.0 + boumaEdge * 1.0;
         coupledEccentricity *= congestionBoost;
     }
 

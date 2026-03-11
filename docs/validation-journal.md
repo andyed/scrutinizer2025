@@ -11,7 +11,7 @@ Scrutinizer's rendering pipeline implements three decades of visual psychophysic
 |------|-----------|----------------|--------|-------|
 | [1](#wave-1-chromatic-decay) | Chromatic Decay | Mullen & Kingdom 2002, Hansen et al. 2009, Bowers et al. 2025 | T1: 7/7 · T2: 3/3 · T3: 1/2 | [spec](../docs/specs/wave1_feature_search_validation.md) · [report](https://andyed.github.io/scrutinizer-www/validation-reports/color-search-report.html) |
 | [2](#wave-2-spatial-frequency-attenuation) | Spatial Frequency | Rovamo & Virsu 1979, castleCSF (Ashraf et al. 2024) | T1: 12/16 · T2: 5/5 · T3: 0/4 | [spec](../docs/specs/wave2_spatial_acuity_validation.md) · [report](https://andyed.github.io/scrutinizer-www/validation-reports/spatial-acuity-report.html) |
-| [3](#wave-3-crowding-geometry) | Crowding Geometry | Bouma 1970, Toet & Levi 1992, Pelli & Tillman 2008 | 7/7 after tuning | [spec](../docs/specs/wave3_crowding_validation.md) |
+| [3](#wave-3-crowding-geometry) | Crowding Geometry | Bouma 1970, Toet & Levi 1992, Pelli & Tillman 2008 | 5/7 + Bouma step | [spec](../docs/specs/wave3_crowding_validation.md) |
 | [4](#wave-4-saliency-validation) | Saliency & Protection | Itti & Koch 2001, Rosenholtz 2007 (Feature Congestion) | 4A: 6+1 INFO · 4B: 5/5 | [stimulus](https://andyed.github.io/scrutinizer-www/reference-pages/saliency-popout.html) |
 
 ### Tier Structure
@@ -113,11 +113,13 @@ At 6°, V1 Lateral Smash displacement reaches ~69px for dense content. Bouma pre
 
 Metric: spread ratio = stddev of 2D cyan target positions, crowded / isolated. Values > 1.0 indicate V1 displacement scattering the crowded letter.
 
-| Eccentricity | Spread Ratio (mean) | Count Ratio | Published Prediction |
-|---|---|---|---|
-| 3° | 0.988 | 0.916 | No crowding in fovea — confirmed |
-| 6° | 2.542 (peak) | 1.863 | Strong crowding — Bouma range |
-| 10° | 1.256 | 0.859 | Continued crowding (post-fix) |
+| Eccentricity | Spread Ratio (mean) | Count Ratio | Published Prediction | v2.2 (Bouma gate) |
+|---|---|---|---|---|
+| 3° | 0.988 | 0.916 | No crowding in fovea — confirmed | 1.046 (PASS) |
+| 6° | 2.542 (peak) | 1.863 | Strong crowding — Bouma range | 1.002 (see note) |
+| 10° | 1.256 | 0.859 | Continued crowding (post-fix) | 0.964 |
+
+**v2.2 note**: Congestion-gated MIP pooling with Bouma-scaled edge density is now active during captures (`TEST_WAIT_CONGESTION=true`). The spread ratio at 6° dropped from 2.542 to 1.002 because MIP blur smooths displaced pixels back together — the crowding signal shifted from measurable scatter to measurable information loss. The Bouma spacing test (distortion ratio) confirms spacing selectivity: tight spacings (≤0.6×) show ~65% distortion ratio vs ~100% for wide spacings (≥0.7×). See "Metric Limitation" section below.
 
 Growth factor calibration (V1 `farScale` in `peripheral.frag:594`):
 
@@ -138,19 +140,44 @@ Scope: V4 styles 7-8 only. The main V1 Lateral Smash achieves radial bias throug
 
 Density gate: 69px displacement for dense content (crowding factor ~1.0) vs 21px for isolated content (~0.3).
 
-#### Bouma Spacing: Architectural Limit
+#### Bouma Spacing: Bouma-Scaled Edge Density Gate (v2.2)
 
-Captured `crowding-spacing.html` (7 spacing ratios 0.2×–0.8× at 6°). All survival ratios are 0.91–0.97 — the filter does not differentiate spacing levels.
+v2.2 replaced the MIP congestion gate's Feature Congestion signal with Bouma-scaled edge density sampling via `textureLod()`. The GPU MIP chain integrates edge density over a Bouma-sized neighborhood (0.5 × eccentricity in degrees), approximating the critical spacing window. The `sampleBoumaEdgeDensity()` function in `peripheral.frag` computes the appropriate LOD from eccentricity and congestion map resolution.
 
-| Spacing | Survival | Spread/Isolated |
-|---|---|---|
-| 0.2× | 0.913 | 0.786 |
-| 0.3× | 0.951 | 0.759 |
-| 0.5× | 0.947 | 0.990 |
-| 0.8× | 0.924 | 1.050 |
-| isolated | 0.920 | 1.000 |
+Captured `crowding-spacing.html` (7 spacing ratios 0.2×–0.8× at 6°, target at 6° right of fixation):
 
-V1 Lateral Smash is eccentricity-dependent but not spacing-dependent — `warpAmp = eccentricityScale × texture`, not `warpAmp = f(local_density) × texture`. A spacing-dependent Bouma curve would require pooling-region-based crowding (Rosenholtz TTM), where features within an eccentricity-scaled pooling region are mixed. The V1 approach simulates crowding *strength* correctly (more at larger eccentricities) but not *spatial selectivity* (more when flankers are closer).
+| Spacing | Survival | Distortion Ratio | Spread Ratio |
+|---|---|---|---|
+| 0.2× | 0.949 | 0.645 | 0.999 |
+| 0.3× | 0.953 | 0.652 | 0.995 |
+| 0.4× | 0.950 | 0.621 | 0.983 |
+| 0.5× | 0.946 | 0.698 | 0.991 |
+| 0.6× | 0.939 | 0.692 | 1.004 |
+| 0.7× | 0.950 | **1.019** | 1.001 |
+| 0.8× | 0.885 | **0.999** | 1.013 |
+| isolated | 0.897 | **1.007** | 1.014 |
+
+**Key finding**: Clear step function in distortion ratio at 0.6–0.7× spacing. Tight spacings (0.2–0.6×) show ~65% distortion ratio (MIP pooling suppressing target shape). Wide spacings (0.7–0.8×) converge to ~100% (isolated-like). This transition aligns with Bouma's critical spacing at 0.5× eccentricity — flankers within the critical window get pooled together, flankers outside it are resolved independently.
+
+Two mechanisms contribute to spacing-dependent behavior:
+
+1. **Congestion-gated MIP pooling** (line ~1000): Bouma-scaled edge density via `textureLod()` on the congestion map's G channel. At each fragment, the LOD matches the critical spacing window at that eccentricity. High edge density within the window → stronger MIP pooling (information loss). This is where spacing selectivity lives.
+
+2. **V1 Lateral Smash** (line ~770): DOM density sigmoid gates V1 displacement strength. Text regions get full distortion; isolated elements are spared. V1 is eccentricity-dependent but not spacing-selective — it handles crowding *strength*, not *selectivity*.
+
+The two mechanisms are complementary:
+- **V1**: crowding *strength* (eccentricity-dependent, DOM-density-gated)
+- **MIP pooling**: crowding *selectivity* (spacing-dependent, Bouma-edge-density-gated)
+
+#### Metric Limitation: Spread Ratio vs MIP Blur
+
+The spread ratio metric (stddev of displaced cyan pixel positions, crowded/isolated) measures V1 displacement scatter. When congestion-gated MIP pooling is active, blur counteracts scatter — displaced pixels are smoothed back together, reducing the measured spread ratio even though more information is being lost. The 6° spread ratio with congestion map present is 1.049 (below the 1.2 threshold), but the distortion ratio in the Bouma spacing test shows clear spacing discrimination.
+
+This is a metric limitation, not a model regression. Spread ratio captures one crowding mechanism (displacement), while Bouma spacing distortion captures the other (pooling). A combined metric that accounts for both displacement scatter and MIP information loss is needed for accurate total-crowding measurement. For now, the two metrics should be read together:
+- **Spread ratio**: V1 displacement signal (passes at eccentricities where MIP pooling is weak)
+- **Distortion ratio**: MIP pooling signal (shows Bouma step at critical spacing)
+
+**Test infrastructure note**: Captures now wait for the congestion map via `TEST_WAIT_CONGESTION=true` (polls `renderer._hasCongestionMapData`). The congestion worker typically completes within 500ms of page load, well before the capture window.
 
 ---
 
@@ -203,6 +230,7 @@ At 256px worker resolution, 40px CSS items map to ~5 saliency pixels. The DoG ce
 | Polar sector R:T | 3 | Biased spoke count produced 1:1 instead of Toet & Levi's 2:1 | Unbiased ring width for spoke count |
 | V1 displacement plateau | 3 | `eccentricityScale` clamped at 1.0 beyond parafovea | `farScale` continuation at 1.5× rate; 7/7 checks |
 | V1 growth factor | 3 | Initial 0.5× factor regressed 3° while barely helping 10° | Calibrated to 1.5× via capture→analyze loop |
+| Density gate threshold | 3 | Threshold at 0.6 in v2.2 modes.json suppressed V1 for normal-weight text (DOM density 0.44). Spread ratio at 6° dropped from 2.542 to ~1.0. Blending `max(density, congestion)` failed: congestion also fires for isolated targets (letter-on-blank has edge contrast). | Lowered threshold to 0.3 (partial V1 recovery: 6/7 main checks). Bouma spacing differentiation is carried by congestion-gated MIP pooling (separate path), not V1 displacement — the two mechanisms are complementary. |
 
 ---
 

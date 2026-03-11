@@ -1673,6 +1673,34 @@ function runIntegrationTest() {
                         // Wait for render — 1500ms to ensure IPC settles after mode switch + overrides
                         await new Promise(resolve => setTimeout(resolve, 1500));
 
+                        // Wait for congestion map if requested (Bouma-scaled gate needs MIP data)
+                        if (process.env.TEST_WAIT_CONGESTION === 'true' && mode !== 'bypass' && mode !== 'disabled') {
+                            console.log('[Test] Waiting for congestion map...');
+                            const congestionTimeout = 15000; // 15s max
+                            const pollInterval = 500;
+                            const startWait = Date.now();
+                            let congestionReady = false;
+                            while (Date.now() - startWait < congestionTimeout) {
+                                try {
+                                    congestionReady = await mainWindow.scrutinizerHud.webContents.executeJavaScript(`
+                                        (() => {
+                                            const s = window._scrutinizer;
+                                            return s && s.renderer && s.renderer._hasCongestionMapData === true;
+                                        })()
+                                    `);
+                                } catch (e) { /* ignore */ }
+                                if (congestionReady) break;
+                                await new Promise(resolve => setTimeout(resolve, pollInterval));
+                            }
+                            if (congestionReady) {
+                                console.log(`[Test] Congestion map ready (${Date.now() - startWait}ms)`);
+                                // Extra render frames to let Bouma-scaled sampling use the new MIP data
+                                await new Promise(resolve => setTimeout(resolve, 500));
+                            } else {
+                                console.warn(`[Test] Congestion map not ready after ${congestionTimeout}ms — capturing anyway`);
+                            }
+                        }
+
                         console.log(`[Test] Capturing screenshot for Mode ${mode}...`);
                         try {
                             // When disabled, capture raw content view (not the empty HUD overlay)

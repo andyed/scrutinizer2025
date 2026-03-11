@@ -8,7 +8,7 @@
  *  - desaturateOklab — amount=0 identity, amount=1 full grey, intermediate scale
  *  - Edge cases: black, white, pure primaries, NaN inputs, out-of-range values
  *
- * Run: node tests/unit/test-runner.js  (via index.js entry point)
+ * Run: npm run test:unit
  */
 
 'use strict';

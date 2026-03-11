@@ -27,6 +27,7 @@
         }
 
         scrutinizer = new Scrutinizer(CONFIG);
+        window._scrutinizer = scrutinizer; // Expose for test harness queries
 
         // REMOVED local mouse listener to prevent conflict with IPC stream
         // document.addEventListener('mousemove', (e) => {

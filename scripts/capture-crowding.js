@@ -95,6 +95,7 @@ function runCapture(pageConf, fixation, condition) {
       TEST_FIXATION_Y: String(fixation.y),
       TEST_OVERLAY: 'false',
       TEST_OUTPUT_FILENAME: filename,
+      TEST_WAIT_CONGESTION: 'true',
       SCREENSHOT_MODE: 'update',
       ELECTRON_RUN_AS_NODE: undefined,
     };

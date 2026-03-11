@@ -13,7 +13,7 @@
  *    mock image/imageData, verifying saliency values for known pixel patterns.
  *  - clear() / getCanvas(): smoke tests confirming expected call shapes.
  *
- * Run: node tests/unit/test-runner.js  (via index.js entry point)
+ * Run: npm run test:unit
  */
 
 'use strict';

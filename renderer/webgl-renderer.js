@@ -118,7 +118,10 @@
                 // High-res congestion map (from dedicated congestion worker)
                 this.congestionMapLocation = null;
                 this.hasCongestionMapLocation = null;
+                this.congestionMapSizeLocation = null;
                 this._hasCongestionMapData = false;
+                this._congestionMapWidth = 1;
+                this._congestionMapHeight = 1;
 
                 // Default Configuration
                 this.config = {
@@ -272,6 +275,7 @@
                 // High-res congestion map uniform lookups
                 this.congestionMapLocation = gl.getUniformLocation(this.program, "u_congestionMap");
                 this.hasCongestionMapLocation = gl.getUniformLocation(this.program, "u_hasCongestionMap");
+                this.congestionMapSizeLocation = gl.getUniformLocation(this.program, "u_congestionMapSize");
 
                 // Create buffers
                 this.positionBuffer = gl.createBuffer();
@@ -337,11 +341,13 @@
                 // Initialize to BLACK (0.0 Saliency)
                 const dummySaliency = new Uint8Array([0, 0, 0, 255]);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, dummySaliency);
-                // LINEAR filter for smooth gradients
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                // MIP-enabled for Bouma-scaled fallback path (textureLod in shader)
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                gl.generateMipmap(gl.TEXTURE_2D);
 
                 // Create high-res congestion map texture (GL_TEXTURE4)
+                // MIP-enabled for Bouma-scaled edge density sampling (textureLod in shader)
                 this.congestionMapTexture = gl.createTexture();
                 gl.activeTexture(gl.TEXTURE4);
                 gl.bindTexture(gl.TEXTURE_2D, this.congestionMapTexture);
@@ -350,8 +356,11 @@
                 // Initialize to BLACK (no congestion data)
                 const dummyCongestion = new Uint8Array([0, 0, 0, 255]);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, dummyCongestion);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                gl.generateMipmap(gl.TEXTURE_2D);
+                this._congestionMapWidth = 1;
+                this._congestionMapHeight = 1;
             }
 
             createProgram(gl, vsSource, fsSource) {
@@ -420,6 +429,7 @@
                 gl.activeTexture(gl.TEXTURE3);
                 gl.bindTexture(gl.TEXTURE_2D, this.saliencyMapTexture);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+                gl.generateMipmap(gl.TEXTURE_2D);
             }
 
             uploadCongestionMap(image) {
@@ -427,6 +437,9 @@
                 gl.activeTexture(gl.TEXTURE4);
                 gl.bindTexture(gl.TEXTURE_2D, this.congestionMapTexture);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+                gl.generateMipmap(gl.TEXTURE_2D);
+                this._congestionMapWidth = image.width || image.naturalWidth || 1;
+                this._congestionMapHeight = image.height || image.naturalHeight || 1;
                 this._hasCongestionMapData = true;
             }
 
@@ -436,6 +449,9 @@
                 gl.bindTexture(gl.TEXTURE_2D, this.congestionMapTexture);
                 const empty = new Uint8Array([0, 0, 0, 255]);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, empty);
+                gl.generateMipmap(gl.TEXTURE_2D);
+                this._congestionMapWidth = 1;
+                this._congestionMapHeight = 1;
                 this._hasCongestionMapData = false;
             }
 
@@ -639,6 +655,7 @@
                 gl.bindTexture(gl.TEXTURE_2D, this.congestionMapTexture);
                 gl.uniform1i(this.congestionMapLocation, 4);
                 gl.uniform1f(this.hasCongestionMapLocation, this._hasCongestionMapData ? 1.0 : 0.0);
+                gl.uniform2f(this.congestionMapSizeLocation, this._congestionMapWidth || 1, this._congestionMapHeight || 1);
 
                 gl.uniform2f(this.resolutionLocation, width, height);
                 gl.uniform2f(this.mouseLocation, mouseX, mouseY);
@@ -715,7 +732,7 @@
                 gl.uniform1i(this.showCongestionLocation, this.config.show_congestion);
                 gl.uniform1f(this.saccadicBlindnessLocation, this.config.saccadic_blindness ? 1.0 : 0.0);
                 gl.uniform1f(this.congestionPoolingLocation, this.config.congestion_pooling ? 1.0 : 0.0);
-                gl.uniform1f(this.crowdingDensityThresholdLocation, this.config.crowding_density_threshold ?? 0.6);
+                gl.uniform1f(this.crowdingDensityThresholdLocation, this.config.crowding_density_threshold ?? 0.3);
                 gl.uniform1f(this.crowdingDensitySteepnessLocation, this.config.crowding_density_steepness ?? 20.0);
 
                 if (Math.random() < 0.01) {

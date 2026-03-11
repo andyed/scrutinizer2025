@@ -9,7 +9,7 @@
  *  - expandCluster() — reachability chain: A→B→C where A and C don't directly touch
  *  - mergeClusters() — bounding box union, density averaging, type promotion rules
  *
- * Run: node tests/unit/test-runner.js  (via index.js entry point)
+ * Run: npm run test:unit
  */
 
 'use strict';
