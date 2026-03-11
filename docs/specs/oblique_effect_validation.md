@@ -1,9 +1,9 @@
 # Oblique Effect Validation
 
-> **Last updated:** 2026-03-09
+> **Last updated:** 2026-03-10 (v2.2)
 
 Date: 2026-03-09
-Status: In progress
+Status: IMPLEMENTED
 Dependencies: Oriented DoG bands (v2.2, implemented), DoG band decomposition (v1.6)
 
 ## 1. Problem Statement

@@ -1,9 +1,9 @@
 # Oriented DoG Band Decomposition
 
-> **Last updated:** 2026-03-08
+> **Last updated:** 2026-03-10 (v2.2)
 
 Date: 2026-02-28
-Status: COMPLETE (Phase 1-3 implemented)
+Status: IMPLEMENTED
 Dependencies: DoG band decomposition (v1.6, implemented), V1 crowding pipeline (implemented)
 
 ## 1. Problem Statement
@@ -98,10 +98,12 @@ vec4 sampleDoGOriented(vec2 uv, float eccentricity, float fovea_radius,
     // MIP 1 gives 2px-averaged gradient — robust to pixel noise,
     // captures stroke-level orientation
     vec2 px = 2.0 / u_resolution;  // MIP 1 texel size
-    float lum_r = dot(textureLod(u_texture, uv + vec2(px.x, 0.0), 1.0).rgb, vec3(0.299, 0.587, 0.114));
-    float lum_l = dot(textureLod(u_texture, uv - vec2(px.x, 0.0), 1.0).rgb, vec3(0.299, 0.587, 0.114));
-    float lum_t = dot(textureLod(u_texture, uv + vec2(0.0, px.y), 1.0).rgb, vec3(0.299, 0.587, 0.114));
-    float lum_b = dot(textureLod(u_texture, uv - vec2(0.0, px.y), 1.0).rgb, vec3(0.299, 0.587, 0.114));
+    // BGRA-corrected luminance: .b=Red, .g=Green, .r=Blue in Electron capture
+    vec3 lumaW = vec3(0.114, 0.587, 0.299);
+    float lum_r = dot(textureLod(u_texture, uv + vec2(px.x, 0.0), 1.0).rgb, lumaW);
+    float lum_l = dot(textureLod(u_texture, uv - vec2(px.x, 0.0), 1.0).rgb, lumaW);
+    float lum_t = dot(textureLod(u_texture, uv + vec2(0.0, px.y), 1.0).rgb, lumaW);
+    float lum_b = dot(textureLod(u_texture, uv - vec2(0.0, px.y), 1.0).rgb, lumaW);
 
     float gx = lum_r - lum_l;
     float gy = lum_t - lum_b;
@@ -119,8 +121,9 @@ vec4 sampleDoGOriented(vec2 uv, float eccentricity, float fovea_radius,
 
     // Gate by gradient magnitude — flat regions (gradMag ≈ 0) get no bonus.
     // This prevents noise amplification in uniform areas.
-    // Threshold at ~2% contrast, saturate at ~8%.
-    float edgeGate = smoothstep(0.02, 0.08, gradMag);
+    // Tuned for web UI: 1px borders (#fff → #e9ecef) produce gradMag ~0.01 at MIP 1.
+    // Original 0.02/0.08 rejected all web UI borders — lowered to catch real edges.
+    float edgeGate = smoothstep(0.005, 0.03, gradMag);
 
     // Effective orientation bonus: 0..1
     float orientBonus = cardinalAlign * edgeGate * orient_enabled * orient_bias;
@@ -148,11 +151,11 @@ vec4 sampleDoGOriented(vec2 uv, float eccentricity, float fovea_radius,
     // Push cutoffs outward for cardinal-aligned content.
     // 1.5x = "50% further into periphery" for perfectly H/V edges.
     // Higher bands (coarser) get less bonus — they're already robust.
-    // Bonus tapers linearly from 0.5 (finest) to 0.1 (coarsest)
+    // Bonus tapers linearly from 0.5 (finest) to 0.1 (coarsest).
+    // Eccentricity fade applied per-band — see "Eccentricity-Dependent Fade" section.
     float c[8];
     for (int k = 0; k < 8; k++) {
-        float boost = 1.0 + orientBonus * mix(0.5, 0.1, float(k) / 7.0);
-        c[k] = c_base[k] * boost;
+        c[k] = c_base[k];  // boost applied after eccentricity fade (see below)
     }
 
     // Transition width (unchanged)
@@ -203,23 +206,23 @@ float gd2 = (gx - gy) * 0.7071;    // 135° projection
 float energy_d45  = gd1 * gd1;
 float energy_d135 = gd2 * gd2;
 
-// Normalize energies
-float totalEnergy = energy_h + energy_v + energy_d45 + energy_d135 + 1e-6;
-float norm_h    = energy_h / totalEnergy;
-float norm_v    = energy_v / totalEnergy;
-float norm_d45  = energy_d45 / totalEnergy;
-float norm_d135 = energy_d135 / totalEnergy;
+// Cardinal fraction via max-based normalization.
+// Sum-based normalization (energy_h + energy_v) / totalEnergy was degenerate —
+// overlapping projections meant cardinalFrac ≡ 0.5 always, making the feature inert.
+// max(H,V) vs max(D45,D135) correctly identifies the dominant orientation channel.
+float cardinalMax = max(energy_h, energy_v);
+float obliqueMax = max(energy_d45, energy_d135);
+float cardinalFrac = cardinalMax / (cardinalMax + obliqueMax + 1e-6);
 
-// Cardinal advantage: H/V channels weighted higher
-// orient_bias controls the magnitude of the oblique effect
-float orientBonus = (norm_h + norm_v) * orient_bias * edgeGate * orient_enabled;
+// Cardinal advantage: orient_bias controls the magnitude of the oblique effect
+float orientBonus = cardinalFrac * edgeGate * orient_bias;
 
 // Per-band boost (same structure as Phase 1, now using decomposed energy)
-float boost0 = 1.0 + orientBonus * 0.5;
+float boost = 1.0 + orientBonus * mix(0.5, 0.1, float(k) / 7.0);
 // ... (same cascade)
 ```
 
-**Why this matters**: Text-heavy pages have predominantly horizontal edges (text baselines, ascender/descender lines). Phase 2 lets us weight horizontal edges more heavily than vertical ones if desired, matching the asymmetric crowding data (Pelli et al., 2007).
+**Why this matters**: Text-heavy pages have predominantly horizontal edges (text baselines, ascender/descender lines). Phase 2 keeps the 4-channel decomposition for debug visualization and future asymmetric H/V weighting, matching the asymmetric crowding data (Pelli et al., 2007).
 
 ---
 
@@ -261,6 +264,36 @@ float c0 = c0_base * boost0 * radialBias;
 - `radialDir` can be computed in `main()` and passed in, since `u_mouse` and `uv` are already available.
 - The radial bias is multiplicative with the orientation bonus, not additive. A tangential H edge gets both the cardinal bonus AND the tangential bonus.
 - `u_dog_radial_bias` defaults to 0.0 (off) to allow incremental validation.
+
+---
+
+### Eccentricity-Dependent Fade
+
+The oblique effect diminishes with retinal eccentricity — fine spatial frequencies lose the cardinal advantage by ~10° (Berkley, Kitterle & Watkins 1975), while coarse frequencies retain it to ~25° (Essock 1990). The implementation applies a per-band fade:
+
+```glsl
+// Convert pixel eccentricity to visual degrees
+float px_per_deg = max(fovea_radius / 2.0, 1.0);
+float visual_ecc_deg = visual_ecc / px_per_deg;
+
+for (int k = 0; k < 8; k++) {
+    // Band 0 (finest, >4 cpd): fades 3°–10°
+    // Band 7 (coarsest, <0.25 cpd): fades 8°–25°
+    float fadeStart = mix(3.0, 8.0, float(k) / 7.0);
+    float fadeEnd   = mix(10.0, 25.0, float(k) / 7.0);
+    float eccFade   = 1.0 - smoothstep(fadeStart, fadeEnd, visual_ecc_deg);
+
+    // Demo mode bypass: when orient_bias > 3.0, skip eccFade so the
+    // effect is visible at typical viewport scales (biological levels
+    // produce sub-pixel differences that don't survive JPEG compression)
+    float effectiveEccFade = orient_bias > 3.0 ? 1.0 : eccFade;
+
+    float boost = 1.0 + orientBonus * effectiveEccFade * mix(0.5, 0.1, float(k) / 7.0);
+    c[k] *= boost;
+}
+```
+
+Without this fade, the orient bonus would apply uniformly from fovea to far periphery — biologically wrong and visually distracting at high eccentricities where the visual system has no orientation selectivity to speak of.
 
 ---
 
@@ -373,10 +406,12 @@ Add a new debug level to the existing `u_debug_structure` system:
 if (debugLevel > 3.5) {
     // Gradient orientation field visualization
     vec2 px = 2.0 / u_resolution;
-    float lum_r = dot(textureLod(u_texture, uv + vec2(px.x, 0.0), 1.0).rgb, vec3(0.299, 0.587, 0.114));
-    float lum_l = dot(textureLod(u_texture, uv - vec2(px.x, 0.0), 1.0).rgb, vec3(0.299, 0.587, 0.114));
-    float lum_t = dot(textureLod(u_texture, uv + vec2(0.0, px.y), 1.0).rgb, vec3(0.299, 0.587, 0.114));
-    float lum_b = dot(textureLod(u_texture, uv - vec2(0.0, px.y), 1.0).rgb, vec3(0.299, 0.587, 0.114));
+    // BGRA-corrected luminance: .b=Red, .g=Green, .r=Blue in Electron capture
+    vec3 lumaW = vec3(0.114, 0.587, 0.299);
+    float lum_r = dot(textureLod(u_texture, uv + vec2(px.x, 0.0), 1.0).rgb, lumaW);
+    float lum_l = dot(textureLod(u_texture, uv - vec2(px.x, 0.0), 1.0).rgb, lumaW);
+    float lum_t = dot(textureLod(u_texture, uv + vec2(0.0, px.y), 1.0).rgb, lumaW);
+    float lum_b = dot(textureLod(u_texture, uv - vec2(0.0, px.y), 1.0).rgb, lumaW);
 
     float gx = lum_r - lum_l;
     float gy = lum_t - lum_b;
@@ -387,8 +422,8 @@ if (debugLevel > 3.5) {
     // Encode: R = gradient magnitude, G = cardinal alignment, B = oblique alignment
     color.rgb = vec3(
         smoothstep(0.0, 0.15, mag),           // R: edge strength
-        cos2theta * smoothstep(0.02, 0.08, mag), // G: cardinal edges (bright green = H/V)
-        (1.0 - cos2theta) * smoothstep(0.02, 0.08, mag)  // B: oblique edges (bright blue = diagonal)
+        cos2theta * smoothstep(0.005, 0.03, mag), // G: cardinal edges (bright green = H/V)
+        (1.0 - cos2theta) * smoothstep(0.005, 0.03, mag)  // B: oblique edges (bright blue = diagonal)
     );
 }
 ```
@@ -496,3 +531,7 @@ The gradient computation and orientation classification can be tested independen
 8. **Freeman, J. & Simoncelli, E. P.** (2011). Metamers of the ventral stream. *Nature Neuroscience*, 14(9), 1195-1201. — Texture synthesis based on pooled statistics.
 
 9. **Greenwood, J. A., Szinte, M., Sayim, B. & Cavanagh, P.** (2017). Variations in crowding, saccadic precision, and spatial localization reveal the shared topology of spatial vision. *PNAS*, 114(17), E3573-E3582. — Unified crowding model linking radial/tangential anisotropy to cortical architecture.
+
+10. **Berkley, M. A., Kitterle, F. & Watkins, D. W.** (1975). Grating visibility as a function of orientation and retinal eccentricity. *Vision Research*, 15(2), 239-244. — Oblique effect diminishes with eccentricity; fine gratings lose cardinal advantage by ~10°.
+
+11. **Essock, E. A.** (1990). The influence of stimulus length on the oblique effect of contrast sensitivity. *Vision Research*, 30(8), 1243-1246. — Coarse spatial frequencies retain cardinal advantage to higher eccentricities (~25–40°).

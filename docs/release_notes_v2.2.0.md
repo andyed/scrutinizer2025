@@ -5,7 +5,7 @@
 
 ## In This Release
 
-1. [Oriented DoG Bands (Phase 1-3)](#oriented-dog-bands-phase-1-3) — Orientation-selective band attenuation across three phases: oblique effect, 4-channel V1 energy decomposition, radial-tangential anisotropy. 3 uniforms, 4-tap gradient, enabled on modes 0 and 1.
+1. [Oriented DoG Bands (Phase 1-3)](#oriented-dog-bands-phase-1-3) — Orientation-selective band attenuation across three phases: oblique effect, 4-channel V1 energy decomposition, radial-tangential anisotropy. 3 uniforms, 4-tap gradient.
 2. [Orientation Diagnostics](#orientation-diagnostics) — Debug levels 4 and 5 for visualizing orientation energy channels and band weights with fovea blend.
 3. [Keyboard Shortcuts](#keyboard-shortcuts) — Direct keyboard access to visualization modes.
 4. [Test Harness Improvements](#test-harness-improvements) — Env vars for oriented DoG testing, scroll-to-top fix, A/B capture script.
@@ -29,7 +29,7 @@ Implementation: 4-tap MIP-1 gradient samples with BGRA-corrected luminance. Grad
 
 Replaces the continuous `cos(2*theta)` orientation model with four discrete energy channels — horizontal, vertical, diagonal-45, diagonal-135 — matching V1 simple cell orientation columns.
 
-Cardinal fraction `max(E_H, E_V) / (max(E_H, E_V) + max(E_D45, E_D135))` replaces `cos(2θ)`. The max-of-pairs formulation avoids the degenerate case where summing overlapping projections yields a constant 0.5 regardless of orientation. Same 4 texture lookups, ~5 extra ALU ops. The decomposition enables future asymmetric H vs V weighting for text-heavy pages.
+Cardinal fraction `max(E_H, E_V) / (max(E_H, E_V) + max(E_D45, E_D135))` replaces `cos(2θ)`. The max-of-pairs formulation avoids the degenerate case where summing overlapping projections yields a constant 0.5 regardless of orientation. Same 4 texture lookups, ~5 extra ALU ops.
 
 ### Phase 3: Radial-Tangential Anisotropy (Toet & Levi 1992)
 
@@ -47,11 +47,11 @@ Implementation: per-band `smoothstep` fade keyed to visual eccentricity in degre
 
 | Uniform | Default | Controls |
 |---------|---------|----------|
-| `u_dog_oriented` | 0.0 (1.0 on modes 0, 1) | Master enable for orientation-selective attenuation |
+| `u_dog_oriented` | 0.0 | Master enable for orientation-selective attenuation |
 | `u_dog_orient_bias` | 1.0 | Cardinal vs oblique bias strength (1.0=biological ~50%, 2.0=exaggerated) |
-| `u_dog_radial_bias` | 0.0 (0.5 on mode 1) | Radial-tangential anisotropy strength |
+| `u_dog_radial_bias` | 0.0 | Radial-tangential anisotropy strength |
 
-Enabled on modes 0 (High-Key) and 1 (Biological).
+Enabled by default in the primary visualization presets. Per-preset values configured in `modes.json`.
 
 ---
 
@@ -102,6 +102,6 @@ The format separates claims grounded in published data from those based on archi
 
 ## MCP Server Expansion
 
-The AI-assisted design review capabilities have been expanded with a new `capture_vision` tool in the MCP server. This tool allows connected LLM agents to request a foveated screenshot (simulating the Scrutinizer visual pipeline) of any URL, specifying the fixation point `(x, y)`, foveal `radius`, and `mode`. It returns a Base64 encoded PNG.
+New `capture_vision` tool in the MCP server. LLM agents can request a foveated screenshot of any URL, specifying fixation point `(x, y)`, foveal `radius`, and visualization preset. Returns a Base64 encoded PNG.
 
-Additionally, the Developer's Guide and README have been updated to provide explicit setup instructions for connecting Scrutinizer's MCP server to popular LLM clients beyond just the `claude` CLI, specifically detailing configuration for **Claude Desktop**, **Cursor**, and **Windsurf**.
+Added MCP setup docs for **Claude Desktop**, **Cursor**, and **Windsurf**.

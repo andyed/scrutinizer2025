@@ -462,7 +462,111 @@ Band boundaries in pixels are computed from the display's `px_per_deg` (see FOV 
 
 ---
 
-## 6. Priority Order
+## 6. CI Pipeline Integration — Automated Attention Auditing
+
+*Concept contributed by Matt Queen, drawing on his work with icon discrimination
+and industrial interface evaluation.*
+
+### Motivation
+
+Scrutinizer's pipeline already answers "where does the eye go?" for any web page.
+The next step is embedding that answer into a build or release pipeline so teams can
+track visual attention regressions the same way they track performance regressions.
+
+This matters most for **industrial UI** — dashboards, control panels, analyst
+workbenches — where the number of competing attention targets is high and the
+cost of missing a critical element is real. Consumer UI benefits too, but
+industrial UI is where frequency-based scoring has the clearest payoff because
+the stimulus is dense and the task structure is well-defined.
+
+### How it works
+
+```
+commit/PR → headless Scrutinizer → saliency + congestion maps → ROI scoring → report
+```
+
+1. **Trigger**: A CI step (GitHub Action, Jenkins stage, etc.) launches Scrutinizer
+   in headless mode against one or more target URLs or local screenshots.
+2. **ROI identification**: Scrutinizer scores each region using a combination of:
+   - Frequency-domain energy (DoG band weights — already computed)
+   - Congestion / clutter score (Feature Congestion metric)
+   - DOM-aware element scoring (interactive elements, data displays, alerts)
+   - Optional: face detection, motion onset for animated UI
+3. **Report generation**: A JSON report listing identified ROIs ranked by predicted
+   attention draw, with coordinates, scores, and thumbnails.
+4. **Expected-ROI manifest**: Teams maintain a `scrutinizer-expected.json` that
+   declares which elements *should* draw attention and their relative priority:
+   ```json
+   {
+     "page": "ops-dashboard",
+     "expected_rois": [
+       { "label": "alert-banner", "selector": "#alert-banner", "priority": 1 },
+       { "label": "kpi-grid",     "selector": ".kpi-grid",     "priority": 2 },
+       { "label": "nav-sidebar",  "selector": "nav.sidebar",   "priority": 5 }
+     ],
+     "tolerance": 0.15
+   }
+   ```
+5. **Offset measurement**: The report compares predicted attention rank against
+   expected rank, flagging elements whose offset exceeds the tolerance threshold.
+   A sidebar that jumps from priority 5 to predicted rank 1 after a redesign is a
+   regression — it's stealing attention from the alert banner.
+
+### ROI identification strategy
+
+This is the core puzzle. Three complementary approaches:
+
+| Strategy | Signal | Best for |
+|----------|--------|----------|
+| **Frequency scoring** | DoG band energy in pooling regions | Dense displays, data tables |
+| **Congestion mapping** | Feature Congestion / Subband Entropy | Cluttered layouts, competing elements |
+| **DOM structure** | Element type, size, color contrast, interactivity | Web apps with semantic markup |
+
+The frequency approach reuses existing pipeline output — the per-band weights that
+`sampleDoGReconstructed` computes are already a spatial frequency decomposition.
+Regions with high energy in the mid-frequency bands (edges, text) that *also* have
+high local contrast relative to surround are strong ROI candidates.
+
+### CLI interface
+
+```bash
+# Generate attention audit report
+scrutinizer audit --url https://internal-dashboard.example.com \
+                  --expected scrutinizer-expected.json \
+                  --output audit-report.json
+
+# CI mode: exit non-zero if any ROI offset exceeds tolerance
+scrutinizer audit --url https://internal-dashboard.example.com \
+                  --expected scrutinizer-expected.json \
+                  --ci --fail-on-regression
+```
+
+### Output format
+
+```json
+{
+  "timestamp": "2026-03-10T...",
+  "url": "https://internal-dashboard.example.com",
+  "viewport": { "width": 1920, "height": 1080 },
+  "predicted_rois": [
+    { "rank": 1, "label": "alert-banner", "score": 0.87, "bbox": [100, 20, 800, 60] },
+    { "rank": 2, "label": "kpi-grid",     "score": 0.72, "bbox": [100, 80, 800, 400] }
+  ],
+  "regressions": [],
+  "pass": true
+}
+```
+
+### Priority
+
+This sits downstream of the core scanpath replay infrastructure. The saliency
+prediction experiment (5D) provides the scoring foundation; the CLI replay
+framework (phase 5) provides the headless execution model. Target: phase 8,
+after the validation suite.
+
+---
+
+## 7. Priority Order
 
 | Phase | Work | Rationale |
 |-------|------|-----------|
@@ -473,10 +577,11 @@ Band boundaries in pixels are computed from the display's `px_per_deg` (see FOV 
 | 5 | CLI replay + video recording | Automation, demo generation |
 | 6 | MIT1003 importer + Python converter | Saliency benchmarking (most-cited dataset) |
 | 7 | Experiments A, B, C | Full validation suite |
+| 8 | CI pipeline audit (§6) | Requires saliency scoring + CLI headless; concept by Matt Queen |
 
 ---
 
-## 7. File Manifest
+## 8. File Manifest
 
 ### New Files
 
@@ -498,6 +603,8 @@ Band boundaries in pixels are computed from the display's `px_per_deg` (see FOV 
 | `tests/validation/experiments/chromatic-pooling.js` | Experiment B |
 | `tests/validation/experiments/congestion-gating.js` | Experiment C |
 | `tests/validation/experiments/saliency-prediction.js` | Experiment D |
+| `cli/lib/audit-runner.js` | CI attention audit orchestrator |
+| `cli/lib/roi-scorer.js` | ROI identification from saliency + congestion + DOM |
 
 ### Modified Files
 
