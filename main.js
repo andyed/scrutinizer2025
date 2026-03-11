@@ -3,12 +3,16 @@ const path = require('path');
 const { buildMenuTemplate, RADIUS_OPTIONS } = require('./menu-template');
 const settingsManager = require('./settings-manager');
 const { CALIBRATION_URL } = require('./renderer/config');
-const { autoUpdater } = require('electron-updater');
+// Auto-updater: graceful fallback if electron-updater not bundled
+let autoUpdater = null;
+try {
+    ({ autoUpdater } = require('electron-updater'));
+} catch (err) {
+    console.warn('[Updater] electron-updater failed to load:', err.message || err);
+}
 
-// Configure auto-updater
-autoUpdater.autoDownload = false; // Don't auto-download, just notify
-autoUpdater.logger = require('electron-log');
-autoUpdater.logger.transports.file.level = 'info';
+let updateCheckInFlight = false;
+let manualUpdateCheck = false;
 
 // Track current settings for menu state and new windows
 let currentRadius;
@@ -1239,15 +1243,26 @@ ipcMain.on('export:citation-screenshot', async (event, options = {}) => {
         const citationExport = require('./renderer/citation-export');
 
         // Build metadata from current state
+        // Auto-populate pipeline config for reproducibility when not explicitly passed
+        const autoPipeline = {
+            aestheticMode: currentAestheticMode,
+            saliencyResolution: currentSaliencyResolution,
+            congestionResolution: currentCongestionResolution,
+            congestionMode: currentCongestionMode,
+            eccentricityMode: currentEccentricityMode,
+            saliencyMapOn: currentSaliencyMapOn,
+            structureMapOn: currentStructureMapOn
+        };
+
         const metadata = {
-            modeId: options.modeId || 0,
+            modeId: options.modeId || currentAestheticMode || 0,
             modeName: options.modeName || null,
             foveaRadius: options.foveaRadius || currentRadius || 180,
             foveaAspect: options.foveaAspect || 1.33,
-            intensity: options.intensity || currentIntensity || 0.6,
+            degradationStrength: options.degradationStrength || options.intensity || currentIntensity || 0.6,
             caStrength: options.caStrength || 1.0,
             url: options.url || '',
-            pipeline: options.pipeline || null,
+            pipeline: options.pipeline || autoPipeline,
             customFields: options.customFields || {}
         };
 
@@ -1702,8 +1717,14 @@ function runIntegrationTest() {
                                     modeId: typeof mode === 'number' ? mode : 0,
                                     modeName: String(mode),
                                     foveaRadius: testRadius || currentRadius || 180,
-                                    intensity: testIntensity || currentIntensity || 0.6,
-                                    url: testUrl
+                                    degradationStrength: testIntensity || currentIntensity || 0.6,
+                                    url: testUrl,
+                                    pipeline: {
+                                        aestheticMode: typeof mode === 'number' ? mode : currentAestheticMode,
+                                        saliencyResolution: currentSaliencyResolution,
+                                        congestionResolution: currentCongestionResolution,
+                                        congestionMode: currentCongestionMode
+                                    }
                                 });
                                 console.log(`[Test] Embedded citation metadata`);
                             } catch (metaErr) {
@@ -1819,6 +1840,111 @@ app.whenReady().then(() => {
     });
 });
 
+// === Auto-Updater Setup ===
+
+function setupAutoUpdater() {
+    if (!autoUpdater) return;
+    if (!app.isPackaged) return;
+
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.logger = require('electron-log');
+    autoUpdater.logger.transports.file.level = 'info';
+
+    autoUpdater.on('checking-for-update', () => {
+        console.log('[Updater] Checking for updates...');
+    });
+
+    autoUpdater.on('update-available', (info) => {
+        console.log('[Updater] Update available:', info?.version || 'unknown');
+    });
+
+    autoUpdater.on('update-not-available', () => {
+        console.log('[Updater] No updates available.');
+        if (manualUpdateCheck) {
+            const { dialog } = require('electron');
+            dialog.showMessageBox({
+                type: 'info',
+                title: 'No Updates Available',
+                message: `Scrutinizer v${app.getVersion()} is up to date.`,
+                buttons: ['OK']
+            });
+        }
+    });
+
+    autoUpdater.on('error', (err) => {
+        console.error('[Updater] Error:', err);
+        if (manualUpdateCheck) {
+            const { dialog } = require('electron');
+            dialog.showErrorBox('Update Error', err.message || String(err));
+        }
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+        const { dialog } = require('electron');
+        const version = info?.version || 'the latest';
+        dialog.showMessageBox({
+            type: 'info',
+            buttons: ['Restart Now', 'Later'],
+            defaultId: 0,
+            cancelId: 1,
+            title: 'Update Ready',
+            message: `Scrutinizer ${version} has been downloaded and is ready to install.`
+        }).then(({ response }) => {
+            if (response === 0) {
+                autoUpdater.quitAndInstall();
+            }
+        }).catch((err) => {
+            console.error('[Updater] Failed to show update dialog:', err);
+        });
+    });
+}
+
+function checkForAppUpdates({ manual = false } = {}) {
+    const currentVersion = app.getVersion();
+
+    // Auto-updater not bundled or running in dev
+    if (!autoUpdater || !app.isPackaged) {
+        if (manual) {
+            const { dialog, shell } = require('electron');
+            dialog.showMessageBox({
+                type: 'info',
+                title: 'Check for Updates',
+                message: `Scrutinizer v${currentVersion}`,
+                detail: 'Auto-update is disabled in development mode. Visit GitHub for the latest release.',
+                buttons: ['Download Page', 'OK'],
+                defaultId: 0,
+                cancelId: 1
+            }).then(({ response }) => {
+                if (response === 0) {
+                    shell.openExternal('https://github.com/andyed/scrutinizer2025/releases/latest');
+                }
+            });
+        }
+        return;
+    }
+
+    if (updateCheckInFlight) return;
+
+    updateCheckInFlight = true;
+    manualUpdateCheck = manual;
+
+    if (manual) {
+        console.log('[Updater] Manual update check initiated...');
+    }
+
+    autoUpdater.checkForUpdates().catch((err) => {
+        console.error('[Updater] checkForUpdates failed:', err);
+        if (manualUpdateCheck) {
+            const { dialog } = require('electron');
+            dialog.showErrorBox('Update Check Failed', err.message || String(err));
+        }
+    }).finally(() => {
+        updateCheckInFlight = false;
+        manualUpdateCheck = false;
+    });
+}
+
 // App Startup Logic
 app.whenReady().then(() => {
     if (process.env.TEST_MODE === 'true') {
@@ -1826,6 +1952,12 @@ app.whenReady().then(() => {
     } else {
         createWindow();
     }
+
+    // Initialize auto-updater with persistent event handlers
+    setupAutoUpdater();
+
+    // Silent update check 10s after startup
+    setTimeout(() => checkForAppUpdates({ manual: false }), 10000);
 });
 
 
@@ -1860,52 +1992,9 @@ app.on('create-new-window', () => {
     createScrutinizerWindow();
 });
 
-// Handle "Check for Updates" menu action
+// Handle "Check for Updates" menu action (delegated from menu-template)
 app.on('check-for-updates', () => {
-    const { dialog } = require('electron');
-
-    // Show checking dialog
-    console.log('[Main] Manual update check triggered');
-
-    autoUpdater.once('update-available', (info) => {
-        dialog.showMessageBox({
-            type: 'info',
-            title: 'Update Available',
-            message: `Scrutinizer ${info.version} is available!`,
-            detail: 'Would you like to download it now?',
-            buttons: ['Download', 'Later'],
-            defaultId: 0,
-            cancelId: 1
-        }).then(result => {
-            if (result.response === 0) {
-                require('electron').shell.openExternal('https://github.com/andyed/scrutinizer2025/releases/latest');
-            }
-        });
-    });
-
-    autoUpdater.once('update-not-available', () => {
-        dialog.showMessageBox({
-            type: 'info',
-            title: 'No Updates Available',
-            message: 'You\'re running the latest version!',
-            detail: `Current version: ${app.getVersion()}`,
-            buttons: ['OK']
-        });
-    });
-
-    autoUpdater.once('error', (err) => {
-        dialog.showMessageBox({
-            type: 'warning',
-            title: 'Update Check Failed',
-            message: 'Could not check for updates.',
-            detail: err.message || 'Please check your internet connection.',
-            buttons: ['OK']
-        });
-    });
-
-    autoUpdater.checkForUpdates().catch(err => {
-        console.log('[Main] Update check error:', err.message);
-    });
+    checkForAppUpdates({ manual: true });
 });
 
 // === Calibration Window Logic ===

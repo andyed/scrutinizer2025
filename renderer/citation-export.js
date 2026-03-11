@@ -11,7 +11,7 @@
  * const annotatedBuffer = await embedMetadata(pngBuffer, {
  *     mode: 'blueprint',
  *     foveaRadius: 180,
- *     intensity: 0.6,
+ *     degradationStrength: 0.6,
  *     url: 'https://example.com'
  * });
  * 
@@ -61,7 +61,7 @@ const METADATA_FIELDS = {
     'Scrutinizer:ModeId': '',
     'Scrutinizer:FoveaRadius': '',
     'Scrutinizer:FoveaAspect': '',
-    'Scrutinizer:Intensity': '',
+    'Scrutinizer:DegradationStrength': '',
     'Scrutinizer:URL': '',
     'Scrutinizer:Timestamp': '',
     'Scrutinizer:Pipeline': '',
@@ -92,12 +92,17 @@ function buildMetadata(options = {}) {
         modeName = null,
         foveaRadius = 180,
         foveaAspect = 1.33,
-        intensity = 0.6,
+        degradationStrength = 0.6,
+        intensity, // deprecated alias
         caStrength = 1.0,
         url = '',
         pipeline = null,
         customFields = {}
     } = options;
+
+    // Support old 'intensity' callers during transition
+    const strength = degradationStrength !== 0.6 ? degradationStrength
+        : (intensity !== undefined ? intensity : 0.6);
 
     // Look up mode info from registry
     let modeLabel = `Mode ${modeId}`;
@@ -131,7 +136,7 @@ function buildMetadata(options = {}) {
         'Scrutinizer:ModeId': String(modeId),
         'Scrutinizer:FoveaRadius': String(foveaRadius),
         'Scrutinizer:FoveaAspect': String(foveaAspect),
-        'Scrutinizer:Intensity': String(intensity),
+        'Scrutinizer:DegradationStrength': String(strength),
         'Scrutinizer:CAStrength': String(caStrength),
         'Scrutinizer:URL': url,
         'Scrutinizer:Timestamp': timestamp,
@@ -267,7 +272,7 @@ function generateSidecar(pngPath, options = {}) {
             mode_id: parseInt(metadata['Scrutinizer:ModeId']),
             fovea_radius: parseFloat(metadata['Scrutinizer:FoveaRadius']),
             fovea_aspect: parseFloat(metadata['Scrutinizer:FoveaAspect']),
-            intensity: parseFloat(metadata['Scrutinizer:Intensity']),
+            degradationStrength: parseFloat(metadata['Scrutinizer:DegradationStrength']),
             url: metadata['Scrutinizer:URL']
         },
         scientific_context: {

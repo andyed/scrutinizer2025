@@ -526,7 +526,7 @@ All screenshots captured via the golden capture system (`npm run capture-golden`
 | `Scrutinizer:Mode` | `Blueprint (Gestalt)` | Human-readable mode name |
 | `Scrutinizer:ModeId` | `3` | Numeric mode ID |
 | `Scrutinizer:FoveaRadius` | `180` | Foveal radius in pixels |
-| `Scrutinizer:Intensity` | `0.6` | Peripheral intensity |
+| `Scrutinizer:DegradationStrength` | `0.6` | Peripheral degradation strength (Reference = 0.6) |
 | `Scrutinizer:URL` | `https://...` | Source page URL |
 | `Scrutinizer:Timestamp` | `2026-01-19T...` | Capture timestamp |
 | `Scrutinizer:CiteAs` | `Scrutinizer v1.4.5, Blueprint Mode (Captured 2026-01-19)` | Citation string |
