@@ -21,10 +21,10 @@ Your eyes only see fine detail right where you're looking — everything else is
 
 *A dashboard viewed through Scrutinizer. Cursor at center — detail and color fade with distance from fixation, and dense regions (text, grids) degrade more than isolated elements.*
 
-| Congestion Overlay | Chromatic Pooling | Article Page |
+| Congestion Heatmap | Crowding Stimulus | Article Page |
 |:--:|:--:|:--:|
-| ![Congestion](screenshots/v23_dashboard_congestion.png) | ![Chromatic](screenshots/v23_chromatic_pooling.png) | ![Article](screenshots/v23_article.png) |
-| Visual clutter heatmap | Peripheral color shift | Blog article with simulation |
+| ![Congestion](screenshots/v23_dashboard_congestion.png) | ![Crowding](screenshots/v23_crowding_stimulus.png) | ![Article](screenshots/v23_article.png) |
+| Feature Congestion clutter map | Flanker letters at 3°, 6°, 10° eccentricity | Blog article with foveated rendering |
 
 ---
 
