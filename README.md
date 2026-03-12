@@ -2,6 +2,7 @@
 
 [![Electron](https://img.shields.io/badge/Electron-28.0-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![WebGL](https://img.shields.io/badge/WebGL-2.0-990000?style=flat-square&logo=webgl&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API)
+[![WebGPU](https://img.shields.io/badge/WebGPU-Compute-5B8FB9?style=flat-square)](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 
 Live site: **[scrutinizer.app](https://andyed.github.io/scrutinizer-www/)** | [Blog](https://andyed.github.io/scrutinizer-www/blog/) | [YouTube](https://www.youtube.com/@scrutinizer-app/playlists)

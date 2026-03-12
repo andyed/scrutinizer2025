@@ -549,29 +549,49 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     checked: isClosest(RADIUS_OPTIONS[1], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[1])
                                 },
+                                { type: 'separator' },
                                 {
-                                    label: 'Medium (90px)',
+                                    label: 'Tight (70px)',
                                     type: 'radio',
                                     checked: isClosest(RADIUS_OPTIONS[2], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[2])
                                 },
                                 {
-                                    label: 'Large (180px)',
+                                    label: 'Medium (90px)',
                                     type: 'radio',
                                     checked: isClosest(RADIUS_OPTIONS[3], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[3])
                                 },
                                 {
-                                    label: 'Extra Large (300px)',
+                                    label: 'Relaxed (110px)',
                                     type: 'radio',
                                     checked: isClosest(RADIUS_OPTIONS[4], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[4])
                                 },
                                 {
-                                    label: 'Huge (450px)',
+                                    label: 'Wide (130px)',
                                     type: 'radio',
                                     checked: isClosest(RADIUS_OPTIONS[5], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[5])
+                                },
+                                { type: 'separator' },
+                                {
+                                    label: 'Large (180px)',
+                                    type: 'radio',
+                                    checked: isClosest(RADIUS_OPTIONS[6], 'radius'),
+                                    click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[6])
+                                },
+                                {
+                                    label: 'Extra Large (300px)',
+                                    type: 'radio',
+                                    checked: isClosest(RADIUS_OPTIONS[7], 'radius'),
+                                    click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[7])
+                                },
+                                {
+                                    label: 'Huge (450px)',
+                                    type: 'radio',
+                                    checked: isClosest(RADIUS_OPTIONS[8], 'radius'),
+                                    click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[8])
                                 },
                                 { type: 'separator' },
                                 /*

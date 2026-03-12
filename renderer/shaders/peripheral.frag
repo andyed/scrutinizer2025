@@ -685,6 +685,7 @@ struct LGN_Signal {
     float congestion;   // Feature Congestion (Rosenholtz 2007) — local feature variance
     float edgeDensity;  // Edge Density — local Sobel magnitude density
     float density;
+    float softDensity; // Blurred density (LOD 4) for smooth crowding gate at content edges
     float rhythm;
     float type;
 };
@@ -699,10 +700,18 @@ struct V1_Signal {
 LGN_Signal processLGN(vec2 uv, ModeConfig config, float dist, float fovea_radius) {
     LGN_Signal signal;
     
-    vec4 structure = texture(u_structureMap, uv);
-    signal.density = structure.g;
-    signal.rhythm = structure.r;
-    signal.type = structure.b;
+    // Ratio reconstruction: sharp LOD 0 for type/density, blurred LOD 4 for rhythm.
+    // Rhythm = R/G at low resolution recovers the DOM rhythm signal that cliff-edges
+    // destroy at full res (R and G both drop at boundaries, but their ratio is stable).
+    vec4 structureSharp = textureLod(u_structureMap, uv, 0.0);
+    vec4 structureBlur  = textureLod(u_structureMap, uv, 4.0);
+    signal.type    = structureSharp.b;
+    signal.density = structureSharp.g;
+    float rawRhythm = structureBlur.r / max(structureBlur.g, 0.0005);
+    signal.rhythm   = clamp(rawRhythm, 0.0, 1.0);
+    // Soft density for crowding gate — blurred density tapers at content edges
+    // instead of cliff-edging, giving smooth V1 strength transitions at DOM boundaries
+    signal.softDensity = structureBlur.g;
 
     // Saliency texture: R=saliency, G=feature congestion, B=edge density
     vec4 salTex = texture(u_saliencyMap, uv);
@@ -776,7 +785,9 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     // are spared. This is a coarse "is this content?" gate — fine-grained spacing
     // discrimination is handled by the Bouma-scaled MIP gate (processV4, line ~1000).
     // Floor at 0.3 so isolated elements still lose some acuity, just not full crowding.
-    float densityCrowding = 1.0 / (1.0 + exp(-u_crowding_density_steepness * (lgn.density - u_crowding_density_threshold)));
+    // Use soft (blurred) density for the crowding gate so V1 strength tapers
+    // at content edges instead of cliff-edging at DOM boundaries
+    float densityCrowding = 1.0 / (1.0 + exp(-u_crowding_density_steepness * (lgn.softDensity - u_crowding_density_threshold)));
     float crowdingFactor = mix(0.3, 1.0, densityCrowding);
     strength *= crowdingFactor;
 
