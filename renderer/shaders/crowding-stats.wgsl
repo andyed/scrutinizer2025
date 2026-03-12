@@ -25,7 +25,7 @@ struct Config {
     ecc_scaling: f32,
     aspect: f32,            // width / height (screen aspect ratio)
     fovea_aspect_ratio: f32, // elliptical fovea shape (default 1.33)
-    _pad1: f32,
+    temporal_blend: f32,     // EMA smoothing factor (0=frozen, 1=no smoothing)
     _pad2: f32,
     _pad3: f32,
 };
@@ -49,6 +49,7 @@ struct TileStats {
 @group(0) @binding(0) var<uniform> config: Config;
 @group(0) @binding(1) var source_tex: texture_2d<f32>;
 @group(0) @binding(2) var<storage, read_write> stats: array<TileStats>;
+@group(0) @binding(3) var<storage, read> prev_stats: array<TileStats>;
 
 // Shared memory for parallel reduction (64 threads)
 var<workgroup> sh_L: array<f32, 64>;
@@ -207,24 +208,40 @@ fn main(
         workgroupBarrier();
     }
 
-    // Thread 0 writes tile statistics
+    // Thread 0 writes tile statistics with temporal smoothing
     if (local_idx == 0u) {
         let n: f32 = 64.0;
         let inv_n = 1.0 / n;
-        let mean_L = sh_L[0] * inv_n;
+        let cur_mean_L = sh_L[0] * inv_n;
         let mean_L2 = sh_L2[0] * inv_n;
         // NaN guard: clamp variance to >= 0 before sqrt
-        let variance = max(mean_L2 - mean_L * mean_L, 0.0);
+        let variance = max(mean_L2 - cur_mean_L * cur_mean_L, 0.0);
+        let cur_sigma_L = sqrt(variance);
+        let cur_mean_a = sh_a[0] * inv_n;
+        let cur_mean_b = sh_b[0] * inv_n;
+        let cur_eH = sh_eH[0] * inv_n;
+        let cur_eV = sh_eV[0] * inv_n;
+        let cur_eD45 = sh_eD45[0] * inv_n;
+        let cur_eD135 = sh_eD135[0] * inv_n;
+
+        // Temporal EMA: smooth only sigma and orientation energies to suppress
+        // frame-to-frame noise shimmer. Means track content instantly (no lag
+        // during cursor movement). Eccentricity and mip are geometric, not smoothed.
+        let prev = prev_stats[tile_idx];
+        let a = config.temporal_blend;
+        // If prev frame had no samples (first frame), skip blending
+        let has_prev = prev.sample_count > 0.0;
+        let b = select(1.0, a, has_prev);
 
         stats[tile_idx] = TileStats(
-            mean_L,
-            sqrt(variance),
-            sh_a[0] * inv_n,
-            sh_b[0] * inv_n,
-            sh_eH[0] * inv_n,
-            sh_eV[0] * inv_n,
-            sh_eD45[0] * inv_n,
-            sh_eD135[0] * inv_n,
+            cur_mean_L,                          // means: instant (no smoothing)
+            mix(prev.sigma_L, cur_sigma_L, b),   // sigma: smoothed
+            cur_mean_a,
+            cur_mean_b,
+            mix(prev.energy_h, cur_eH, b),       // orientation: smoothed
+            mix(prev.energy_v, cur_eV, b),
+            mix(prev.energy_d45, cur_eD45, b),
+            mix(prev.energy_d135, cur_eD135, b),
             ecc,
             mip,
             n,

@@ -16,6 +16,7 @@ const path = require('path');
 const TILE_SIZE = 8;           // 8x8 workgroup = 1 tile
 const FRAME_INTERVAL = 2;     // Run every 2nd frame
 const CONFIG_SIZE = 64;        // 16 floats × 4 bytes
+const TEMPORAL_SMOOTHING = 0.3; // EMA blend factor (0=frozen, 1=no smoothing)
 
 class WebGPUCrowdingCompute {
     /**
@@ -78,11 +79,17 @@ class WebGPUCrowdingCompute {
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
-        // Stats storage buffer: 48 bytes per tile (12 floats)
+        // Stats storage buffers: 48 bytes per tile (12 floats)
+        // Double-buffered for temporal smoothing — prev frame's stats
+        // are read during current frame's stats pass to apply EMA.
         const statsSize = this.totalTiles * 48;
         this.statsBuffer = this.device.createBuffer({
             size: statsSize,
-            usage: GPUBufferUsage.STORAGE,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+        });
+        this.prevStatsBuffer = this.device.createBuffer({
+            size: statsSize,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         });
 
         // Output storage buffer: 4 bytes per pixel (RGBA8 packed as u32)
@@ -109,11 +116,12 @@ class WebGPUCrowdingCompute {
     }
 
     _createPipelines() {
-        // --- Pass 1: Stats ---
+        // --- Pass 1: Stats (with temporal smoothing via prev frame) ---
         this.statsBGL = this._bgl([
             { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
             { binding: 1, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
             { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+            { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         ]);
         this.statsPipeline = this._cp(this.statsCode, this.statsBGL);
         this.statsBindGroup = this.device.createBindGroup({
@@ -122,6 +130,7 @@ class WebGPUCrowdingCompute {
                 { binding: 0, resource: { buffer: this.configBuffer } },
                 { binding: 1, resource: this.sourceTexture.createView() },
                 { binding: 2, resource: { buffer: this.statsBuffer } },
+                { binding: 3, resource: { buffer: this.prevStatsBuffer } },
             ],
         });
 
@@ -188,7 +197,7 @@ class WebGPUCrowdingCompute {
             cmfConfig.ecc_scaling || 0.75,
             aspect,               // screen aspect ratio (w/h)
             foveaAspectRatio,     // elliptical fovea shape
-            0.0,                  // _pad1
+            TEMPORAL_SMOOTHING,   // temporal_blend (EMA alpha)
             0.0,                  // _pad2
             0.0,                  // _pad3
         ]);
@@ -227,6 +236,10 @@ class WebGPUCrowdingCompute {
         synthPass.setBindGroup(0, this.synthBindGroup);
         synthPass.dispatchWorkgroups(synthWgX, synthWgY);
         synthPass.end();
+
+        // Copy current stats to prev for next frame's temporal smoothing
+        const statsSize = this.totalTiles * 48;
+        encoder.copyBufferToBuffer(this.statsBuffer, 0, this.prevStatsBuffer, 0, statsSize);
 
         // Only copy to readback buffer if it's not currently mapped
         if (!this._readbackPending) {
@@ -299,12 +312,14 @@ class WebGPUCrowdingCompute {
 
         this.configBuffer?.destroy();
         this.statsBuffer?.destroy();
+        this.prevStatsBuffer?.destroy();
         this.outputBuffer?.destroy();
         this.readbackBuffer?.destroy();
         this.sourceTexture?.destroy();
 
         this.configBuffer = null;
         this.statsBuffer = null;
+        this.prevStatsBuffer = null;
         this.outputBuffer = null;
         this.readbackBuffer = null;
         this.sourceTexture = null;

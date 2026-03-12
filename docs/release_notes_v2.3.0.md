@@ -42,9 +42,9 @@ Ported from Psychodeli+:
 | `renderer/webgpu-probe.js` | ~60 | WebGPU adapter capability detection |
 | `renderer/webgpu-safety.js` | ~80 | Frame budget monitor with auto-fallback |
 
-### Mode 10: Compute Mongrel (Experimental)
+### Mode 10: Peripheral Texture Synthesis (Default)
 
-Opt-in via the Rendering menu or keyboard shortcut — not yet the default. Currently in validation; the goal is to promote this to the default rendering path in the next release. Requires WebGPU (`navigator.gpu`). Falls back gracefully to Tier 1.6 on unsupported hardware.
+Now the default rendering mode. Requires WebGPU (`navigator.gpu`). Falls back gracefully to Tier 1.6 (MIP blur) on unsupported hardware. Temporal smoothing (EMA, blend factor 0.3) damps frame-to-frame tile stat jitter — only variance and orientation energies are smoothed; means pass through instantly to avoid color lag during cursor movement.
 
 ---
 

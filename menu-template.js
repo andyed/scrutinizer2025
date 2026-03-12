@@ -509,7 +509,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             click: () => { sendToOverlays('menu:set-aesthetic-mode', 7); app.emit('aesthetic-mode-changed', 7); }
                         },
                         {
-                            label: 'Compute Mongrel (Tier 2.5)',
+                            label: 'Peripheral Texture Synthesis (Tier 2.5)',
                             type: 'radio',
                             checked: currentAestheticMode === 10,
                             click: () => { sendToOverlays('menu:set-aesthetic-mode', 10); app.emit('aesthetic-mode-changed', 10); }

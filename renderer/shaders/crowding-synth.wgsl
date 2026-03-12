@@ -23,7 +23,7 @@ struct Config {
     ecc_scaling: f32,
     aspect: f32,
     fovea_aspect_ratio: f32,
-    _pad1: f32,
+    temporal_blend: f32,
     _pad2: f32,
     _pad3: f32,
 };

@@ -329,9 +329,9 @@
         },
         "compute_mongrel": {
             "id": 10,
-            "label": "Compute Mongrel (Tier 2.5)",
-            "shortLabel": "Mongrel",
-            "category": "experimental",
+            "label": "Peripheral Texture Synthesis (Tier 2.5)",
+            "shortLabel": "Texture Synth",
+            "category": "default",
             "description": "WebGPU compute shader synthesizes metamer textures matching per-tile summary statistics (mean/variance luminance, orientation energy). Implements Rosenholtz (2012) mongrel theory via oriented noise synthesis. Requires WebGPU; auto-falls back to Tier 1.6 if unavailable.",
             "pipeline": {
                 "lgn_use_structure_mask": true,
