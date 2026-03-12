@@ -887,7 +887,7 @@ This takes the maximum of:
 - **Text in bitmaps/screenshots** → High saliency from contrast, even without structure data
 - **Colorful logos/icons** → High saliency from color opponency
 
-This dual-source approach provides robust bandwidth allocation across both live DOM content (browser) and flattened bitmap exports (Figma plugin).
+This dual-source approach provides reliable bandwidth allocation across both live DOM content (browser) and flattened bitmap exports (Figma plugin).
 
 ### Stage 2: V1 (Geometry & Distortion)
 The "Feature Extractor" stage determines *how* the image is warped.

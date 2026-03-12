@@ -76,7 +76,7 @@ Add a text density channel to the content analysis pipeline (runs in overlay.js)
 2. Weight by inverse inter-element spacing (closer = denser)
 3. Write to an unused channel of the structure map or congestion map
 
-**Pros:** Leverages existing DOM analysis, semantically accurate (knows what's text vs image).
+**Pros:** Uses existing DOM analysis, semantically accurate (knows what's text vs image).
 **Cons:** Same DOM block-level granularity problem — unless we switch to per-character bounding boxes via `Range.getClientRects()`.
 
 ### Option C: Hybrid — precomputed edge density texture

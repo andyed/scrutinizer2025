@@ -14,7 +14,7 @@ Vision is not a camera feed; it is a controlled hallucination. Your fovea acts a
 You can frame foveal vs. peripheral vision exactly like a GPU optimization technique.
 
 - **The Fovea (The High-Res Texture)**: Only the central 1-2 degrees of your vision (about the size of your thumb at arm's length) captures high-fidelity color and detail. This is the only part of the screen "fully rendered."
-- **The Periphery (The Low-Poly Mesh)**: The rest of your visual field is surprisingly low-resolution, color-blind in the far reaches, and optimized almost exclusively for motion detection (magno-cellular pathways). It triggers the "camera" (eye) to move, but it doesn't actually see the object until the fovea lands on it.
+- **The Periphery (The Low-Poly Mesh)**: The rest of your visual field is low-resolution, color-blind in the far reaches, and optimized almost exclusively for motion detection (magno-cellular pathways). It triggers the "camera" (eye) to move, but it doesn't actually see the object until the fovea lands on it.
 - **The Illusion**: You feel like you see a detailed world in 180 degrees because your brain caches the details of where you just looked and predicts the details of where you will look.
 
 ### 2. Saccadic Masking: The "Cut" in the Film
@@ -189,7 +189,7 @@ A "Mongrel" is the actual visualization of this mathematical summary. It looks l
 
 #### B. The "Google Maps" Mongrel
 
-- **The Road Grid**: The grid-like streets of downtown remain surprisingly clear (because "grid" is a strong statistical summary).
+- **The Road Grid**: The grid-like streets of downtown remain clear (because "grid" is a strong statistical summary).
 - **The Winding Roads**: The curving roads in the suburbs turn into a nest of snakes. The brain captures "curviness" and "density" but loses the connectivity.
 
 #### C. The "Subway Map" Crowding

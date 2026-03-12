@@ -173,6 +173,29 @@ Only σ_L and orientation energies are smoothed — the noise-driving statistics
 
 `temporal_blend = 0.3` — converges in ~7 frames (~120ms at 60fps). Fast enough to track scrolling, slow enough to damp frame-to-frame jitter.
 
+### Velocity-Gated Metamer Freeze (v2.3.1)
+
+**Problem:** Even with temporal smoothing (above), the synthesis depends on gaze position — tile eccentricities change when gaze shifts, so tile sizes and statistics change, producing a different peripheral texture. During slow mouse movement (fixation drift, smooth pursuit), this produces shimmer in the magnocellular-sensitive band: high temporal frequency, low spatial frequency. The EMA damps frame-to-frame jitter on *static* gaze, but can't prevent the continuous re-evaluation that slow gaze movement causes.
+
+**Solution:** Gate compute dispatch on oculomotor state rather than a fixed frame interval:
+
+| Gaze state | Compute dispatch | Biological basis |
+|------------|-----------------|------------------|
+| Fixation | **Frozen** — last texture persists | Peripheral representation stable during fixation |
+| Smooth pursuit | **Frozen** unless drift > 2× foveal radius | Peripheral stable during pursuit; safety valve for accumulated displacement |
+| Saccade in flight | **Frozen** (also suppressed by §1 performance skip) | Saccadic suppression — no processing during ballistic movement |
+| Saccade landing | **Resynthesize** | Peripheral rebuilt at new fixation |
+
+**Implementation** (`scrutinizer.js`, render loop):
+1. Track `_metamerSaccading` flag — set `true` when velocity > `saccadicSuppressionThreshold` (2.5 px/ms)
+2. Detect landing: flag was `true`, velocity now below threshold → `saccadeLanded`
+3. Compute displacement from last synthesis position; if > `fovealRadius × 2.0` → `driftExceeded`
+4. Dispatch only when `saccadeLanded || driftExceeded || !_metamerInitialized`
+
+**Interaction with temporal smoothing:** Complementary. Temporal smoothing (EMA on σ_L and orientation energies) handles stat jitter when the compute *does* run. Velocity gating controls *whether* it runs. Together: no shimmer during fixation, smooth convergence at saccade landing.
+
+**Interaction with frame-skip (`shouldCompute`):** The 2-frame interval in `webgpu-crowding-compute.js` remains as a secondary pacing gate. Both conditions are `&&`-conjoined on the dispatch line: `shouldCompute() && imageDataBuffer && shouldResynth`. If velocity says "don't resynthesize," the frame-skip is never reached. If a saccade lands on a frame-skip frame, the `_metamerSaccading` flag persists (cleared only inside the dispatch block) so the landing is caught on the next eligible frame.
+
 ### Design Constraint: Restricted Foveal Viewing
 
 Scrutinizer is not a pure vision science simulation — it's a tool for evaluating interfaces under simulated peripheral viewing. This distinction matters for the compute pipeline:

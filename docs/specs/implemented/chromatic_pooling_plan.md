@@ -22,7 +22,7 @@ planStatus:
 - Replace uniform Oklab chrominance reduction with biologically accurate per-channel chromatic pooling
 - RG (red-green, Oklab `a`) decays ~2.5× faster than achromatic with eccentricity (k_e=0.059)
 - YV (blue-yellow, Oklab `b`) persists far into periphery and is frequency-dependent (k_e=0.004, k_ef=0.008)
-- Leverage existing DoG band decomposition to solve size dependence (small red text loses color fast; large blue background retains it)
+- Use existing DoG band decomposition to solve size dependence (small red text loses color fast; large blue background retains it)
 - Ship as part of v1.9.0 alongside CMF fix and oriented DoG bands
 - Demo-ready for Rosenholtz/Blauch meeting (~March 14)
 

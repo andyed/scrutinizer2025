@@ -342,6 +342,31 @@ col *= mix(1.0, lumaRatio, contrastPreservation);
 *   **Files**: `peripheral.frag`, `peripheral.frag` (uniform + fovea shrink), `webgl-renderer.js` (uniform binding), `scrutinizer.js` (`toggleSaccadicBlindness()` + suppression bypass)
 *   **Limitation**: Mouse velocity is a noisy proxy for saccadic state. Real saccades are ballistic (200-500°/s, 30-80ms). The velocity thresholds are tuned for visual effect, not biological fidelity.
 
+#### 1c. Velocity-Gated Metamer Freeze (v2.3.1)
+**Problem**: The WebGPU compute metamer (Tier 2.5) resynthesizes oriented noise every 2nd frame. The noise is spatially deterministic (`hash21(px)`), but synthesis depends on gaze position — when gaze shifts, tile eccentricities change, producing a visibly different peripheral texture. During slow mouse movement this creates shimmer in the frequency band the peripheral magnocellular pathway detects (high temporal, low spatial). The tool generates false peripheral salience.
+
+**Biology**: During fixation and smooth pursuit, the peripheral representation is **stable**. During saccades, visual processing is **suppressed** and the representation is rebuilt at landing (Sperry 1950, Burr 1994).
+
+**Solution**: The compute dispatch in `scrutinizer.js` is gated by velocity state:
+*   **Saccade landing detection**: Velocity crosses above `saccadicSuppressionThreshold` (2.5 px/ms) then drops below → `saccadeLanded = true` → resynthesize.
+*   **Drift safety valve**: If gaze moves > 2× `fovealRadius` from last synthesis position, force resynthesis regardless of velocity. Handles sustained smooth pursuit that slowly accumulates displacement.
+*   **First frame**: Always synthesize on initialization (`_metamerInitialized` flag).
+*   **During fixation/pursuit**: Compute dispatch is skipped entirely — the last synthesized texture persists in TEXTURE5. The fragment shader's eccentricity ramp continues blending it smoothly.
+
+**State fields** (initialized in constructor):
+```javascript
+this._metamerSaccading = false;     // true while velocity > threshold
+this._metamerInitialized = false;   // first-frame gate
+this._lastSynthGazeX = 0;          // half-res gaze at last synthesis
+this._lastSynthGazeY = 0;
+```
+
+**Performance benefit**: Compute dispatch drops from every-2nd-frame to only on saccade landing or drift exceeded — measurable GPU reduction during reading/browsing. The `shouldCompute()` frame-skip in `webgpu-crowding-compute.js` remains as a secondary pacing gate (both conditions are `&&`-conjoined on the dispatch line). The saccade-landing flag is cleared *inside* the dispatch block so it persists across frame-skip frames.
+
+**Saccade tracking and early return**: The `_metamerSaccading` flag is set *above* the saccadic suppression early return in `processFrame()`, so it tracks velocity even when the rest of the frame is skipped. This ensures saccade landing is detected on the first frame after velocity drops.
+
+**Why no cross-dissolve**: The fragment shader already blends the compute texture with a smooth eccentricity ramp. The foveal region always shows original source; the compute texture only appears in the periphery where change detection is poor. Hard swap during saccade landing is invisible (saccadic suppression). Hard swap from drift exceeded happens after sustained pursuit — the boundary texture is low-resolution enough that the swap is below perceptual threshold.
+
 #### 2. Web Worker Saliency
 **Problem**: Computing saliency maps (pixel-by-pixel color analysis) on the main thread blocks the UI, causing stutter even during slow movements.
 

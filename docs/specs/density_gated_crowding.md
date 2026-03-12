@@ -117,7 +117,7 @@ Add `crowding_density_threshold` and `crowding_density_steepness` to mode config
 
 The structure map density difference between a 5-letter crowded group (~0.53) and an isolated letter (~0.44) is small. Three options for increasing the signal, each with different tradeoffs:
 
-**Option A: Sigmoid only (current plan).** Keep `density = fontWeight/900 * 1.2` as-is. The sigmoid amplifies the 0.44→0.53 gap into a meaningful crowdingFactor difference. Pro: zero risk to existing pipeline stages that read density. Con: the shader is doing heavy lifting to separate a narrow signal — fragile if font-weight happens to be similar across content types.
+**Option A: Sigmoid only (current plan).** Keep `density = fontWeight/900 * 1.2` as-is. The sigmoid amplifies the 0.44→0.53 gap into a meaningful crowdingFactor difference. Pro: zero risk to existing pipeline stages that read density. Con: the shader is doing all the work to separate a narrow signal — fragile if font-weight happens to be similar across content types.
 
 **Option B: Scale group boost by cluster size.** Change gestalt-processor.js line 166 from `* 1.2` to `* (1.0 + 0.1 * Math.min(cluster.length, 8))`. A 5-letter cluster gets 1.5×, a single letter stays 1.0×. Pro: gives the shader more dynamic range with a biologically motivated signal (more items in the pooling region = more features to pool). Con: changes the density channel semantics for ALL downstream consumers, including the LGN whitespace gate and any future saliency-density interaction.
 

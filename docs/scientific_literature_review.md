@@ -194,7 +194,7 @@ The Magnocellular pathway (motion/luminance) processes information faster than t
 
 ### Gaze-Contingent Research Protocols
 
-> **Context**: The studies below utilize "Gaze-Contingent Displays" (GCDs) as a **research protocol**. While they typically use simple Gaussian blur (unlike Scrutinizer's biologically plausible simulation), they validate the fundamental methodology: restricting peripheral information forces users to reveal their cognitive focus via overt attention (mouse/eye movements).
+> **Context**: The studies below use "Gaze-Contingent Displays" (GCDs) as a **research protocol**. While they typically use simple Gaussian blur (unlike Scrutinizer's biologically plausible simulation), they validate the fundamental methodology: restricting peripheral information forces users to reveal their cognitive focus via overt attention (mouse/eye movements).
 
 
 - **Lagun, D. & Agichtein, E. (2011)**: ["ViewSer: A Tool for Large-Scale Studies of Web Search Result Examination"](http://www.mathcs.emory.edu/~dlagun/pubs/sigir636-lagun.pdf). *CHI 2011*.
@@ -241,7 +241,7 @@ The Magnocellular pathway (motion/luminance) processes information faster than t
 
 * **Eyeware FidelityFX-SDK (Fork)**: [GitHub Repository](https://github.com/eyeware/FidelityFX-SDK)
     * **The Project**: A fork of AMD's optimal FidelityFX SDK that integrates with the **Beam Eye Tracker** to enable foveated rendering using standard webcams, rather than specialized research hardware.
-    * **Technical Implementation**: The project utilizes **Variable Rate Shading (VRS)**—a technique that reduces shading rate in peripheral regions—driven by real-time gaze data.
+    * **Technical Implementation**: The project uses **Variable Rate Shading (VRS)**—a technique that reduces shading rate in peripheral regions—driven by real-time gaze data.
     * **Relevance to Scrutinizer**: This validates the transition of foveated rendering from a theoretical or lab-based constraint to a consumer-accessible optimization technique. It demonstrates that the biological efficiency principles simulated in Scrutinizer (allocating resources to the fovea) are actively being productized for performance in gaming and graphics.
 
 * **Noised-Foveation (SIGGRAPH 2022)**: [GitHub Repository](https://github.com/taimoor6864/Noised-Foveation)

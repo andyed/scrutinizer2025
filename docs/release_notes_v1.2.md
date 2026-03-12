@@ -12,7 +12,7 @@ A fully functional browser toolbar has been added to the top of the window, prov
 *   **URL Bar**: Displays current URL and allows navigation to new sites.
 *   **Fovea Toggle**: A dedicated eye icon button to toggle the foveal effect on/off.
     *   **Loading State**: The eye icon pulses blue/grey to indicate page loading status.
-*   **Architecture**: Implemented as a separate `WebContentsView` to ensure robust input handling independent of the web content.
+*   **Architecture**: Implemented as a separate `WebContentsView` to ensure reliable input handling independent of the web content.
 
 ### Redesigned App Menu
 The application menu has been completely reorganized for better discoverability and ease of use.
@@ -44,7 +44,7 @@ The visual memory system has been tuned for greater realism and usability.
 ## 🛠️ Engineering & Quality
 
 ### "Golden Image" Testing Framework
-We've established a robust visual regression testing pipeline to prevent "AI Hubris" and accidental regressions.
+We've established a visual regression testing pipeline to prevent "AI Hubris" and accidental regressions.
 *   **Golden Images**: A set of reference screenshots (`tests/golden/`) defines the "correct" visual output.
 *   **Automated Verification**: `npm test` now compares current output against these golden images.
 *   **Parameterized Testing**: Integration tests can now be parameterized via environment variables (e.g., `TEST_URL`, `TEST_MODES`).

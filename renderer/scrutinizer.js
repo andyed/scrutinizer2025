@@ -105,6 +105,11 @@
             this.webgpuSafety = null;
             this.webgpuDevice = null;
             this.webgpuTier = 0;
+            // Velocity-gated metamer freeze state
+            this._metamerSaccading = false;
+            this._metamerInitialized = false;
+            this._lastSynthGazeX = 0;
+            this._lastSynthGazeY = 0;
             this._initWebGPU();
 
             // ── SVG Overlay (debug visualization) ────────────────────
@@ -379,10 +384,17 @@
         processFrame(buffer, width, height) {
             if (!this.renderer || !this.enabled) return;
 
+            // Track saccade state for metamer freeze *before* the early return,
+            // so the flag is set even when processFrame bails during saccadic suppression.
+            const currentVelocity = this.gazeModel.getVelocity();
+            if (currentVelocity > this.config.saccadicSuppressionThreshold) {
+                this._metamerSaccading = true;
+            }
+
             // Saccadic suppression: skip heavy processing during rapid eye movement.
             // When saccadic blindness is enabled, let the render proceed — the shader
             // shrinks the fovea instead of skipping the frame entirely.
-            if (this.gazeModel.getVelocity() > this.config.saccadicSuppressionThreshold
+            if (currentVelocity > this.config.saccadicSuppressionThreshold
                 && !this.renderer.config.saccadic_blindness) {
                 return;
             }
@@ -536,7 +548,30 @@
                     this.webgpuCompute.resize(halfW, halfH);
                 }
 
-                if (this.webgpuCompute?.shouldCompute() && this.imageDataBuffer) {
+                // Gaze is in canvas space — scale to frame space for compute.
+                // Canvas may be taller than frame (toolbar chrome).
+                const gazeFrameX = gaze.x * (frameW / this.canvas.width);
+                const gazeFrameY = gaze.y * (frameH / this.canvas.height);
+
+                // Velocity-gated metamer freeze: don't resynthesize during fixation/pursuit.
+                // Peripheral representation is stable during these states (Sperry 1950, Burr 1994).
+                // Only resynthesize after saccade landing (deceleration below threshold).
+                // Note: _metamerSaccading is set above the saccadic suppression early-return
+                // (line ~389) so it tracks velocity even when processFrame bails.
+                const isSaccading = velocity > this.config.saccadicSuppressionThreshold;
+                const saccadeLanded = this._metamerSaccading && !isSaccading;
+
+                // Displacement safety valve: if gaze drifted far from last synthesis,
+                // force resynthesis even during slow movement (sustained pursuit edge case).
+                const synthDx = gazeFrameX / 2 - this._lastSynthGazeX;
+                const synthDy = gazeFrameY / 2 - this._lastSynthGazeY;
+                const synthDist = Math.sqrt(synthDx * synthDx + synthDy * synthDy);
+                const maxDrift = this.config.fovealRadius * 2.0; // ~5° at default radius
+                const driftExceeded = synthDist > maxDrift;
+
+                const shouldResynth = saccadeLanded || driftExceeded || !this._metamerInitialized;
+
+                if (this.webgpuCompute?.shouldCompute() && this.imageDataBuffer && shouldResynth) {
                     // Downsample source to half-res using frame dimensions (not canvas)
                     const halfBuf = this._downsampleToHalf(this.imageDataBuffer, frameW, frameH);
 
@@ -548,11 +583,6 @@
                     const cmfA = this.renderer.config.cmf_a || 2.78;
                     const corticalMax = Math.log1p(rMaxDeg / cmfA);
 
-                    // Gaze is in canvas space — scale to frame space for compute.
-                    // Canvas may be taller than frame (toolbar chrome).
-                    const gazeFrameX = gaze.x * (frameW / this.canvas.width);
-                    const gazeFrameY = gaze.y * (frameH / this.canvas.height);
-
                     this.webgpuCompute.uploadAndConfigure(
                         halfBuf,
                         gazeFrameX / 2, gazeFrameY / 2,
@@ -562,6 +592,20 @@
                         aspectRatio  // fovea_aspect_ratio (same as fragment shader)
                     );
                     this.webgpuCompute.dispatch();
+
+                    // Clear saccade flag and track synthesis position inside the dispatch
+                    // block so a saccade-landing isn't lost to shouldCompute() frame-skip.
+                    if (saccadeLanded) {
+                        this._metamerSaccading = false;
+                        console.debug('[Scrutinizer] Metamer resynth: reason=saccade');
+                    } else if (driftExceeded) {
+                        console.debug('[Scrutinizer] Metamer resynth: reason=drift (%dpx)', Math.round(synthDist));
+                    } else {
+                        console.debug('[Scrutinizer] Metamer resynth: reason=init');
+                    }
+                    this._lastSynthGazeX = gazeFrameX / 2;
+                    this._lastSynthGazeY = gazeFrameY / 2;
+                    this._metamerInitialized = true;
 
                     // Async readback — non-blocking, result arrives next frame
                     const cw = this.canvas.width, ch = this.canvas.height;
