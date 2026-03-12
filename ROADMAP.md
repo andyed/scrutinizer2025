@@ -10,7 +10,7 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 |------|-------|--------|
 | [linguistic_priming.md](docs/specs/linguistic_priming.md) | Goal embeddings → scent map → saliency gating | **Planned** |
 | [oriented_dog_bands.md](docs/specs/oriented_dog_bands.md) | Orientation-selective band attenuation, radial-tangential bias | **Shipped** (v2.2) |
-| [ratio_reconstruction.md](docs/specs/ratio_reconstruction.md) | Dual-LOD structure map sampling for margin soft-edge | **Planned** |
+| [ratio_reconstruction.md](docs/specs/ratio_reconstruction.md) | Dual-LOD structure map sampling for margin soft-edge | **Shipped** (v2.3) |
 | [metamer_mode.md](docs/specs/metamer_mode.md) | Structure-locked adaptive grid V1 distortion | **Planned** |
 | [mongrel_textures.md](docs/specs/mongrel_textures.md) | Statistical texture synthesis (WebGPU tiered path) | **Tier 2.5 Shipped** (v2.3) |
 | [congestion_text_density.md](docs/specs/congestion_text_density.md) | Congestion gate enhancement for text density | **Planned** |
@@ -44,6 +44,9 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 - Oklab luminance/chrominance variance metrics for quantitative comparison
 - Seeded flanker RNG (mulberry32) for reproducible crowding captures
 - Auto-fallback safety harness (60-frame rolling window, 30fps floor)
+- Ratio reconstruction: dual-LOD structure map sampling (sharp LOD 0 + blurred LOD 4) for smooth V1 taper at content edges
+- Soft density gate: crowding sigmoid uses blurred density so V1 strength tapers at DOM boundaries instead of cliff-edging
+- Fovea radius granularity: 70/110/130px options around the 90px sweet spot
 
 ### v2.1: Psychophysical Validation & 8-Band DoG (2026-03-08)
 - 8 half-octave DoG bands (9 MIP levels at √2 spacing)

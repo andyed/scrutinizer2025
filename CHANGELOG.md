@@ -4,6 +4,8 @@
 
 ### Added
 - **WebGPU Compute Mongrel Pipeline (Tier 2.5)**: Real-time metamer texture synthesis via two-pass WebGPU compute. Pass 1: tile-based Oklab statistics extraction (luminance, chrominance variance). Pass 2: oriented noise synthesis from extracted moments. ~900 lines of pipeline code, under 0.3ms on integrated GPU. Graceful fallback to Tier 1 when WebGPU is unavailable.
+- **Ratio Reconstruction**: Dual-LOD structure map sampling in `processLGN()`. Sharp LOD 0 for type/density, blurred LOD 4 for rhythm via R/G ratio (stable across content boundaries). Soft density gate feeds blurred density into the crowding sigmoid so V1 strength tapers smoothly at DOM edges instead of cliff-edging. Structure map texture upgraded to `LINEAR_MIPMAP_LINEAR` with `generateMipmap()` on upload.
+- **Fovea Radius Granularity**: Three new options around the 90px sweet spot — Tight (70px), Relaxed (110px), Wide (130px) — with separator-grouped menu layout.
 - **Oklab Variance Metrics**: Luminance and chrominance variance computation in `compare-crowding-modes.js` for quantitative mongrel quality comparison.
 - **Seeded Flanker RNG**: Deterministic `mulberry32` PRNG for crowding captures — identical flanker placement across runs for reproducible A/B comparison.
 - **Auto-Fallback Safety Harness**: 60-frame rolling window frame budget monitor with 30fps floor. Automatically disables WebGPU compute path and falls back to fragment shader pipeline if sustained frame drops detected.
