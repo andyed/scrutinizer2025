@@ -6,7 +6,7 @@
 
 Live site: **[scrutinizer.app](https://andyed.github.io/scrutinizer-www/)** | [Blog](https://andyed.github.io/scrutinizer-www/blog/) | [YouTube](https://www.youtube.com/@scrutinizer-app/playlists)
 
-macOS Installer: **[Download v2.2.0](https://github.com/andyed/scrutinizer2025/releases/tag/v2.2.0)** | [Changelog](CHANGELOG.md)
+macOS Installer: **[Download v2.3.0](https://github.com/andyed/scrutinizer2025/releases/tag/v2.3.0)** | [Changelog](CHANGELOG.md)
 
 ---
 
@@ -17,13 +17,13 @@ Your eyes only see fine detail right where you're looking — everything else is
 > [!TIP]
 > **For usability practitioners:** Scrutinizer works as a [Restricted Focus Viewer](https://pubmed.ncbi.nlm.nih.gov/12078741/) — evaluate peripheral discoverability, color reliance, and layout hierarchy without eye tracking hardware.
 
-![Dashboard with foveated rendering](screenshots/v19_dashboard.png)
+![Dashboard with foveated rendering](screenshots/v23_dashboard.png)
 
 *A dashboard viewed through Scrutinizer. Cursor at center — detail and color fade with distance from fixation, and dense regions (text, grids) degrade more than isolated elements.*
 
 | Congestion Overlay | Chromatic Pooling | Article Page |
 |:--:|:--:|:--:|
-| ![Congestion](screenshots/v19_dashboard_congestion.png) | ![Chromatic](screenshots/v19_chromatic_pooling.png) | ![Article](screenshots/v19_article.png) |
+| ![Congestion](screenshots/v23_dashboard_congestion.png) | ![Chromatic](screenshots/v23_chromatic_pooling.png) | ![Article](screenshots/v23_article.png) |
 | Visual clutter heatmap | Peripheral color shift | Blog article with simulation |
 
 ---
@@ -63,7 +63,7 @@ Resolution falloff across all stages follows a [cortical magnification function]
 - **Foveal/peripheral simulation** — eccentricity-dependent spatial pooling and chromatic filtering bound to cursor position
 - **[Analytical cortical magnification](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html)** — eccentricity falloff using the Schwartz (1980) log-mapping parameterization (mode 6), alongside legacy (mode 7) for comparison
 - **[Feature Congestion](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html) pipeline** — real-time visual clutter scoring with ComplexityHUD overlay (Score / Stats / Spatial tabs)
-- **WebGPU compute mongrel synthesis** (Tier 2.5) — two-pass tile statistics extraction and oriented noise synthesis via WGSL compute shaders, with auto-fallback safety harness
+- **WebGPU compute mongrel synthesis** (Tier 2.5, experimental) — two-pass tile statistics extraction and oriented noise synthesis via WGSL compute shaders, with auto-fallback safety harness. Opt-in via Rendering menu; target default in next release.
 - **Congestion-gated pooling** (mode 9) — peripheral attenuation weighted by local visual complexity
 - **Saliency modulation** — allocates more peripheral bandwidth to salient regions (edges, contrast, high-importance areas)
 - **Structure map analysis** — reads the live DOM to detect text rhythm, element density, font weight, and semantic type (ARIA roles), feeding the crowding and saliency stages

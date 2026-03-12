@@ -2,6 +2,7 @@
 
 **Release Date:** 2026-03-11
 **Previous:** [v2.2.0 release notes](release_notes_v2.2.0.md)
+**Blog post:** [Five Decades to Real Time](https://andyed.github.io/scrutinizer-www/blog/2026-03-11-luminance-metrics.html)
 
 ## In This Release
 
@@ -41,9 +42,9 @@ Ported from Psychodeli+:
 | `renderer/webgpu-probe.js` | ~60 | WebGPU adapter capability detection |
 | `renderer/webgpu-safety.js` | ~80 | Frame budget monitor with auto-fallback |
 
-### Mode 10: Compute Mongrel
+### Mode 10: Compute Mongrel (Experimental)
 
-Accessible via the Rendering menu or keyboard shortcut. Requires WebGPU (`navigator.gpu`). Falls back gracefully to Tier 1.6 on unsupported hardware.
+Opt-in via the Rendering menu or keyboard shortcut — not yet the default. Currently in validation; the goal is to promote this to the default rendering path in the next release. Requires WebGPU (`navigator.gpu`). Falls back gracefully to Tier 1.6 on unsupported hardware.
 
 ---
 
