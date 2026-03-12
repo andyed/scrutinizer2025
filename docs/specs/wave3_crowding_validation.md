@@ -1,8 +1,8 @@
 # Wave 3: Crowding Zone Validation
 
-> **Last updated:** 2026-03-07
+> **Last updated:** 2026-03-11
 
-**Status**: Proposed
+**Status**: Complete (results in [validation-journal.md](../validation-journal.md#wave-3-crowding-geometry))
 **Created**: 2026-03-07
 **Dependencies**: `renderer/shaders/peripheral.frag` (density-gated crowding, polar sectors), `renderer/config.js`, Wave 1-2 infrastructure, existing reference pages (`crowding.html`, `crowding-stimulus.html`)
 
@@ -316,10 +316,11 @@ Where `eccentricityScale = smoothstep(fovea_radius, parafovea_radius, dist)` and
 
 ## 10. Relationship to Existing Crowding Work
 
-The density-gated crowding spec (`density_gated_crowding.md`) established the mechanism. This wave validates the *geometry* — whether the spatial extent and shape of Scrutinizer's crowding zones match published psychophysics. The two are complementary:
+The density-gated crowding spec (`density_gated_crowding.md`) established the V1 displacement mechanism. This wave validated the *geometry* — whether the spatial extent and shape of Scrutinizer's crowding zones match published psychophysics. v2.2 added congestion-gated MIP pooling with Bouma-scaled edge density, which provides spacing selectivity that V1 displacement alone cannot. The three layers are complementary:
 
-- Density gating (v1.9.1): **what** gets crowded (dense vs sparse) — qualitative
-- Wave 3 (this spec): **where** crowding happens (spatial extent, shape, scaling) — quantitative
+- Density gating (v1.9.1): **what** gets crowded (dense vs sparse) — V1 displacement strength
+- Congestion-gated MIP pooling (v2.2): **where** crowding happens (Bouma-scaled spacing selectivity) — information loss
+- Wave 3 validation: confirms both mechanisms produce geometry consistent with Bouma (1970) and Toet & Levi (1992)
 
 ## References
 

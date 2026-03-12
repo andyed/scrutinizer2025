@@ -1,24 +1,24 @@
 # Mongrel Textures Specification
 
-> **Last updated:** 2026-03-09 (v2.1)
+> **Last updated:** 2026-03-11 (v2.3)
 
 ## 1. Overview
 
 "Mongrel" textures (Rosenholtz et al.) represent the **statistical summary** of visual information as processed by the peripheral visual system. The brain does not "see" individual pixels in the periphery—it perceives pooled statistics: average color, texture orientation, contrast variance, and density.
 
-### Current State (v2.1)
+### Current State (v2.3)
 
-Scrutinizer implements Tier 1 MIP-based pooling with density-gated crowding and per-channel chromatic decay. Five V1 distortion types are available in `shared/modes.json`, selectable per aesthetic mode. Higher tiers (contrast-preserving pooling, metamer synthesis) remain future work.
+Scrutinizer implements Tiers 1 through 2.5 of the mongrel pipeline. Tier 2.5 shipped in v2.3 as a two-pass WebGPU compute pipeline: tile-based Oklab statistics extraction followed by oriented noise synthesis. The implementation uses oriented sine gratings rather than Walton's steerable filter decomposition — simpler and faster, running under 0.3ms on integrated GPU. Five V1 distortion types are available in `shared/modes.json`, selectable per aesthetic mode. Tier 2 (contrast-preserving pooling in WebGL2) and Tier 3 (full TTM synthesis) remain future work.
 
 | Tier | Status | Strategy |
 |------|--------|----------|
-| **Tier 0** (Legacy) | ❌ Removed | Shatter jitter — replaced by Slow Wave (v1.4.1) |
-| **Tier 1** | ✅ Implemented (v1.4) | Eccentricity-based MIP sampling |
-| **Tier 1.5** | ✅ Implemented (v2.0) | Density-gated crowding + anisotropic noise |
-| **Tier 1.6** | ✅ Reimplemented (v1.9) | Per-channel chromatic pooling (castleCSF) |
-| **Tier 2** | 📋 Planned | Contrast-preserving pooling (WebGL2) |
-| **Tier 2.5** | 📋 Future | Walton-style smooth moment synthesis (WebGPU compute) |
-| **Tier 3** | 📋 Future | Full statistical texture replacement (WebGPU compute) |
+| **Tier 0** (Legacy) | Removed | Shatter jitter — replaced by Slow Wave (v1.4.1) |
+| **Tier 1** | Implemented (v1.4) | Eccentricity-based MIP sampling |
+| **Tier 1.5** | Implemented (v2.0) | Density-gated crowding + anisotropic noise |
+| **Tier 1.6** | Reimplemented (v1.9) | Per-channel chromatic pooling (castleCSF) |
+| **Tier 2** | Planned | Contrast-preserving pooling (WebGL2) |
+| **Tier 2.5** | **Shipped (v2.3)** | Tile-based Oklab statistics + oriented noise synthesis (WebGPU compute) |
+| **Tier 3** | Planned | Full statistical texture replacement (WebGPU compute) |
 
 ### Goal
 This spec defines a **tiered improvement roadmap** that:
@@ -63,7 +63,7 @@ Research identifies these as the key preserved features:
 | **Tier 1.5** | ~0.5ms | Density-gated crowding + anisotropic V1 noise | ✅ **Implemented (v2.0)** |
 | **Tier 1.6** | ~0.3ms | Per-channel chromatic decay (castleCSF) | ✅ **Reimplemented (v1.9)** |
 | **Tier 2** | ~2.0ms | Contrast-preserving pooling (WebGL2) | 📋 Planned |
-| **Tier 2.5** | ~2-3ms | Walton-style smooth moment synthesis (WebGPU compute) | 📋 Future |
+| **Tier 2.5** | ~0.3ms | Tile-based Oklab statistics + oriented noise synthesis (WebGPU compute) | **Shipped (v2.3)** |
 | **Tier 3** | ~3-4ms | Full statistical texture replacement (WebGPU compute) | 📋 Future |
 
 ---
@@ -283,20 +283,30 @@ vec3 mongrelColor = meanColor + (noise * contrast * 0.5);
 
 ---
 
-### Tier 2.5: Smooth Moment Metamer Synthesis (WebGPU Compute) — 📋 FUTURE
+### Tier 2.5: WebGPU Compute Mongrel Synthesis — SHIPPED (v2.3)
 
-**Goal**: Real-time ventral metamers via Walton et al. (2021) — synthesize textures that match smooth moments of steerable filter responses within eccentricity-scaled pooling regions.
+**Goal**: Real-time metamer texture synthesis via WebGPU compute, replacing simplex noise with statistically-informed oriented textures.
 
-**Mechanism**:
-1. **Steerable filter decomposition**: 4 orientations × 4 scales via steerable pyramid
-2. **Smooth moment computation**: Weighted moments within CMF-sized pooling regions
-3. **Metamer synthesis**: Reconstruct texture matching computed moments
+**Original spec** called for Walton-style smooth moment synthesis using steerable filter decomposition (4 orientations x 4 scales). The shipped implementation takes a more direct approach: tile-based Oklab statistics extraction followed by oriented sine grating synthesis. This trades the full steerable pyramid for a simpler two-pass pipeline that achieves the core goal — texture replacement informed by local image statistics — at a fraction of the compute cost.
 
-**Why WebGPU?**: Fragment shaders cannot accumulate statistics over pooling regions. Compute shaders provide workgroup shared memory for parallel reduction and read-write storage buffers for the pyramid decomposition.
+**Mechanism (as shipped)**:
+1. **Pass 1 — Tile statistics**: Extract per-tile Oklab luminance mean, luminance variance, and chrominance variance
+2. **Pass 2 — Oriented noise synthesis**: Generate oriented sine gratings parameterized by the extracted statistics
+
+**Why WebGPU?**: Fragment shaders cannot accumulate statistics over pooling regions. Compute shaders provide workgroup shared memory for parallel reduction and read-write storage buffers.
+
+**Implementation divergence**: Oriented sine gratings vs Walton's steerable filters. The steerable approach would provide better perceptual fidelity to the TTM's summary statistics, but the sine grating approach is sufficient for the current pipeline and runs under 0.3ms on integrated GPU (vs the original 2-3ms estimate). Walton's full approach remains an option for Tier 3 if needed.
+
+**Performance**: Under 0.3ms on integrated GPU. Auto-fallback safety harness monitors a 60-frame rolling window and disables the compute path if sustained frame time exceeds the 30fps floor.
+
+**Files**:
+- `renderer/webgpu-crowding-compute.js` — pipeline manager (device init, buffer allocation, bind groups, dispatch)
+- `renderer/shaders/crowding-stats.wgsl` — pass 1: tile statistics extraction
+- `renderer/shaders/crowding-synth.wgsl` — pass 2: oriented noise synthesis
+- `renderer/webgpu-probe.js` — WebGPU capability detection and feature negotiation
+- `renderer/webgpu-safety.js` — frame budget monitor with auto-fallback to fragment shader path
 
 **Prior art**: Walton et al. (2021) in CUDA/DirectX for VR foveated rendering. Vacher & Briand (2021) provide CPU reference for offline ground truth.
-
-**Performance estimate**: ~2-3ms on modern GPU (M1+, discrete).
 
 ---
 

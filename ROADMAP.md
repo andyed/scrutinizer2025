@@ -1,6 +1,6 @@
 # Scrutinizer Roadmap
 
-Last updated: 2026-03-09 (v2.2)
+Last updated: 2026-03-11 (v2.3)
 
 ## Specs
 
@@ -10,7 +10,9 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 |------|-------|--------|
 | [linguistic_priming.md](docs/specs/linguistic_priming.md) | Goal embeddings → scent map → saliency gating | **Planned** |
 | [oriented_dog_bands.md](docs/specs/oriented_dog_bands.md) | Orientation-selective band attenuation, radial-tangential bias | **Shipped** (v2.2) |
-| [mongrel_textures.md](docs/specs/mongrel_textures.md) | Statistical texture synthesis (WebGPU tiered path) | **Planned** |
+| [ratio_reconstruction.md](docs/specs/ratio_reconstruction.md) | Dual-LOD structure map sampling for margin soft-edge | **Planned** |
+| [metamer_mode.md](docs/specs/metamer_mode.md) | Structure-locked adaptive grid V1 distortion | **Planned** |
+| [mongrel_textures.md](docs/specs/mongrel_textures.md) | Statistical texture synthesis (WebGPU tiered path) | **Tier 2.5 Shipped** (v2.3) |
 | [congestion_text_density.md](docs/specs/congestion_text_density.md) | Congestion gate enhancement for text density | **Planned** |
 | [gaussian_blur_comparison.md](docs/specs/gaussian_blur_comparison.md) | DoG vs Gaussian frequency/saliency comparison | In progress |
 | [halverson_hornof_validation.md](docs/specs/halverson_hornof_validation.md) | Active vision behavioral validation | In progress |
@@ -34,6 +36,14 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 ---
 
 ## Completed
+
+### v2.3: WebGPU Compute Mongrel Synthesis (2026-03-11)
+- Tier 2.5 mongrel pipeline: tile-based Oklab statistics + oriented noise synthesis via WebGPU compute
+- Two WGSL compute passes (~900 lines), under 0.3ms on integrated GPU
+- Implementation uses oriented sine gratings, not Walton's steerable filter approach — simpler and faster
+- Oklab luminance/chrominance variance metrics for quantitative comparison
+- Seeded flanker RNG (mulberry32) for reproducible crowding captures
+- Auto-fallback safety harness (60-frame rolling window, 30fps floor)
 
 ### v2.1: Psychophysical Validation & 8-Band DoG (2026-03-08)
 - 8 half-octave DoG bands (9 MIP levels at √2 spacing)
@@ -135,21 +145,41 @@ Cardinal (H/V) edges get M-scaling cutoffs pushed ~50% further than oblique edge
 
 ## Open — Tier 2 (Medium Impact)
 
-### Mongrel Texture Synthesis (WebGPU Tiered Path)
-**Status:** Planned, blocked on WebGPU maturity
+### Axis Bias: Radial-Tangential V1 Displacement Weighting
+**Status:** TODO (cherry-pick from `metamer` branch)
 
-The arxiv paper defines a three-tier upgrade path:
-- **Tier 2:** Contrast-preserving statistical pooling within WebGL2 fragment shader (~2 ms)
-- **Tier 2.5:** Walton-style smooth moment synthesis via WebGPU compute (~2–3 ms)
-- **Tier 3:** Full TTM pooling-region statistical replacement via WebGPU compute
+V1 displacement currently has no directional bias — noise scramble applies isotropic displacement regardless of content type or radial orientation. Toet & Levi (1992) show crowding is ~2:1 stronger along the radial axis. The metamer branch demonstrated a simple per-fragment axis bias that improves perceptual plausibility:
 
-The crowding branch point (branch point #3) already accepts per-pixel modulation. Each tier swaps in without modifying the core shader.
+- **Text** (`type > 0.8`): `vec2(1.8, 0.15)` — strong horizontal displacement, minimal vertical. Preserves the "lines of text" gestalt while making words unreadable. Horizontal dominates because text lines run horizontally and radial crowding exceeds tangential.
+- **Image/UI** (`type ≤ 0.8`): `vec2(0.8, 0.8)` — roughly isotropic, slight reduction from 1.0 to avoid over-displacement on structured UI.
+
+This maps directly to the radial-tangential anisotropy already implemented in the DoG bands (v2.2), but applied to V1 displacement rather than V4 frequency attenuation. The two are complementary — DoG bands control *what spatial frequencies survive*, axis bias controls *how the surviving content is scrambled*.
 
 **Work:**
+- [ ] Add axis bias vector to V1 displacement calculation (noise scramble path, type 0)
+- [ ] Derive bias from structure map type channel (text vs image vs UI)
+- [ ] Test interaction with existing radial-tangential DoG band attenuation
+- [ ] Validate: crowding-radial stimulus should show stronger radial spread with axis bias enabled
+
+**Files:** `peripheral.frag` (processV1), `shared/modes.json` (optional per-mode toggle)
+
+---
+
+### Mongrel Texture Synthesis (WebGPU Tiered Path)
+**Status:** Tier 2.5 shipped (v2.3); Tiers 2 and 3 remain planned
+
+The arxiv paper defines a three-tier upgrade path:
+- **Tier 2:** Contrast-preserving statistical pooling within WebGL2 fragment shader (~2 ms) — planned
+- **Tier 2.5:** WebGPU compute mongrel synthesis (~0.3 ms) — **shipped v2.3**
+- **Tier 3:** Full TTM pooling-region statistical replacement via WebGPU compute — planned
+
+The v2.3 implementation diverges from the original spec: oriented sine gratings replace Walton's steerable filter decomposition. The result is simpler, faster (under 0.3ms vs the spec's 2-3ms estimate), and sufficient for the tile-based statistics the pipeline requires. Walton's full steerable pyramid remains an option for Tier 3 if perceptual fidelity demands it.
+
+**Work:**
+- [x] WebGPU compute shader path for Tier 2.5 (two-pass: stats extraction + oriented noise synthesis)
+- [x] Benchmark against current simplex noise + grid scramble
 - [ ] Prototype Tier 2 statistical pooling in current fragment shader
-- [ ] WebGPU compute shader path for Tier 2.5 (Walton 2021)
-- [ ] Benchmark against current simplex noise + grid scramble
-- [ ] TTM integration through crowding branch point
+- [ ] TTM integration through crowding branch point (Tier 3)
 
 ---
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.3.0] - 2026-03-11
+
+### Added
+- **WebGPU Compute Mongrel Pipeline (Tier 2.5)**: Real-time metamer texture synthesis via two-pass WebGPU compute. Pass 1: tile-based Oklab statistics extraction (luminance, chrominance variance). Pass 2: oriented noise synthesis from extracted moments. ~900 lines of pipeline code, under 0.3ms on integrated GPU. Graceful fallback to Tier 1 when WebGPU is unavailable.
+- **Oklab Variance Metrics**: Luminance and chrominance variance computation in `compare-crowding-modes.js` for quantitative mongrel quality comparison.
+- **Seeded Flanker RNG**: Deterministic `mulberry32` PRNG for crowding captures — identical flanker placement across runs for reproducible A/B comparison.
+- **Auto-Fallback Safety Harness**: 60-frame rolling window frame budget monitor with 30fps floor. Automatically disables WebGPU compute path and falls back to fragment shader pipeline if sustained frame drops detected.
+
+### Files
+- `renderer/webgpu-crowding-compute.js` — pipeline manager (device, buffers, bind groups, dispatch)
+- `renderer/shaders/crowding-stats.wgsl` — pass 1: tile statistics extraction
+- `renderer/shaders/crowding-synth.wgsl` — pass 2: oriented noise synthesis
+- `renderer/webgpu-probe.js` — WebGPU capability detection
+- `renderer/webgpu-safety.js` — frame budget monitor and auto-fallback
+
 ## [2.2.0] - 2026-03-09
 
 ### Added

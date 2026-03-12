@@ -63,6 +63,7 @@ Resolution falloff across all stages follows a [cortical magnification function]
 - **Foveal/peripheral simulation** — eccentricity-dependent spatial pooling and chromatic filtering bound to cursor position
 - **[Analytical cortical magnification](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html)** — eccentricity falloff using the Schwartz (1980) log-mapping parameterization (mode 6), alongside legacy (mode 7) for comparison
 - **[Feature Congestion](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html) pipeline** — real-time visual clutter scoring with ComplexityHUD overlay (Score / Stats / Spatial tabs)
+- **WebGPU compute mongrel synthesis** (Tier 2.5) — two-pass tile statistics extraction and oriented noise synthesis via WGSL compute shaders, with auto-fallback safety harness
 - **Congestion-gated pooling** (mode 9) — peripheral attenuation weighted by local visual complexity
 - **Saliency modulation** — allocates more peripheral bandwidth to salient regions (edges, contrast, high-importance areas)
 - **Structure map analysis** — reads the live DOM to detect text rhythm, element density, font weight, and semantic type (ARIA roles), feeding the crowding and saliency stages

@@ -20,6 +20,7 @@
 const path = require('path');
 const fs = require('fs');
 const { PNG } = require('pngjs');
+const { rgbToOklab } = require('../renderer/oklab-utils');
 
 const args = process.argv.slice(2);
 function getArg(name, def) {
@@ -202,8 +203,115 @@ function analyzePng(png) {
     return results;
 }
 
+// ── Luminance structure metrics: Oklab variance comparison ──
+
+function variance(arr) {
+    if (arr.length < 2) return 0;
+    const mean = arr.reduce((a, b) => a + b) / arr.length;
+    return arr.reduce((s, v) => s + (v - mean) ** 2, 0) / arr.length;
+}
+
+/**
+ * Compute Oklab L/a/b variance in corresponding patches of two PNGs.
+ * Reuses the same band geometry as analyzePng() so patch positions match.
+ * Returns per-band metrics: Oklab L variance ratio (M1) and chrom variance ratio (M3).
+ */
+function analyzePatches(png0, png10) {
+    const dpr0 = png0.width > 2000 ? 2 : 1;
+    const dpr10 = png10.width > 2000 ? 2 : 1;
+    const cssW0 = png0.width / dpr0;
+    const vpOffX0 = (cssW0 - VIEWPORT_W) / 2;
+    const fixY0 = detectFixationY(png0);
+
+    const cssW10 = png10.width / dpr10;
+    const vpOffX10 = (cssW10 - VIEWPORT_W) / 2;
+    const fixY10 = detectFixationY(png10);
+
+    const patchResults = [];
+
+    for (let colIdx = 0; colIdx < FONT_SIZES.length; colIdx++) {
+        const fontSize = FONT_SIZES[colIdx];
+
+        for (const row of ROWS) {
+            for (const [dir, sign] of [['above', -1], ['below', 1]]) {
+                // Band geometry for mode 0
+                const rowCenterY0 = fixY0 + sign * row.deg * PX_PER_DEG;
+                const bandH = Math.max(fontSize * 2, 40);
+                const colLeftCSS0 = vpOffX0 + colIdx * (VIEWPORT_W / 3);
+                const colRightCSS0 = colLeftCSS0 + VIEWPORT_W / 3;
+
+                const pyStart0 = Math.round((rowCenterY0 - bandH / 2) * dpr0);
+                const pyEnd0 = Math.round((rowCenterY0 + bandH / 2) * dpr0);
+                const pxLeft0 = Math.round(colLeftCSS0 * dpr0);
+                const pxRight0 = Math.round(colRightCSS0 * dpr0);
+
+                // Band geometry for mode 10
+                const rowCenterY10 = fixY10 + sign * row.deg * PX_PER_DEG;
+                const colLeftCSS10 = vpOffX10 + colIdx * (VIEWPORT_W / 3);
+                const colRightCSS10 = colLeftCSS10 + VIEWPORT_W / 3;
+
+                const pyStart10 = Math.round((rowCenterY10 - bandH / 2) * dpr10);
+                const pyEnd10 = Math.round((rowCenterY10 + bandH / 2) * dpr10);
+                const pxLeft10 = Math.round(colLeftCSS10 * dpr10);
+                const pxRight10 = Math.round(colRightCSS10 * dpr10);
+
+                // Sample Oklab values from each PNG's band
+                const oklab0 = sampleOklabPatch(png0, pyStart0, pyEnd0, pxLeft0, pxRight0);
+                const oklab10 = sampleOklabPatch(png10, pyStart10, pyEnd10, pxLeft10, pxRight10);
+
+                const varL0 = variance(oklab0.L);
+                const varL10 = variance(oklab10.L);
+                const varA0 = variance(oklab0.a);
+                const varA10 = variance(oklab10.a);
+                const varB0 = variance(oklab0.b);
+                const varB10 = variance(oklab10.b);
+
+                const lumRatio = varL0 > 0 ? varL10 / varL0 : null;
+                const chromVar0 = Math.sqrt(varA0 + varB0);
+                const chromVar10 = Math.sqrt(varA10 + varB10);
+                const chromRatio = chromVar0 > 0 ? chromVar10 / chromVar0 : null;
+
+                patchResults.push({
+                    ecc_deg: row.deg,
+                    position: dir,
+                    fontSize,
+                    varL_mode0: round4(varL0),
+                    varL_mode10: round4(varL10),
+                    lumVarianceRatio: lumRatio !== null ? round3(lumRatio) : null,
+                    chromVar_mode0: round4(chromVar0),
+                    chromVar_mode10: round4(chromVar10),
+                    chromVarianceRatio: chromRatio !== null ? round3(chromRatio) : null,
+                });
+            }
+        }
+    }
+
+    return patchResults;
+}
+
+/**
+ * Sample all pixels in a rectangular patch and return arrays of Oklab L, a, b values.
+ * Samples every other pixel (2x step) for performance on high-DPR captures.
+ */
+function sampleOklabPatch(png, pyStart, pyEnd, pxLeft, pxRight) {
+    const L = [], a = [], b = [];
+    const step = 2; // skip every other pixel for speed
+    for (let py = pyStart; py <= pyEnd; py += step) {
+        for (let px = pxLeft; px < pxRight; px += step) {
+            if (py < 0 || py >= png.height || px < 0 || px >= png.width) continue;
+            const idx = (py * png.width + px) * 4;
+            const lab = rgbToOklab(png.data[idx], png.data[idx + 1], png.data[idx + 2]);
+            L.push(lab.L);
+            a.push(lab.a);
+            b.push(lab.b);
+        }
+    }
+    return { L, a, b };
+}
+
 function round1(v) { return Math.round(v * 10) / 10; }
 function round3(v) { return Math.round(v * 1000) / 1000; }
+function round4(v) { return Math.round(v * 10000) / 10000; }
 
 function loadPng(filepath) {
     if (!fs.existsSync(filepath)) return null;
@@ -341,6 +449,35 @@ function main() {
         );
     }
 
+    // ── Luminance structure metrics ──
+    const patchResults = analyzePatches(png0, png10);
+    const patch28 = patchResults.filter(r => r.fontSize === 28);
+
+    console.log('\n=== Luminance Structure Metrics (28px column) ===\n');
+    console.log('Ecc(°)  Dir     │ Oklab L Variance          │ Chrom Variance');
+    console.log('                │ Mode 0    Mode 10  Ratio   │ Mode 0    Mode 10  Ratio');
+    console.log('────────────────┼────────────────────────────┼─────────────────────────');
+
+    for (const deg of [3, 6, 10]) {
+        for (const dir of ['above', 'below']) {
+            const p = patch28.find(r => r.ecc_deg === deg && r.position === dir);
+            if (!p) continue;
+            const lv0 = (p.varL_mode0 * 1000).toFixed(1);  // scale for readability
+            const lv10 = (p.varL_mode10 * 1000).toFixed(1);
+            const lr = p.lumVarianceRatio !== null ? p.lumVarianceRatio.toFixed(2) : ' N/A';
+            const cv0 = (p.chromVar_mode0 * 1000).toFixed(1);
+            const cv10 = (p.chromVar_mode10 * 1000).toFixed(1);
+            const cr = p.chromVarianceRatio !== null ? p.chromVarianceRatio.toFixed(2) : ' N/A';
+
+            console.log(
+                `${String(deg).padStart(4)}°   ${dir.padEnd(6)}  │ ` +
+                `${lv0.padStart(7)}   ${lv10.padStart(7)}  ${lr.padStart(5)}   │ ` +
+                `${cv0.padStart(7)}   ${cv10.padStart(7)}  ${cr.padStart(5)}`
+            );
+        }
+    }
+    console.log('(variance values ×1000 for readability)');
+
     // ── Hypothesis test ──
     console.log('\n=== Hypothesis Evaluation ===\n');
 
@@ -379,6 +516,33 @@ function main() {
     console.log(`[${gradient0 ? 'PASS' : 'FAIL'}] H4a: Mode 0 crowding ratio decreases with eccentricity (monotonic gradient)`);
     console.log(`[${gradient10 ? 'PASS' : 'FAIL'}] H4b: Mode 10 crowding ratio decreases with eccentricity (monotonic gradient)`);
 
+    // H5: Oklab L variance ratio > 1.0 at ≥6° (metamer preserves luminance contrast)
+    const periphPatch = patch28.filter(r => r.ecc_deg >= 6 && r.lumVarianceRatio !== null);
+    const avgLumRatio = avg(periphPatch.map(r => r.lumVarianceRatio));
+    const h5 = avgLumRatio !== null && avgLumRatio > 1.0;
+    console.log(`[${h5 ? 'PASS' : 'FAIL'}] H5: Oklab L variance ratio > 1.0 at >=6° (avg=${fmt(avgLumRatio)})`);
+    if (h5) {
+        console.log(`       → Compute mongrel preserves ${((avgLumRatio - 1.0) * 100).toFixed(1)}% more luminance contrast than MIP blur`);
+    }
+
+    // H6: Chrominance variance ratio ≈ 1.0 (both modes pool color similarly)
+    const periphChrom = patch28.filter(r => r.ecc_deg >= 6 && r.chromVarianceRatio !== null);
+    const avgChromRatio = avg(periphChrom.map(r => r.chromVarianceRatio));
+    const h6 = avgChromRatio !== null && Math.abs(avgChromRatio - 1.0) < 0.25;
+    console.log(`[${h6 ? 'PASS' : 'FAIL'}] H6: Chrom variance ratio ≈ 1.0 at >=6° (avg=${fmt(avgChromRatio)}, tolerance ±0.25)`);
+    if (h6) {
+        console.log(`       → Both modes pool chrominance similarly (ratio within 25% of unity)`);
+    }
+
+    // 3° is a transition zone, not passthrough: fovealRadius=90px (2.37°), so 3° is
+    // 0.63° beyond the foveal boundary with blendFactor≈0.33. The two pooling paths
+    // (MIP-only vs compute-with-MIP-fallback) diverge here because compute alpha is
+    // near-zero (~0.012) but the MIP fallback routes through different code paths.
+    // Expect ratio > 1.0 — measures onset divergence between pooling strategies.
+    const fovPatch = patch28.filter(r => r.ecc_deg === 3 && r.lumVarianceRatio !== null);
+    const avgFovLumRatio = avg(fovPatch.map(r => r.lumVarianceRatio));
+    console.log(`[INFO] Transition zone (3°): L variance ratio=${fmt(avgFovLumRatio)} — pooling path onset divergence (fovealRadius=2.37°, blendFactor≈0.33)`);
+
     // ── JSON output ──
     if (hasFlag('json')) {
         const jsonData = {
@@ -387,17 +551,23 @@ function main() {
             mode10_file: path.basename(mode10File),
             mode0: results0,
             mode10: results10,
+            luminancePatches: patchResults,
             hypotheses: {
                 h1_stronger_crowding: h1,
                 h2_more_dispersion: h2,
                 h3_foveal_preserved: h3,
                 h4a_mode0_gradient: gradient0,
                 h4b_mode10_gradient: gradient10,
+                h5_luminance_variance_preserved: h5,
+                h6_chrominance_similar: h6,
             },
             summary: {
                 peripheral_crowding_ratio: { mode0: avgPeriCnt0, mode10: avgPeriCnt10 },
                 peripheral_spread_ratio: { mode0: avgPeriSpr0, mode10: avgPeriSpr10 },
                 foveal_crowding_ratio: { mode0: fov0, mode10: fov10 },
+                peripheral_lum_variance_ratio: avgLumRatio,
+                peripheral_chrom_variance_ratio: avgChromRatio,
+                transition_zone_3deg_lum_variance_ratio: avgFovLumRatio,
             }
         };
         console.log('\n--- JSON ---');
@@ -421,6 +591,14 @@ function main() {
         `| Crowding ratio | ${fmt(avgPeriCnt0)} | ${fmt(avgPeriCnt10)} | ${fmtDelta(avgPeriCnt10, avgPeriCnt0)} |`,
         `| Spread ratio | ${fmt(avgPeriSpr0)} | ${fmt(avgPeriSpr10)} | ${fmtDelta(avgPeriSpr10, avgPeriSpr0)} |`,
         '',
+        '## Luminance Structure (>=6°, 28px column)',
+        '',
+        `| Metric | Value | Interpretation |`,
+        `|--------|-------|----------------|`,
+        `| Oklab L variance ratio | ${fmt(avgLumRatio)} | ${avgLumRatio > 1.0 ? 'Mode 10 preserves more luminance contrast' : avgLumRatio < 1.0 ? 'Mode 10 smooths more' : 'Similar'} |`,
+        `| Chrom variance ratio | ${fmt(avgChromRatio)} | ${avgChromRatio !== null && Math.abs(avgChromRatio - 1.0) < 0.25 ? 'Both modes pool color similarly' : 'Chrominance differs'} |`,
+        `| Transition zone L ratio (3°) | ${fmt(avgFovLumRatio)} | Pooling path onset divergence (fovealRadius=2.37°, blendFactor≈0.33) |`,
+        '',
         '## Hypothesis Results',
         '',
         `- H1 (stronger crowding): ${h1 ? 'PASS' : 'FAIL'}`,
@@ -428,6 +606,8 @@ function main() {
         `- H3 (foveal preserved): ${h3 ? 'PASS' : 'FAIL'}`,
         `- H4a (mode 0 gradient): ${gradient0 ? 'PASS' : 'FAIL'}`,
         `- H4b (mode 10 gradient): ${gradient10 ? 'PASS' : 'FAIL'}`,
+        `- H5 (L variance preserved): ${h5 ? 'PASS' : 'FAIL'} — avg ratio ${fmt(avgLumRatio)} at >=6°`,
+        `- H6 (chrom similar): ${h6 ? 'PASS' : 'FAIL'} — avg ratio ${fmt(avgChromRatio)} at >=6°`,
         '',
     ];
     fs.writeFileSync(reportFile, reportLines.join('\n'));
