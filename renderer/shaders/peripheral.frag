@@ -86,6 +86,12 @@ uniform sampler2D u_congestionMap;
 uniform float u_hasCongestionMap; // 0.0=not available, 1.0=use high-res data
 uniform vec2 u_congestionMapSize; // Width/height of congestion map texture (for Bouma LOD)
 
+// WebGPU compute metamer texture (Tier 2.5 — crowding synthesis)
+// RGBA: RGB = oriented noise metamer, A = blend weight (0=foveal passthrough, 1=full metamer)
+uniform sampler2D u_computeStatTexture;
+uniform float u_compute_tier; // 0.0=disabled, 2.5=active
+uniform vec2 u_compute_frame_scale; // frame/canvas ratio for UV correction (1.0 if same)
+
 in vec2 v_texCoord;
 out vec4 fragColor;
 
@@ -999,7 +1005,34 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     }
 
     vec3 pooledCol;
-    if (u_gaussian_blur_mode > 0.5) {
+
+    // Tier 2.5: WebGPU compute metamer — oriented noise matching pooling statistics.
+    // Alpha encodes blend weight: 0 at fovea, 1 in far periphery.
+    // Falls through to MIP/DoG for uncovered regions (alpha < 1).
+    if (u_compute_tier > 2.0) {
+        // Map canvas UV to frame UV: the compute texture covers the frame area,
+        // which may be smaller than the canvas (e.g. toolbar chrome).
+        vec2 computeUV = uv * u_compute_frame_scale;
+        vec4 computeSample = texture(u_computeStatTexture, computeUV);
+        float computeAlpha = computeSample.a;
+
+        if (computeAlpha > 0.99) {
+            // Full metamer coverage — skip MIP fallback
+            pooledCol = computeSample.rgb;
+        } else {
+            // Partial blend — compute MIP fallback for uncovered portion
+            vec3 mipFallback;
+            if (u_dog_enabled > 0.5) {
+                mipFallback = sampleDoGReconstructed(
+                    v1.distortedUV, coupledEccentricity, fovea_radius,
+                    u_dog_e2, u_dog_sharpness, eccentricity, uv
+                ).rgb;
+            } else {
+                mipFallback = sampleMIPPooled(v1.distortedUV, coupledEccentricity, fovea_radius).rgb;
+            }
+            pooledCol = mix(mipFallback, computeSample.rgb, computeAlpha);
+        }
+    } else if (u_gaussian_blur_mode > 0.5) {
         // Eccentricity-scaled Gaussian blur via MIP chain (no band decomposition).
         // Same M-scaling curve as DoG, but uniform frequency degradation.
         pooledCol = sampleMIPPooled(v1.distortedUV, coupledEccentricity, fovea_radius).rgb;

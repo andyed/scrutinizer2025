@@ -508,6 +508,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             checked: currentAestheticMode === 7,
                             click: () => { sendToOverlays('menu:set-aesthetic-mode', 7); app.emit('aesthetic-mode-changed', 7); }
                         },
+                        {
+                            label: 'Compute Mongrel (Tier 2.5)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 10,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 10); app.emit('aesthetic-mode-changed', 10); }
+                        },
                         { type: 'separator' },
                         {
                             label: 'Congestion-Gated Pooling',

@@ -137,7 +137,9 @@ const CAPTURE_TASKS = [
         page: 'crowding',
         fixations: ['center', 'crowded_row2', 'corner', 'isolated_row1'],
         variants: [
-            ...DEBUG_VARIANTS
+            ...DEBUG_VARIANTS,
+            // Tier 2.5: WebGPU compute mongrel — compare against fragment-shader-only
+            { id: 'mode10_mongrel', mode: '10', overlay: false }
         ],
         coordinates: {
             'center': { x: 600, y: 450 },
@@ -154,7 +156,8 @@ const CAPTURE_TASKS = [
         page: 'crowding-stimulus',
         fixations: ['center'],
         variants: [
-            ...DEBUG_VARIANTS
+            ...DEBUG_VARIANTS,
+            { id: 'mode10_mongrel', mode: '10', overlay: false }
         ]
     },
 

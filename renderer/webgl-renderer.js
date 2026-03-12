@@ -123,6 +123,14 @@
                 this._congestionMapWidth = 1;
                 this._congestionMapHeight = 1;
 
+                // WebGPU compute texture (Tier 2.5 metamer synthesis)
+                this.computeTextureLocation = null;
+                this.computeTierLocation = null;
+                this.computeFrameScaleLocation = null;
+                this._hasComputeData = false;
+                this._computeTier = 0;
+                this._computeFrameScale = [1.0, 1.0];
+
                 // Default Configuration
                 this.config = {
                     lgn_use_structure_mask: true,
@@ -150,7 +158,8 @@
                     supra_exponent: 0.5, // Threshold→appearance compression (Jiang et al. 2022)
                     show_congestion: 0,  // 0=off, 1=congestion heatmap, 2=saliency vs congestion
                     congestion_pooling: true,
-                    saccadic_blindness: false
+                    saccadic_blindness: false,
+                    compute_tier: 0
                 };
 
                 this.init(vsSource, fsSource);
@@ -277,6 +286,11 @@
                 this.hasCongestionMapLocation = gl.getUniformLocation(this.program, "u_hasCongestionMap");
                 this.congestionMapSizeLocation = gl.getUniformLocation(this.program, "u_congestionMapSize");
 
+                // WebGPU compute texture uniform lookups (Tier 2.5)
+                this.computeTextureLocation = gl.getUniformLocation(this.program, "u_computeStatTexture");
+                this.computeTierLocation = gl.getUniformLocation(this.program, "u_compute_tier");
+                this.computeFrameScaleLocation = gl.getUniformLocation(this.program, "u_compute_frame_scale");
+
                 // Create buffers
                 this.positionBuffer = gl.createBuffer();
                 gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
@@ -361,6 +375,18 @@
                 gl.generateMipmap(gl.TEXTURE_2D);
                 this._congestionMapWidth = 1;
                 this._congestionMapHeight = 1;
+
+                // Create WebGPU compute texture (GL_TEXTURE5) — Tier 2.5 metamer output
+                this.computeTexture = gl.createTexture();
+                gl.activeTexture(gl.TEXTURE5);
+                gl.bindTexture(gl.TEXTURE_2D, this.computeTexture);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                // Dummy 1x1 black pixel
+                const dummyCompute = new Uint8Array([0, 0, 0, 0]);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, dummyCompute);
             }
 
             createProgram(gl, vsSource, fsSource) {
@@ -455,6 +481,40 @@
                 this._hasCongestionMapData = false;
             }
 
+            /**
+             * Upload WebGPU compute result to TEXTURE5.
+             * @param {Uint8Array} data - RGBA pixel data (alpha = blend weight, NOT premultiplied)
+             * @param {number} width
+             * @param {number} height
+             * @param {number} canvasWidth - full canvas width for UV scale
+             * @param {number} canvasHeight - full canvas height for UV scale
+             */
+            uploadComputeTexture(data, width, height, canvasWidth, canvasHeight) {
+                const gl = this.gl;
+                gl.activeTexture(gl.TEXTURE5);
+                gl.bindTexture(gl.TEXTURE_2D, this.computeTexture);
+                // Disable premultiply — alpha encodes blend weight, not transparency
+                gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+                gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true); // Restore
+                this._hasComputeData = true;
+
+                // Both source and compute textures cover the same frame content
+                // and are stretched by the GPU to fill the canvas quad identically.
+                // No UV correction needed — 1:1 mapping.
+                this._computeFrameScale = [1.0, 1.0];
+            }
+
+            /**
+             * Set the compute tier level (0 = disabled, 2.5 = active).
+             */
+            setComputeTier(tier) {
+                this._computeTier = tier;
+                if (tier === 0) {
+                    this._hasComputeData = false;
+                }
+            }
+
             updateConfigFromMode(modeId) {
                 // Preserve runtime toggles that aren't mode-specific.
                 // show_congestion is set by setShowCongestion() and must survive
@@ -489,7 +549,8 @@
                     cmf_enabled: false,
                     cmf_a: 2.78,
                     cmf_color_sigma: 0.0,
-                    congestion_pooling: true
+                    congestion_pooling: true,
+                    compute_tier: 0
                 };
 
                 this.config = { ...defaults };
@@ -529,6 +590,7 @@
                         this.config.yv_decay = p.yv_decay ?? defaults.yv_decay;
                         this.config.yv_freq_decay = p.yv_freq_decay ?? defaults.yv_freq_decay;
                         this.config.supra_exponent = p.supra_exponent ?? defaults.supra_exponent;
+                        this.config.compute_tier = p.compute_tier ?? defaults.compute_tier;
 
                         // Store current mode metadata for export
                         this.currentMode = modeEntry;
@@ -656,6 +718,13 @@
                 gl.uniform1i(this.congestionMapLocation, 4);
                 gl.uniform1f(this.hasCongestionMapLocation, this._hasCongestionMapData ? 1.0 : 0.0);
                 gl.uniform2f(this.congestionMapSizeLocation, this._congestionMapWidth || 1, this._congestionMapHeight || 1);
+
+                // Tier 2.5: WebGPU compute metamer texture
+                gl.activeTexture(gl.TEXTURE5);
+                gl.bindTexture(gl.TEXTURE_2D, this.computeTexture);
+                gl.uniform1i(this.computeTextureLocation, 5);
+                gl.uniform1f(this.computeTierLocation, this._hasComputeData ? this._computeTier : 0.0);
+                gl.uniform2f(this.computeFrameScaleLocation, this._computeFrameScale[0], this._computeFrameScale[1]);
 
                 gl.uniform2f(this.resolutionLocation, width, height);
                 gl.uniform2f(this.mouseLocation, mouseX, mouseY);

@@ -21,6 +21,9 @@
     const GazeModel = require('./gaze-model');
     const VisualMemory = require('./visual-memory');
     const ContentAnalysis = require('./content-analysis');
+    const { probeWebGPU } = require('./webgpu-probe');
+    const { WebGPUSafetyHarness } = require('./webgpu-safety');
+    const { WebGPUCrowdingCompute } = require('./webgpu-crowding-compute');
 
     // Architecture: Explicit require for optional dependencies
     let SVGOverlay;
@@ -97,6 +100,13 @@
             this._lastCongestionResultTime = 0;
             this._heatmapPendingRestore = false;
 
+            // ── WebGPU Compute (Tier 2.5) ──────────────────────────────
+            this.webgpuCompute = null;
+            this.webgpuSafety = null;
+            this.webgpuDevice = null;
+            this.webgpuTier = 0;
+            this._initWebGPU();
+
             // ── SVG Overlay (debug visualization) ────────────────────
             const OverlayClass = SVGOverlay || (typeof window !== 'undefined' ? window.SVGOverlay : null);
             if (OverlayClass) {
@@ -126,6 +136,81 @@
             this.render = this.render.bind(this);
 
             this.setupEventListeners();
+        }
+
+        // ── WebGPU Init (Tier 2.5) ────────────────────────────────────
+
+        /**
+         * Non-blocking WebGPU probe → safety harness → compute pipeline.
+         * Only activates if the current mode has compute_tier >= 2.5.
+         */
+        async _initWebGPU() {
+            try {
+                const result = await probeWebGPU();
+                if (!result.success) {
+                    console.log('[Scrutinizer] WebGPU not available:', result.error);
+                    return;
+                }
+                this.webgpuDevice = result.device;
+
+                // Safety harness with auto-fallback callback
+                this.webgpuSafety = new WebGPUSafetyHarness(result.device, {
+                    onBudgetExceeded: () => this._fallbackToTier16(),
+                });
+
+                // Device loss callback (for external kill signals)
+                window._scrutinizerWebGPULostCallback = () => this._fallbackToTier16();
+
+                console.log('[Scrutinizer] WebGPU ready (Tier 2.5 available)');
+            } catch (e) {
+                console.warn('[Scrutinizer] WebGPU init error:', e.message);
+            }
+        }
+
+        /**
+         * Simple 2x2 box downsample for compute shader input.
+         * @param {Uint8ClampedArray} src - full-res RGBA
+         * @param {number} w - full width
+         * @param {number} h - full height
+         * @returns {Uint8Array} half-res RGBA
+         */
+        _downsampleToHalf(src, w, h) {
+            const hw = Math.ceil(w / 2);
+            const hh = Math.ceil(h / 2);
+            const dst = new Uint8Array(hw * hh * 4);
+            for (let y = 0; y < hh; y++) {
+                const sy = Math.min(y * 2, h - 1);
+                const sy1 = Math.min(sy + 1, h - 1);
+                for (let x = 0; x < hw; x++) {
+                    const sx = Math.min(x * 2, w - 1);
+                    const sx1 = Math.min(sx + 1, w - 1);
+                    const i00 = (sy * w + sx) * 4;
+                    const i10 = (sy * w + sx1) * 4;
+                    const i01 = (sy1 * w + sx) * 4;
+                    const i11 = (sy1 * w + sx1) * 4;
+                    const di = (y * hw + x) * 4;
+                    dst[di]     = (src[i00] + src[i10] + src[i01] + src[i11]) >> 2;
+                    dst[di + 1] = (src[i00 + 1] + src[i10 + 1] + src[i01 + 1] + src[i11 + 1]) >> 2;
+                    dst[di + 2] = (src[i00 + 2] + src[i10 + 2] + src[i01 + 2] + src[i11 + 2]) >> 2;
+                    dst[di + 3] = 255;
+                }
+            }
+            return dst;
+        }
+
+        /**
+         * Destroy compute pipeline and revert to fragment-shader-only path.
+         */
+        _fallbackToTier16() {
+            console.warn('[Scrutinizer] Falling back to Tier 1.6 (WebGL-only)');
+            if (this.webgpuCompute) {
+                this.webgpuCompute.destroy();
+                this.webgpuCompute = null;
+            }
+            this.webgpuTier = 0;
+            if (this.renderer) {
+                this.renderer.setComputeTier(0);
+            }
         }
 
         // ── Event Wiring ─────────────────────────────────────────────
@@ -424,6 +509,68 @@
             if (this.complexityHud) {
                 const perfStats = this.frameTimer ? this.frameTimer.getStats() : null;
                 this.complexityHud.update(contentState.congestionStats, contentState.edgeDensityStats, perfStats);
+            }
+
+            // 7c. WebGPU compute dispatch (Tier 2.5)
+            // Runs every other frame. Uploads half-res source, dispatches stats+synth,
+            // async readback → WebGL TEXTURE5.
+            if (this.webgpuDevice && this.webgpuSafety?.isAlive() &&
+                this.renderer?.config.compute_tier >= 2.5 &&
+                this.imageData) {
+                // Use actual frame dimensions, NOT canvas dimensions.
+                // Canvas may include toolbar chrome (e.g. 3840x2104 vs frame 3840x2024).
+                const frameW = this.imageData.width;
+                const frameH = this.imageData.height;
+                const halfW = Math.ceil(frameW / 2);
+                const halfH = Math.ceil(frameH / 2);
+                if (!this.webgpuCompute) {
+                    try {
+                        this.webgpuCompute = new WebGPUCrowdingCompute(this.webgpuDevice, halfW, halfH);
+                        this.webgpuTier = 2.5;
+                        this.renderer.setComputeTier(2.5);
+                    } catch (e) {
+                        console.warn('[Scrutinizer] WebGPU compute init failed:', e.message);
+                        this._fallbackToTier16();
+                    }
+                } else if (halfW !== this.webgpuCompute.width || halfH !== this.webgpuCompute.height) {
+                    this.webgpuCompute.resize(halfW, halfH);
+                }
+
+                if (this.webgpuCompute?.shouldCompute() && this.imageDataBuffer) {
+                    // Downsample source to half-res using frame dimensions (not canvas)
+                    const halfBuf = this._downsampleToHalf(this.imageDataBuffer, frameW, frameH);
+
+                    // Compute cortical_max for half-res coordinates
+                    const foveaDeg = 2.0;
+                    const halfDiag = Math.sqrt(halfW * halfW + halfH * halfH) / 2;
+                    const halfFovea = this.config.fovealRadius / 2;
+                    const rMaxDeg = (halfDiag / halfFovea) * foveaDeg;
+                    const cmfA = this.renderer.config.cmf_a || 2.78;
+                    const corticalMax = Math.log1p(rMaxDeg / cmfA);
+
+                    // Gaze is in canvas space — scale to frame space for compute.
+                    // Canvas may be taller than frame (toolbar chrome).
+                    const gazeFrameX = gaze.x * (frameW / this.canvas.width);
+                    const gazeFrameY = gaze.y * (frameH / this.canvas.height);
+
+                    this.webgpuCompute.uploadAndConfigure(
+                        halfBuf,
+                        gazeFrameX / 2, gazeFrameY / 2,
+                        halfFovea,
+                        this.renderer.config,
+                        corticalMax,
+                        aspectRatio  // fovea_aspect_ratio (same as fragment shader)
+                    );
+                    this.webgpuCompute.dispatch();
+
+                    // Async readback — non-blocking, result arrives next frame
+                    const cw = this.canvas.width, ch = this.canvas.height;
+                    this.webgpuCompute.readback().then((data) => {
+                        if (data && this.renderer) {
+                            this.renderer.uploadComputeTexture(data, halfW, halfH, cw, ch);
+                        }
+                    });
+                }
             }
 
             // 8. Render (single call to WebGL with all composed state)
