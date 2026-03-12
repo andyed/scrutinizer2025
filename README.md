@@ -24,7 +24,7 @@ Your eyes only see fine detail right where you're looking — everything else is
 | Congestion Heatmap | Crowding Stimulus | Article Page |
 |:--:|:--:|:--:|
 | ![Congestion](screenshots/v23_dashboard_congestion.png) | ![Crowding](screenshots/v23_crowding_stimulus.png) | ![Article](screenshots/v23_article.png) |
-| Feature Congestion clutter map ([original](screenshots/v23_dashboard_original.png)) | Flanker letters at 3°, 6°, 10° ([original](screenshots/v23_crowding_stimulus_original.png)) | Blog article with foveated rendering ([original](screenshots/v23_article_original.png)) |
+| Feature Congestion clutter map <sub>[original](screenshots/v23_dashboard_original.png)</sub> | Flanker letters at 3°, 6°, 10° <sub>[original](screenshots/v23_crowding_stimulus_original.png)</sub> | Blog article with foveated rendering <sub>[original](screenshots/v23_article_original.png)</sub> |
 
 ---
 
