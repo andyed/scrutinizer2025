@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wave 3: Crowding Geometry Validation</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e8; padding: 32px; max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #888; margin-bottom: 24px; }
+  .subtitle span { color: #aaa; }
+  .scorecard { display: flex; gap: 16px; margin-bottom: 24px; }
+  .tier-card { flex: 1; background: #222240; border-radius: 10px; padding: 16px 20px; border: 1px solid #333; }
+  .tier-card h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #888; margin-bottom: 8px; }
+  .tier-card .score { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+  .tier-card .score .of { font-size: 16px; color: #666; font-weight: 400; }
+  .intro { font-size: 13px; line-height: 1.7; color: #999; margin-bottom: 24px; max-width: 800px; }
+  .intro strong { color: #bbb; font-weight: 600; }
+  .section-desc { font-size: 12px; line-height: 1.6; color: #888; margin-bottom: 12px; max-width: 720px; }
+  .chart-desc { font-size: 11px; line-height: 1.5; color: #777; margin-top: -8px; margin-bottom: 12px; }
+  .tier-card.all-pass { border-color: #2d6a3080; }
+  .tier-card.all-pass .score { color: #4ade80; }
+  .tier-card.has-fail { border-color: #a0602080; }
+  .tier-card.has-fail .score { color: #fbbf24; }
+  .tier-card.all-fail { border-color: #dc262680; }
+  .tier-card.all-fail .score { color: #f87171; }
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .chart-box { background: #222240; border-radius: 10px; padding: 20px; border: 1px solid #333; }
+  .chart-box h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: #ccc; }
+  svg { display: block; }
+  .axis-label { fill: #666; font-size: 10px; }
+  .grid-line { stroke: #2a2a44; stroke-width: 1; }
+  .legend { font-size: 10px; fill: #aaa; }
+  .results { background: #222240; border-radius: 10px; padding: 20px; border: 1px solid #333; margin-bottom: 16px; }
+  .results h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: #ccc; }
+  .result-row { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; border-bottom: 1px solid #2a2a44; font-size: 12px; line-height: 1.4; }
+  .result-row:last-child { border-bottom: none; }
+  .badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; min-width: 44px; text-align: center; flex-shrink: 0; margin-top: 1px; }
+  .badge.pass { background: #166534; color: #4ade80; }
+  .badge.fail { background: #7c2d12; color: #fbbf24; }
+  .badge.skip { background: #374151; color: #9ca3af; }
+  .badge.info { background: #1e3a5f; color: #7db4e0; }
+  .result-text { color: #bbb; }
+  .footer { margin-top: 24px; font-size: 11px; color: #555; text-align: center; }
+</style>
+</head>
+<body>
+<h1>Wave 3: Crowding Geometry Validation</h1>
+<div class="subtitle">
+  cmf_a=2.78 &middot; ecc_scaling=0.75 &middot; radial_bias=2 &middot; fovea=90px &middot;
+  <span>2026-03-13</span>
+</div>
+
+<div class="intro">
+  <strong>What this tests:</strong> Scrutinizer models crowding through three mechanisms:
+  MIP pooling (V4 receptive field growth), polar sector quantization (V1/V4), and
+  density-gated V1 displacement (Lateral Smash). We validate that these mechanisms collectively
+  reproduce the spatial geometry of crowding described by Bouma (1970) — critical spacing
+  proportional to eccentricity — and the radial:tangential asymmetry found by Toet &amp; Levi (1992).
+  Tier 3 stretch goals test size independence (Pelli &amp; Tillman 2008), stimulus specificity,
+  and the sharpness of the Bouma transition.
+</div>
+
+<div class="scorecard">
+  <div class="tier-card has-fail">
+    <h3>Tier 1: Must Pass</h3>
+    <div class="score">2 <span class="of">/ 3</span></div>
+  </div>
+  <div class="tier-card has-fail">
+    <h3>Tier 2: Should Pass</h3>
+    <div class="score">2 <span class="of">/ 3</span></div>
+  </div>
+  <div class="tier-card all-pass">
+    <h3>Tier 3: Stretch</h3>
+    <div class="score">1 <span class="of">/ 1</span></div>
+  </div>
+</div>
+
+<div class="charts">
+<div class="chart-box">
+  <h3>MIP Pooling Region vs Bouma Critical Spacing</h3>
+  <p class="chart-desc">Blue: MIP pooling diameter in degrees (2^mipLevel / ppd). Red dashed: Bouma's 0.5&times;eccentricity.
+  MIP pooling is ~5% of Bouma — intentionally small. MIP handles frequency-domain averaging;
+  V1 Lateral Smash handles the spatial extent of crowding interference.</p>
+  <svg width="540" height="300" viewBox="0 0 540 300">
+  <g transform="translate(48,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0°</text><line x1="0" y1="213.5" x2="472" y2="213.5" class="grid-line"/><text x="-8" y="216.5" text-anchor="end" class="axis-label">1°</text><line x1="0" y1="183" x2="472" y2="183" class="grid-line"/><text x="-8" y="186" text-anchor="end" class="axis-label">2°</text><line x1="0" y1="152.5" x2="472" y2="152.5" class="grid-line"/><text x="-8" y="155.5" text-anchor="end" class="axis-label">3°</text><line x1="0" y1="122" x2="472" y2="122" class="grid-line"/><text x="-8" y="125" text-anchor="end" class="axis-label">4°</text><line x1="0" y1="91.5" x2="472" y2="91.5" class="grid-line"/><text x="-8" y="94.5" text-anchor="end" class="axis-label">5°</text><line x1="0" y1="61" x2="472" y2="61" class="grid-line"/><text x="-8" y="64" text-anchor="end" class="axis-label">6°</text><line x1="0" y1="30.5" x2="472" y2="30.5" class="grid-line"/><text x="-8" y="33.5" text-anchor="end" class="axis-label">7°</text><line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">8°</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="59" y="260" text-anchor="middle" class="axis-label">2°</text><text x="118" y="260" text-anchor="middle" class="axis-label">4°</text><text x="177" y="260" text-anchor="middle" class="axis-label">6°</text><text x="236" y="260" text-anchor="middle" class="axis-label">8°</text><text x="295" y="260" text-anchor="middle" class="axis-label">10°</text><text x="354" y="260" text-anchor="middle" class="axis-label">12°</text><text x="413" y="260" text-anchor="middle" class="axis-label">14°</text><text x="472" y="260" text-anchor="middle" class="axis-label">16°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><path d="M0,244 L472,0" fill="none" stroke="#e04040" stroke-width="2" stroke-dasharray="6 3" opacity="0.7"/><text x="417" y="30.5" class="legend" fill="#e04040">Bouma 0.5&times;ecc</text><path d="M59,242.75379912950666 L88.5,242.45725732759695 L118,242.15426986256864 L147.5,241.84568425223082 L177,241.53213991186863 L236,240.89208074965495 L295,240.23708008060922 L354,239.56922584158028 L442.5,238.54662933149953" fill="none" stroke="#4080e0" stroke-width="2"/><circle cx="59" cy="242.75379912950666" r="3" fill="#4080e0" stroke="#1a1a2e" stroke-width="2"/><circle cx="88.5" cy="242.45725732759695" r="3" fill="#4080e0" stroke="#1a1a2e" stroke-width="2"/><circle cx="118" cy="242.15426986256864" r="3" fill="#4080e0" stroke="#1a1a2e" stroke-width="2"/><circle cx="147.5" cy="241.84568425223082" r="3" fill="#4080e0" stroke="#1a1a2e" stroke-width="2"/><circle cx="177" cy="241.53213991186863" r="3" fill="#4080e0" stroke="#1a1a2e" stroke-width="2"/><circle cx="236" cy="240.89208074965495" r="3" fill="#4080e0" stroke="#1a1a2e" stroke-width="2"/><circle cx="295" cy="240.23708008060922" r="3" fill="#4080e0" stroke="#1a1a2e" stroke-width="2"/><circle cx="354" cy="239.56922584158028" r="3" fill="#4080e0" stroke="#1a1a2e" stroke-width="2"/><circle cx="442.5" cy="238.54662933149953" r="3" fill="#4080e0" stroke="#1a1a2e" stroke-width="2"/></g></svg></div>
+<div class="chart-box">
+  <h3>Crowding Ratio by Eccentricity</h3>
+  <p class="chart-desc">Crowded/isolated cyan pixel ratio across 3 font sizes.
+  Below 1.0 = crowding effect present. Below 0.8 at 6°+ is Tier 1 requirement.
+  Similar ratios across font sizes validates Pelli &amp; Tillman size independence.</p>
+  <svg width="540" height="300" viewBox="0 0 540 300">
+  <g transform="translate(48,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0.0</text><line x1="0" y1="211.46666666666667" x2="472" y2="211.46666666666667" class="grid-line"/><text x="-8" y="214.46666666666667" text-anchor="end" class="axis-label">0.2</text><line x1="0" y1="178.93333333333334" x2="472" y2="178.93333333333334" class="grid-line"/><text x="-8" y="181.93333333333334" text-anchor="end" class="axis-label">0.4</text><line x1="0" y1="146.39999999999998" x2="472" y2="146.39999999999998" class="grid-line"/><text x="-8" y="149.39999999999998" text-anchor="end" class="axis-label">0.6</text><line x1="0" y1="113.86666666666667" x2="472" y2="113.86666666666667" class="grid-line"/><text x="-8" y="116.86666666666667" text-anchor="end" class="axis-label">0.8</text><line x1="0" y1="81.33333333333334" x2="472" y2="81.33333333333334" class="grid-line"/><text x="-8" y="84.33333333333334" text-anchor="end" class="axis-label">1.0</text><line x1="0" y1="48.80000000000001" x2="472" y2="48.80000000000001" class="grid-line"/><text x="-8" y="51.80000000000001" text-anchor="end" class="axis-label">1.2</text><line x1="0" y1="16.26666666666668" x2="472" y2="16.26666666666668" class="grid-line"/><text x="-8" y="19.26666666666668" text-anchor="end" class="axis-label">1.4</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="78.66666666666666" y="260" text-anchor="middle" class="axis-label">2°</text><text x="157.33333333333331" y="260" text-anchor="middle" class="axis-label">4°</text><text x="236" y="260" text-anchor="middle" class="axis-label">6°</text><text x="314.66666666666663" y="260" text-anchor="middle" class="axis-label">8°</text><text x="393.33333333333337" y="260" text-anchor="middle" class="axis-label">10°</text><text x="472" y="260" text-anchor="middle" class="axis-label">12°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><line x1="0" y1="113.86666666666667" x2="472" y2="113.86666666666667" stroke="#e04040" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/><text x="470" y="109.86666666666667" text-anchor="end" class="legend" fill="#e04040">0.8 threshold</text><line x1="0" y1="81.33333333333334" x2="472" y2="81.33333333333334" stroke="#555" stroke-width="1" stroke-dasharray="4 4"/><path d="M118,143.716 L236,-19.68266666666665 L393.33333333333337,91.58133333333333" fill="none" stroke="#e09040" stroke-width="2"/><circle cx="118" cy="143.716" r="4" fill="#e09040" stroke="#fff" stroke-width="1.5"/><circle cx="236" cy="-19.68266666666665" r="4" fill="#e09040" stroke="#fff" stroke-width="1.5"/><circle cx="393.33333333333337" cy="91.58133333333333" r="4" fill="#e09040" stroke="#fff" stroke-width="1.5"/><path d="M118,55.87600000000003 L236,90.60533333333333 L393.33333333333337,100.12133333333333" fill="none" stroke="#4080e0" stroke-width="2"/><circle cx="118" cy="55.87600000000003" r="4" fill="#4080e0" stroke="#fff" stroke-width="1.5"/><circle cx="236" cy="90.60533333333333" r="4" fill="#4080e0" stroke="#fff" stroke-width="1.5"/><circle cx="393.33333333333337" cy="100.12133333333333" r="4" fill="#4080e0" stroke="#fff" stroke-width="1.5"/><path d="M118,100.52800000000002 L236,101.42266666666666 L393.33333333333337,80.84533333333331" fill="none" stroke="#40c060" stroke-width="2"/><circle cx="118" cy="100.52800000000002" r="4" fill="#40c060" stroke="#fff" stroke-width="1.5"/><circle cx="236" cy="101.42266666666666" r="4" fill="#40c060" stroke="#fff" stroke-width="1.5"/><circle cx="393.33333333333337" cy="80.84533333333331" r="4" fill="#40c060" stroke="#fff" stroke-width="1.5"/><rect x="402" y="2" width="12" height="3" fill="#e09040" rx="1"/><text x="418" y="8" class="legend">16px</text><rect x="402" y="16" width="12" height="3" fill="#4080e0" rx="1"/><text x="418" y="22" class="legend">28px</text><rect x="402" y="30" width="12" height="3" fill="#40c060" rx="1"/><text x="418" y="36" class="legend">48px</text></g></svg></div>
+<div class="chart-box"><h3>Bouma Spacing Transition (no data)</h3><svg width="540" height="300"><text x="270" y="150" text-anchor="middle" fill="#555" font-size="14">Capture spacing screenshots first</text></svg></div>
+<div class="chart-box"><h3>Mode 0 vs Mode 10 (no captures)</h3><svg width="540" height="300"><text x="270" y="150" text-anchor="middle" fill="#555" font-size="14">Capture mode 10 screenshots first</text></svg></div>
+</div>
+
+<div class="results" style="margin-bottom:16px">
+  <h3>Tier 1: Must Pass</h3>
+  <p class="section-desc"><strong>Core checks:</strong> Does the filter differentiate crowded from isolated targets (ratio &lt; 0.8)?
+    Do MIP pooling regions grow proportionally with eccentricity? Does the radial bias parameter
+    ensure crowding extends further radially than tangentially?</p>
+  <div class="result-row">
+    <span class="badge fail">FAIL</span>
+    <span class="result-text">crowding ratio peripheral (6°=0.943, 10°=0.885)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">mip proportional</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">radial gt tangential</span>
+  </div>
+</div>
+<div class="results" style="margin-bottom:16px">
+  <h3>Tier 2: Should Pass</h3>
+  <p class="section-desc"><strong>Quantitative match:</strong> Is the MIP pooling diameter within a reasonable multiple of Bouma's
+    0.5&times;eccentricity? Does the density gate produce measurably different effects at near vs far eccentricities?
+    Is the radial:tangential ratio consistent with Toet &amp; Levi's ~2:1 finding?</p>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">bouma ratio</span>
+  </div>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">density gate separation</span>
+  </div>
+  <div class="result-row">
+    <span class="badge fail">FAIL</span>
+    <span class="result-text">rt asymmetry</span>
+  </div>
+</div>
+<div class="results" style="margin-bottom:16px">
+  <h3>Tier 3: Stretch</h3>
+  <p class="section-desc"><strong>Stretch goals:</strong> Size independence (Pelli &amp; Tillman 2008) — crowding ratio should be
+    similar across font sizes at matched eccentricity. Stimulus specificity — harder flanker conditions should
+    produce stronger crowding. Bouma transition — the spacing curve should show a sigmoid centered near 0.5&times;.</p>
+  <div class="result-row">
+    <span class="badge pass">PASS</span>
+    <span class="result-text">size independence (3°:CV=0.249, 6°:CV=0.293, 10°:CV=0.051)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge skip">SKIP</span>
+    <span class="result-text">stimulus specific</span>
+  </div>
+  <div class="result-row">
+    <span class="badge skip">SKIP</span>
+    <span class="result-text">bouma sigmoid</span>
+  </div>
+</div>
+
+<div class="footer">
+  Scrutinizer Wave 3 &middot; Bouma (1970) &middot; Toet &amp; Levi (1992) &middot; Pelli &amp; Tillman (2008)
+</div>
+</body>
+</html>

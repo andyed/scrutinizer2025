@@ -1,0 +1,682 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for congestion-worker.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="prettify.css" />
+    <link rel="stylesheet" href="base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="index.html">All files</a> congestion-worker.js</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>0/101</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/16</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/5</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>0/95</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a>
+<a name='L183'></a><a href='#L183'>183</a>
+<a name='L184'></a><a href='#L184'>184</a>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a>
+<a name='L189'></a><a href='#L189'>189</a>
+<a name='L190'></a><a href='#L190'>190</a>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
+ * Congestion Worker — Dedicated high-resolution Feature Congestion computation
+ *
+ * Runs independently of the 256px saliency worker to produce accurate
+ * congestion + edge density data for the inspection overlay and HUD.
+ *
+ * Validation showed congestion ranking degrades at 256px (Spearman ρ=0.69)
+ * but reaches ρ=0.89 at 512px and ρ=0.93 at 768px with fixed σ=2.5.
+ * This worker defaults to 1024px for maximum detail in the inspection overlay.
+ *
+ * Reuses congestion-core.js (shared with saliency-worker.js) for all math.
+ * Inlines Oklab conversion (same as saliency-worker.js — small functions,
+ * avoids cross-worker import complexity).
+ *
+ * No face detection, no center-surround DoG, no structure gating.
+ * This worker is congestion + edge density only.
+ */
+&nbsp;
+<span class="cstat-no" title="statement not covered" >console.log('[CongestionWorker] Worker starting.');</span>
+<span class="cstat-no" title="statement not covered" >try {</span>
+<span class="cstat-no" title="statement not covered" >    importScripts('./congestion-core.js');</span>
+<span class="cstat-no" title="statement not covered" >    console.log('[CongestionWorker] congestion-core.js loaded.');</span>
+} catch (e) {
+<span class="cstat-no" title="statement not covered" >    console.error('[CongestionWorker] Import failed:', e);</span>
+}
+&nbsp;
+let canvas;
+let ctx;
+let width = <span class="cstat-no" title="statement not covered" >0;</span>
+let height = <span class="cstat-no" title="statement not covered" >0;</span>
+&nbsp;
+// Cached temp buffers for gaussianBlur (same pattern as saliency-worker.js)
+let tempBuffer1;
+let tempBuffer2;
+&nbsp;
+// ── Color conversion (inlined — same as saliency-worker.js) ─────────
+&nbsp;
+function <span class="fstat-no" title="function not covered" >srgbToLinear(</span>c) {
+<span class="cstat-no" title="statement not covered" >    if (c &lt;= 0.04045) {</span>
+<span class="cstat-no" title="statement not covered" >        return c / 12.92;</span>
+    } else {
+<span class="cstat-no" title="statement not covered" >        return Math.pow((c + 0.055) / 1.055, 2.4);</span>
+    }
+}
+&nbsp;
+function <span class="fstat-no" title="function not covered" >linearSrgbToOklab(</span>r, g, b) {
+    const l = <span class="cstat-no" title="statement not covered" >0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;</span>
+    const m = <span class="cstat-no" title="statement not covered" >0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;</span>
+    const s = <span class="cstat-no" title="statement not covered" >0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;</span>
+&nbsp;
+    const l_ = <span class="cstat-no" title="statement not covered" >Math.cbrt(l);</span>
+    const m_ = <span class="cstat-no" title="statement not covered" >Math.cbrt(m);</span>
+    const s_ = <span class="cstat-no" title="statement not covered" >Math.cbrt(s);</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    return {</span>
+        L: 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+        a: 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+        b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
+    };
+}
+&nbsp;
+// ── Cached-buffer wrapper for gaussianBlur ───────────────────────────
+&nbsp;
+function <span class="fstat-no" title="function not covered" >gaussianBlurCached(</span>data, w, h, sigma) {
+    const len = <span class="cstat-no" title="statement not covered" >w * h;</span>
+<span class="cstat-no" title="statement not covered" >    if (!tempBuffer1 || tempBuffer1.length !== len) {</span>
+<span class="cstat-no" title="statement not covered" >        tempBuffer1 = new Float32Array(len);</span>
+<span class="cstat-no" title="statement not covered" >        tempBuffer2 = new Float32Array(len);</span>
+    }
+<span class="cstat-no" title="statement not covered" >    return gaussianBlur(data, w, h, sigma, tempBuffer1, tempBuffer2);</span>
+}
+&nbsp;
+// ── Main message handler ─────────────────────────────────────────────
+&nbsp;
+<span class="cstat-no" title="statement not covered" >self.onmessage = <span class="fstat-no" title="function not covered" >fu</span>nction (e) {</span>
+    const { imageBitmap, id, maxDimension } = <span class="cstat-no" title="statement not covered" >e.data;</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    if (!imageBitmap) <span class="cstat-no" title="statement not covered" >return;</span></span>
+&nbsp;
+    const t0 = <span class="cstat-no" title="statement not covered" >performance.now();</span>
+&nbsp;
+    const MAX_DIM = <span class="cstat-no" title="statement not covered" >maxDimension || 1024;</span>
+    const srcW = <span class="cstat-no" title="statement not covered" >imageBitmap.width;</span>
+    const srcH = <span class="cstat-no" title="statement not covered" >imageBitmap.height;</span>
+    const maxDim = <span class="cstat-no" title="statement not covered" >Math.max(srcW, srcH);</span>
+    const scale = <span class="cstat-no" title="statement not covered" >maxDim &gt; 0 ? Math.min(1.0, MAX_DIM / maxDim) : 0.5;</span>
+&nbsp;
+    const targetW = <span class="cstat-no" title="statement not covered" >Math.floor(srcW * scale);</span>
+    const targetH = <span class="cstat-no" title="statement not covered" >Math.floor(srcH * scale);</span>
+&nbsp;
+    // Initialize/resize canvas
+<span class="cstat-no" title="statement not covered" >    if (width !== targetW || height !== targetH) {</span>
+<span class="cstat-no" title="statement not covered" >        width = targetW;</span>
+<span class="cstat-no" title="statement not covered" >        height = targetH;</span>
+<span class="cstat-no" title="statement not covered" >        canvas = new OffscreenCanvas(width, height);</span>
+<span class="cstat-no" title="statement not covered" >        ctx = canvas.getContext('2d', { willReadFrequently: true });</span>
+<span class="cstat-no" title="statement not covered" >        ctx.imageSmoothingEnabled = false;</span>
+&nbsp;
+        const len = <span class="cstat-no" title="statement not covered" >width * height;</span>
+<span class="cstat-no" title="statement not covered" >        tempBuffer1 = new Float32Array(len);</span>
+<span class="cstat-no" title="statement not covered" >        tempBuffer2 = new Float32Array(len);</span>
+    }
+&nbsp;
+    // Draw frame at target resolution
+<span class="cstat-no" title="statement not covered" >    ctx.drawImage(imageBitmap, 0, 0, width, height);</span>
+&nbsp;
+    const len = <span class="cstat-no" title="statement not covered" >width * height;</span>
+    const imageData = <span class="cstat-no" title="statement not covered" >ctx.getImageData(0, 0, width, height);</span>
+    const pixels = <span class="cstat-no" title="statement not covered" >imageData.data;</span>
+&nbsp;
+    // ── Extract Oklab channels ───────────────────────────────────────
+    const I = <span class="cstat-no" title="statement not covered" >new Float32Array(len);</span>   // Lightness (L)
+    const RG = <span class="cstat-no" title="statement not covered" >new Float32Array(len);</span>  // |a| (red-green)
+    const BY = <span class="cstat-no" title="statement not covered" >new Float32Array(len);</span>  // |b| (blue-yellow)
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    for (let i = <span class="cstat-no" title="statement not covered" >0;</span> i &lt; len; i++) {</span>
+        const rLin = <span class="cstat-no" title="statement not covered" >srgbToLinear(pixels[i * 4] / 255.0);</span>
+        const gLin = <span class="cstat-no" title="statement not covered" >srgbToLinear(pixels[i * 4 + 1] / 255.0);</span>
+        const bLin = <span class="cstat-no" title="statement not covered" >srgbToLinear(pixels[i * 4 + 2] / 255.0);</span>
+&nbsp;
+        const lab = <span class="cstat-no" title="statement not covered" >linearSrgbToOklab(rLin, gLin, bLin);</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >        I[i] = lab.L;</span>
+<span class="cstat-no" title="statement not covered" >        RG[i] = Math.abs(lab.a);</span>
+<span class="cstat-no" title="statement not covered" >        BY[i] = Math.abs(lab.b);</span>
+    }
+&nbsp;
+    // ── Feature Congestion (Rosenholtz 2007) ─────────────────────────
+    // Local variance across L, |a|, |b| channels with σ=2.5
+    const congestionSigma = <span class="cstat-no" title="statement not covered" >2.5;</span>
+&nbsp;
+    function <span class="fstat-no" title="function not covered" >computeLocalVarianceCached(</span>channel, w, h, sigma) {
+<span class="cstat-no" title="statement not covered" >        return computeLocalVariance(channel, w, h, sigma, tempBuffer1, tempBuffer2);</span>
+    }
+&nbsp;
+    const var_I = <span class="cstat-no" title="statement not covered" >computeLocalVarianceCached(I, width, height, congestionSigma);</span>
+    const var_RG = <span class="cstat-no" title="statement not covered" >computeLocalVarianceCached(RG, width, height, congestionSigma);</span>
+    const var_BY = <span class="cstat-no" title="statement not covered" >computeLocalVarianceCached(BY, width, height, congestionSigma);</span>
+&nbsp;
+    // Sum variances → raw congestion
+    const congestion = <span class="cstat-no" title="statement not covered" >new Float32Array(len);</span>
+<span class="cstat-no" title="statement not covered" >    for (let i = <span class="cstat-no" title="statement not covered" >0;</span> i &lt; len; i++) {</span>
+<span class="cstat-no" title="statement not covered" >        congestion[i] = var_I[i] + var_RG[i] + var_BY[i];</span>
+    }
+&nbsp;
+    // ── Edge Density (Sobel + blur) ──────────────────────────────────
+    const edgeMag = <span class="cstat-no" title="statement not covered" >new Float32Array(len);</span>
+<span class="cstat-no" title="statement not covered" >    for (let y = <span class="cstat-no" title="statement not covered" >1;</span> y &lt; height - 1; y++) {</span>
+<span class="cstat-no" title="statement not covered" >        for (let x = <span class="cstat-no" title="statement not covered" >1;</span> x &lt; width - 1; x++) {</span>
+            const idx = <span class="cstat-no" title="statement not covered" >y * width + x;</span>
+            const tl = <span class="cstat-no" title="statement not covered" >I[(y - 1) * width + (x - 1)];</span>
+            const t  = <span class="cstat-no" title="statement not covered" >I[(y - 1) * width + x];</span>
+            const tr = <span class="cstat-no" title="statement not covered" >I[(y - 1) * width + (x + 1)];</span>
+            const ml = <span class="cstat-no" title="statement not covered" >I[y * width + (x - 1)];</span>
+            const mr = <span class="cstat-no" title="statement not covered" >I[y * width + (x + 1)];</span>
+            const bl = <span class="cstat-no" title="statement not covered" >I[(y + 1) * width + (x - 1)];</span>
+            const b  = <span class="cstat-no" title="statement not covered" >I[(y + 1) * width + x];</span>
+            const br = <span class="cstat-no" title="statement not covered" >I[(y + 1) * width + (x + 1)];</span>
+&nbsp;
+            const gx = <span class="cstat-no" title="statement not covered" >(tl + 2 * ml + bl) - (tr + 2 * mr + br);</span>
+            const gy = <span class="cstat-no" title="statement not covered" >(tl + 2 * t + tr) - (bl + 2 * b + br);</span>
+<span class="cstat-no" title="statement not covered" >            edgeMag[idx] = Math.sqrt(gx * gx + gy * gy);</span>
+        }
+    }
+&nbsp;
+    // Blur edge magnitude → local edge density
+    const edgeMagCopy = <span class="cstat-no" title="statement not covered" >new Float32Array(edgeMag);</span>
+    const blurredEdge = <span class="cstat-no" title="statement not covered" >gaussianBlurCached(edgeMagCopy, width, height, 3.0);</span>
+    const edgeDensity = <span class="cstat-no" title="statement not covered" >new Float32Array(blurredEdge);</span>
+&nbsp;
+    // ── Normalize ────────────────────────────────────────────────────
+    const norm_congestion = <span class="cstat-no" title="statement not covered" >normalizeFeature(congestion);</span>
+    const norm_edgeDensity = <span class="cstat-no" title="statement not covered" >normalizeFeature(edgeDensity);</span>
+&nbsp;
+    // ── Stats for HUD ────────────────────────────────────────────────
+    const congestionStats = <span class="cstat-no" title="statement not covered" >computeStats(norm_congestion, width, height);</span>
+    const edgeDensityStats = <span class="cstat-no" title="statement not covered" >computeStats(norm_edgeDensity, width, height);</span>
+&nbsp;
+    // ── Pack into ImageData: R=congestion, G=edgeDensity, B=0, A=255 ─
+<span class="cstat-no" title="statement not covered" >    for (let i = <span class="cstat-no" title="statement not covered" >0;</span> i &lt; len; i++) {</span>
+<span class="cstat-no" title="statement not covered" >        pixels[i * 4]     = Math.floor(Math.max(0, Math.min(1, norm_congestion[i])) * 255);</span>
+<span class="cstat-no" title="statement not covered" >        pixels[i * 4 + 1] = Math.floor(Math.max(0, Math.min(1, norm_edgeDensity[i])) * 255);</span>
+<span class="cstat-no" title="statement not covered" >        pixels[i * 4 + 2] = 0;</span>
+<span class="cstat-no" title="statement not covered" >        pixels[i * 4 + 3] = 255;</span>
+    }
+&nbsp;
+    const elapsed = <span class="cstat-no" title="statement not covered" >performance.now() - t0;</span>
+<span class="cstat-no" title="statement not covered" >    console.log(`[CongestionWorker] Computed ${width}x${height} in ${elapsed.toFixed(1)}ms`);</span>
+&nbsp;
+    // Return results
+<span class="cstat-no" title="statement not covered" >    self.postMessage({</span>
+        imageData: imageData,
+        id: id,
+        congestionStats: congestionStats,
+        edgeDensityStats: edgeDensityStats,
+        resolution: { width, height },
+        computeTimeMs: elapsed
+    }, [imageData.data.buffer]);
+};
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-03-13T15:23:51.438Z
+            </div>
+        <script src="prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="sorter.js"></script>
+        <script src="block-navigation.js"></script>
+    </body>
+</html>
+    

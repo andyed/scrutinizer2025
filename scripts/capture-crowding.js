@@ -37,6 +37,7 @@ const CAPTURE_HEIGHT = '1080';
 
 const dryRun = hasFlag('dry-run');
 const pagesFilter = getArg('pages', 'all');
+const modeOverride = getArg('mode', null); // e.g. --mode=10 for mongrel captures
 
 // Capture matrix: page × fixation × condition (filtered vs baseline)
 // Fixation coordinates are normalized (0-1) for the capture viewport.
@@ -66,15 +67,27 @@ const PAGES = [
   },
 ];
 
-const CONDITIONS = [
-  { id: 'filtered', mode: '0' },
-  { id: 'baseline', mode: 'bypass' },
-];
+const CONDITIONS = modeOverride
+  ? [
+    { id: 'filtered', mode: modeOverride },
+    { id: 'baseline', mode: 'bypass' },
+  ]
+  : [
+    { id: 'filtered', mode: '0' },
+    { id: 'baseline', mode: 'bypass' },
+  ];
+
+// Mode suffix for filenames when not default mode 0
+const modeSuffix = modeOverride && modeOverride !== '0' ? `_mode${modeOverride}` : '';
 
 function runCapture(pageConf, fixation, condition) {
   return new Promise((resolve) => {
     const pageUrl = `${BASE_URL}/${pageConf.page}`;
-    const filename = `${pageConf.id}_${fixation.id}_${condition.id}.png`;
+    // Include mode suffix for non-default modes (e.g. crowding_center_mode10_filtered.png)
+    const condSuffix = condition.id === 'baseline' ? condition.id : `${modeSuffix ? modeSuffix.slice(1) + '_' : ''}${condition.id}`;
+    const filename = condition.id === 'baseline'
+      ? `${pageConf.id}_${fixation.id}_${condition.id}.png`
+      : `${pageConf.id}_${fixation.id}${modeSuffix}_${condition.id}.png`;
 
     if (dryRun) {
       console.log(`[dry-run] ${filename}  →  ${pageUrl}`);

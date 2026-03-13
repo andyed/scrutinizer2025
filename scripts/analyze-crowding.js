@@ -301,7 +301,12 @@ function analyze() {
   const results = analyzeCrowdingCenter(centerPng);
 
   if (hasFlag('json')) {
-    console.log(JSON.stringify({ source: dir, measurements: results }, null, 2));
+    const tier3 = {
+      sizeIndependence: analyzeSizeIndependence(results),
+      stimulusSpecific: analyzeStimulusSpecific(dir),
+      sigmoidFit: fitBoumaTransitionSigmoid(dir),
+    };
+    console.log(JSON.stringify({ source: dir, measurements: results, tier3 }, null, 2));
     return;
   }
 
@@ -664,6 +669,254 @@ function analyzeSpacing() {
   if (hasFlag('json')) {
     console.log(JSON.stringify({ source: dir, spacingRows: rows, criticalSpacingDisp }, null, 2));
   }
+}
+
+// ── Tier 3: Size Independence (Pelli & Tillman 2008) ──
+// crowding.html has 3 font-size columns (16/28/48px) at 3°/6°/10°.
+// Crowding ratio should be similar across sizes at each eccentricity.
+// PASS if coefficient of variation < 0.3 at each eccentricity.
+
+function analyzeSizeIndependence(results) {
+  const eccs = [3, 6, 10];
+  const output = [];
+
+  for (const ecc of eccs) {
+    const ratiosBySz = {};
+    for (const fs of FONT_SIZES) {
+      const rows = results.filter(r => r.ecc_deg === ecc && r.fontSize === fs && r.crowdingRatio !== null);
+      if (rows.length > 0) {
+        ratiosBySz[fs] = rows.reduce((s, r) => s + r.crowdingRatio, 0) / rows.length;
+      }
+    }
+
+    const vals = Object.values(ratiosBySz);
+    if (vals.length < 2) {
+      output.push({ ecc_deg: ecc, ratios: ratiosBySz, cv: null, pass: null });
+      continue;
+    }
+
+    const mean = vals.reduce((a, b) => a + b) / vals.length;
+    const variance = vals.reduce((s, v) => s + (v - mean) ** 2, 0) / vals.length;
+    const cv = mean > 0 ? Math.sqrt(variance) / mean : null;
+    const pass = cv !== null && cv < 0.3;
+
+    output.push({
+      ecc_deg: ecc,
+      ratios: ratiosBySz,
+      mean: round3(mean),
+      cv: cv !== null ? round3(cv) : null,
+      pass,
+    });
+  }
+
+  return output;
+}
+
+// ── Tier 3: Stimulus-Specific Crowding ──
+// crowding-stimulus.html has 3 condition pairs at 3°/6°/10°.
+// Harder conditions (same-orientation, same-color, complex) should
+// produce stronger crowding than easier ones.
+// PASS if hard/easier ratio < 0.9 at 6°+ in at least one dimension.
+
+function analyzeStimulusSpecific(dir) {
+  const filteredFile = path.join(dir, 'stimulus_center_filtered.png');
+  const baselineFile = path.join(dir, 'stimulus_center_baseline.png');
+
+  if (!fs.existsSync(filteredFile) || !fs.existsSync(baselineFile)) {
+    return { available: false, reason: 'stimulus captures not found' };
+  }
+
+  const filteredPng = loadPng(filteredFile);
+  const baselinePng = loadPng(baselineFile);
+  if (!filteredPng || !baselinePng) {
+    return { available: false, reason: 'could not load stimulus PNGs' };
+  }
+
+  const dpr = filteredPng.width > 2000 ? 2 : 1;
+  const cssW = filteredPng.width / dpr;
+  const vpOffX = (cssW - VIEWPORT_W) / 2;
+  const fixY = detectFixationY(filteredPng);
+
+  // crowding-stimulus.html has 3 columns (conditions) with paired hard/easier
+  // Each column has targets at 3°/6°/10° above and below fixation
+  // We measure cyan survival between filtered and baseline per condition per eccentricity
+  const conditions = ['orientation', 'color', 'complexity'];
+  const results = [];
+
+  for (let colIdx = 0; colIdx < 3; colIdx++) {
+    const colLeftCSS = vpOffX + colIdx * (VIEWPORT_W / 3);
+    const colRightCSS = colLeftCSS + VIEWPORT_W / 3;
+    const colMidCSS = (colLeftCSS + colRightCSS) / 2;
+
+    for (const row of ROWS) {
+      for (const [dir_label, sign] of [['above', -1], ['below', 1]]) {
+        const rowCenterY = fixY + sign * row.deg * PX_PER_DEG;
+        const bandH = 50;
+
+        const pyStart = Math.round((rowCenterY - bandH / 2) * dpr);
+        const pyEnd = Math.round((rowCenterY + bandH / 2) * dpr);
+
+        // Left half = hard condition, right half = easier condition
+        const halfW = (colRightCSS - colLeftCSS) / 2;
+        const hardLeft = Math.round(colLeftCSS * dpr);
+        const hardRight = Math.round(colMidCSS * dpr);
+        const easyLeft = Math.round(colMidCSS * dpr);
+        const easyRight = Math.round(colRightCSS * dpr);
+
+        let hardFiltered = 0, hardBaseline = 0, easyFiltered = 0, easyBaseline = 0;
+
+        for (let py = pyStart; py <= pyEnd; py++) {
+          // Hard half
+          for (let px = hardLeft; px < hardRight; px++) {
+            const fi = (py * filteredPng.width + px) * 4;
+            const bi = (py * baselinePng.width + px) * 4;
+            if (filteredPng.data[fi + 2] - filteredPng.data[fi] > CYAN_THRESHOLD) hardFiltered++;
+            if (baselinePng.data[bi + 2] - baselinePng.data[bi] > CYAN_THRESHOLD) hardBaseline++;
+          }
+          // Easy half
+          for (let px = easyLeft; px < easyRight; px++) {
+            const fi = (py * filteredPng.width + px) * 4;
+            const bi = (py * baselinePng.width + px) * 4;
+            if (filteredPng.data[fi + 2] - filteredPng.data[fi] > CYAN_THRESHOLD) easyFiltered++;
+            if (baselinePng.data[bi + 2] - baselinePng.data[bi] > CYAN_THRESHOLD) easyBaseline++;
+          }
+        }
+
+        const hardSurvival = hardBaseline > 0 ? hardFiltered / hardBaseline : null;
+        const easySurvival = easyBaseline > 0 ? easyFiltered / easyBaseline : null;
+        const ratio = (hardSurvival !== null && easySurvival !== null && easySurvival > 0)
+          ? hardSurvival / easySurvival : null;
+
+        results.push({
+          condition: conditions[colIdx],
+          ecc_deg: row.deg,
+          position: dir_label,
+          hardSurvival: hardSurvival !== null ? round3(hardSurvival) : null,
+          easySurvival: easySurvival !== null ? round3(easySurvival) : null,
+          ratio: ratio !== null ? round3(ratio) : null,
+        });
+      }
+    }
+  }
+
+  // Check: at least one condition shows hard/easy < 0.9 at 6°+
+  const peripheral = results.filter(r => r.ecc_deg >= 6 && r.ratio !== null);
+  const pass = peripheral.some(r => r.ratio < 0.9);
+
+  return {
+    available: true,
+    measurements: results,
+    pass,
+  };
+}
+
+// ── Tier 3: Bouma Transition Sigmoid Fit ──
+// Fits logistic y = 1 / (1 + exp(-k*(x - x0))) to spacing data.
+// x = spacing ratio (0.2-0.8), y = normalized survival/distortion.
+// PASS if center x0 between 0.3 and 0.7 (Bouma predicts ~0.5).
+
+function fitBoumaTransitionSigmoid(dir) {
+  const filteredPng = loadPng(path.join(dir, 'spacing_center_filtered.png'));
+  const baselinePng = loadPng(path.join(dir, 'spacing_center_baseline.png'));
+
+  if (!filteredPng || !baselinePng) {
+    return { available: false, reason: 'spacing captures not found' };
+  }
+
+  const dpr = filteredPng.width > 2000 ? 2 : 1;
+  const cssW = filteredPng.width / dpr;
+  const cssH = filteredPng.height / dpr;
+  const vpOffX = (cssW - SPACING_VP_W) / 2;
+  const vpOffY = (cssH - SPACING_VP_H) / 2;
+
+  const totalHeight = 600;
+  const rowSpacing = totalHeight / (SPACING_RATIOS.length + 1);
+  const startY = SPACING_CY - totalHeight / 2 + rowSpacing;
+  const targetX = SPACING_CX + SPACING_ECC_DEG * PX_PER_DEG;
+  const targetCSSX = vpOffX + targetX;
+
+  const bandH = 50, bandW = 120;
+  const dataPoints = [];
+
+  const allRows = [...SPACING_RATIOS.map((r, i) => ({
+    ratio: r,
+    y: vpOffY + startY + i * rowSpacing,
+  })), {
+    ratio: null, // isolated
+    y: vpOffY + startY + SPACING_RATIOS.length * rowSpacing,
+  }];
+
+  for (const row of allRows) {
+    const pyS = Math.round((row.y - bandH / 2) * dpr);
+    const pyE = Math.round((row.y + bandH / 2) * dpr);
+    const pxL = Math.round((targetCSSX - bandW / 2) * dpr);
+    const pxR = Math.round((targetCSSX + bandW / 2) * dpr);
+
+    let filteredCyan = 0, baselineCyan = 0;
+    for (let py = pyS; py <= pyE; py++) {
+      for (let px = pxL; px < pxR; px++) {
+        const fi = (py * filteredPng.width + px) * 4;
+        const bi = (py * baselinePng.width + px) * 4;
+        if (filteredPng.data[fi + 2] - filteredPng.data[fi] > CYAN_THRESHOLD) filteredCyan++;
+        if (baselinePng.data[bi + 2] - baselinePng.data[bi] > CYAN_THRESHOLD) baselineCyan++;
+      }
+    }
+
+    const survival = baselineCyan > 0 ? filteredCyan / baselineCyan : 0;
+    dataPoints.push({ ratio: row.ratio, survival });
+  }
+
+  // Use spacing rows only (not isolated) for sigmoid fit
+  const spacingData = dataPoints.filter(d => d.ratio !== null);
+  const isoData = dataPoints.find(d => d.ratio === null);
+
+  // Normalize: 0 = max crowding (lowest survival), 1 = least crowding (highest survival)
+  const survVals = spacingData.map(d => d.survival);
+  const minSurv = Math.min(...survVals);
+  const maxSurv = Math.max(...survVals);
+  const range = maxSurv - minSurv;
+
+  if (range < 0.01) {
+    return { available: true, reason: 'survival range too narrow for sigmoid fit', pass: null };
+  }
+
+  const normData = spacingData.map(d => ({
+    x: d.ratio,
+    y: range > 0 ? (d.survival - minSurv) / range : 0.5,
+  }));
+
+  // Grid search for logistic: y = 1 / (1 + exp(-k*(x - x0)))
+  let bestX0 = 0.5, bestK = 10, bestR2 = -Infinity;
+  const yMean = normData.reduce((s, d) => s + d.y, 0) / normData.length;
+  const ssTot = normData.reduce((s, d) => s + (d.y - yMean) ** 2, 0);
+
+  for (let x0 = 0.15; x0 <= 0.85; x0 += 0.01) {
+    for (let k = 2; k <= 40; k += 0.5) {
+      let ssRes = 0;
+      for (const d of normData) {
+        const pred = 1 / (1 + Math.exp(-k * (d.x - x0)));
+        ssRes += (d.y - pred) ** 2;
+      }
+      const r2 = ssTot > 0 ? 1 - ssRes / ssTot : 0;
+      if (r2 > bestR2) {
+        bestR2 = r2;
+        bestX0 = x0;
+        bestK = k;
+      }
+    }
+  }
+
+  const pass = bestX0 >= 0.3 && bestX0 <= 0.7;
+
+  return {
+    available: true,
+    x0: round3(bestX0),
+    k: round3(bestK),
+    r2: round3(bestR2),
+    pass,
+    dataPoints: spacingData.map(d => ({ ratio: d.ratio, survival: round3(d.survival) })),
+    isolatedSurvival: isoData ? round3(isoData.survival) : null,
+  };
 }
 
 try {

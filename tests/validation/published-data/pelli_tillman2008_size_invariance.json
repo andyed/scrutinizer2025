@@ -1,0 +1,11 @@
+{
+  "source": "Pelli, D. G. & Tillman, K. A. (2008). The uncrowded window of object recognition. Nature Neuroscience, 11(10), 1129-1135.",
+  "note": "Critical spacing proportional to eccentricity, independent of target size. The 'uncrowded window' scales with eccentricity, not stimulus dimensions.",
+  "size_independence_tolerance_cv": 0.3,
+  "data": [
+    { "eccentricity_deg": 0, "critical_spacing_deg": 0.2, "note": "foveal floor" },
+    { "eccentricity_deg": 4, "critical_spacing_deg": 1.6 },
+    { "eccentricity_deg": 8, "critical_spacing_deg": 3.6 },
+    { "eccentricity_deg": 12, "critical_spacing_deg": 5.4 }
+  ]
+}

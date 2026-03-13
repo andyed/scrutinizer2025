@@ -1,0 +1,9 @@
+{
+  "source": "Toet, A. & Levi, D. M. (1992). The two-dimensional shape of spatial interaction zones in the parafovea. Vision Research, 32(7), 1349-1357.",
+  "note": "Radial:tangential critical spacing ratio at various eccentricities. Crowding zones are elliptical, extending ~2x further radially than tangentially.",
+  "data": [
+    { "eccentricity_deg": 2.5, "radial_tangential_ratio": 2.1 },
+    { "eccentricity_deg": 5, "radial_tangential_ratio": 2.0 },
+    { "eccentricity_deg": 10, "radial_tangential_ratio": 1.8 }
+  ]
+}

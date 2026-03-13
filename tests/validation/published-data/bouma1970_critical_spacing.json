@@ -1,0 +1,13 @@
+{
+  "source": "Bouma, H. (1970). Interaction effects in parafoveal letter recognition. Nature, 226, 177-178.",
+  "note": "Critical spacing for letter identification. Proportionality constant varies 0.3-0.5 across studies; canonical value is 0.5.",
+  "data": [
+    { "eccentricity_deg": 1, "critical_spacing_deg": 0.5 },
+    { "eccentricity_deg": 2, "critical_spacing_deg": 1.0 },
+    { "eccentricity_deg": 3, "critical_spacing_deg": 1.5 },
+    { "eccentricity_deg": 5, "critical_spacing_deg": 2.5 },
+    { "eccentricity_deg": 7, "critical_spacing_deg": 3.5 },
+    { "eccentricity_deg": 10, "critical_spacing_deg": 5.0 },
+    { "eccentricity_deg": 15, "critical_spacing_deg": 7.5 }
+  ]
+}

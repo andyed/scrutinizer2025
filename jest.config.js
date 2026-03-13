@@ -6,5 +6,6 @@ module.exports = {
     'shared/*.js'
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov']
+  coverageReporters: ['text', 'lcov'],
+  setupFiles: ['<rootDir>/tests/setup.js']
 };
