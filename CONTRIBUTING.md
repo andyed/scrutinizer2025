@@ -42,7 +42,7 @@ These are the designed-for places to plug in your own work:
 
 ## Research Projects
 
-Looking for a thesis or capstone project? See [`docs/grad-student-projects.md`](docs/grad-student-projects.md) — 14 scoped projects across vision science, HCI, accessibility, and systems, with research questions, deliverables, and publication targets.
+See [`docs/research-opportunities.md`](docs/research-opportunities.md) — 17 open directions across vision science, HCI, accessibility, and systems, with research questions, deliverables, and publication venues.
 
 ## How to Contribute
 

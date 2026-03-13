@@ -22,7 +22,6 @@ Quick reference for acronyms and abbreviations used throughout the Scrutinizer c
 | **PPA** | Parahippocampal Place Area | Cortical region selective for scenes, referenced in the pathway diagram. |
 | **RFV** | Restricted Focus Viewer | Usability evaluation paradigm that restricts visible detail to a gaze-contingent window. Scrutinizer functions as an RFV. |
 | **EPIC** | Executive-Process/Interactive Control (model) | Halverson & Hornof (2011) computational model of active visual search used in Wave 5 validation. |
-| **IRB** | Institutional Review Board | Ethics review board; noted in grad-student project specs that involve human subjects. |
 | **cpd** | Cycles per degree | Unit of spatial frequency. Scrutinizer's DoG bands span 0.5–5.66 cpd. |
 | **E2** | Half-resolution eccentricity | M-scaling parameter where acuity drops to 50% of foveal (e.g., `dog_e2: 0.15`). |
 | **castleCSF** | Contrast sensitivity model (Ashraf et al. 2024) | Per-channel chromatic CSF covering color, area, spatiotemporal frequency, luminance, and eccentricity. |

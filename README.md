@@ -132,13 +132,13 @@ npm run validate:scrutinizer    # Run Scrutinizer's JS implementation
 
 ## Calibration
 
-Default: `fovea_deg = 2.0`, `foveaRadius = 90px` (45 px/°) — within 2% on reference hardware (MBP Retina @ 50cm). At different viewing distances the fixed mapping diverges (±30–40%). The [Foveal Calibrator](https://andyed.github.io/scrutinizer-www/foveal-calibration.html) measures perceptual foveal extent via Motion Silence staircase but doesn't yet separate `px_per_deg` from comfort radius. *Fix path: [Project 1.3](docs/grad-student-projects.md).*
+Default: `fovea_deg = 2.0`, `foveaRadius = 90px` (45 px/°) — within 2% on reference hardware (MBP Retina @ 50cm). At different viewing distances the fixed mapping diverges (±30–40%). The [Foveal Calibrator](https://andyed.github.io/scrutinizer-www/foveal-calibration.html) measures perceptual foveal extent via Motion Silence staircase but doesn't yet separate `px_per_deg` from comfort radius. *Fix path: [Project 1.3](docs/research-opportunities.md).*
 
 ---
 
 ## Research Opportunities
 
-Seventeen graduate-level projects are specified in [**grad-student-projects.md**](docs/grad-student-projects.md) — vision science, HCI, design tools, and systems work, each with effort level, novelty, and IRB requirements.
+Seventeen research directions are described in [**research-opportunities.md**](docs/research-opportunities.md) — vision science, HCI, design tools, and systems work, with research questions, publication venues, and infrastructure pointers.
 
 Key open specs: oriented DoG bands (1.1), texture synthesis (1.2), calibrated visual angles (1.3), saccadic dynamics (1.4), eye tracker integration (3.3). Contributions welcome — see the [Developer's Guide](docs/developers_guide.md).
 
@@ -146,11 +146,11 @@ Key open specs: oriented DoG bands (1.1), texture synthesis (1.2), calibrated vi
 
 ## Known Limitations
 
-1. **Calibration portability** — default mapping is accurate on reference hardware (MBP Retina @ 50cm); diverges at other viewing distances. *Fix: [Project 1.3](docs/grad-student-projects.md)*
-2. **Approximate spatial pooling** — uses averaged pixel blocks, not the texture-like statistical summaries the brain preserves in peripheral vision. *Fix: [Project 1.2](docs/grad-student-projects.md)*
+1. **Calibration portability** — default mapping is accurate on reference hardware (MBP Retina @ 50cm); diverges at other viewing distances. *Fix: [Project 1.3](docs/research-opportunities.md)*
+2. **Approximate spatial pooling** — uses averaged pixel blocks, not the texture-like statistical summaries the brain preserves in peripheral vision. *Fix: [Project 1.2](docs/research-opportunities.md)*
 3. **Sequential color pipeline** — spatial averaging runs before color attenuation, slightly over-degrading mid-peripheral color. *Fix: [ROADMAP](ROADMAP.md)*
 4. **No memory across fixations** — each fixation renders independently; the brain accumulates information across eye movements. Visual Memory modes approximate this. *See: [simulation-limitations.md](docs/simulation-limitations.md)*
-5. **Mouse, not eyes** — cursor tracking (~200ms latency) approximates but doesn't replicate gaze fixation. *Fix: [Project 3.3](docs/grad-student-projects.md)*
+5. **Mouse, not eyes** — cursor tracking (~200ms latency) approximates but doesn't replicate gaze fixation. *Fix: [Project 3.3](docs/research-opportunities.md)*
 
 Full gap analysis: [simulation-limitations.md](docs/simulation-limitations.md).
 

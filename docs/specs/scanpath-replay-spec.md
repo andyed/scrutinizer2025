@@ -18,7 +18,7 @@ Phases 1–2 (common format + ScanpathPlayer) are prerequisites for:
 - **Project 2.1** (Fixation Recording) — recording format and coordinate conversion
 - **Project 2.3** (Cognitive Load) — behavioral baseline for mouse-vs-eye comparison
 - **Project 4.1** (Saliency/Congestion Comparison) — Validation Experiment D
-- See `docs/grad-student-projects.md` for full project descriptions.
+- See `docs/research-opportunities.md` for full project descriptions.
 
 ### Pipeline validation integration
 

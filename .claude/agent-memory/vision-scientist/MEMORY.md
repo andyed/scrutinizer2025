@@ -125,8 +125,8 @@ See `~/Documents/dev/backlog.md` lines 71-112:
 - **Li et al. 2020 Virtual Chinrest**: ±3.25cm viewing distance accuracy via blind spot method
 - **Motion Silence staircase**: Already implemented, validates perceptual fovea boundary
 
-### Student Project: Calibrated Visual Angle Pipeline
-See `docs/grad-student-projects.md` Project 1.3:
+### Research Opportunity: Calibrated Visual Angle Pipeline
+See `docs/research-opportunities.md` Project 1.3:
 - Goal: Derive actual pixels-per-degree from viewing distance + screen geometry
 - Blind spot calibration (~15° eccentricity) as a second anchor point beyond fovea
 - Would make `fovea_deg` data-driven instead of hardcoded
