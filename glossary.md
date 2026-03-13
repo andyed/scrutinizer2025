@@ -24,6 +24,8 @@ Quick reference for acronyms and abbreviations used throughout the Scrutinizer c
 | **EPIC** | Executive-Process/Interactive Control (model) | Halverson & Hornof (2011) computational model of active visual search used in Wave 5 validation. |
 | **IRB** | Institutional Review Board | Ethics review board; noted in grad-student project specs that involve human subjects. |
 | **cpd** | Cycles per degree | Unit of spatial frequency. Scrutinizer's DoG bands span 0.5–5.66 cpd. |
+| **E2** | Half-resolution eccentricity | M-scaling parameter where acuity drops to 50% of foveal (e.g., `dog_e2: 0.15`). |
+| **castleCSF** | Contrast sensitivity model (Ashraf et al. 2024) | Per-channel chromatic CSF covering color, area, spatiotemporal frequency, luminance, and eccentricity. |
 
 ## Color & Image
 
@@ -39,6 +41,8 @@ Quick reference for acronyms and abbreviations used throughout the Scrutinizer c
 | **PNG** | Portable Network Graphics | Lossless image format used for screenshots and golden captures. |
 | **DFT** | Discrete Fourier Transform | Used in spatial-acuity validation to extract frequency amplitudes from rendered stimuli. |
 | **LOD** | Level of Detail | Refers to MIP chain levels that control resolution falloff with eccentricity. |
+| **RGBA** | Red, Green, Blue, Alpha | Color model with transparency channel, used in texture sampling and framebuffer operations. |
+| **BGRA** | Blue, Green, Red, Alpha | Alternate channel order used by Electron's `desktopCapturer` on some platforms. |
 
 ## Graphics & Rendering
 
@@ -55,6 +59,8 @@ Quick reference for acronyms and abbreviations used throughout the Scrutinizer c
 | **SVG** | Scalable Vector Graphics | Used for overlay rendering (`svg-overlay.js`) and referenced in the founding assessment. |
 | **CSS** | Cascading Style Sheets | Web styling language; CSS pixels are the unit for foveal radius and viewport measurements. |
 | **DPI** | Dots per Inch | Display density metric. Relevant to calibration and px/deg calculations. |
+| **DPR** | Device Pixel Ratio | High-DPI scaling factor (`window.devicePixelRatio`); affects px/deg conversion. |
+| **FBO** | Framebuffer Object | WebGL off-screen render target used in multi-pass rendering. |
 
 ## Software & Platform
 
@@ -85,3 +91,5 @@ Quick reference for acronyms and abbreviations used throughout the Scrutinizer c
 | **UI** | User Interface | General term for interactive elements; Scrutinizer analyzes UI density and saliency. |
 | **UX** | User Experience | Design discipline; Scrutinizer aids UX evaluation of peripheral discoverability. |
 | **MBP** | MacBook Pro | Reference hardware for calibration defaults (16" MBP M3 @ 20"). |
+| **PPD** | Pixels per Degree | Visual angle conversion factor (~44 CSS px/° on MBP Retina @ 50 cm). |
+| **WAI** | Web Accessibility Initiative | W3C initiative that defines the ARIA specification. |
