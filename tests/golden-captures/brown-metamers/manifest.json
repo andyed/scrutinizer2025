@@ -1,0 +1,64 @@
+{
+  "parameters": {
+    "scaling": 0.75,
+    "pooling_size": 96,
+    "iterations": 300,
+    "brown_repo": "../../PooledStatisticsMetamers"
+  },
+  "comparisons": [
+    {
+      "page": "dashboard",
+      "fixation": "center",
+      "gaze": [0.5, 0.5],
+      "raw": "../raw/dashboard_center_raw.png",
+      "brown": "dashboard_center_brown.png",
+      "scrutinizer_mode0": "v2.3/dashboard_center.png",
+      "scrutinizer_mode10": null
+    },
+    {
+      "page": "article",
+      "fixation": "center",
+      "gaze": [0.5, 0.5],
+      "raw": "../raw/article_center_raw.png",
+      "brown": "article_center_brown.png",
+      "scrutinizer_mode0": "v2.3/article_center.png",
+      "scrutinizer_mode10": null
+    },
+    {
+      "page": "ecommerce",
+      "fixation": "center",
+      "gaze": [0.5, 0.5],
+      "raw": "../raw/ecommerce_center_raw.png",
+      "brown": "ecommerce_center_brown.png",
+      "scrutinizer_mode0": null,
+      "scrutinizer_mode10": null
+    },
+    {
+      "page": "techmeme",
+      "fixation": "center",
+      "gaze": [0.5, 0.5],
+      "raw": "../raw/techmeme_center_raw.png",
+      "brown": "techmeme_center_brown.png",
+      "scrutinizer_mode0": "v2.3/techmeme_center.png",
+      "scrutinizer_mode10": null
+    },
+    {
+      "page": "crowding",
+      "fixation": "center",
+      "gaze": [0.5, 0.5],
+      "raw": "../raw/crowding_center_raw.png",
+      "brown": "crowding_center_brown.png",
+      "scrutinizer_mode0": "v2.3/crowding_center.png",
+      "scrutinizer_mode10": "v2.3/crowding_center_mode10_mongrel.png"
+    },
+    {
+      "page": "color-spectrum",
+      "fixation": "center",
+      "gaze": [0.5, 0.5],
+      "raw": "../raw/color-spectrum_center_raw.png",
+      "brown": "color-spectrum_center_brown.png",
+      "scrutinizer_mode0": "v2.3/color-spectrum_center_mode0_smoothstep.png",
+      "scrutinizer_mode10": null
+    }
+  ]
+}
