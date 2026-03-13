@@ -56,22 +56,12 @@ function polarRingWidth(r_norm) {
     return r_norm * (Math.pow(POLAR_EF, CROWDING_RADIAL_BIAS) - 1);
 }
 
-// Unbiased ring width (what spoke count SHOULD use for 2:1 R:T)
-function polarRingWidthUnbiased(r_norm) {
-    return r_norm * (POLAR_EF - 1);
-}
-
-// Spoke count at a given ring (replicates shader line 341)
-// BUG: Uses biased ringWidth, producing ~1:1 sectors instead of intended 2:1
-function polarSpokeCount(ring_center, ring_width) {
-    const raw = Math.floor(2 * Math.PI * ring_center / ring_width);
+// Spoke count at a given ring (replicates shader peripheral.frag:513)
+// Uses unbiased ring width (ef - 1) so spoke angular width < radial ring width → 2:1 R:T
+function polarSpokeCount(ring_center) {
+    const unbiasedWidth = ring_center * (POLAR_EF - 1);
+    const raw = Math.floor(2 * Math.PI * ring_center / unbiasedWidth);
     return Math.max(6, Math.floor(raw / 2) * 2); // even, min 6
-}
-
-// What spoke count SHOULD be for 2:1 R:T (using unbiased ring width)
-function polarSpokeCountFixed(ring_center, ring_width_unbiased) {
-    const raw = Math.floor(2 * Math.PI * ring_center / ring_width_unbiased);
-    return Math.max(6, Math.floor(raw / 2) * 2);
 }
 
 // --- Analysis ---
@@ -123,8 +113,8 @@ console.log(`This is expected — MIP handles frequency-domain averaging, V1 Lat
 // --- Section 2: Polar Sector Geometry ---
 
 console.log('--- 2. Polar Sector Geometry vs Bouma ---\n');
-console.log('Ecc(°)  r_norm   Ring(°)   Spoke#  Spoke(°)  R:T(cur)  R:T(fix)  Bouma(°)  Sec/Bouma');
-console.log('------  -------  --------  ------  --------  --------  --------  --------  ---------');
+console.log('Ecc(°)  r_norm   Ring(°)   Spoke#  Spoke(°)  R:T       Bouma(°)  Sec/Bouma');
+console.log('------  -------  --------  ------  --------  --------  --------  ---------');
 
 const sectorResults = eccentricities_deg.map(ecc_deg => {
     const ecc_px = ecc_deg * PPD;
@@ -132,24 +122,17 @@ const sectorResults = eccentricities_deg.map(ecc_deg => {
     const r_norm = r_px / 1440; // approximate for 1440px viewport height
 
     const ringWidth_norm = polarRingWidth(r_norm);
-    const ringWidth_unbiased_norm = polarRingWidthUnbiased(r_norm);
     const ringWidth_px = ringWidth_norm * 1440;
     const ringWidth_deg = ringWidth_px / PPD;
 
     const ring_center_norm = r_norm;
 
-    // Current behavior: spoke count from biased width → ~1:1 sectors
-    const spokeCount = polarSpokeCount(ring_center_norm, ringWidth_norm);
-    const spokeWidth_rad = 2 * Math.PI / spokeCount;
+    // Spoke count uses unbiased width (matching shader peripheral.frag:513)
+    const spokes = polarSpokeCount(ring_center_norm);
+    const spokeWidth_rad = 2 * Math.PI / spokes;
     const spokeWidth_px = spokeWidth_rad * r_px;
     const spokeWidth_deg = spokeWidth_px / PPD;
-    const rt_ratio_current = ringWidth_deg / spokeWidth_deg;
-
-    // Fixed behavior: spoke count from unbiased width → ~2:1 sectors
-    const spokeCountFixed = polarSpokeCountFixed(ring_center_norm, ringWidth_unbiased_norm);
-    const spokeWidthFixed_rad = 2 * Math.PI / spokeCountFixed;
-    const spokeWidthFixed_deg = (spokeWidthFixed_rad * r_px) / PPD;
-    const rt_ratio_fixed = ringWidth_deg / spokeWidthFixed_deg;
+    const rt_ratio = ringWidth_deg / spokeWidth_deg;
 
     const bouma_deg = boumaCriticalSpacingDeg(ecc_deg);
     const sectorsPerBouma = bouma_deg / ringWidth_deg;
@@ -158,21 +141,20 @@ const sectorResults = eccentricities_deg.map(ecc_deg => {
         `${ecc_deg.toString().padStart(6)}  ` +
         `${r_norm.toFixed(4).padStart(7)}  ` +
         `${ringWidth_deg.toFixed(3).padStart(8)}  ` +
-        `${spokeCount.toString().padStart(6)}  ` +
+        `${spokes.toString().padStart(6)}  ` +
         `${spokeWidth_deg.toFixed(3).padStart(8)}  ` +
-        `${rt_ratio_current.toFixed(2).padStart(8)}  ` +
-        `${rt_ratio_fixed.toFixed(2).padStart(8)}  ` +
+        `${rt_ratio.toFixed(2).padStart(8)}  ` +
         `${bouma_deg.toFixed(1).padStart(8)}  ` +
         `${sectorsPerBouma.toFixed(1).padStart(9)}`
     );
 
-    return { ecc_deg, r_norm, ringWidth_deg, spokeWidth_deg, rt_ratio_current, rt_ratio_fixed, bouma_deg, sectorsPerBouma };
+    return { ecc_deg, r_norm, ringWidth_deg, spokeWidth_deg, rt_ratio, bouma_deg, sectorsPerBouma };
 });
 
-console.log(`\nFINDING: Polar sector R:T ratio is ${sectorResults[0]?.rt_ratio_current.toFixed(2)}:1 (current), not ${CROWDING_RADIAL_BIAS.toFixed(1)}:1 as intended.`);
-console.log(`The shader comment (peripheral.frag:338-339) claims bias=2.0 gives 2:1 aspect ratio,`);
-console.log(`but spokeCount is computed from the biased ring width, neutralizing the elongation.`);
-console.log(`Fix: compute spokeCount from unbiased ring width (ef^1, not ef^bias). This gives R:T = ${sectorResults[0]?.rt_ratio_fixed.toFixed(2)}:1.\n`);
+const rtRatios = sectorResults.map(r => r.rt_ratio);
+const meanRT = rtRatios.reduce((a, b) => a + b) / rtRatios.length;
+console.log(`\nPolar sector R:T ratio: mean=${meanRT.toFixed(2)}:1 (target: ${CROWDING_RADIAL_BIAS.toFixed(1)}:1).`);
+console.log(`Shader uses unbiased spoke count (peripheral.frag:513), producing correct radial elongation.\n`);
 
 // --- Section 3: V1 Lateral Smash Effective Displacement ---
 
@@ -235,8 +217,7 @@ console.log('--- 4. Validation Summary ---\n');
 
 // Tier 1 checks
 const mipProportional = ratioSpread < 3.0;
-const rtRatiosCurrent = sectorResults.map(r => r.rt_ratio_current);
-const rtRatiosFixed = sectorResults.map(r => r.rt_ratio_fixed);
+const allRadialGtTangential = sectorResults.every(r => r.rt_ratio > 1.0);
 
 // V1 Lateral Smash DOES have 2:1 via direct radialNoise scaling (not polar sectors)
 const v1HasRadialBias = CROWDING_RADIAL_BIAS >= 1.5;
@@ -244,15 +225,14 @@ const v1HasRadialBias = CROWDING_RADIAL_BIAS >= 1.5;
 console.log('Tier 1 (Must Pass):');
 console.log(`  [${mipProportional ? 'PASS' : 'FAIL'}] MIP pooling grows proportionally (spread ${ratioSpread.toFixed(2)}x < 3.0x)`);
 console.log(`  [${v1HasRadialBias ? 'PASS' : 'FAIL'}] V1 Lateral Smash has radial bias (u_crowding_radial_bias=${CROWDING_RADIAL_BIAS})`);
-console.log(`  [ISSUE] Polar sectors are ~1:1 (not 2:1) — see finding above`);
+console.log(`  [${allRadialGtTangential ? 'PASS' : 'FAIL'}] Polar sectors radial > tangential (R:T ${meanRT.toFixed(2)}:1)`);
 console.log(`  [ -- ] Crowding ratio < 0.8 at 6° and 10° (requires screenshot analysis)\n`);
 
 // Tier 2 checks
-const meanRT_current = rtRatiosCurrent.reduce((a, b) => a + b) / rtRatiosCurrent.length;
-const meanRT_fixed = rtRatiosFixed.reduce((a, b) => a + b) / rtRatiosFixed.length;
+const rtInRange = meanRT >= 1.5 && meanRT <= 2.5;
 
 console.log('Tier 2 (Should Pass):');
-console.log(`  [FAIL] Polar sector R:T ratio ${meanRT_current.toFixed(2)} (current) vs ${meanRT_fixed.toFixed(2)} (if fixed)`);
+console.log(`  [${rtInRange ? 'PASS' : 'FAIL'}] Polar sector R:T ratio ${meanRT.toFixed(2)}:1 in range [1.5, 2.5]`);
 console.log(`  [ -- ] Bouma ratio within 3x (requires combined V1+V4 measurement)`);
 console.log(`  [ -- ] Density gate separation (requires screenshot analysis)\n`);
 
@@ -269,8 +249,6 @@ console.log(`         Bouma predicts linear growth; V1 distortion is flat. MIP p
 
 // JSON output
 if (jsonOutput) {
-    const allRadialGtTangential = sectorResults.every(r => r.rt_ratio_current > 1.0);
-    const rtInRange = meanRT_current >= 1.5 && meanRT_current <= 2.5;
     const results = {
         parameters: { FOVEA_RADIUS, PPD, CMF_A, ECC_SCALING, CROWDING_RADIAL_BIAS, POLAR_EF },
         mip_pooling: mipResults,
@@ -279,7 +257,7 @@ if (jsonOutput) {
             tier1_mip_proportional: mipProportional,
             tier1_radial_gt_tangential: allRadialGtTangential,
             tier2_rt_ratio_in_range: rtInRange,
-            mean_rt_ratio: meanRT_current,
+            mean_rt_ratio: meanRT,
             mip_bouma_ratio_mean: meanRatio,
             mip_bouma_ratio_spread: ratioSpread
         }
