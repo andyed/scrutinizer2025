@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.4.0] - 2026-03-13
+
+### Added
+- **Reading Span (Rayner 1998)**: Asymmetric foveal envelope shifts protection zone in the reading direction during horizontal pursuit over text content. Three gates (speed, horizontality, text structure) prevent false activation. Fovea center shifts by up to `radius × 0.7`. Directional velocity tracking (vx/vy) in GazeModel. Menu toggle: Vision Model → Reading Span (Rayner). Per-mode config: ON for presentation/default, OFF for research modes.
+- **Wave 6: COCO-Periph Validation Scaffolding**: System-level peripheral encoding validation against Harrington et al. 2024. Download, capture, analyze, validate scripts. Published psychophysics data. Validation adversary agent spec. `npm run wave6` runs the full pipeline.
+- **Citation Export Fields**: `foveaDeg` and `pxPerDeg` metadata in PNG captures for angular calibration documentation.
+- **Reading Span Capture Script**: 4-scenario trajectory capture (`scripts/capture-reading-span.js`) with mid-sweep screenshot timing. Tests static, LTR, RTL, and disabled conditions.
+- **Isotropic Cortical Sampling Spec**: Design document for isotropic log-polar sampling.
+
+### Changed
+- **Fovea Degree Correction**: `fovea_deg` 2.0→1.0 (1° radius = 2° diameter). Default `fovealRadius` 90→45px. Settings migration via `_foveaDegMigrated` flag halves existing user radius on first launch. All shader `px_per_deg` derivations updated.
+- **Saccadic Blindness Default**: Now ON by default (was OFF).
+- **Menu Labels**: Foveal radius options now show px/° units. "Double Vision" renamed to "Drunken Reading".
+
+### Fixed
+- **Mid-sweep capture timing**: Trajectory-based test captures now screenshot during active motion, not after velocity decay.
+
 ## [2.3.0] - 2026-03-11
 
 ### Added

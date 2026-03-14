@@ -1,6 +1,6 @@
 # Scrutinizer Roadmap
 
-Last updated: 2026-03-11 (v2.3)
+Last updated: 2026-03-13 (v2.4)
 
 ## Specs
 
@@ -11,8 +11,10 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 | [linguistic_priming.md](docs/specs/linguistic_priming.md) | Goal embeddings → scent map → saliency gating | **Planned** |
 | [oriented_dog_bands.md](docs/specs/oriented_dog_bands.md) | Orientation-selective band attenuation, radial-tangential bias | **Shipped** (v2.2) |
 | [ratio_reconstruction.md](docs/specs/ratio_reconstruction.md) | Dual-LOD structure map sampling for margin soft-edge | **Shipped** (v2.3) |
+| [isotropic_cortical_sampling.md](docs/specs/isotropic_cortical_sampling.md) | Isotropic log-polar sampling | **Planned** |
 | [metamer_mode.md](docs/specs/metamer_mode.md) | Structure-locked adaptive grid V1 distortion | **Planned** |
 | [mongrel_textures.md](docs/specs/mongrel_textures.md) | Statistical texture synthesis (WebGPU tiered path) | **Tier 2.5 Shipped** (v2.3) |
+| [wave6_coco_periph_validation.md](docs/specs/wave6_coco_periph_validation.md) | COCO-Periph system-level peripheral encoding validation | **Scaffolding** (v2.4) |
 | [congestion_text_density.md](docs/specs/congestion_text_density.md) | Congestion gate enhancement for text density | **Planned** |
 | [gaussian_blur_comparison.md](docs/specs/gaussian_blur_comparison.md) | DoG vs Gaussian frequency/saliency comparison | In progress |
 | [halverson_hornof_validation.md](docs/specs/halverson_hornof_validation.md) | Active vision behavioral validation | In progress |
@@ -36,6 +38,14 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 ---
 
 ## Completed
+
+### v2.4: Reading Span & Fovea Degree Correction (2026-03-13)
+- Reading span: asymmetric foveal envelope during reading (Rayner 1998)
+- Fovea degree correction: fovea_deg 2.0→1.0, default radius 90→45px
+- Saccadic blindness default ON
+- Wave 6 COCO-Periph validation scaffolding (Harrington et al. 2024)
+- Citation export: foveaDeg + pxPerDeg metadata fields
+- Mid-sweep trajectory screenshot timing for reading span captures
 
 ### v2.3: WebGPU Compute Mongrel Synthesis (2026-03-11)
 - Tier 2.5 mongrel pipeline: tile-based Oklab statistics + oriented noise synthesis via WebGPU compute

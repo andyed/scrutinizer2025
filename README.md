@@ -7,7 +7,7 @@
 
 Live site: **[scrutinizer.app](https://andyed.github.io/scrutinizer-www/)** | [Blog](https://andyed.github.io/scrutinizer-www/blog/) | [YouTube](https://www.youtube.com/@scrutinizer-app/playlists)
 
-macOS Installer: **[Download v2.3.0](https://github.com/andyed/scrutinizer2025/releases/tag/v2.3.0)** | [Changelog](CHANGELOG.md)
+macOS Installer: **[Download v2.4.0](https://github.com/andyed/scrutinizer2025/releases/tag/v2.4.0)** | [Changelog](CHANGELOG.md)
 
 ---
 
@@ -18,13 +18,13 @@ Your eyes only see fine detail right where you're looking — everything else is
 > [!TIP]
 > **For usability practitioners:** Scrutinizer works as a [Restricted Focus Viewer](https://pubmed.ncbi.nlm.nih.gov/12078741/) — evaluate peripheral discoverability, color reliance, and layout hierarchy without eye tracking hardware.
 
-![Dashboard with foveated rendering](screenshots/v23_dashboard.png)
+![Dashboard with foveated rendering](screenshots/v24_dashboard.png)
 
 *A dashboard viewed through Scrutinizer. Cursor at center — detail and color fade with distance from fixation, and dense regions (text, grids) degrade more than isolated elements.*
 
 | Congestion Heatmap | Crowding Stimulus | Article Page |
 |:--:|:--:|:--:|
-| ![Congestion](screenshots/v23_dashboard_congestion.png) | ![Crowding](screenshots/v23_crowding_stimulus.png) | ![Article](screenshots/v23_article.png) |
+| ![Congestion](screenshots/v24_dashboard_congestion.png) | ![Crowding](screenshots/v24_crowding_stimulus.png) | ![Article](screenshots/v24_article.png) |
 | Feature Congestion clutter map + score overlay <br><sub>([original](screenshots/v23_dashboard_original.png))</sub> | Flanker letters at 3°, 6°, 10° <br><sub>([original](screenshots/v23_crowding_stimulus_original.png))</sub> | Blog article with foveated rendering <br><sub>([original](screenshots/v23_article_original.png))</sub> |
 
 ---
