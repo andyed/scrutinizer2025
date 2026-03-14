@@ -13,6 +13,7 @@ Scrutinizer's rendering pipeline implements three decades of visual psychophysic
 | [2](#wave-2-spatial-frequency-attenuation) | Spatial Frequency | Rovamo & Virsu 1979, castleCSF (Ashraf et al. 2024) | T1: 12/16 · T2: 5/5 · T3: 0/4 | [spec](../docs/specs/wave2_spatial_acuity_validation.md) · [report](https://andyed.github.io/scrutinizer-www/validation-reports/spatial-acuity-report.html) |
 | [3](#wave-3-crowding-geometry) | Crowding Geometry | Bouma 1970, Toet & Levi 1992, Pelli & Tillman 2008 | 5/7 + Bouma step | [spec](../docs/specs/wave3_crowding_validation.md) |
 | [4](#wave-4-saliency-validation) | Saliency & Protection | Itti & Koch 2001, Rosenholtz 2007 (Feature Congestion) | 4A: 6+1 INFO · 4B: 5/5 | [stimulus](https://andyed.github.io/scrutinizer-www/reference-pages/saliency-popout.html) |
+| [6](#wave-6-coco-periph-peripheral-encoding) | System-Level Encoding | Harrington et al. 2024 (COCO-Periph), Rosenholtz et al. 2012 (TTM) | Pending | [spec](../docs/specs/wave6_coco_periph_validation.md) |
 
 ### Tier Structure
 
@@ -234,6 +235,33 @@ At 256px worker resolution, 40px CSS items map to ~5 saliency pixels. The DoG ce
 
 ---
 
+## Wave 6: COCO-Periph Peripheral Encoding
+
+**Published basis**: Harrington et al. (2024) created COCO-Periph — COCO images processed through Rosenholtz's Texture Tiling Model (TTM) at 4 eccentricities (5°, 10°, 15°, 20°), with human psychophysics data for object recognition at each eccentricity. This is the first system-level validation: natural images through Scrutinizer's complete pipeline (MIP + DoG + crowding + chromatic decay), compared against the TTM reference.
+
+**Spec**: [wave6_coco_periph_validation.md](../docs/specs/wave6_coco_periph_validation.md)
+**Dataset**: [data.csail.mit.edu/coco_periph/](https://data.csail.mit.edu/coco_periph/) (MIT license)
+**Published data**: [harrington2024_coco_periph.json](../tests/validation/published-data/harrington2024_coco_periph.json)
+**Scripts**: [download-coco-periph.js](../scripts/download-coco-periph.js) · [capture-coco-periph.js](../scripts/capture-coco-periph.js) · [analyze-coco-periph.js](../scripts/analyze-coco-periph.js) · [validate-coco-periph.js](../scripts/validate-coco-periph.js)
+
+### Method
+
+50 COCO images selected by congestion quintile (10 per quintile spanning low to high visual complexity). Each image loaded as centered `<img>` on 1920×1080 viewport, captured through Scrutinizer mode 0 (MIP+DoG baseline). Annular patches (45×45px = 1°) extracted at N/S/E/W cardinal positions at each eccentricity ring. Compared against TTM reference images from COCO-Periph via SSIM, PSNR, and DFT band energy.
+
+### Predictions
+
+**Tier 1 (Must Pass):** SSIM monotonic decrease with eccentricity (≥90% of images), Scrutinizer preserves more at 5° than TTM (≥70%), low-frequency band energy correlation (r>0.5).
+
+**Tier 2 (Should Pass):** SSIM degradation rate correlation (ρ>0.4), congestion predicts divergence at 15-20° (ρ>0.3), crossover eccentricity between 10-20°.
+
+**Tier 3 (Stretch):** High-frequency ratio growth (>1.5 at 20°), object detection AP correlation (deferred), per-image SSIM rank preservation (ρ>0.5).
+
+### Results
+
+Pending — run `npm run wave6` to execute.
+
+---
+
 ## References
 
 - Bouma, H. (1970). Interaction effects in parafoveal letter recognition. *Nature*, 226, 177-178.
@@ -249,3 +277,4 @@ At 256px worker resolution, 40px CSS items map to ~5 saliency pixels. The DoG ce
 - Toet, A. & Levi, D.M. (1992). The two-dimensional shape of spatial interaction zones in the parafovea. *Vision Research*, 32(7), 1349-1357.
 - Ashraf, M., et al. (2024). castleCSF — A contrast sensitivity function of color, area, spatiotemporal frequency, luminance and eccentricity. *bioRxiv*.
 - Blauch, N.M., Alvarez, G.A. & Konkle, T. (2026). FOVI: Foveated vision transformers. *arXiv*.
+- Harrington, C., Pepe, A., Ling, S. & Rosenholtz, R. (2024). COCO-Periph: Bridging the gap between human and machine perception with a peripheral vision benchmark. *ICLR 2024*.

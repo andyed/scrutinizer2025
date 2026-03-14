@@ -77,7 +77,7 @@ Resolution falloff across all stages follows a [cortical magnification function]
 - **Golden capture pipeline** — automated screenshot capture and SSIM/PSNR regression testing across versions
 
 ### Interface
-- **Extensibility modes** — modular shader pipeline supports custom visual effects (Frosted Glass, Wireframe, Minecraft, Double Vision are included as test cases; see [Developer's Guide](docs/developers_guide.md))
+- **Extensibility modes** — modular shader pipeline supports custom visual effects (Frosted Glass, Wireframe, Minecraft, Drunken Reading are included as test cases; see [Developer's Guide](docs/developers_guide.md))
 - **Simulation menu** — organized into Behavior (cognitive), Foveal (spatial), Peripheral (rendering), and Utility (debug) groups
 - **Eccentricity overlay** — boundary ring visualization for foveal/parafoveal/peripheral zones
 
@@ -132,7 +132,7 @@ npm run validate:scrutinizer    # Run Scrutinizer's JS implementation
 
 ## Calibration
 
-Default: `fovea_deg = 2.0`, `foveaRadius = 90px` (45 px/°) — within 2% on reference hardware (MBP Retina @ 50cm). At different viewing distances the fixed mapping diverges (±30–40%). The [Foveal Calibrator](https://andyed.github.io/scrutinizer-www/foveal-calibration.html) measures perceptual foveal extent via Motion Silence staircase but doesn't yet separate `px_per_deg` from comfort radius. *Fix path: [Project 1.3](docs/research-opportunities.md).*
+Default: `fovea_deg = 1.0`, `foveaRadius = 45px` (45 px/°) — within 2% on reference hardware (MBP Retina @ 50cm). At different viewing distances the fixed mapping diverges (±30–40%). The [Foveal Calibrator](https://andyed.github.io/scrutinizer-www/foveal-calibration.html) measures perceptual foveal extent via Motion Silence staircase but doesn't yet separate `px_per_deg` from comfort radius. *Fix path: [Project 1.3](docs/research-opportunities.md).*
 
 ---
 

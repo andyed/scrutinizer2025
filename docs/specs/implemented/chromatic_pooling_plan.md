@@ -68,7 +68,7 @@ After the existing reconstruction at line ~176 (`vec4 result = clamp(mip4 + band
 if (u_chromatic_pooling > 0.5) {
     // Convert normalized eccentricity to degrees
     // normEcc is eccentricity / fovea_radius; fovea ≈ 2° visual angle
-    float ecc_deg = normEcc * 2.0;  // TODO: use actual fovea_deg if uniform available
+    float ecc_deg = normEcc * 1.0;  // fovea_deg = 1.0 (1° foveal radius)
 
     // RG: frequency-independent steep decay (wiring constraint)
     float rg_atten = pow(10.0, -u_rg_decay * ecc_deg);
@@ -207,7 +207,7 @@ No new textures, no new passes, no CPU-side computation. Pure fragment shader co
 
 ## Open Questions
 
-1. **ecc_deg conversion**: Currently `normEcc * 2.0` assumes fovea = 2° visual angle. Should we pass actual fovea_deg as a uniform for accuracy? (Low priority — 2° is standard.)
+1. **ecc_deg conversion**: Currently `normEcc * 1.0` uses fovea_deg = 1.0 (1° foveal radius). Should we pass actual fovea_deg as a uniform for accuracy? (Low priority — 1° radius is standard.)
 
 2. **Interaction with saliency modulation**: When saliency modulation preserves detail in salient regions, should it also preserve color? Currently `u_desat_floor` gates the V4 chrominance path — if we're skipping V4 uniform path, we need an equivalent gate on the chromatic attenuation. Probably: `rg_atten = mix(rg_atten, 1.0, saliency * u_desat_floor)`.
 

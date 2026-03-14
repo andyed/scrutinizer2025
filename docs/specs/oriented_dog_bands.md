@@ -273,7 +273,7 @@ The oblique effect diminishes with retinal eccentricity — fine spatial frequen
 
 ```glsl
 // Convert pixel eccentricity to visual degrees
-float px_per_deg = max(fovea_radius / 2.0, 1.0);
+float px_per_deg = max(fovea_radius / 1.0, 1.0);
 float visual_ecc_deg = visual_ecc / px_per_deg;
 
 for (int k = 0; k < 8; k++) {
@@ -359,7 +359,7 @@ Add to `highkey` and `biological` pipeline blocks:
 | Frosted (2) | `false` | — | — | Not biologically motivated |
 | Blueprint (3) | `false` | — | — | Uses Sobel edges |
 | Cyberpunk (4) | `false` | — | — | Uses pixelation |
-| Double Vision (5) | `false` | — | — | Artistic mode |
+| Drunken Reading (5) | `false` | — | — | Artistic mode |
 
 ---
 

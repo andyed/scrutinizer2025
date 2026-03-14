@@ -23,9 +23,9 @@ function getArg(name, def) {
 const hasFlag = (name) => args.includes(`--${name}`);
 
 // ── Viewport geometry ──
-const foveaRadius = parseInt(getArg('fovea-radius', '90'));
+const foveaRadius = parseInt(getArg('fovea-radius', '45'));
 const [vpW, vpH] = getArg('viewport', '1536x914').split('x').map(Number);
-const fovea_deg = 2.0;  // Hardcoded in shader
+const fovea_deg = 1.0;  // 1° foveal radius (2° diameter) — matches shader
 
 // ── Load castleCSF parameters from modes.json ──
 const modesPath = path.join(__dirname, '..', 'shared', 'modes.json');

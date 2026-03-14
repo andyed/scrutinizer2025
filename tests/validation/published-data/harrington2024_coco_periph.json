@@ -1,0 +1,43 @@
+{
+  "source": "Harrington, C., Pepe, A., Ling, S., & Rosenholtz, R. (2024). COCO-Periph: Bridging the gap between human and machine perception with a peripheral vision benchmark. ICLR 2024.",
+  "license": "MIT",
+  "url": "https://data.csail.mit.edu/coco_periph/",
+  "note": "TTM-transformed COCO images at 4 eccentricities (5°, 10°, 15°, 20°). Includes human psychophysics data for object recognition at each eccentricity. Uses Rosenholtz Texture Tiling Model for peripheral encoding.",
+  "eccentricities_deg": [5, 10, 15, 20],
+  "fixation": "center",
+  "image_size": [768, 768],
+  "viewing_distance_cm": 57,
+  "ppd": 32,
+  "dataset_base_url": "https://data.csail.mit.edu/coco_periph/",
+  "paths": {
+    "original": "original_images/",
+    "ttm_5deg": "ttm_images/5deg/",
+    "ttm_10deg": "ttm_images/10deg/",
+    "ttm_15deg": "ttm_images/15deg/",
+    "ttm_20deg": "ttm_images/20deg/",
+    "annotations": "annotations/"
+  },
+  "subset_selection": {
+    "method": "congestion_quintile",
+    "count": 50,
+    "per_quintile": 10,
+    "congestion_metric": "rosenholtz_feature_congestion",
+    "note": "Select 10 images per congestion quintile to span the full range of visual complexity"
+  },
+  "annular_sampling": {
+    "method": "cardinal_patches",
+    "positions": ["N", "S", "E", "W"],
+    "patch_size_deg": 1.0,
+    "ring_width_deg": 1.0,
+    "note": "Extract 45x45px patches at N/S/E/W cardinal positions at target eccentricity for SSIM comparison"
+  },
+  "eccentricity_mapping_scrutinizer": {
+    "note": "At FOVEA_RADIUS=90px, PPD=45, 1920x1080 viewport",
+    "rings": [
+      { "ecc_deg": 5, "radius_px": 225, "in_viewport": true },
+      { "ecc_deg": 10, "radius_px": 450, "in_viewport": "vertical edge" },
+      { "ecc_deg": 15, "radius_px": 675, "in_viewport": "horizontal only" },
+      { "ecc_deg": 20, "radius_px": 900, "in_viewport": "partial horizontal" }
+    ]
+  }
+}

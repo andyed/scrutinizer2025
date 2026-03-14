@@ -46,7 +46,7 @@ Implementation: edge orientation compared to the gaze-relative radial direction 
 
 The oblique effect diminishes with retinal eccentricity, and the rate depends on spatial frequency. Fine spatial frequencies lose the cardinal advantage by ~10° (Berkley et al. 1975 report disappearance at 8–18°). Coarse spatial frequencies retain a small advantage to 25°+ (Essock 1990).
 
-Implementation: per-band `smoothstep` fade keyed to visual eccentricity in degrees. Fine bands (k=0) fade from 3° to 10°. Coarse bands (k=7) fade from 8° to 25°. Eccentricity in degrees derived from `fovea_radius / 2.0` (fovea ≈ 2° visual angle). When `u_px_per_deg` becomes available (see Roadmap: Calibrated Visual Angles), the approximation will be replaced.
+Implementation: per-band `smoothstep` fade keyed to visual eccentricity in degrees. Fine bands (k=0) fade from 3° to 10°. Coarse bands (k=7) fade from 8° to 25°. Eccentricity in degrees derived from `fovea_radius / 1.0` (fovea ≈ 1° radius). When `u_px_per_deg` becomes available (see Roadmap: Calibrated Visual Angles), the approximation will be replaced.
 
 ### Uniforms
 

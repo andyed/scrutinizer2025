@@ -1,7 +1,7 @@
 // Configuration constants for Scrutinizer effect
 const CONFIG = {
     // Foveal region settings
-    fovealRadius: 90, // pixels - ~2° eccentricity on MBP Retina @ 20" (see docs/foveal-calibration-logic.md §7)
+    fovealRadius: 45, // pixels - ~1° foveal radius (2° diameter) on MBP Retina @ 20" (see docs/foveal-calibration-logic.md §7)
     fovealAspectRatio: 1.33, // width/height ratio of foveal shape (4:3 default)
 
     // Image processing settings

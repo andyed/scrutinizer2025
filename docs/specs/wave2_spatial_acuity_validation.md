@@ -26,14 +26,14 @@ The DoG decomposition in `peripheral.frag` (lines 164-176) extracts 5 bands:
 
 Cutoff formula (M-scaling): `cutoff_norm = E2 × (2^k - 1)` where E2 = `dog_e2` = 0.15.
 
-At `fovea_radius=90px`, `fovea_deg=2.0`, `ppd=45`:
+At `fovea_radius=45px`, `fovea_deg=1.0`, `ppd=45`:
 
 | Band | Cutoff norm_ecc | Cutoff px | Cutoff deg |
 |------|----------------|-----------|------------|
-| band0 (4 cpd) | 0.15 | 13.5 | 0.30 |
-| band1 (2 cpd) | 0.45 | 40.5 | 0.90 |
-| band2 (1 cpd) | 1.05 | 94.5 | 2.10 |
-| band3 (0.5 cpd) | 2.25 | 202.5 | 4.50 |
+| band0 (4 cpd) | 0.15 | 6.75 | 0.15 |
+| band1 (2 cpd) | 0.45 | 20.25 | 0.45 |
+| band2 (1 cpd) | 1.05 | 47.25 | 1.05 |
+| band3 (0.5 cpd) | 2.25 | 101.25 | 2.25 |
 | residual (0.25 cpd) | Never | Never | Never |
 
 ### Prediction A: Band dropout order is frequency-ordered

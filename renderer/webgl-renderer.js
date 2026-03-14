@@ -108,6 +108,11 @@
                 // Saccadic blindness (suppress fovea during movement)
                 this.saccadicBlindnessLocation = null;
 
+                // Reading span (Rayner asymmetric foveal envelope)
+                this.velocityDirLocation = null;
+                this.readingSpanLocation = null;
+                this.readingSpanStrengthLocation = null;
+
                 // Congestion-gated pooling (hypothesis mode)
                 this.congestionPoolingLocation = null;
 
@@ -158,7 +163,9 @@
                     supra_exponent: 0.5, // Threshold→appearance compression (Jiang et al. 2022)
                     show_congestion: 0,  // 0=off, 1=congestion heatmap, 2=saliency vs congestion
                     congestion_pooling: true,
-                    saccadic_blindness: false,
+                    saccadic_blindness: true,
+                    reading_span: true,
+                    reading_span_strength: 1.0,
                     compute_tier: 0
                 };
 
@@ -273,6 +280,11 @@
 
                 // Saccadic blindness uniform lookup
                 this.saccadicBlindnessLocation = gl.getUniformLocation(this.program, "u_saccadic_blindness");
+
+                // Reading span (Rayner asymmetric foveal envelope) uniform lookups
+                this.velocityDirLocation = gl.getUniformLocation(this.program, "u_velocity_dir");
+                this.readingSpanLocation = gl.getUniformLocation(this.program, "u_reading_span");
+                this.readingSpanStrengthLocation = gl.getUniformLocation(this.program, "u_reading_span_strength");
 
                 // Congestion-gated pooling uniform lookup
                 this.congestionPoolingLocation = gl.getUniformLocation(this.program, "u_congestion_pooling");
@@ -527,6 +539,7 @@
                 const savedChromaticOverride = this._chromaticPoolingOverride;
                 const savedCongestionPooling = this._congestionPoolingOverride;
                 const savedSaccadicBlindness = this._saccadicBlindnessOverride;
+                const savedReadingSpan = this._readingSpanOverride;
                 const savedGaussianBlurMode = this._gaussianBlurModeOverride;
                 const savedDogE2 = this._dogE2Override;
                 const savedDogOriented = this._dogOrientedOverride;
@@ -552,6 +565,8 @@
                     cmf_a: 2.78,
                     cmf_color_sigma: 0.0,
                     congestion_pooling: true,
+                    reading_span: true,
+                    reading_span_strength: 1.0,
                     compute_tier: 0
                 };
 
@@ -593,6 +608,8 @@
                         this.config.yv_freq_decay = p.yv_freq_decay ?? defaults.yv_freq_decay;
                         this.config.supra_exponent = p.supra_exponent ?? defaults.supra_exponent;
                         this.config.compute_tier = p.compute_tier ?? defaults.compute_tier;
+                        this.config.reading_span = p.reading_span ?? defaults.reading_span;
+                        this.config.reading_span_strength = p.reading_span_strength ?? defaults.reading_span_strength;
 
                         // Store current mode metadata for export
                         this.currentMode = modeEntry;
@@ -605,6 +622,9 @@
                         }
                         if (savedSaccadicBlindness !== undefined) {
                             this.config.saccadic_blindness = savedSaccadicBlindness;
+                        }
+                        if (savedReadingSpan !== undefined) {
+                            this.config.reading_span = savedReadingSpan;
                         }
                         if (savedGaussianBlurMode !== undefined) {
                             this.config.gaussian_blur_mode = savedGaussianBlurMode;
@@ -656,7 +676,7 @@
                 gl.clearColor(0.0, 0.0, 0.0, 0.0);
                 gl.clear(gl.COLOR_BUFFER_BIT);
             }
-            render(width, height, mouseX, mouseY, foveaRadius, foveaAspectRatio = 1.33, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, debugStructure = 0.0, useMask = 0.0, mongrelMode = 1.0, aestheticMode = 0.0, velocity = 0.0, stableMouseX = 0.0, stableMouseY = 0.0, hasStructure = 0.0, enableSaliencyModulation = 1.0, time = 0.0, scrollbarWidth = 17.0) {
+            render(width, height, mouseX, mouseY, foveaRadius, foveaAspectRatio = 1.33, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, debugStructure = 0.0, useMask = 0.0, mongrelMode = 1.0, aestheticMode = 0.0, velocity = 0.0, stableMouseX = 0.0, stableMouseY = 0.0, hasStructure = 0.0, enableSaliencyModulation = 1.0, time = 0.0, scrollbarWidth = 17.0, velocityDirX = 0.0, velocityDirY = 0.0) {
                 if (!this.program) {
                     console.error('[WebGLRenderer] render() called but program is null!');
                     return;
@@ -756,10 +776,10 @@
                 this.updateConfigFromMode(aestheticMode);
 
                 // Compute cortical_max from screen geometry + foveal calibration
-                // Foveal radius encodes pixels-per-degree (fovea ≈ 2° visual angle).
-                // r_max in degrees = (screen_half_diagonal / fovea_radius) × 2°.
+                // Foveal radius encodes pixels-per-degree (fovea ≈ 1° radius, 2° diameter).
+                // r_max in degrees = (screen_half_diagonal / fovea_radius) × 1°.
                 // cortical_max = ln(r_max + a) - ln(a), the total cortical distance range.
-                const foveaDeg = 2.0;
+                const foveaDeg = 1.0;
                 const halfDiag = Math.sqrt(width * width + height * height) / 2;
                 const rMaxDeg = (halfDiag / foveaRadius) * foveaDeg;
                 const cmfA = this.config.cmf_a || 2.78;
@@ -802,6 +822,9 @@
                 gl.uniform1f(this.enableSaliencyModulationLocation, enableSaliencyModulation);
                 gl.uniform1i(this.showCongestionLocation, this.config.show_congestion);
                 gl.uniform1f(this.saccadicBlindnessLocation, this.config.saccadic_blindness ? 1.0 : 0.0);
+                gl.uniform2f(this.velocityDirLocation, velocityDirX, velocityDirY);
+                gl.uniform1f(this.readingSpanLocation, this.config.reading_span ? 1.0 : 0.0);
+                gl.uniform1f(this.readingSpanStrengthLocation, this.config.reading_span_strength);
                 gl.uniform1f(this.congestionPoolingLocation, this.config.congestion_pooling ? 1.0 : 0.0);
                 gl.uniform1f(this.crowdingDensityThresholdLocation, this.config.crowding_density_threshold ?? 0.3);
                 gl.uniform1f(this.crowdingDensitySteepnessLocation, this.config.crowding_density_steepness ?? 20.0);

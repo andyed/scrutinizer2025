@@ -63,7 +63,7 @@ Cycling (not toggling) keeps the shortcut count low. A single key walks through 
 | `Ctrl+7` | Legacy v1.6 (Comparison) | `menu:set-aesthetic-mode` 7 |
 | `Ctrl+9` | Congestion-Gated Pooling | `menu:set-aesthetic-mode` 9 |
 
-Numbers match the internal mode IDs. Only the primary models get shortcuts — test modes (Purkinje, Frosted, Wireframe, Minecraft, Double Vision) stay menu-only.
+Numbers match the internal mode IDs. Only the primary models get shortcuts — test modes (Purkinje, Frosted, Wireframe, Minecraft, Drunken Reading) stay menu-only.
 
 ### Tier 4 — Foveal radius presets
 

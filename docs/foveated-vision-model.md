@@ -894,7 +894,7 @@ The "Feature Extractor" stage determines *how* the image is warped.
 -   **Inputs**: `suppressionFactor` (from LGN), `ModeConfig`.
 -   **Operation**: Calculates `distortedUV` and `displacement`.
 -   **Modes**:
-    -   **Noise**: Fluid, continuous distortion (e.g., Double Vision).
+    -   **Noise**: Fluid, continuous distortion (e.g., Drunken Reading).
     -   **Mongrel Approximation** (formerly "Shatter"): Blocky, discontinuous displacement (e.g., Default).
         > **Note:** This is a statistical approximation of the "Mongrel" texture theory. We aspire to full texture synthesis, but it is currently too expensive for real-time performance.
     -   **None**: No distortion (e.g., Blueprint, Cyberpunk).
@@ -911,7 +911,7 @@ The "Interpreter" stage determines *what* the final pixel looks like. This stage
     -   **Frosted**: A low-contrast, milky aesthetic useful for simulating cataracts or foggy conditions.
     -   **Blueprint**: A "wireframe" mode that visualizes the underlying Gestalt structure (rhythm/mass) detected by the engine.
     -   **Cyberpunk**: An exaggerated "glitch" aesthetic using neon colors and blocky artifacts.
-    -   **Double Vision**: A fluid, wave-based distortion that simulates temporary visual impairments or disorienting states.
+    -   **Drunken Reading**: A fluid, wave-based distortion that simulates temporary visual impairments or disorienting states.
 
 ### Saccadic Suppression (The "Pupil Dilation" Model)
 To naturally simulate biological response to eye movement, the renderer maps **Mouse Velocity** to a simulated **"Pupil Aperture"** (Blur Radius).

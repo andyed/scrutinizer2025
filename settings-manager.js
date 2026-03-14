@@ -7,7 +7,7 @@ class SettingsManager {
         this.settings = null;
         this.settingsFile = null;
         this.defaults = {
-            radius: 90,  // ~2° foveal eccentricity on MBP Retina @ 20" (was 180, see docs/foveal-calibration-logic.md §7)
+            radius: 45,  // ~1° foveal radius (2° diameter) on MBP Retina @ 20" (see docs/foveal-calibration-logic.md §7)
             blur: 10,
             intensity: 0.6,
             enabled: true, // Default to enabled
@@ -31,11 +31,22 @@ class SettingsManager {
                 // Merge defaults to ensure all keys exist
                 const mergedSettings = { ...this.defaults, ...userSettings };
 
-                // Migration: Clamp radius to [20, 200] range.
+                // Migration v1: Clamp radius to [20, 200] range.
                 // Old defaults (180, 300, 450) were too large — 180px maps to ~4° on MBP Retina,
                 // compressing eccentricity and under-attenuating all peripheral models.
                 if (mergedSettings.radius > 200) {
-                    mergedSettings.radius = 90;
+                    mergedSettings.radius = 45;
+                }
+
+                // Migration v2: fovea_deg 2.0→1.0 — halve stored radius to preserve ppd.
+                // Old default 90px assumed fovea_deg=2.0 (2° radius). Correct anatomy is
+                // 1° radius (2° diameter). Halving radius keeps ppd = radius/fovea_deg = 45.
+                if (!mergedSettings._foveaDegMigrated) {
+                    mergedSettings.radius = Math.round(mergedSettings.radius / 2);
+                    mergedSettings._foveaDegMigrated = true;
+                    // Persist the migration flag
+                    this.settings = mergedSettings;
+                    this.save();
                 }
 
                 return mergedSettings;

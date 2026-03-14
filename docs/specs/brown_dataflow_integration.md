@@ -44,10 +44,10 @@ const corticalMax = Math.log1p(rMaxDeg / cmfA);         // :621
 DoG band cutoffs are derived from the same CMF by inverting the MIP formula (`peripheral.frag:162-171`):
 ```glsl
 float scale = u_cortical_max / maxMipLevel;
-c0 = u_cmf_a * (exp(1.0 * scale) - 1.0) / fovea_deg;  // MIP 1 boundary
-c1 = u_cmf_a * (exp(2.0 * scale) - 1.0) / fovea_deg;  // MIP 2 boundary
-c2 = u_cmf_a * (exp(3.0 * scale) - 1.0) / fovea_deg;  // MIP 3 boundary
-c3 = u_cmf_a * (exp(4.0 * scale) - 1.0) / fovea_deg;  // MIP 4 boundary
+c0 = u_cmf_a * (exp(1.0 * scale) - 1.0) / fovea_deg;  // MIP 1 boundary (fovea_deg = 1.0)
+c1 = u_cmf_a * (exp(2.0 * scale) - 1.0) / fovea_deg;  // MIP 2 boundary (fovea_deg = 1.0)
+c2 = u_cmf_a * (exp(3.0 * scale) - 1.0) / fovea_deg;  // MIP 3 boundary (fovea_deg = 1.0)
+c3 = u_cmf_a * (exp(4.0 * scale) - 1.0) / fovea_deg;  // MIP 4 boundary (fovea_deg = 1.0)
 ```
 
 **What Brown et al. does (log-polar warp):**

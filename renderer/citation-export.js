@@ -60,6 +60,8 @@ const METADATA_FIELDS = {
     'Scrutinizer:Mode': '',
     'Scrutinizer:ModeId': '',
     'Scrutinizer:FoveaRadius': '',
+    'Scrutinizer:FoveaDeg': '',
+    'Scrutinizer:PxPerDeg': '',
     'Scrutinizer:FoveaAspect': '',
     'Scrutinizer:DegradationStrength': '',
     'Scrutinizer:URL': '',
@@ -91,6 +93,7 @@ function buildMetadata(options = {}) {
         modeId = 0,
         modeName = null,
         foveaRadius = 180,
+        foveaDeg = 1.0, // foveal radius in degrees (1° = anatomical fovea radius)
         foveaAspect = 1.33,
         degradationStrength = 0.6,
         intensity, // deprecated alias
@@ -99,6 +102,9 @@ function buildMetadata(options = {}) {
         pipeline = null,
         customFields = {}
     } = options;
+
+    // Derive px/deg from radius and angular size
+    const pxPerDeg = foveaDeg > 0 ? foveaRadius / foveaDeg : foveaRadius;
 
     // Support old 'intensity' callers during transition
     const strength = degradationStrength !== 0.6 ? degradationStrength
@@ -135,6 +141,8 @@ function buildMetadata(options = {}) {
         'Scrutinizer:Mode': modeLabel,
         'Scrutinizer:ModeId': String(modeId),
         'Scrutinizer:FoveaRadius': String(foveaRadius),
+        'Scrutinizer:FoveaDeg': String(foveaDeg),
+        'Scrutinizer:PxPerDeg': String(Math.round(pxPerDeg * 100) / 100),
         'Scrutinizer:FoveaAspect': String(foveaAspect),
         'Scrutinizer:DegradationStrength': String(strength),
         'Scrutinizer:CAStrength': String(caStrength),
@@ -271,6 +279,8 @@ function generateSidecar(pngPath, options = {}) {
             mode: metadata['Scrutinizer:Mode'],
             mode_id: parseInt(metadata['Scrutinizer:ModeId']),
             fovea_radius: parseFloat(metadata['Scrutinizer:FoveaRadius']),
+            fovea_deg: parseFloat(metadata['Scrutinizer:FoveaDeg']),
+            px_per_deg: parseFloat(metadata['Scrutinizer:PxPerDeg']),
             fovea_aspect: parseFloat(metadata['Scrutinizer:FoveaAspect']),
             degradationStrength: parseFloat(metadata['Scrutinizer:DegradationStrength']),
             url: metadata['Scrutinizer:URL']

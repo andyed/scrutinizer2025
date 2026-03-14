@@ -87,7 +87,7 @@ v2.0.0 ships 10 modes across 4 categories:
 | 2 | Frosted Glass | Research |
 | 3 | Blueprint (ARIA Wireframe) | Presentation |
 | 4 | Minecraft (Block Pooling) | Presentation |
-| 5 | Double Vision | Presentation |
+| 5 | Drunken Reading | Presentation |
 | 6 | Log-Polar MIP | Research |
 | 7 | Legacy v1.6 | Research |
 | 8 | Minecraft Eyeball (Polar) | Presentation |

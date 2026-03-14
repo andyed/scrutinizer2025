@@ -62,6 +62,9 @@ uniform float u_desat_floor;      // Min desaturation multiplier in salient regi
 // color appearance decays more slowly — Jiang, Shooner & Mullen (2022) found power-law
 // exponent ~0.5 maps threshold sensitivity to perceived saturation at high contrasts.
 uniform float u_saccadic_blindness; // 0.0=off, 1.0=suppress fovea during saccades
+uniform vec2  u_velocity_dir;          // Directional velocity (px/ms) for reading span
+uniform float u_reading_span;          // 0=strict circle, 1=asymmetric envelope (Rayner 1998)
+uniform float u_reading_span_strength; // 0.7=comfort, 1.0=full Rayner asymmetry
 uniform float u_chromatic_pooling;  // 0.0=off (legacy uniform desat), 1.0=on
 uniform float u_rg_decay;           // RG (L-M) eccentricity decay k_e (default 0.072, Bowers et al. 2025 suprathreshold)
 uniform float u_rg_freq_decay;      // RG frequency-dependent decay k_ef (default 0.003)
@@ -291,7 +294,7 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     if (u_cmf_enabled > 0.5) {
         // CMF-derived: c_k = cmf_a × (exp(k×0.5×scale) − 1) / fovea_deg
         // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
-        float fovea_deg = 2.0;
+        float fovea_deg = 1.0;  // 1° foveal radius (2° diameter)
         float maxMipLevel = 4.0;
         float scale = u_cortical_max / maxMipLevel / (u_ecc_scaling / 0.75);
         c[0] = u_cmf_a * (exp(0.5 * scale) - 1.0) / fovea_deg;
@@ -322,8 +325,8 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     // Eccentricity fade: the oblique effect diminishes with retinal eccentricity.
     // Fine bands lose the cardinal advantage by ~10° (Berkley et al. 1975),
     // coarse bands retain it to ~25° (Essock 1990). Rate depends on spatial frequency.
-    // fovea_radius ≈ 2° of visual angle → px_per_deg ≈ fovea_radius / 2.0
-    float px_per_deg = max(fovea_radius / 2.0, 1.0);
+    // fovea_radius ≈ 1° foveal radius (2° diameter) → px_per_deg ≈ fovea_radius / 1.0
+    float px_per_deg = max(fovea_radius / 1.0, 1.0);
     float visual_ecc_deg = visual_ecc / px_per_deg;
 
     for (int k = 0; k < 8; k++) {
@@ -362,7 +365,7 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         // Per-band chromatic attenuation (castleCSF; Ashraf et al. 2024)
         // RG (L-M): steep base decay + weak freq dependence (suprathreshold spatial summation)
         // YV S-(L+M): slow base decay + strong freq dependence (coarse bands persist)
-        float fovea_deg = 2.0;
+        float fovea_deg = 1.0;  // 1° foveal radius (2° diameter)
         float ecc_deg = chromNormEcc * fovea_deg;
 
         // Threshold sensitivity → appearance compression (Jiang, Shooner & Mullen 2022)
@@ -417,10 +420,10 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
 // averages over a 2^N × 2^N texel neighborhood, approximating the pooling region.
 //
 // dist: pixel distance from fovea center
-// fovea_radius: fovea radius in pixels (~2° of visual angle)
+// fovea_radius: fovea radius in pixels (~1° foveal radius)
 // uv: texture coordinate to sample
 float sampleBoumaEdgeDensity(float dist, float fovea_radius, vec2 uv) {
-    float px_per_deg = max(fovea_radius / 2.0, 1.0);
+    float px_per_deg = max(fovea_radius / 1.0, 1.0);
     float ecc_deg = max(0.0, dist - fovea_radius) / px_per_deg;
 
     // Bouma's law: critical spacing ≈ 0.5 × eccentricity (Bouma 1970)
@@ -798,7 +801,7 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     signal.distortionStrength = strength;
 
     if (config.v4_style_id == 5) {
-        // Double Vision Mode
+        // Drunken Reading Mode
         float waveSpeed = 0.5; 
         float waveFreq = 3.0;
         float waveX = sin(uv.y * waveFreq + u_time * waveSpeed);
@@ -935,7 +938,8 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         // === MINECRAFT: CMF-driven block sizing ===
         // Block size = exp2(floor(mipLevel) + 2) → discrete steps: 4, 8, 16, 32, 64px.
         // Makes the CMF resolution curve visible as geometry — blocks grow
-        // logarithmically from gaze outward.
+        // logarithmically from gaze outward. Discrete steps are the point:
+        // this mode is a didactic visualizer showing actual MIP levels.
         // Blocks blend in at parafovea edge to avoid distracting grid shift on mouse move.
         float mipLevel = computeMipLevel(max(0.0, dist - fovea_radius), fovea_radius);
 
@@ -1306,7 +1310,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             }
 
             float mipLevel = computeMipLevel(max(0.0, dist - fovea_radius), fovea_radius);
-            float blockPx = exp2(floor(mipLevel) + 2.0);
+            float blockPx = exp2(floor(mipLevel) + 2.0); // discrete: matches V1 block sizing
             vec2 pixelSize = vec2(blockPx) / u_resolution;
 
             // Sample 4 cardinal neighbors at block-center offsets
@@ -1520,7 +1524,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
 
     } else if (config.v4_style_id == 6) { // FOVI: Gaussian color decay (rod-cone transition)
         if (u_cmf_color_sigma > 0.01) {
-            float fovea_deg = 2.0;
+            float fovea_deg = 1.0;  // 1° foveal radius (2° diameter)
             float normEcc = max(0.0, eccentricity) / max(fovea_radius, 0.001);
             float r_deg = normEcc * fovea_deg;
             float decay = exp(-r_deg / max(u_cmf_color_sigma, 0.1));
@@ -1570,14 +1574,47 @@ void main() {
     vec2 mouse_corrected = vec2(mouse_uv.x * aspect, mouse_uv.y);
     
     vec2 delta = uv_corrected - mouse_corrected;
-    delta.x /= u_fovea_aspect_ratio; 
-    float dist = length(delta); 
+    delta.x /= u_fovea_aspect_ratio;
+    float dist = length(delta);
 
     vec2 mouse_stable_uv = u_mouse_stable / u_resolution;
     vec2 mouse_stable_corrected = vec2(mouse_stable_uv.x * aspect, mouse_stable_uv.y);
     vec2 delta_stable = uv_corrected - mouse_stable_corrected;
     delta_stable.x /= u_fovea_aspect_ratio;
-    float dist_stable = length(delta_stable); 
+    float dist_stable = length(delta_stable);
+
+    float radius_norm_pre = u_foveaRadius / u_resolution.y;
+
+    // === READING SPAN: Asymmetric foveal envelope during reading ===
+    // Rayner (1998): Perceptual span ~1.3° left, ~5° right (LTR).
+    // Attentional, not acuity — reshape protection zone, not falloff.
+    if (u_reading_span > 0.5) {
+        float hSpeed = abs(u_velocity_dir.x);
+        float vSpeed = abs(u_velocity_dir.y);
+
+        // Gate: predominantly horizontal, pursuit speed (not saccade, not jitter)
+        float horizontality = hSpeed / max(hSpeed + vSpeed, 0.001);
+        float speedGate = smoothstep(0.05, 0.3, hSpeed) * (1.0 - smoothstep(2.5, 4.0, hSpeed));
+        float readingGate = horizontality * speedGate;
+
+        // Gate: text content under cursor (structure map B channel)
+        vec2 cursorUV = u_mouse / u_resolution;
+        float textGate = smoothstep(0.3, 0.6, textureLod(u_structureMap, cursorUV, 2.0).b);
+
+        // Combined activation
+        float readingActivation = readingGate * textGate * u_reading_span_strength;
+
+        // Shift fovea center in reading direction
+        float readDir = sign(u_velocity_dir.x); // +1 LTR, -1 RTL
+        float shiftAmount = radius_norm_pre * 0.7 * readingActivation * readDir;
+        delta.x += shiftAmount / u_fovea_aspect_ratio;
+        dist = length(delta);
+
+        // Apply same shift to stable delta for consistent V1 boundaries
+        delta_stable.x += shiftAmount / u_fovea_aspect_ratio;
+        dist_stable = length(delta_stable);
+    }
+
 
     float radius_norm = u_foveaRadius / u_resolution.y;
     float fovea_radius = radius_norm;

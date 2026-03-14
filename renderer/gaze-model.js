@@ -37,7 +37,9 @@
             this.lastMouseX = 0;
             this.lastMouseY = 0;
             this.lastUpdateTime = 0;
-            this.currentVelocity = 0; // pixels per ms
+            this.currentVelocity = 0; // pixels per ms (scalar magnitude)
+            this.currentVelocityX = 0; // pixels per ms (horizontal component)
+            this.currentVelocityY = 0; // pixels per ms (vertical component)
 
             // Zoom (Electron browser zoom level)
             this.currentZoom = 1.0;
@@ -116,6 +118,10 @@
             const dist = Math.sqrt(dx * dx + dy * dy);
             const instantVelocity = dt > 0 ? dist / dt : 0;
 
+            // Directional velocity components (for reading span asymmetry)
+            const instantVx = dt > 0 ? dx / dt : 0;
+            const instantVy = dt > 0 ? dy / dt : 0;
+
             // Adaptive smoothing (time-based EMA)
             // Consistent behavior regardless of FPS
             // Target: 95% smoothing at 60fps (16ms) -> alpha ~0.05
@@ -124,6 +130,8 @@
                 : this.config.velocityDecayMove;
             const alpha = 1.0 - Math.exp(-decay * dt);
             this.currentVelocity = this.currentVelocity + (instantVelocity - this.currentVelocity) * alpha;
+            this.currentVelocityX += (instantVx - this.currentVelocityX) * alpha;
+            this.currentVelocityY += (instantVy - this.currentVelocityY) * alpha;
 
             this.lastMouseX = this.mouseX;
             this.lastMouseY = this.mouseY;
@@ -147,6 +155,15 @@
          */
         getVelocity() {
             return this.currentVelocity;
+        }
+
+        /**
+         * Get directional velocity components in px/ms.
+         * Used by reading span to detect horizontal reading motion.
+         * @returns {{ vx: number, vy: number }}
+         */
+        getVelocityComponents() {
+            return { vx: this.currentVelocityX, vy: this.currentVelocityY };
         }
 
         /**

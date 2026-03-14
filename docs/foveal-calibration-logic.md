@@ -66,7 +66,7 @@ The fovea subtends a fixed angular diameter (~2°) regardless of screen. What ch
 **Formula:**
 ```
 px_per_deg = (resolution_css / screen_width_cm) × 2 × D_cm × tan(0.5°)
-fovea_radius_px = px_per_deg × 2.0   (for 2° eccentricity at fovea edge)
+fovea_radius_px = px_per_deg × 1.0   (for 1° foveal radius)
 ```
 
 Where `D_cm` is viewing distance in cm, `resolution_css` is CSS pixels (native ÷ devicePixelRatio).
@@ -80,7 +80,7 @@ Where `D_cm` is viewing distance in cm, `resolution_css` is CSS pixels (native �
 | Screen width | 12.1" (30.7cm) |
 | Typical viewing distance | 18-22" (46-56cm) |
 | px/deg @ 20" (50.8cm) | **44 CSS px** |
-| Fovea radius (2°) | **89 CSS px** |
+| Fovea radius (1°) | **45 CSS px** |
 | Fovea diameter | 178 CSS px |
 | Horizontal half-field | ~16.8° |
 | Full screen diagonal | ~37° |
@@ -94,7 +94,7 @@ Where `D_cm` is viewing distance in cm, `resolution_css` is CSS pixels (native �
 | Screen width | 13.6" (34.5cm) |
 | Typical viewing distance | 18-22" (46-56cm) |
 | px/deg @ 20" (50.8cm) | **44 CSS px** |
-| Fovea radius (2°) | **89 CSS px** |
+| Fovea radius (1°) | **45 CSS px** |
 | Fovea diameter | 178 CSS px |
 | Horizontal half-field | ~18.8° |
 | Full screen diagonal | ~44° |
@@ -107,7 +107,7 @@ Where `D_cm` is viewing distance in cm, `resolution_css` is CSS pixels (native �
 | Screen width | 20.9" (53.1cm) |
 | Typical viewing distance | 22-26" (56-66cm) |
 | px/deg @ 24" (60cm) | **38 CSS px** |
-| Fovea radius (2°) | **76 CSS px** |
+| Fovea radius (1°) | **38 CSS px** |
 | Fovea diameter | 152 CSS px |
 | Horizontal half-field | ~23.8° |
 | Full screen diagonal | ~48° |
@@ -121,14 +121,14 @@ Where `D_cm` is viewing distance in cm, `resolution_css` is CSS pixels (native �
 | Screen width | 23.5" (59.8cm) |
 | Typical viewing distance | 24-28" (60-70cm) |
 | px/deg @ 26" (66cm) | **37 CSS px** |
-| Fovea radius (2°) | **74 CSS px** |
+| Fovea radius (1°) | **37 CSS px** |
 | Fovea diameter | 148 CSS px |
 | Horizontal half-field | ~24.3° |
 | Full screen diagonal | ~50° |
 
 ### Current Default vs Reality
 
-The default `foveaRadius: 90px` maps to a ~2° eccentricity foveal boundary on both MBP models, matching the anatomical fovea. This means:
+The default `foveaRadius: 45px` maps to a ~1° foveal radius on both MBP models, matching the anatomical fovea. This means:
 - `normEcc` (used by DoG, chromatic pooling, crowding) scales correctly from the foveal edge
 - Viewport edges reach ~19-24° eccentricity
 - Peripheral effects are appropriately attenuated

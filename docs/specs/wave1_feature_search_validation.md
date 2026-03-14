@@ -28,15 +28,15 @@ Parameters from `shared/modes.json` (castleCSF Chromatic Pooling mode):
 | `yv_freq_decay` (k_ef) | 0.008 | castleCSF spatial frequency interaction |
 | `supra_exponent` | 0.5 | Jiang, Shooner & Mullen 2022 (foveal measurement, extrapolated to periphery) |
 
-Eccentricity mapping at `fovea_radius=90px`, `fovea_deg=2.0`:
+Eccentricity mapping at `fovea_radius=45px`, `fovea_deg=1.0`, `ppd=45`:
 
 | Ring | Distance (px) | norm_ecc | ecc (deg) |
 |------|--------------|----------|-----------|
-| 1 | 100 | 1.11 | 2.22 |
-| 2 | 200 | 2.22 | 4.44 |
-| 3 | 300 | 3.33 | 6.67 |
-| 4 | 420 | 4.67 | 9.33 |
-| 5 | 560 | 6.22 | 12.44 |
+| 1 | 100 | 2.22 | 2.22 |
+| 2 | 200 | 4.44 | 4.44 |
+| 3 | 300 | 6.67 | 6.67 |
+| 4 | 420 | 9.33 | 9.33 |
+| 5 | 560 | 12.44 | 12.44 |
 
 ### Prediction A: RG collapses ~5x faster than BY
 
@@ -165,7 +165,7 @@ Use `scripts/capture-golden.js` pattern — launch Scrutinizer pointed at `color
 **Capture requirements:**
 - PNG format only (JPEG chroma subsampling at 4:2:0 would smear color across 2x2 blocks, invalidating delta-C measurements)
 - sRGB color profile (macOS P3 displays may apply gamut mapping via ColorSync — force `--color-profile=srgb` or equivalent)
-- Log actual `fovea_radius` used and verify it matches prediction parameters (90px)
+- Log actual `fovea_radius` used and verify it matches prediction parameters (45px)
 - Capture both filtered (Scrutinizer active) and unfiltered (baseline) for each condition
 
 Capture matrix: 4 colors x 5 sizes x 2 conditions (filtered/baseline) = 40 screenshots.

@@ -271,6 +271,10 @@
             scrutinizer.toggleSaccadicBlindness(enabled);
         });
 
+        ipcRenderer.on('menu:toggle-reading-span', (e, enabled) => {
+            scrutinizer.toggleReadingSpan(enabled);
+        });
+
         ipcRenderer.on('menu:toggle-gaussian-blur-mode', (e, enabled) => {
             scrutinizer.toggleGaussianBlurMode(enabled);
         });

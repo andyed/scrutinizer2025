@@ -576,7 +576,7 @@
                     const halfBuf = this._downsampleToHalf(this.imageDataBuffer, frameW, frameH);
 
                     // Compute cortical_max for half-res coordinates
-                    const foveaDeg = 2.0;
+                    const foveaDeg = 1.0;
                     const halfDiag = Math.sqrt(halfW * halfW + halfH * halfH) / 2;
                     const halfFovea = this.config.fovealRadius / 2;
                     const rMaxDeg = (halfDiag / halfFovea) * foveaDeg;
@@ -619,6 +619,14 @@
 
             // 8. Render (single call to WebGL with all composed state)
             const debugMode = this.contentAnalysis.getDebugMode();
+            const vel = this.gazeModel.getVelocityComponents();
+            // Debug: log velocity every 30 frames via IPC (shows in test stdout)
+            if (!this._rsDebugCount) this._rsDebugCount = 0;
+            this._rsDebugCount++;
+            if (this._rsDebugCount % 30 === 0) {
+                const scalarV = this.gazeModel.getVelocity();
+                ipcRenderer.send('log:renderer', `[ReadingSpan] frame=${this._rsDebugCount} vx=${vel.vx.toFixed(4)} vy=${vel.vy.toFixed(4)} scalar=${scalarV.toFixed(4)} gaze=(${gaze.x.toFixed(0)},${gaze.y.toFixed(0)}) target=(${this.gazeModel.targetMouseX.toFixed(0)},${this.gazeModel.targetMouseY.toFixed(0)}) reading_span=${this.renderer.config.reading_span}`);
+            }
             this.renderer.render(
                 this.canvas.width,
                 this.canvas.height,
@@ -639,7 +647,9 @@
                 (contentState.hasStructure && contentState.enableStructureMap) ? 1.0 : 0.0,
                 contentState.enableSaliencyModulation ? 1.0 : 0.0,
                 now / 1000.0, // time (seconds)
-                this.config.scrollbarWidth
+                this.config.scrollbarWidth,
+                vel.vx,
+                vel.vy
             );
 
             if (this.frameTimer) this.frameTimer.mark('render');
@@ -741,6 +751,14 @@
                 this.renderer.config.saccadic_blindness = enabled;
                 this.renderer._saccadicBlindnessOverride = enabled;
                 ipcRenderer.send('log:renderer', `[Scrutinizer] Saccadic blindness: ${enabled}`);
+            }
+        }
+
+        toggleReadingSpan(enabled) {
+            if (this.renderer) {
+                this.renderer.config.reading_span = enabled;
+                this.renderer._readingSpanOverride = enabled;
+                ipcRenderer.send('log:renderer', `[Scrutinizer] Reading span: ${enabled}`);
             }
         }
 

@@ -1458,6 +1458,9 @@ function runIntegrationTest() {
     const testFixationX = process.env.TEST_FIXATION_X ? parseFloat(process.env.TEST_FIXATION_X) : null;
     const testFixationY = process.env.TEST_FIXATION_Y ? parseFloat(process.env.TEST_FIXATION_Y) : null;
     const testSelector = process.env.TEST_SELECTOR || null;
+    // Gaze trajectory: "startX,startY,endX,endY,durationMs,captureAtNorm"
+    // Coordinates are normalized (0-1). captureAtNorm is optional (default 0.6 = capture at 60% of sweep).
+    const testTrajectory = process.env.TEST_GAZE_TRAJECTORY || null;
     const testOverlay = process.env.TEST_OVERLAY === 'true';
     const screenshotMode = process.env.SCREENSHOT_MODE || 'date';
     const outputFilename = process.env.TEST_OUTPUT_FILENAME || null;
@@ -1579,8 +1582,10 @@ function runIntegrationTest() {
                 const screenTargetX = winBounds.x + targetX;
                 const screenTargetY = winBounds.y + targetY;
 
-                // Simulate mouse move to target
-                mainWindow.scrutinizerHud.webContents.send('browser:mousemove', screenTargetX, screenTargetY, 1.0);
+                // Simulate mouse move to target (static fixation unless trajectory is set)
+                if (!testTrajectory) {
+                    mainWindow.scrutinizerHud.webContents.send('browser:mousemove', screenTargetX, screenTargetY, 1.0);
+                }
 
                 // Apply overrides if present
                 if (testRadius !== null) {
@@ -1663,6 +1668,13 @@ function runIntegrationTest() {
                             mainWindow.scrutinizerHud.webContents.send('menu:set-dog-orient-bias', value);
                         }
 
+                        const readingSpanOverride = process.env.TEST_READING_SPAN;
+                        if (readingSpanOverride !== undefined) {
+                            const enabled = readingSpanOverride === 'true';
+                            console.log(`[Test] Reading span override: ${enabled}`);
+                            mainWindow.scrutinizerHud.webContents.send('menu:toggle-reading-span', enabled);
+                        }
+
                         const debugLevelOverride = process.env.TEST_DEBUG_LEVEL;
                         if (debugLevelOverride !== undefined) {
                             const level = parseInt(debugLevelOverride, 10);
@@ -1672,6 +1684,60 @@ function runIntegrationTest() {
 
                         // Wait for render — 1500ms to ensure IPC settles after mode switch + overrides
                         await new Promise(resolve => setTimeout(resolve, 1500));
+
+                        // === Gaze trajectory animation (reading span test) ===
+                        // Captures screenshot MID-SWEEP while velocity is active.
+                        // Sets trajectoryImage so the later screenshot section is skipped.
+                        let trajectoryImage = null;
+                        if (testTrajectory) {
+                            const parts = testTrajectory.split(',').map(Number);
+                            const [sx, sy, ex, ey, durMs, captureAt] = parts;
+                            const duration = durMs || 2000;
+                            const captureNorm = isNaN(captureAt) ? 0.6 : captureAt;
+                            const { width: tw, height: th } = mainWindow.getContentBounds();
+                            const wb = mainWindow.getBounds();
+                            const frameMs = 16; // ~60fps
+                            const totalFrames = Math.ceil(duration / frameMs);
+                            const captureFrame = Math.floor(totalFrames * captureNorm);
+
+                            console.log(`[Test] Running gaze trajectory: (${sx},${sy})→(${ex},${ey}) over ${duration}ms, capture at ${(captureNorm * 100).toFixed(0)}%`);
+
+                            const sendGazePos = (px, py) => {
+                                ipcMain.emit('browser:mousemove', { sender: mainWindow.scrutinizerView.webContents }, px, py, 1.0);
+                            };
+
+                            // Pre-position at start for 500ms so velocity starts from zero
+                            const startScreenX = wb.x + sx * tw;
+                            const startScreenY = wb.y + sy * th;
+                            sendGazePos(startScreenX, startScreenY);
+                            await new Promise(resolve => setTimeout(resolve, 500));
+
+                            // Animate trajectory — capture screenshot at the capture point
+                            for (let i = 0; i <= totalFrames; i++) {
+                                const t = i / totalFrames;
+                                const curX = wb.x + (sx + (ex - sx) * t) * tw;
+                                const curY = wb.y + (sy + (ey - sy) * t) * th;
+                                sendGazePos(curX, curY);
+
+                                if (i === captureFrame) {
+                                    console.log(`[Test] Trajectory capture point: t=${t.toFixed(2)}, pos=(${(sx + (ex - sx) * t).toFixed(3)}, ${(sy + (ey - sy) * t).toFixed(3)})`);
+                                    // Wait 2 frames for the GPU to render with current velocity
+                                    await new Promise(resolve => setTimeout(resolve, frameMs * 2));
+                                    // Keep sending motion so velocity doesn't decay during capture
+                                    const nextT = Math.min(1.0, (i + 3) / totalFrames);
+                                    const nextX = wb.x + (sx + (ex - sx) * nextT) * tw;
+                                    const nextY = wb.y + (sy + (ey - sy) * nextT) * th;
+                                    sendGazePos(nextX, nextY);
+                                    // Capture NOW while velocity is active
+                                    const captureTarget = mainWindow.scrutinizerHud;
+                                    trajectoryImage = await captureTarget.capturePage();
+                                    console.log(`[Test] Screenshot captured mid-sweep (velocity active)`);
+                                    break;
+                                }
+
+                                await new Promise(resolve => setTimeout(resolve, frameMs));
+                            }
+                        }
 
                         // Wait for congestion map if requested (Bouma-scaled gate needs MIP data)
                         if (process.env.TEST_WAIT_CONGESTION === 'true' && mode !== 'bypass' && mode !== 'disabled') {
@@ -1703,11 +1769,18 @@ function runIntegrationTest() {
 
                         console.log(`[Test] Capturing screenshot for Mode ${mode}...`);
                         try {
-                            // When disabled, capture raw content view (not the empty HUD overlay)
-                            const captureTarget = (mode === 'disabled' && mainWindow.scrutinizerView)
-                                ? mainWindow.scrutinizerView.webContents
-                                : mainWindow.scrutinizerHud;
-                            const image = await captureTarget.capturePage();
+                            // Use mid-sweep capture if trajectory already grabbed one
+                            let image;
+                            if (trajectoryImage) {
+                                image = trajectoryImage;
+                                console.log(`[Test] Using mid-sweep trajectory capture`);
+                            } else {
+                                // When disabled, capture raw content view (not the empty HUD overlay)
+                                const captureTarget = (mode === 'disabled' && mainWindow.scrutinizerView)
+                                    ? mainWindow.scrutinizerView.webContents
+                                    : mainWindow.scrutinizerHud;
+                                image = await captureTarget.capturePage();
+                            }
                             let buffer = image.toPNG();
 
                             // Reuse save logic

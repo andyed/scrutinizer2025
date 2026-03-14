@@ -94,7 +94,7 @@ mipLevel = maxMipLevel × [ln(r + a) - ln(a)] / cortical_max
 The foveal radius encodes the user's pixels-per-degree calibration (fovea ≈ 2° visual angle):
 
 ```
-r_max_deg = (screen_half_diagonal_px / fovea_radius_px) × 2.0°
+r_max_deg = (screen_half_diagonal_px / fovea_radius_px) × 1.0°
 cortical_max = ln(r_max_deg + a) - ln(a)
 ```
 
@@ -148,7 +148,7 @@ c3 = u_cmf_a * (exp(4.0 * scale) - 1.0) / fovea_deg;
 
 ```javascript
 // Compute cortical_max from screen geometry + foveal calibration
-const foveaDeg = 2.0;
+const foveaDeg = 1.0;
 const halfDiag = Math.sqrt(width * width + height * height) / 2;
 const rMaxDeg = (halfDiag / foveaRadius) * foveaDeg;
 const corticalMax = this.config.cmf_enabled

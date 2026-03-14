@@ -121,8 +121,8 @@ float visual_ecc_deg = visual_ecc / u_px_per_deg;
 If `u_px_per_deg` isn't available yet (see Roadmap: "Calibrated Visual Angles"), approximate from fovea radius:
 
 ```glsl
-// fovea_radius ≈ 2° of visual angle → px_per_deg ≈ fovea_radius / 2.0
-float approx_px_per_deg = max(fovea_radius / 2.0, 1.0);
+// fovea_radius ≈ 1° foveal radius → px_per_deg ≈ fovea_radius / 1.0
+float approx_px_per_deg = max(fovea_radius / 1.0, 1.0);
 float visual_ecc_deg = visual_ecc / approx_px_per_deg;
 ```
 

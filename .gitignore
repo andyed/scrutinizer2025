@@ -38,6 +38,8 @@ docs/research/
 
 # Private correspondence
 docs/meeting-prep-*.md
+docs/meeting-questions-*.md
+docs/transcripts/
 
 # LaTeX build artifacts
 docs/arxiv-paper/*.aux

@@ -33,7 +33,9 @@
                 "supra_exponent": 0.5,
                 "crowding_density_threshold": 0.3,
                 "crowding_density_steepness": 20.0,
-                "congestion_pooling": true
+                "congestion_pooling": true,
+                "reading_span": false,
+                "reading_span_strength": 1.0
             },
             "tests": [
                 "structure_masking",
@@ -77,7 +79,9 @@
                 "supra_exponent": 0.5,
                 "crowding_density_threshold": 0.3,
                 "crowding_density_steepness": 20.0,
-                "congestion_pooling": true
+                "congestion_pooling": true,
+                "reading_span": false,
+                "reading_span_strength": 1.0
             },
             "tests": [
                 "purkinje_shift",
@@ -125,7 +129,9 @@
                 "v1_distortion_type": 2,
                 "v1_strength_mult": 1.0,
                 "v1_animate": false,
-                "v4_style_id": 3
+                "v4_style_id": 3,
+                "reading_span": true,
+                "reading_span_strength": 1.0
             },
             "tests": [
                 "aria_role_classification",
@@ -201,9 +207,9 @@
                 "biological_basis": "Rosenholtz TTM pooling regions, Toet & Levi (1992) radial elongation"
             }
         },
-        "double_vision": {
+        "drunken_reading": {
             "id": 5,
-            "label": "Double Vision",
+            "label": "Drunken Reading",
             "shortLabel": "Trippy",
             "category": "presentation",
             "description": "Fluid wave-based distortion simulating temporary visual impairments or disorienting states. Bypasses LGN structure masking for full ungated distortion.",
@@ -224,7 +230,7 @@
             "architectural_purpose": "Stress-test for bypassing LGN gating without breaking pipeline",
             "citations": {
                 "technique": "Animated simplex noise domain warping",
-                "perceptual_basis": "Alcohol/fatigue-induced double vision"
+                "perceptual_basis": "Alcohol/fatigue-induced visual impairment"
             }
         },
         "log_polar_mip": {
@@ -315,7 +321,9 @@
                 "yv_freq_decay": 0.008,
                 "supra_exponent": 0.5,
                 "crowding_density_threshold": 0.3,
-                "crowding_density_steepness": 20.0
+                "crowding_density_steepness": 20.0,
+                "reading_span": false,
+                "reading_span_strength": 1.0
             },
             "tests": [
                 "congestion_modulated_mip",
@@ -359,7 +367,9 @@
                 "congestion_pooling": true,
                 "crowding_density_threshold": 0.3,
                 "crowding_density_steepness": 20.0,
-                "compute_tier": 2.5
+                "compute_tier": 2.5,
+                "reading_span": true,
+                "reading_span_strength": 1.0
             },
             "tests": [
                 "webgpu_probe_success",

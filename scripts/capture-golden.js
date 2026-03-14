@@ -27,10 +27,11 @@ const OUTPUT_DIR = path.join(__dirname, '..', 'tests', 'golden-captures', `v${ve
 // Override with BASE_URL env var for local development.
 const BASE_URL = process.env.BASE_URL || 'https://andyed.github.io/scrutinizer-www/reference-pages';
 
-// Foveal radius for captures — calibrated to ~2° eccentricity on MBP Retina @ 20".
+// Foveal radius for captures — 45px = 1° radius (2° diameter fovea) on MBP Retina @ 20".
+// 90px = 2° radius (4° diameter) — use for relaxed/parafoveal captures.
 // See docs/foveal-calibration-logic.md §7 for derivation.
 // Override with TEST_RADIUS env var for other screen geometries.
-const CAPTURE_FOVEA_RADIUS = process.env.TEST_RADIUS || '90';
+const CAPTURE_FOVEA_RADIUS = process.env.TEST_RADIUS || '45';
 
 // Window size for captures — fixed at 1920×1080 for cross-machine reproducibility.
 // Override with CAPTURE_WIDTH/CAPTURE_HEIGHT env vars.

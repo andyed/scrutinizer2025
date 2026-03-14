@@ -131,7 +131,7 @@ The shader uses a modular architecture inspired by the human visual system to or
     *   **Function**: `processV1`
     *   **Logic**: Determines *how* the image is warped. It uses the signal from the LGN to apply displacement.
     *   **Types**:
-        *   **Noise (0)**: Fluid, continuous distortion with animation. Used by Double Vision mode.
+        *   **Noise (0)**: Fluid, continuous distortion with animation. Used by Drunken Reading mode.
         *   **Shatter (1)**: Slow wave distortion (legacy "Mongrel Approximation"). Used by default modes.
         *   **None (2)**: No geometric change. Used by Blueprint mode.
         *   **Pixelate (3)**: CMF-driven block quantization. Used by Minecraft/Wireframe.
@@ -147,7 +147,7 @@ The shader uses a modular architecture inspired by the human visual system to or
 ### Philosophy: Aesthetic Modes as Test Cases
 In Scrutinizer, an "Aesthetic Mode" is not just a visual filter—it is a **functional test case** for the modularity of the pipeline. We encourage keeping "Work In Progress" (WIP) or experimental modes in the codebase because they often reveal missing architectural features.
 
-*   **Double Vision (Mode 5)** is a test for **Stream Integration**. By bypassing LGN gating (`lgn_use_structure_mask = false`), it proves the pipeline can handle raw, ungated input without breaking.
+*   **Drunken Reading (Mode 5)** is a test for **Stream Integration**. By bypassing LGN gating (`lgn_use_structure_mask = false`), it proves the pipeline can handle raw, ungated input without breaking.
 *   **Blueprint (Mode 3)** is a test for **Edge Detection**. It forces V1 to use pixelated UVs (`Type 3`) and tests if V4 can run a Sobel filter on that distorted coordinate space.
 *   **Minecraft (Mode 4)** is a test for **CMF Block Sizing**. Blocks sized to MIP level at each eccentricity (4-64px) with channel-independent neighbor averaging in Oklab. Demonstrates customizing the baseline — same CMF math, visible as block geometry.
 
@@ -241,7 +241,7 @@ The following table details the rendering characteristics of each built-in mode 
 | **4: Minecraft** | **LGN** | Standard |
 | | **V1** | **CMF Block Sizing**: Blocks sized to MIP level (4-64px), fovea-relative grid (Type 3). |
 | | **V4** | **Block Pooling**: Channel-independent neighbor averaging in Oklab + grid lines. |
-| **5: Double Vision** | **LGN** | **Bypassed**: No Gating (Stream Integration). |
+| **5: Drunken Reading** | **LGN** | **Bypassed**: No Gating (Stream Integration). |
 | | **V1** | **Flowing Wave**: High-amplitude animated sine wave (Type 0). |
 | | **V4** | **Vibrant**: Saturation Boost + Subtle Fractal Noise. |
 
@@ -405,7 +405,7 @@ const scaledBox = {
 **Reuse Opportunity**: If other features (e.g., text detection, logo detection) need higher resolution, they can share the 640px canvas created for face detection.
 
 ### 4. UI Protection (Scrollbars)
-**Problem**: Applying heavy geometric distortion (like the "Shatter" or "Double Vision" modes) to the entire window renders the native scrollbar unusable, as the user cannot accurately target the thumb or track.
+**Problem**: Applying heavy geometric distortion (like the "Shatter" or "Drunken Reading" modes) to the entire window renders the native scrollbar unusable, as the user cannot accurately target the thumb or track.
 
 **Solution**: The shader pipeline includes a hard **Scrollbar Override** controlled by the `u_scrollbarWidth` uniform (default: 20px).
 

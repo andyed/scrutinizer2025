@@ -485,8 +485,14 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         {
                             label: 'Saccadic Blindness',
                             type: 'checkbox',
-                            checked: false,
+                            checked: true,
                             click: (menuItem) => sendToOverlays('menu:toggle-saccadic-blindness', menuItem.checked)
+                        },
+                        {
+                            label: 'Reading Span (Rayner)',
+                            type: 'checkbox',
+                            checked: true,
+                            click: (menuItem) => sendToOverlays('menu:toggle-reading-span', menuItem.checked)
                         },
                         { type: 'separator' },
                         // === EXPERIMENTAL MODELS (alternative simulation pipelines) ===
@@ -538,57 +544,57 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             label: 'Foveal Radius',
                             submenu: [
                                 {
-                                    label: 'Extra Small (20px)',
+                                    label: 'Extra Small (20px radius, 20 px/°)',
                                     type: 'radio',
                                     checked: isClosest(RADIUS_OPTIONS[0], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[0])
                                 },
                                 {
-                                    label: 'Small (45px)',
+                                    label: 'Medium (45px radius, 45 px/°)',
                                     type: 'radio',
                                     checked: isClosest(RADIUS_OPTIONS[1], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[1])
                                 },
                                 { type: 'separator' },
                                 {
-                                    label: 'Tight (70px)',
+                                    label: 'Relaxed (70px radius, 70 px/°)',
                                     type: 'radio',
                                     checked: isClosest(RADIUS_OPTIONS[2], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[2])
                                 },
                                 {
-                                    label: 'Medium (90px)',
+                                    label: 'Wide (90px radius, 90 px/°)',
                                     type: 'radio',
                                     checked: isClosest(RADIUS_OPTIONS[3], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[3])
                                 },
                                 {
-                                    label: 'Relaxed (110px)',
+                                    label: 'Large (110px radius, 110 px/°)',
                                     type: 'radio',
                                     checked: isClosest(RADIUS_OPTIONS[4], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[4])
                                 },
                                 {
-                                    label: 'Wide (130px)',
+                                    label: 'Extra Large (130px radius, 130 px/°)',
                                     type: 'radio',
                                     checked: isClosest(RADIUS_OPTIONS[5], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[5])
                                 },
                                 { type: 'separator' },
                                 {
-                                    label: 'Large (180px)',
+                                    label: 'Huge (180px radius, 180 px/°)',
                                     type: 'radio',
                                     checked: isClosest(RADIUS_OPTIONS[6], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[6])
                                 },
                                 {
-                                    label: 'Extra Large (300px)',
+                                    label: 'Extreme (300px radius, 300 px/°)',
                                     type: 'radio',
                                     checked: isClosest(RADIUS_OPTIONS[7], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[7])
                                 },
                                 {
-                                    label: 'Huge (450px)',
+                                    label: 'Full Screen (450px radius, 450 px/°)',
                                     type: 'radio',
                                     checked: isClosest(RADIUS_OPTIONS[8], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[8])
@@ -730,7 +736,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     click: () => { sendToOverlays('menu:set-aesthetic-mode', 8); app.emit('aesthetic-mode-changed', 8); }
                                 },
                                 {
-                                    label: 'Double Vision',
+                                    label: 'Drunken Reading',
                                     type: 'radio',
                                     checked: currentAestheticMode === 5,
                                     click: () => { sendToOverlays('menu:set-aesthetic-mode', 5); app.emit('aesthetic-mode-changed', 5); }
