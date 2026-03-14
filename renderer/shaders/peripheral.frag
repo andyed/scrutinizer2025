@@ -998,10 +998,13 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
 vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float parafovea_radius, float saccadeFactor) {
     float eccentricity = max(0.0, dist - fovea_radius);
     
-    vec2 duvdx = dFdx(uv);
-    vec2 duvdy = dFdy(uv);
-    
-    vec3 foveaCol = sampleSourceGrad(v1.distortedUV, duvdx, duvdy).rgb;
+    // Screen-space derivatives of the distorted UV so textureGrad sees the
+    // actual Jacobian of the V1 warp.  dFdx/dFdy on the undistorted uv would
+    // ignore crowding-induced UV stretching, causing incorrect hardware LOD at
+    // the foveal boundary (over-blurs radially, under-blurs tangentially).
+    vec2 distDuvdx = dFdx(v1.distortedUV);
+    vec2 distDuvdy = dFdy(v1.distortedUV);
+    vec3 foveaCol = sampleSourceGrad(v1.distortedUV, distDuvdx, distDuvdy).rgb;
     
     // TIER 1.8: COUPLED POOLING
     float blurMult = 1.0 + (u_blurRadius * 0.3);
@@ -1058,7 +1061,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             uv  // undistorted UV for orientation gradient (not V1-warped)
         ).rgb;
     } else {
-        pooledCol = sampleMIPPooledGrad(v1.distortedUV, duvdx, duvdy, coupledEccentricity, fovea_radius).rgb;
+        pooledCol = sampleMIPPooledGrad(v1.distortedUV, distDuvdx, distDuvdy, coupledEccentricity, fovea_radius).rgb;
     }
     
     // Gradual blend across inner parafovea — was 0.1 (completed in ~15px),
@@ -1315,10 +1318,10 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
 
             // Sample 4 cardinal neighbors at block-center offsets
             vec3 labCenter = rgbToOklab(col);
-            vec3 labN = rgbToOklab(sampleSourceGrad(v1.distortedUV + vec2(0.0, pixelSize.y), dFdx(uv), dFdy(uv)).rgb);
-            vec3 labS = rgbToOklab(sampleSourceGrad(v1.distortedUV - vec2(0.0, pixelSize.y), dFdx(uv), dFdy(uv)).rgb);
-            vec3 labE = rgbToOklab(sampleSourceGrad(v1.distortedUV + vec2(pixelSize.x, 0.0), dFdx(uv), dFdy(uv)).rgb);
-            vec3 labW = rgbToOklab(sampleSourceGrad(v1.distortedUV - vec2(pixelSize.x, 0.0), dFdx(uv), dFdy(uv)).rgb);
+            vec3 labN = rgbToOklab(sampleSourceGrad(v1.distortedUV + vec2(0.0, pixelSize.y), distDuvdx, distDuvdy).rgb);
+            vec3 labS = rgbToOklab(sampleSourceGrad(v1.distortedUV - vec2(0.0, pixelSize.y), distDuvdx, distDuvdy).rgb);
+            vec3 labE = rgbToOklab(sampleSourceGrad(v1.distortedUV + vec2(pixelSize.x, 0.0), distDuvdx, distDuvdy).rgb);
+            vec3 labW = rgbToOklab(sampleSourceGrad(v1.distortedUV - vec2(pixelSize.x, 0.0), distDuvdx, distDuvdy).rgb);
             vec3 neighborAvg = (labN + labS + labE + labW) * 0.25;
 
             // Per-channel blend: 0 at parafovea → max at far periphery
