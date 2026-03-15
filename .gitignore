@@ -33,6 +33,14 @@ tests/validation/results-*/
 # Golden captures — bulk regression screenshots, too large for git.
 # Key illustrative captures live in docs/golden/ instead (curated per release).
 tests/golden-captures/
+tests/smoke-captures/
+
+# Capture pipeline manifests (per-directory skip cache)
+.capture-manifest.json
+
+# OCR test artifacts
+*.traineddata
+tests/validation/ocr-accuracy-curve.json
 # Research papers (PDFs, too large for git)
 docs/research/
 

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reference: Grid Comparison — Rectangular MIP vs Isotropic Cortical</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0f;
+            color: #e0e0ec;
+            font-family: system-ui, -apple-system, sans-serif;
+            overflow: hidden;
+        }
+        .container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+        }
+        .panel {
+            flex: 1;
+            position: relative;
+            border-right: 1px solid rgba(255,255,255,0.1);
+        }
+        .panel:last-child { border-right: none; }
+        .panel canvas {
+            width: 100%;
+            height: 100%;
+        }
+        .panel-label {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.7);
+            letter-spacing: 0.05em;
+            z-index: 10;
+            text-align: center;
+            line-height: 1.4;
+        }
+        .panel-label .sub {
+            font-size: 10px;
+            font-weight: 400;
+            color: rgba(255,255,255,0.4);
+            font-family: monospace;
+        }
+        /* Fixation cross via CSS */
+        .fixation {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 2px;
+            height: 16px;
+            background: rgba(255,255,255,0.8);
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+        .fixation::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 16px;
+            height: 2px;
+            background: rgba(255,255,255,0.8);
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="panel">
+            <div class="panel-label">
+                Rectangular MIP Grid
+                <div class="sub">v2.3 — uniform tiles, power-of-2 MIP levels</div>
+            </div>
+            <div class="fixation"></div>
+            <canvas id="rectGrid"></canvas>
+        </div>
+        <div class="panel">
+            <div class="panel-label">
+                Isotropic Cortical Grid
+                <div class="sub">v2.5 — Blauch 2026, w&thinsp;=&thinsp;log(r+a), spokes&thinsp;=&thinsp;floor(2&pi;r/dr)</div>
+            </div>
+            <div class="fixation"></div>
+            <canvas id="isoGrid"></canvas>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const CMF_A = 2.78;     // degrees
+        const R_MAX = 30;       // degrees
+        const N_RINGS = 50;     // cortical sample points
+        const FOVEA_DEG = 1.0;  // fovea radius in degrees
+        const TILE_SIZE = 8;    // MIP tile size in pixels (at half-res)
+
+        function setupCanvas(id) {
+            const canvas = document.getElementById(id);
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            // Guard against 0-size layout (Electron WebContentsView may not have laid out yet)
+            const w = rect.width || window.innerWidth / 2;
+            const h = rect.height || window.innerHeight;
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+            return { canvas, ctx, w, h };
+        }
+
+        // Map eccentricity (degrees) to opacity: fovea clear, periphery visible
+        function fidelityAlpha(ecc_deg) {
+            if (ecc_deg < FOVEA_DEG) return 0.0; // fovea: no overlay
+            const t = Math.min((ecc_deg - FOVEA_DEG) / 15, 1.0);
+            return 0.15 + t * 0.55;
+        }
+
+        // Pixels per degree (based on panel size)
+        function ppd(panelW, panelH) {
+            const diagonal = Math.sqrt(panelW * panelW + panelH * panelH) / 2;
+            return diagonal / R_MAX;
+        }
+
+        // --- Rectangular MIP Grid ---
+        function drawRectGrid({ ctx, w, h }) {
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = ppd(w, h);
+
+            // Eccentricity bands for MIP levels (degrees)
+            const eccBands = [FOVEA_DEG, 3, 7, 14, 22, R_MAX];
+
+            // Draw tiles at increasing MIP levels, clipped to annular bands
+            for (let mip = 0; mip <= 4; mip++) {
+                const tileW = TILE_SIZE * Math.pow(2, mip);
+                const tilePx = tileW * scale / 45;
+
+                if (tilePx < 2) continue;
+
+                const eccMin = eccBands[mip];
+                const eccMax = eccBands[mip + 1] || R_MAX;
+                const rMin = eccMin * scale;
+                const rMax = eccMax * scale;
+
+                // Clip to annular band — eliminates gaps and overlaps at MIP boundaries
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(cx, cy, rMax, 0, Math.PI * 2);
+                ctx.arc(cx, cy, rMin, 0, Math.PI * 2, true);
+                ctx.clip();
+
+                // Fill all grid cells that intersect this band
+                const startX = Math.floor((cx - rMax) / tilePx) * tilePx;
+                const startY = Math.floor((cy - rMax) / tilePx) * tilePx;
+
+                for (let gx = startX; gx < cx + rMax; gx += tilePx) {
+                    for (let gy = startY; gy < cy + rMax; gy += tilePx) {
+                        const dx = (gx + tilePx / 2) - cx;
+                        const dy = (gy + tilePx / 2) - cy;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+
+                        // Skip tiles clearly outside the band (clip handles edges)
+                        if (dist < rMin - tilePx || dist > rMax + tilePx) continue;
+
+                        const ecc_deg = dist / scale;
+                        const alpha = fidelityAlpha(ecc_deg);
+
+                        ctx.fillStyle = `rgba(100, 160, 200, ${alpha})`;
+                        ctx.fillRect(gx, gy, tilePx - 0.5, tilePx - 0.5);
+
+                        ctx.strokeStyle = `rgba(100, 160, 200, ${alpha * 0.6})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.strokeRect(gx, gy, tilePx, tilePx);
+                    }
+                }
+
+                ctx.restore();
+            }
+
+            // Fovea circle
+            ctx.beginPath();
+            ctx.arc(cx, cy, FOVEA_DEG * scale, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // --- Isotropic Cortical Grid ---
+        function drawIsoGrid({ ctx, w, h }) {
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = ppd(w, h);
+
+            const w_min = Math.log(CMF_A);
+            const w_max = Math.log(R_MAX + CMF_A);
+            const cortical_max = w_max - w_min;
+            const w_step = cortical_max / (N_RINGS - 1);
+
+            for (let i = 0; i < N_RINGS; i++) {
+                const w_i = w_min + i * w_step;
+                const r_center_deg = Math.exp(w_i) - CMF_A;
+
+                // Ring boundaries
+                const w_half_below = i > 0 ? w_i - w_step * 0.5 : w_min;
+                const w_half_above = i < N_RINGS - 1 ? w_i + w_step * 0.5 : w_max;
+                const r_inner_deg = Math.exp(w_half_below) - CMF_A;
+                const r_outer_deg = Math.exp(w_half_above) - CMF_A;
+
+                // Radial spacing
+                let dr_deg;
+                if (i === 0) {
+                    dr_deg = Math.exp(w_min + w_step) - Math.exp(w_min);
+                } else if (i === N_RINGS - 1) {
+                    dr_deg = Math.exp(w_min + (N_RINGS - 1) * w_step) - Math.exp(w_min + (N_RINGS - 2) * w_step);
+                } else {
+                    dr_deg = (Math.exp(w_min + (i + 1) * w_step) - Math.exp(w_min + (i - 1) * w_step)) / 2;
+                }
+
+                // Spoke count
+                const n_spokes = i === 0 ? 1 : Math.max(1, Math.floor(2 * Math.PI * r_center_deg / dr_deg));
+                const spoke_width = (2 * Math.PI) / n_spokes;
+
+                const rInner = r_inner_deg * scale;
+                const rOuter = r_outer_deg * scale;
+                const alpha = fidelityAlpha(r_center_deg);
+
+                if (alpha <= 0 && r_center_deg < FOVEA_DEG) continue;
+
+                // Draw each sector
+                for (let s = 0; s < n_spokes; s++) {
+                    const a0 = s * spoke_width;
+                    const a1 = (s + 1) * spoke_width;
+
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, Math.max(rInner, 0), a0, a1);
+                    ctx.arc(cx, cy, rOuter, a1, a0, true);
+                    ctx.closePath();
+
+                    const fillAlpha = alpha > 0 ? alpha : 0.02;
+                    ctx.fillStyle = `rgba(100, 160, 200, ${fillAlpha})`;
+                    ctx.fill();
+
+                    ctx.strokeStyle = `rgba(100, 160, 200, ${fillAlpha * 0.6})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                }
+            }
+
+            // Fovea circle
+            ctx.beginPath();
+            ctx.arc(cx, cy, FOVEA_DEG * scale, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Render both
+        const rect = setupCanvas('rectGrid');
+        const iso = setupCanvas('isoGrid');
+        drawRectGrid(rect);
+        drawIsoGrid(iso);
+
+        // Redraw on resize
+        window.addEventListener('resize', () => {
+            const r = setupCanvas('rectGrid');
+            const i = setupCanvas('isoGrid');
+            drawRectGrid(r);
+            drawIsoGrid(i);
+        });
+    });
+    </script>
+</body>
+</html>

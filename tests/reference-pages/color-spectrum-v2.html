@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reference: Color Spectrum (Desaturation Diagnostic)</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            overflow: hidden;
+            background: #000;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        .spectrum-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- Full-width hue gradient strip --- */
+        .hue-strip {
+            flex: 1;
+            position: relative;
+        }
+
+        /* Continuous HSL hue gradient at full saturation */
+        .hue-gradient {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to right,
+                hsl(0, 100%, 50%),      /* Red */
+                hsl(30, 100%, 50%),     /* Orange */
+                hsl(60, 100%, 50%),     /* Yellow */
+                hsl(90, 100%, 50%),     /* Yellow-green */
+                hsl(120, 100%, 50%),    /* Green */
+                hsl(150, 100%, 50%),    /* Cyan-green */
+                hsl(180, 100%, 50%),    /* Cyan (rod peak ~505nm) */
+                hsl(210, 100%, 50%),    /* Blue-cyan */
+                hsl(240, 100%, 50%),    /* Blue */
+                hsl(270, 100%, 50%),    /* Violet */
+                hsl(300, 100%, 50%),    /* Magenta */
+                hsl(330, 100%, 50%),    /* Pink */
+                hsl(360, 100%, 50%)     /* Red (wrap) */
+            );
+        }
+
+        /* --- Labeled color patches row --- */
+        .patches-row {
+            height: 80px;
+            display: flex;
+            width: 100%;
+        }
+
+        .patch {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(0,0,0,0.7);
+            text-shadow: 0 0 4px rgba(255,255,255,0.5);
+            border-right: 1px solid rgba(0,0,0,0.15);
+        }
+        .patch:last-child { border-right: none; }
+
+        /* Dark text on bright patches, light text on dark patches */
+        .patch.dark-text { color: rgba(0,0,0,0.8); }
+        .patch.light-text { color: rgba(255,255,255,0.9); text-shadow: 0 0 4px rgba(0,0,0,0.5); }
+
+        /* --- Brightness reference rows (same hues at different L*) --- */
+        .brightness-row {
+            height: 60px;
+            display: flex;
+            width: 100%;
+        }
+        .brightness-row .patch {
+            font-size: 10px;
+        }
+
+        /* --- Gray ramp for achromatic reference --- */
+        .gray-ramp {
+            height: 40px;
+            background: linear-gradient(to right, #000, #fff);
+        }
+
+        /* --- Radial scatter: patches at varying eccentricities and sizes --- */
+        /* Tests Gegenfurtner (2009): large patches preserve color identity in periphery */
+        .radial-field {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: transparent;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 50;
+        }
+        .radial-field .rf-patch {
+            position: absolute;
+            border-radius: 2px;
+        }
+        .radial-field .rf-ring-label {
+            position: absolute;
+            font-size: 9px;
+            color: rgba(255,255,255,0.25);
+            font-family: monospace;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        .radial-field .rf-size-legend {
+            position: absolute;
+            bottom: 6px;
+            left: 8px;
+            font-size: 9px;
+            color: #555;
+            font-family: monospace;
+        }
+
+        /* --- Rod sensitivity curve overlay --- */
+        .rod-curve {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* Fixation cross */
+        .fixation {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 2px;
+            height: 24px;
+            background: white;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            mix-blend-mode: difference;
+        }
+        .fixation::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 24px;
+            height: 2px;
+            background: white;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Wavelength labels */
+        .wavelength-labels {
+            height: 24px;
+            display: flex;
+            width: 100%;
+            background: #111;
+        }
+        .wavelength-labels span {
+            flex: 1;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+            line-height: 24px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="fixation"></div>
+    <div class="spectrum-container">
+        <!-- Approximate wavelength labels -->
+        <div class="wavelength-labels">
+            <span>700nm</span><span>620</span><span>590</span><span>570</span>
+            <span>530</span><span>510</span><span>505nm ★</span><span>480</span>
+            <span>450</span><span>420</span><span>380nm</span>
+        </div>
+
+        <!-- Full-saturation hue gradient (main diagnostic strip) -->
+        <div class="hue-strip">
+            <div class="hue-gradient"></div>
+            <!-- Rod sensitivity curve: peaks at ~505nm (cyan), drawn as SVG -->
+            <svg class="rod-curve" viewBox="0 0 1000 200" preserveAspectRatio="none">
+                <!-- Approximate scotopic luminosity (rod) curve mapped to hue position -->
+                <!-- Peak at ~505nm ≈ 54% across from red end (hue ~180°) -->
+                <polyline fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2"
+                    points="0,195 77,190 154,175 231,155 308,130 385,100 462,60 500,45 538,50 577,65 615,90 692,140 769,170 846,190 923,195 1000,198" />
+                <text x="500" y="35" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="14" font-family="system-ui">
+                    rod sensitivity (V')
+                </text>
+            </svg>
+        </div>
+
+        <!-- Named color patches at full saturation -->
+        <div class="patches-row">
+            <div class="patch dark-text" style="background: hsl(0, 100%, 50%)">Red<br>0°</div>
+            <div class="patch dark-text" style="background: hsl(30, 100%, 50%)">Orange<br>30°</div>
+            <div class="patch dark-text" style="background: hsl(60, 100%, 50%)">Yellow<br>60°</div>
+            <div class="patch dark-text" style="background: hsl(120, 100%, 50%)">Green<br>120°</div>
+            <div class="patch dark-text" style="background: hsl(180, 100%, 50%)">Cyan<br>180°</div>
+            <div class="patch light-text" style="background: hsl(210, 100%, 40%)">Blue-Cyan<br>210°</div>
+            <div class="patch light-text" style="background: hsl(240, 100%, 35%)">Blue<br>240°</div>
+            <div class="patch light-text" style="background: hsl(270, 100%, 35%)">Violet<br>270°</div>
+            <div class="patch dark-text" style="background: hsl(300, 100%, 50%)">Magenta<br>300°</div>
+        </div>
+
+        <!-- Same hues at 75% lightness (tint) — tests desaturation on lighter colors -->
+        <div class="brightness-row">
+            <div class="patch dark-text" style="background: hsl(0, 100%, 75%)">Tint</div>
+            <div class="patch dark-text" style="background: hsl(30, 100%, 75%)"></div>
+            <div class="patch dark-text" style="background: hsl(60, 100%, 75%)"></div>
+            <div class="patch dark-text" style="background: hsl(120, 100%, 75%)"></div>
+            <div class="patch dark-text" style="background: hsl(180, 100%, 75%)"></div>
+            <div class="patch dark-text" style="background: hsl(210, 100%, 75%)"></div>
+            <div class="patch dark-text" style="background: hsl(240, 100%, 75%)"></div>
+            <div class="patch dark-text" style="background: hsl(270, 100%, 75%)"></div>
+            <div class="patch dark-text" style="background: hsl(300, 100%, 75%)"></div>
+        </div>
+
+        <!-- Same hues at 25% lightness (shade) — tests desaturation on darker colors -->
+        <div class="brightness-row">
+            <div class="patch light-text" style="background: hsl(0, 100%, 25%)">Shade</div>
+            <div class="patch light-text" style="background: hsl(30, 100%, 25%)"></div>
+            <div class="patch light-text" style="background: hsl(60, 100%, 25%)"></div>
+            <div class="patch light-text" style="background: hsl(120, 100%, 25%)"></div>
+            <div class="patch light-text" style="background: hsl(180, 100%, 25%)"></div>
+            <div class="patch light-text" style="background: hsl(210, 100%, 25%)"></div>
+            <div class="patch light-text" style="background: hsl(240, 100%, 25%)"></div>
+            <div class="patch light-text" style="background: hsl(270, 100%, 25%)"></div>
+            <div class="patch light-text" style="background: hsl(300, 100%, 25%)"></div>
+        </div>
+
+        <!-- Achromatic gray ramp — reference for pure luminance (no hue to lose) -->
+        <div class="gray-ramp"></div>
+
+        <!-- Opponent channel diagnostic: isolated R-G and B-Y pairs -->
+        <div class="patches-row" style="height: 60px;">
+            <div class="patch dark-text" style="background: #ff0000">R</div>
+            <div class="patch dark-text" style="background: #00ff00">G</div>
+            <div class="patch dark-text" style="background: linear-gradient(to right, #ff0000, #00ff00)">R&rarr;G</div>
+            <div class="patch" style="background: #888"></div>
+            <div class="patch light-text" style="background: #0000ff">B</div>
+            <div class="patch dark-text" style="background: #ffff00">Y</div>
+            <div class="patch dark-text" style="background: linear-gradient(to right, #0000ff, #ffff00)">B&rarr;Y</div>
+            <div class="patch" style="background: #888"></div>
+            <div class="patch dark-text" style="background: #00ffff">Cyan &#9733; 505nm</div>
+        </div>
+    </div>
+
+    <!-- Radial scatter overlaid on viewport, centered on fixation cross -->
+    <div class="radial-field" id="radialField"></div>
+    <script>
+        (function() {
+            const field = document.getElementById('radialField');
+            // Eccentricity rings (px from center of this container)
+            const rings = [
+                { r: 80,  label: '~3°' },
+                { r: 170, label: '~6°' },
+                { r: 290, label: '~10°' },
+                { r: 430, label: '~15°' }
+            ];
+            // Patch sizes (px) — from easily pooled to sub-tile
+            const sizes = [64, 32, 16, 8];
+            // Hues: 3 RG-channel colors, 3 BY-channel colors
+            const hues = [
+                { h: 0,   s: 100, l: 50,  ch: 'RG', name: 'R' },
+                { h: 120, s: 100, l: 45,  ch: 'RG', name: 'G' },
+                { h: 300, s: 100, l: 50,  ch: 'RG', name: 'M' },
+                { h: 240, s: 100, l: 50,  ch: 'BY', name: 'B' },
+                { h: 60,  s: 100, l: 50,  ch: 'BY', name: 'Y' },
+                { h: 180, s: 100, l: 50,  ch: 'BY', name: 'C' }
+            ];
+            // Center matches the fixation cross (viewport center)
+            const cx = window.innerWidth / 2;
+            const cy = window.innerHeight / 2;
+
+            // Place patches: each ring gets all sizes, distributed angularly
+            // 6 hues × 4 sizes = 24 patches per ring, spaced 15° apart
+            rings.forEach((ring, ri) => {
+                // Ring label
+                const lbl = document.createElement('div');
+                lbl.className = 'rf-ring-label';
+                lbl.textContent = ring.label;
+                lbl.style.left = cx + 'px';
+                lbl.style.top = (cy - ring.r - 12) + 'px';
+                field.appendChild(lbl);
+
+                hues.forEach((hue, hi) => {
+                    sizes.forEach((sz, si) => {
+                        // Angular position: group by hue, offset by size
+                        const baseAngle = (hi / hues.length) * 360;
+                        const sizeOffset = (si - 1.5) * (360 / (hues.length * sizes.length));
+                        const angle = (baseAngle + sizeOffset) * Math.PI / 180;
+
+                        const x = cx + Math.cos(angle) * ring.r - sz / 2;
+                        const y = cy + Math.sin(angle) * ring.r - sz / 2;
+
+                        const patch = document.createElement('div');
+                        patch.className = 'rf-patch';
+                        patch.style.width = sz + 'px';
+                        patch.style.height = sz + 'px';
+                        patch.style.left = x + 'px';
+                        patch.style.top = y + 'px';
+                        patch.style.background = `hsl(${hue.h}, ${hue.s}%, ${hue.l}%)`;
+                        patch.title = `${hue.name} ${sz}px ${ring.label} (${hue.ch})`;
+                        field.appendChild(patch);
+                    });
+                });
+            });
+
+            // Size legend
+            const legend = document.createElement('div');
+            legend.className = 'rf-size-legend';
+            legend.textContent = 'Sizes: 64 · 32 · 16 · 8px | RG: R G M | BY: B Y C';
+            field.appendChild(legend);
+        })();
+        </script>
+</body>
+
+</html>

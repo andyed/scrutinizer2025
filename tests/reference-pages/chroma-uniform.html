@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reference: Chromatically Uniform Stimulus</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            overflow: hidden;
+            /* Default to gray; JS overrides based on ?color= parameter */
+            background: #808080;
+        }
+
+        /* Fixation cross — same pattern as color-spectrum.html */
+        .fixation {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 2px;
+            height: 24px;
+            background: white;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            mix-blend-mode: difference;
+        }
+        .fixation::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 24px;
+            height: 2px;
+            background: white;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Tiny label in bottom-right corner for identification in captures */
+        .label {
+            position: fixed;
+            bottom: 8px;
+            right: 12px;
+            font: 10px/1 monospace;
+            color: white;
+            mix-blend-mode: difference;
+            z-index: 100;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="fixation"></div>
+    <div class="label" id="label"></div>
+
+    <script>
+        // Color definitions — sRGB values chosen to maximize one Oklab opponent
+        // channel while zeroing the other. Computed by brute-force gamut search.
+        //
+        //   RG: #fd0387  Oklab a=0.2604, b≈0.0000  (|a|/|b| > 260:1)
+        //   BY: #3000ff  Oklab a≈0.0001, b=-0.3047 (|b|/|a| > 300:1)
+        //   gray: #808080  zero chroma control
+        //
+        const COLORS = {
+            rg:   { hex: '#fd0387', desc: 'RG isolate (Oklab a-axis)' },
+            by:   { hex: '#3000ff', desc: 'BY isolate (Oklab b-axis)' },
+            gray: { hex: '#808080', desc: 'Achromatic control' }
+        };
+
+        const params = new URLSearchParams(window.location.search);
+        const key = (params.get('color') || 'gray').toLowerCase();
+        const color = COLORS[key] || COLORS.gray;
+
+        document.body.style.background = color.hex;
+        document.getElementById('label').textContent = `${key}: ${color.hex}`;
+    </script>
+</body>
+
+</html>

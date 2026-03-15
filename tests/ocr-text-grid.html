@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Peripheral Degradation Test Grid</title>
+    <style>
+        /* Dense text grid designed for OCR measurement of foveal simulation.
+           Uniform text at every position gives clean eccentricity signal —
+           any legibility difference must come from the shader, not the content. */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            background: #fff;
+            color: #111;
+            overflow: hidden;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            padding: 12px;
+            width: 100vw;
+            height: 100vh;
+        }
+        .cell {
+            padding: 6px;
+            border: 1px solid #ddd;
+            font-size: 12px;
+            overflow: hidden;
+        }
+        .cell .label {
+            font-weight: bold;
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 2px;
+        }
+        /* Alternating background for texture contrast */
+        .cell:nth-child(even) { background: #f8f8f8; }
+
+        /* Center crosshair — marks fixation point for test alignment */
+        .crosshair {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px; height: 20px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .crosshair::before, .crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 0, 0, 0.3);
+        }
+        .crosshair::before { top: 0; left: 50%; width: 1px; height: 100%; transform: translateX(-50%); }
+        .crosshair::after { top: 50%; left: 0; width: 100%; height: 1px; transform: translateY(-50%); }
+    </style>
+</head>
+<body>
+    <div class="crosshair"></div>
+    <div class="grid" id="grid"></div>
+    <script>
+        // Generate cells with known, OCR-friendly text.
+        // Each cell has a coordinate label + pangram-like content.
+        // Using mixed-case words with common letter shapes that OCR handles well.
+        const phrases = [
+            'The quick brown fox jumps over the lazy dog near the river bank.',
+            'Pack my box with five dozen liquor jugs for the evening party.',
+            'How vexingly quick daft zebras jump over the sleeping dogs.',
+            'The five boxing wizards jump quickly at dawn every morning.',
+            'Sphinx of black quartz judge my vow before the ancient temple.',
+            'Two driven jocks help fax my big quiz answers to professors.',
+            'The jay pig fox and zebra hid quickly in a vast empty warehouse.',
+            'Few quips galvanized the mock jury box during the heated trial.',
+            'Quick wafting zephyrs vex bold Jim as he crosses the bridge.',
+            'Waltz nymph for quick jigs vex Bud and keep the crowd amused.',
+            'Grumpy wizards make toxic brew for the jovial queen and king.',
+            'Jackdaws love my big sphinx of quartz sitting in the garden.',
+        ];
+
+        const grid = document.getElementById('grid');
+        const cols = Math.ceil(window.innerWidth / 188);
+        const rows = Math.ceil(window.innerHeight / 80);
+        const total = cols * rows;
+
+        for (let i = 0; i < total; i++) {
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.innerHTML = `<div class="label">[${row},${col}]</div>${phrases[i % phrases.length]}`;
+            grid.appendChild(cell);
+        }
+    </script>
+</body>
+</html>
