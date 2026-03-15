@@ -88,10 +88,13 @@ function assertClose(actual, expected, tol, label) {
 // ─── Wave 1: Chromatic Decay ────────────────────────────────────────────────
 // STIMULUS DOMAIN: LAB_COLORS
 // Source studies used saturated color patches (Bowers 2025) and low-contrast
-// gratings (Mullen 2002) on neutral gray backgrounds. Screen UI typically uses
-// desaturated palette colors (link blue, text gray) with structured surround —
-// suprathreshold correction (supra_exponent=0.5) partially addresses this gap.
-// Transfer risk: MODERATE — UI colors rarely reach lab saturation levels.
+// gratings (Mullen 2002) on neutral gray backgrounds, filling the test field.
+// Screen UI uses comparably saturated accents (brand colors, error reds, link
+// blues, syntax highlighting) but these are spatially sparse amid achromatic
+// text and whitespace. Suprathreshold correction (supra_exponent=0.5) addresses
+// the threshold→appearance gap; the coverage gap remains.
+// Transfer risk: MODERATE — per-pixel mechanism is correct; aggregate impact
+// differs by chromatic coverage, not peak saturation.
 
 describe('Wave 1: Chromatic decay (Mullen 2002, Hansen 2009, Bowers 2025)', function () {
 

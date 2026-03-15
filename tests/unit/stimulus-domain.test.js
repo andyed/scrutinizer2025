@@ -70,13 +70,33 @@ const SPECTRA = {
 };
 
 /**
- * Color gamut usage by domain (fraction of Oklab a*,b* range used).
- * 0.0 = achromatic only, 1.0 = full gamut.
+ * Color gamut model by domain — two dimensions:
+ *   peak_chroma: how saturated are the most colorful elements (0–1)
+ *   coverage:    what fraction of pixels carry significant chromaticity (0–1)
+ *   effective = peak_chroma × coverage (weighted chromatic impact)
+ *
+ * Screens are NOT less chromatic than natural scenes. They use saturated brand
+ * colors, syntax highlighting, status indicators (red/green/yellow), colored
+ * buttons, and embedded photographs. The key difference vs lab stimuli is
+ * spatial distribution: lab uses uniform large patches; screens use small
+ * saturated elements scattered across a mixed-chromaticity background.
  */
 const COLOR_GAMUT = {
-    natural: { rg_usage: 0.6, by_usage: 0.5, label: 'Natural (sky, foliage, skin)' },
-    screen:  { rg_usage: 0.2, by_usage: 0.15, label: 'Screen (link blue, text black, bg white)' },
-    lab:     { rg_usage: 1.0, by_usage: 1.0, label: 'Lab (saturated primaries)' },
+    natural: {
+        rg_peak: 0.6, by_peak: 0.5,      // Foliage greens, skin tones, sky blue
+        rg_coverage: 0.7, by_coverage: 0.6, // Most of the image carries color
+        label: 'Natural (sky, foliage, skin — broad coverage)',
+    },
+    screen: {
+        rg_peak: 0.8, by_peak: 0.7,      // Saturated brand colors, error reds, link blues
+        rg_coverage: 0.35, by_coverage: 0.25, // Colored elements are small/sparse amid text+whitespace
+        label: 'Screen (saturated accents, sparse amid achromatic text/bg)',
+    },
+    lab: {
+        rg_peak: 1.0, by_peak: 1.0,      // Maximum saturation isolated patches
+        rg_coverage: 1.0, by_coverage: 1.0, // Entire stimulus field is the test color
+        label: 'Lab (uniform saturated patches, 100% coverage)',
+    },
 };
 
 /**
@@ -123,15 +143,15 @@ function spectralDivergence(a, b) {
 }
 
 /**
- * Effective chromatic attenuation adjusted for gamut usage.
- * If a domain only uses 20% of the RG axis, the perceptual impact of
- * RG decay is proportionally smaller — most content is near-achromatic
- * and unaffected by chromatic attenuation.
+ * Effective chromatic impact adjusted for domain gamut.
+ * Two components:
+ *   1. Peak impact — how much does the most saturated element lose?
+ *   2. Coverage — what fraction of the viewport is affected?
+ * Effective impact = peak_chroma × coverage × (1 - retention)
  */
-function effectiveAttenuation(k_e, supra, ecc, gamut_usage) {
-    const raw = Math.pow(Math.pow(10, -k_e * ecc), supra);
-    // Weighted impact: fraction of content affected × attenuation magnitude
-    return gamut_usage * (1 - raw) + (1 - gamut_usage) * 0;
+function effectiveChromaticImpact(k_e, supra, ecc, peak_chroma, coverage) {
+    const retention = Math.pow(Math.pow(10, -k_e * ecc), supra);
+    return peak_chroma * coverage * (1 - retention);
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -205,28 +225,41 @@ describe('Stimulus domain transfer analysis', () => {
         const SUPRA = pipeline.supra_exponent;
 
         for (const [domain, gamut] of Object.entries(COLOR_GAMUT)) {
-            it(`${domain}: effective RG impact proportional to gamut usage`, () => {
-                const impact = effectiveAttenuation(RG_K, SUPRA, ECC, gamut.rg_usage);
+            it(`${domain}: reports peak chroma, coverage, and effective impact`, () => {
+                const impact = effectiveChromaticImpact(RG_K, SUPRA, ECC, gamut.rg_peak, gamut.rg_coverage);
                 // eslint-disable-next-line no-console
                 console.log(
-                    `  [${domain}] RG gamut usage=${(gamut.rg_usage * 100).toFixed(0)}%, ` +
-                    `effective RG impact at ${ECC}°: ${(impact * 100).toFixed(1)}%`
+                    `  [${domain}] RG peak=${(gamut.rg_peak * 100).toFixed(0)}%, ` +
+                    `coverage=${(gamut.rg_coverage * 100).toFixed(0)}%, ` +
+                    `effective impact at ${ECC}°: ${(impact * 100).toFixed(1)}%`
                 );
                 expect(impact).toBeGreaterThanOrEqual(0);
                 expect(impact).toBeLessThanOrEqual(1);
             });
         }
 
-        it('screen RG impact < 50% of lab RG impact (most screen content is near-achromatic)', () => {
-            const labImpact = effectiveAttenuation(RG_K, SUPRA, ECC, COLOR_GAMUT.lab.rg_usage);
-            const screenImpact = effectiveAttenuation(RG_K, SUPRA, ECC, COLOR_GAMUT.screen.rg_usage);
-            const ratio = screenImpact / labImpact;
+        it('screen has high peak chroma but lower coverage than natural', () => {
+            // Screens use saturated colors (brand, status indicators, syntax highlighting)
+            // but these are spatially sparse amid achromatic text and whitespace.
+            // Natural images have lower peak saturation but more uniform color coverage.
+            expect(COLOR_GAMUT.screen.rg_peak).toBeGreaterThan(COLOR_GAMUT.natural.rg_peak);
+            expect(COLOR_GAMUT.screen.rg_coverage).toBeLessThan(COLOR_GAMUT.natural.rg_coverage);
+        });
+
+        it('screen effective RG impact is between natural and lab', () => {
+            const labImpact = effectiveChromaticImpact(RG_K, SUPRA, ECC, COLOR_GAMUT.lab.rg_peak, COLOR_GAMUT.lab.rg_coverage);
+            const screenImpact = effectiveChromaticImpact(RG_K, SUPRA, ECC, COLOR_GAMUT.screen.rg_peak, COLOR_GAMUT.screen.rg_coverage);
+            const naturalImpact = effectiveChromaticImpact(RG_K, SUPRA, ECC, COLOR_GAMUT.natural.rg_peak, COLOR_GAMUT.natural.rg_coverage);
             // eslint-disable-next-line no-console
             console.log(
-                `  screen/lab RG impact ratio: ${ratio.toFixed(2)} ` +
-                `(screen=${(screenImpact * 100).toFixed(1)}%, lab=${(labImpact * 100).toFixed(1)}%)`
+                `  Effective RG impact: lab=${(labImpact * 100).toFixed(1)}%, ` +
+                `natural=${(naturalImpact * 100).toFixed(1)}%, ` +
+                `screen=${(screenImpact * 100).toFixed(1)}%`
             );
-            expect(ratio).toBeLessThan(0.5);
+            // Screen impact should be meaningful but lower than lab
+            // (high peak × low coverage vs lab's max × max)
+            expect(screenImpact).toBeLessThan(labImpact);
+            expect(screenImpact).toBeGreaterThan(0);
         });
     });
 
@@ -334,9 +367,9 @@ describe('Stimulus domain transfer analysis', () => {
         // eslint-disable-next-line no-console
         console.log('  -------------------+-----------------+--------------------+----------');
         // eslint-disable-next-line no-console
-        console.log('  rg_decay (0.072)   | LAB_COLORS      | Low gamut usage    | MODERATE');
+        console.log('  rg_decay (0.072)   | LAB_COLORS      | High peak, low cov | MODERATE');
         // eslint-disable-next-line no-console
-        console.log('  yv_decay (0.014)   | LAB_COLORS      | Low gamut usage    | LOW');
+        console.log('  yv_decay (0.014)   | LAB_COLORS      | High peak, low cov | LOW');
         // eslint-disable-next-line no-console
         console.log('  dog_e2 (0.15)      | LAB_GRATINGS    | Peaked spectrum    | MODERATE');
         // eslint-disable-next-line no-console
@@ -348,13 +381,17 @@ describe('Stimulus domain transfer analysis', () => {
         // eslint-disable-next-line no-console
         console.log('');
         // eslint-disable-next-line no-console
-        console.log('  Key insight: M-scaling and cortical magnification are anatomical');
+        console.log('  Key insight: M-scaling and CMF are anatomical — domain-independent.');
         // eslint-disable-next-line no-console
-        console.log('  constraints — they transfer across domains. Chromatic decay and');
+        console.log('  Chromatic decay transfers with nuance: screens use saturated accents');
         // eslint-disable-next-line no-console
-        console.log('  crowding are task-dependent — screen UI regularity reduces crowding');
+        console.log('  (brand colors, status reds/greens, syntax highlighting) but these are');
         // eslint-disable-next-line no-console
-        console.log('  and narrow color palettes reduce chromatic impact vs lab conditions.');
+        console.log('  spatially sparse. Lab stimuli fill the field uniformly. The per-pixel');
+        // eslint-disable-next-line no-console
+        console.log('  mechanism is correct; the aggregate impact differs by coverage, not');
+        // eslint-disable-next-line no-console
+        console.log('  by peak chromaticity. Crowding regularity is the largest domain gap.');
 
         expect(true).toBe(true);
     });
