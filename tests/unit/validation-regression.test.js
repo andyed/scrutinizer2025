@@ -9,6 +9,17 @@
  *   Wave 2: Rovamo & Virsu 1979 (spatial frequency / M-scaling)
  *   Wave 3: Bouma 1970, Toet & Levi 1992 (crowding geometry)
  *
+ * Stimulus domain tags (see stimulus-domain.test.js for transfer analysis):
+ *   Wave 1: LAB_COLORS — saturated suprathreshold colors on neutral background
+ *   Wave 2: LAB_GRATINGS — horizontal sine-wave gratings (0.25–4 cpd)
+ *   Wave 3: LAB_TEXT — crowded vs isolated letter stimuli
+ *   Scrutinizer deploys on: SCREEN_UI — web pages, mixed content, UI widgets
+ *
+ * Transfer assumptions (Ruth Rosenholtz, 2026 review):
+ *   Lab stimuli establish biological mechanisms; transfer to screen content
+ *   depends on how well screen Fourier statistics match lab conditions.
+ *   See stimulus-domain.test.js for quantitative analysis.
+ *
  * Run: node tests/unit/index.js
  */
 
@@ -75,6 +86,12 @@ function assertClose(actual, expected, tol, label) {
 }
 
 // ─── Wave 1: Chromatic Decay ────────────────────────────────────────────────
+// STIMULUS DOMAIN: LAB_COLORS
+// Source studies used saturated color patches (Bowers 2025) and low-contrast
+// gratings (Mullen 2002) on neutral gray backgrounds. Screen UI typically uses
+// desaturated palette colors (link blue, text gray) with structured surround —
+// suprathreshold correction (supra_exponent=0.5) partially addresses this gap.
+// Transfer risk: MODERATE — UI colors rarely reach lab saturation levels.
 
 describe('Wave 1: Chromatic decay (Mullen 2002, Hansen 2009, Bowers 2025)', function () {
 
@@ -186,6 +203,12 @@ describe('Wave 1: Chromatic decay (Mullen 2002, Hansen 2009, Bowers 2025)', func
 });
 
 // ─── Wave 2: Spatial Frequency / M-Scaling ──────────────────────────────────
+// STIMULUS DOMAIN: LAB_GRATINGS
+// Source study used horizontal sine-wave gratings at controlled contrasts.
+// Screen content has broadband spectra with energy peaks at text spatial
+// frequencies (~3–6 cpd for body text) and flat regions (backgrounds).
+// Natural images follow ~1/f; web UI does NOT — it has sharper spectral peaks.
+// Transfer risk: LOW for M-scaling mechanism, MODERATE for absolute cutoffs.
 
 describe('Wave 2: Spatial frequency ordering (Rovamo & Virsu 1979)', function () {
 
@@ -235,6 +258,13 @@ describe('Wave 2: Spatial frequency ordering (Rovamo & Virsu 1979)', function ()
 });
 
 // ─── Wave 3: Crowding / Density Gate ────────────────────────────────────────
+// STIMULUS DOMAIN: LAB_TEXT
+// Source study used isolated letter targets flanked by distractor letters.
+// Screen UI has structured element grouping (Gestalt proximity, common region)
+// that may reduce effective crowding vs random letter arrays. The density gate
+// (congestion map) partially bridges this gap by measuring local complexity.
+// Transfer risk: MODERATE — Bouma spacing is well-established but UI elements
+// have regularity/structure that isolated letters lack.
 
 describe('Wave 3: Density-gated crowding (Bouma 1970)', function () {
 
