@@ -682,6 +682,27 @@ The `disabled` mode captures from `mainWindow.scrutinizerView` (the content WebC
 
 Analysis scripts in `scripts/analyze-*.js` and `scripts/validate-*.js` compare captured pixels against published psychophysical data. Results land in `tests/validation/results*/`.
 
+### Smoke Test (Quick Pipeline Sanity Check)
+
+Run before any shader or renderer changes to verify the capture pipeline works end-to-end:
+
+```bash
+npm run capture-smoke           # Incremental — skips unchanged shots (<1s)
+npm run capture-smoke -- --force  # Full recapture (~40s)
+```
+
+5 shots across 3 Electron batches covering the critical paths:
+
+| Shot | What it tests |
+|------|---------------|
+| `smoke_dashboard_mode0` | Basic render — does the pipeline produce output? |
+| `smoke_dashboard_mode6` | Mode switch — does switching to Log-Polar MIP work? (triggers variance validation) |
+| `smoke_dashboard_saliency` | Saliency debug — does the saliency map toggle work? |
+| `smoke_article_scrolled` | Scroll — does capturing at scrollY=600 work? |
+| `smoke_article_topleft` | Off-center fixation — does gaze positioning at (0.2, 0.2) work? |
+
+Uses local `file://` reference pages — no network dependency. Output in `tests/smoke-captures/` (gitignored). If all 5 pass, the Electron → WebGL → capture → PNG pipeline is intact.
+
 ### Browser ↔ Figma Golden Compare (Parity Harness)
 - Capture browser goldens and compute SSIM/PSNR against Figma exports:
     ```bash
