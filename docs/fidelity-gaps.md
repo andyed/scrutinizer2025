@@ -38,7 +38,7 @@ Last updated: 2026-03-15
 
 castleCSF uses a single exponential for RG eccentricity decay. Bowers et al. show the real decay is biphasic: steep to ~15-20°, then the rate slows. The pure exponential over-predicted RG loss by 20× at 75°.
 
-**Fix applied**: Piecewise decay with fast rate (k=0.072) below 20° and slow rate (k=0.025) above. Shader: `peripheral.frag:378-383`. Config: `rg_decay_slow`, `rg_knee_deg`.
+**Fix applied**: Piecewise decay with fast rate (k=0.054) below 15° and slow rate (k=0.014) above. Parameters calibrated so THRESHOLD matches Bowers normalized to 5°; supra_exponent then converts to appearance. Shader: `peripheral.frag:378-387`. Config: `rg_decay`, `rg_decay_slow`, `rg_knee_deg`.
 
 ---
 

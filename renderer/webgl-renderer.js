@@ -156,9 +156,9 @@
                     cmf_a: 2.78,
                     cmf_color_sigma: 0.0,
                     chromatic_pooling: false,
-                    rg_decay: 0.072,     // RG fast decay k_e (Bowers 2025: 29% at 15°)
-                    rg_decay_slow: 0.025, // RG slow decay beyond knee (Bowers 2025 biphasic: 4% at 75°)
-                    rg_knee_deg: 20.0,   // RG biphasic transition (Bowers 2025: steep→slow at ~20°)
+                    rg_decay: 0.054,     // RG fast decay k_e (threshold: 29% at 15°/5° baseline, Bowers 2025)
+                    rg_decay_slow: 0.014, // RG slow decay beyond knee (threshold: 4% at 75°, Bowers 2025)
+                    rg_knee_deg: 15.0,   // RG biphasic transition (Bowers 2025: steep→slow at ~15°)
                     rg_freq_decay: 0.003, // RG frequency-dependent decay (suprathreshold spatial summation)
                     yv_decay: 0.014,     // YV decay k_e (Bowers 2025: 79% at 15°)
                     yv_freq_decay: 0.008, // castleCSF k_ef for YV

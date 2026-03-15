@@ -367,7 +367,7 @@ describe('Stimulus domain transfer analysis', () => {
         // eslint-disable-next-line no-console
         console.log('  -------------------+-----------------+--------------------+----------');
         // eslint-disable-next-line no-console
-        console.log('  rg_decay (0.072)   | LAB_COLORS      | High peak, low cov | MODERATE');
+        console.log('  rg_decay (0.054)   | LAB_COLORS      | High peak, low cov | MODERATE');
         // eslint-disable-next-line no-console
         console.log('  yv_decay (0.014)   | LAB_COLORS      | High peak, low cov | LOW');
         // eslint-disable-next-line no-console

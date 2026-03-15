@@ -66,9 +66,9 @@ uniform vec2  u_velocity_dir;          // Directional velocity (px/ms) for readi
 uniform float u_reading_span;          // 0=strict circle, 1=asymmetric envelope (Rayner 1998)
 uniform float u_reading_span_strength; // 0.7=comfort, 1.0=full Rayner asymmetry
 uniform float u_chromatic_pooling;  // 0.0=off (legacy uniform desat), 1.0=on
-uniform float u_rg_decay;           // RG (L-M) fast eccentricity decay k_e (default 0.072, <knee°)
-uniform float u_rg_decay_slow;      // RG slow decay beyond knee (default 0.025, Bowers et al. 2025 biphasic)
-uniform float u_rg_knee_deg;        // RG biphasic transition eccentricity (default 20.0°)
+uniform float u_rg_decay;           // RG (L-M) fast eccentricity decay k_e (default 0.054, threshold-calibrated)
+uniform float u_rg_decay_slow;      // RG slow decay beyond knee (default 0.014, Bowers et al. 2025)
+uniform float u_rg_knee_deg;        // RG biphasic transition eccentricity (default 15.0°)
 uniform float u_rg_freq_decay;      // RG frequency-dependent decay k_ef (default 0.003)
 uniform float u_yv_decay;           // YV S-(L+M) base decay k_e (default 0.014)
 uniform float u_yv_freq_decay;      // YV frequency-dependent decay k_ef (default 0.008)

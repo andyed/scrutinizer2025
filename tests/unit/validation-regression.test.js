@@ -38,8 +38,10 @@ const modes = JSON.parse(fs.readFileSync(modesPath, 'utf8'));
 const mode0 = modes.modes['highkey'];
 const pipeline = mode0.pipeline;
 
-const RG_DECAY      = pipeline.rg_decay;         // 0.072
-const RG_FREQ_DECAY = pipeline.rg_freq_decay;     // 0.003
+const RG_DECAY      = pipeline.rg_decay;           // 0.054 (fast, <knee)
+const RG_DECAY_SLOW = pipeline.rg_decay_slow;      // 0.014 (slow, >knee)
+const RG_KNEE_DEG   = pipeline.rg_knee_deg;        // 15.0
+const RG_FREQ_DECAY = pipeline.rg_freq_decay;      // 0.003
 const YV_DECAY      = pipeline.yv_decay;           // 0.014
 const YV_FREQ_DECAY = pipeline.yv_freq_decay;      // 0.008
 const SUPRA         = pipeline.supra_exponent;     // 0.5
@@ -55,12 +57,20 @@ const bowers = JSON.parse(fs.readFileSync(bowersPath, 'utf8'));
 // ─── Core formulas (mirrors chromatic-attenuation-table.js & shader) ────────
 
 /**
- * Per-channel chromatic attenuation.
- * threshold = 10^(-(k_e + k_ef × freq) × ecc)
+ * Per-channel chromatic attenuation with optional biphasic decay.
+ * Base decay: k_e × min(ecc, knee) + k_slow × max(0, ecc - knee)
+ * Freq term: k_ef × freq × ecc (linear, not biphasic)
+ * threshold = 10^(-(base + freq_term))
  * appearance = threshold^supra
  */
-function attenuation(k_e, k_ef, freq, ecc_deg, supra) {
-    const threshold = Math.pow(10, -(k_e + k_ef * freq) * ecc_deg);
+function attenuation(k_e, k_ef, freq, ecc_deg, supra, k_slow, knee) {
+    let base;
+    if (k_slow != null && knee != null && ecc_deg > knee) {
+        base = k_e * knee + k_slow * (ecc_deg - knee);
+    } else {
+        base = k_e * ecc_deg;
+    }
+    const threshold = Math.pow(10, -(base + k_ef * freq * ecc_deg));
     return Math.pow(threshold, supra);
 }
 
@@ -104,7 +114,7 @@ describe('Wave 1: Chromatic decay (Mullen 2002, Hansen 2009, Bowers 2025)', func
     it('RG retention monotonically decreases with eccentricity', function () {
         let prev = 1.0;
         for (const ecc of ECCS) {
-            const val = attenuation(RG_DECAY, RG_FREQ_DECAY, FREQ, ecc, SUPRA);
+            const val = attenuation(RG_DECAY, RG_FREQ_DECAY, FREQ, ecc, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
             expect(val).toBeLessThanOrEqual(prev + 1e-10);
             prev = val;
         }
@@ -121,7 +131,7 @@ describe('Wave 1: Chromatic decay (Mullen 2002, Hansen 2009, Bowers 2025)', func
 
     it('BY retention >= 1.5× RG at 15° (Mullen & Kingdom 2002)', function () {
         // Validation report: blue=73.5% / red=43.1% = 1.70×
-        const rg = attenuation(RG_DECAY, RG_FREQ_DECAY, FREQ, 15, SUPRA);
+        const rg = attenuation(RG_DECAY, RG_FREQ_DECAY, FREQ, 15, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
         const by = attenuation(YV_DECAY, YV_FREQ_DECAY, FREQ, 15, SUPRA);
         const ratio = by / rg;
         expect(ratio).toBeGreaterThanOrEqual(1.5);
@@ -130,7 +140,7 @@ describe('Wave 1: Chromatic decay (Mullen 2002, Hansen 2009, Bowers 2025)', func
     it('BY always ranks above RG at every eccentricity', function () {
         // Validation report: 20/20 correct (100%)
         for (const ecc of ECCS) {
-            const rg = attenuation(RG_DECAY, RG_FREQ_DECAY, FREQ, ecc, SUPRA);
+            const rg = attenuation(RG_DECAY, RG_FREQ_DECAY, FREQ, ecc, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
             const by = attenuation(YV_DECAY, YV_FREQ_DECAY, FREQ, ecc, SUPRA);
             expect(by).toBeGreaterThanOrEqual(rg);
         }
@@ -144,7 +154,7 @@ describe('Wave 1: Chromatic decay (Mullen 2002, Hansen 2009, Bowers 2025)', func
         const b_green = 0.11;
         const chroma_orig = Math.sqrt(a_green * a_green + b_green * b_green);
 
-        const rg_atten = attenuation(RG_DECAY, RG_FREQ_DECAY, FREQ, ecc, SUPRA);
+        const rg_atten = attenuation(RG_DECAY, RG_FREQ_DECAY, FREQ, ecc, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
         const by_atten = attenuation(YV_DECAY, YV_FREQ_DECAY, FREQ, ecc, SUPRA);
 
         const chroma_after = Math.sqrt(
@@ -162,11 +172,11 @@ describe('Wave 1: Chromatic decay (Mullen 2002, Hansen 2009, Bowers 2025)', func
         expect(gap_to_red).toBeLessThan(gap_to_blue);
     });
 
-    it('BY/RG ratio within 30% of Bowers et al. 2025 at 15°', function () {
-        // Bowers: BY=79%, RG=29% at 15° → ratio 2.72
-        // Validation report: model=2.15, 21% off. Allow 30% tolerance.
-        const rg = attenuation(RG_DECAY, RG_FREQ_DECAY, FREQ, 15, SUPRA);
-        const by = attenuation(YV_DECAY, YV_FREQ_DECAY, FREQ, 15, SUPRA);
+    it('BY/RG threshold ratio within 30% of Bowers et al. 2025 at 15°', function () {
+        // Bowers: BY=79%, RG=29% at 15° → ratio 2.72 (THRESHOLD, not appearance)
+        // Compare at threshold level (supra=1.0) since Bowers measured thresholds.
+        const rg = attenuation(RG_DECAY, RG_FREQ_DECAY, FREQ, 15, 1.0, RG_DECAY_SLOW, RG_KNEE_DEG);
+        const by = attenuation(YV_DECAY, YV_FREQ_DECAY, FREQ, 15, 1.0);
         const model_ratio = by / rg;
 
         const bowers_rg = bowers.channels.rg.sensitivity_pct[1] / 100;
@@ -177,10 +187,39 @@ describe('Wave 1: Chromatic decay (Mullen 2002, Hansen 2009, Bowers 2025)', func
         expect(pct_off).toBeLessThan(0.30);
     });
 
+    // ── Biphasic RG decay (Bowers et al. 2025) ──
+
+    it('biphasic RG: threshold matches Bowers at 15° and 75° (normalized to 5°)', function () {
+        // Bowers: RG threshold retention = 29% at 15°, 4% at 75° (relative to 5°)
+        function thresholdNorm(ecc) {
+            // threshold = 10^(-base), normalized to 5° baseline
+            const base_ecc = RG_DECAY * Math.min(ecc, RG_KNEE_DEG)
+                           + RG_DECAY_SLOW * Math.max(0, ecc - RG_KNEE_DEG);
+            const base_5   = RG_DECAY * Math.min(5, RG_KNEE_DEG);
+            return Math.pow(10, -(base_ecc - base_5));
+        }
+        assertClose(thresholdNorm(15), 0.29, 0.02, 'RG threshold at 15°');
+        assertClose(thresholdNorm(75), 0.04, 0.01, 'RG threshold at 75°');
+    });
+
+    it('biphasic RG: continuity at knee — no jump in attenuation', function () {
+        const just_below = attenuation(RG_DECAY, RG_FREQ_DECAY, FREQ, RG_KNEE_DEG - 0.01, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
+        const just_above = attenuation(RG_DECAY, RG_FREQ_DECAY, FREQ, RG_KNEE_DEG + 0.01, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
+        // Should be continuous — difference should be tiny
+        expect(Math.abs(just_above - just_below)).toBeLessThan(0.005);
+    });
+
+    it('biphasic RG: far-periphery retention > 1% at 75° (not near-zero)', function () {
+        // Old exponential model gave ~0.2% at 75° — biphasic should give ~4% threshold, ~20% appearance
+        const rg_75 = attenuation(RG_DECAY, RG_FREQ_DECAY, FREQ, 75, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
+        expect(rg_75).toBeGreaterThan(0.01); // Must be > 1%
+        expect(rg_75).toBeLessThan(0.50);    // But not too high
+    });
+
     it('attenuation is always in [0, 1]', function () {
         for (const ecc of [0, 1, 5, 15, 45, 75]) {
             for (const freq of [0.25, 0.5, 1.0, 2.0, 4.0]) {
-                const rg = attenuation(RG_DECAY, RG_FREQ_DECAY, freq, ecc, SUPRA);
+                const rg = attenuation(RG_DECAY, RG_FREQ_DECAY, freq, ecc, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
                 const by = attenuation(YV_DECAY, YV_FREQ_DECAY, freq, ecc, SUPRA);
                 expect(rg).toBeGreaterThanOrEqual(0);
                 expect(rg).toBeLessThanOrEqual(1);
@@ -191,7 +230,7 @@ describe('Wave 1: Chromatic decay (Mullen 2002, Hansen 2009, Bowers 2025)', func
     });
 
     it('fovea (ecc=0) has full retention', function () {
-        const rg = attenuation(RG_DECAY, RG_FREQ_DECAY, 4.0, 0, SUPRA);
+        const rg = attenuation(RG_DECAY, RG_FREQ_DECAY, 4.0, 0, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
         const by = attenuation(YV_DECAY, YV_FREQ_DECAY, 4.0, 0, SUPRA);
         assertClose(rg, 1.0, 1e-10, 'RG at fovea');
         assertClose(by, 1.0, 1e-10, 'BY at fovea');
@@ -199,8 +238,8 @@ describe('Wave 1: Chromatic decay (Mullen 2002, Hansen 2009, Bowers 2025)', func
 
     it('higher frequency decays faster at same eccentricity', function () {
         const ecc = 10;
-        const rg_high = attenuation(RG_DECAY, RG_FREQ_DECAY, 4.0, ecc, SUPRA);
-        const rg_low  = attenuation(RG_DECAY, RG_FREQ_DECAY, 0.5, ecc, SUPRA);
+        const rg_high = attenuation(RG_DECAY, RG_FREQ_DECAY, 4.0, ecc, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
+        const rg_low  = attenuation(RG_DECAY, RG_FREQ_DECAY, 0.5, ecc, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
         expect(rg_low).toBeGreaterThan(rg_high);
     });
 });
@@ -225,7 +264,7 @@ describe('Wave 2: Spatial frequency ordering (Rovamo & Virsu 1979)', function ()
             // Walk from highest freq (most degraded) to lowest (most preserved)
             for (let i = 0; i < BANDS.length; i++) {
                 const freq = BANDS[i];
-                const retention = attenuation(RG_DECAY, RG_FREQ_DECAY, freq, ecc, SUPRA);
+                const retention = attenuation(RG_DECAY, RG_FREQ_DECAY, freq, ecc, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
                 expect(retention).toBeGreaterThanOrEqual(prev_retention - 1e-10);
                 prev_retention = retention;
             }
@@ -237,14 +276,14 @@ describe('Wave 2: Spatial frequency ordering (Rovamo & Virsu 1979)', function ()
         // low frequencies lose signal at high eccentricity. The key invariant
         // is that coarse retains MORE than fine, not that it's fully preserved
         // (MIP pooling separately preserves spatial structure).
-        const coarse = attenuation(RG_DECAY, RG_FREQ_DECAY, 0.25, 15, SUPRA);
-        const fine = attenuation(RG_DECAY, RG_FREQ_DECAY, 4.0, 15, SUPRA);
+        const coarse = attenuation(RG_DECAY, RG_FREQ_DECAY, 0.25, 15, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
+        const fine = attenuation(RG_DECAY, RG_FREQ_DECAY, 4.0, 15, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
         expect(coarse).toBeGreaterThan(fine);
     });
 
     it('fine detail (4+ cpd) decays more than coarse at moderate eccentricity', function () {
         // At 10°, 4cpd RG should show significant loss
-        const retention = attenuation(RG_DECAY, RG_FREQ_DECAY, 4.0, 10, SUPRA);
+        const retention = attenuation(RG_DECAY, RG_FREQ_DECAY, 4.0, 10, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
         expect(retention).toBeLessThan(0.5);
     });
 
@@ -252,7 +291,7 @@ describe('Wave 2: Spatial frequency ordering (Rovamo & Virsu 1979)', function ()
         for (const freq of BANDS) {
             let prev = 1.0;
             for (const ecc of ECCS) {
-                const val = attenuation(RG_DECAY, RG_FREQ_DECAY, freq, ecc, SUPRA);
+                const val = attenuation(RG_DECAY, RG_FREQ_DECAY, freq, ecc, SUPRA, RG_DECAY_SLOW, RG_KNEE_DEG);
                 expect(val).toBeLessThanOrEqual(prev + 1e-10);
                 prev = val;
             }

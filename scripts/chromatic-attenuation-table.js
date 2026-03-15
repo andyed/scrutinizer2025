@@ -37,9 +37,9 @@ const castleMode = allModes.find(m =>
 ) || {};
 const castlePeripheral = castleMode.pipeline || {};
 
-const rg_decay = castlePeripheral.rg_decay ?? 0.072;
-const rg_decay_slow = castlePeripheral.rg_decay_slow ?? 0.025;
-const rg_knee_deg = castlePeripheral.rg_knee_deg ?? 20.0;
+const rg_decay = castlePeripheral.rg_decay ?? 0.054;
+const rg_decay_slow = castlePeripheral.rg_decay_slow ?? 0.014;
+const rg_knee_deg = castlePeripheral.rg_knee_deg ?? 15.0;
 const rg_freq_decay = castlePeripheral.rg_freq_decay ?? 0.003;
 const yv_decay = castlePeripheral.yv_decay ?? 0.014;
 const yv_freq_decay = castlePeripheral.yv_freq_decay ?? 0.008;
