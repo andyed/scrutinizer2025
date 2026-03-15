@@ -1,7 +1,8 @@
 {
-  "source": "Bowers, Tyson & Bhatt (2025). Suprathreshold chromatic sensitivity across the visual field. Vision Research.",
+  "source": "Bowers, N.R., Gegenfurtner, K.R. & Goettker, A. (2025). Chromatic and achromatic contrast sensitivity in the far periphery. Journal of Vision, 25(11):7.",
+  "doi": "10.1167/jov.25.11.7",
   "figure": "Figure 3 — Normalized sensitivity as function of eccentricity",
-  "notes": "Values normalized to 5° baseline (=100%). Suprathreshold measurements at high contrast. Three eccentricities tested: 5°, 15°, 75°.",
+  "notes": "Values normalized to 5° baseline (=100%). THRESHOLD detection sensitivity (CSF), NOT suprathreshold appearance. Stimuli: 15° Gabor gratings. Three eccentricities extracted here: 5°, 15°, 75° (paper tested 5, 15, 45, 60, 75, 90°). RG decay is biphasic (steep to ~15°, then slows); castleCSF exponential over-predicts beyond ~20°.",
   "baseline_deg": 5,
   "eccentricities_deg": [5, 15, 75],
   "channels": {
