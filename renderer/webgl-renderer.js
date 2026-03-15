@@ -156,9 +156,11 @@
                     cmf_a: 2.78,
                     cmf_color_sigma: 0.0,
                     chromatic_pooling: false,
-                    rg_decay: 0.072,     // Suprathreshold RG decay (Bowers 2025: 29% at 15°)
+                    rg_decay: 0.072,     // RG fast decay k_e (Bowers 2025: 29% at 15°)
+                    rg_decay_slow: 0.025, // RG slow decay beyond knee (Bowers 2025 biphasic: 4% at 75°)
+                    rg_knee_deg: 20.0,   // RG biphasic transition (Bowers 2025: steep→slow at ~20°)
                     rg_freq_decay: 0.003, // RG frequency-dependent decay (suprathreshold spatial summation)
-                    yv_decay: 0.014,     // Suprathreshold YV decay (Bowers 2025: 79% at 15°)
+                    yv_decay: 0.014,     // YV decay k_e (Bowers 2025: 79% at 15°)
                     yv_freq_decay: 0.008, // castleCSF k_ef for YV
                     supra_exponent: 0.5, // Threshold→appearance compression (Jiang et al. 2022)
                     show_congestion: 0,  // 0=off, 1=congestion heatmap, 2=saliency vs congestion
@@ -270,6 +272,8 @@
                 // Chromatic pooling uniform lookup
                 this.chromaticPoolingLocation = gl.getUniformLocation(this.program, "u_chromatic_pooling");
                 this.rgDecayLocation = gl.getUniformLocation(this.program, "u_rg_decay");
+                this.rgDecaySlowLocation = gl.getUniformLocation(this.program, "u_rg_decay_slow");
+                this.rgKneeDegLocation = gl.getUniformLocation(this.program, "u_rg_knee_deg");
                 this.rgFreqDecayLocation = gl.getUniformLocation(this.program, "u_rg_freq_decay");
                 this.yvDecayLocation = gl.getUniformLocation(this.program, "u_yv_decay");
                 this.yvFreqDecayLocation = gl.getUniformLocation(this.program, "u_yv_freq_decay");
@@ -814,6 +818,8 @@
                 gl.uniform1f(this.desatFloorLocation, this.config.desat_floor ?? 1.0);
                 gl.uniform1f(this.chromaticPoolingLocation, this.config.chromatic_pooling ? 1.0 : 0.0);
                 gl.uniform1f(this.rgDecayLocation, this.config.rg_decay);
+                gl.uniform1f(this.rgDecaySlowLocation, this.config.rg_decay_slow);
+                gl.uniform1f(this.rgKneeDegLocation, this.config.rg_knee_deg);
                 gl.uniform1f(this.rgFreqDecayLocation, this.config.rg_freq_decay);
                 gl.uniform1f(this.yvDecayLocation, this.config.yv_decay);
                 gl.uniform1f(this.yvFreqDecayLocation, this.config.yv_freq_decay);

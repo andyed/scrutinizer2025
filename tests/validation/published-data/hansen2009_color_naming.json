@@ -1,7 +1,8 @@
 {
-  "source": "Hansen, Pracejus & Gegenfurtner (2009). Color perception in the intermediate periphery of the visual field. Journal of Vision, 9(4), 26.",
+  "source": "Hansen, T., Pracejus, L. & Gegenfurtner, K.R. (2009). Color perception in the intermediate periphery of the visual field. Journal of Vision, 9(4):26.",
+  "doi": "10.1167/9.4.26",
   "figure": "Figure 2 — Color naming accuracy as function of eccentricity",
-  "notes": "Proportion of correct color naming responses for saturated stimuli. Values digitized from published figure, averaged across subjects. 11 hue categories tested; shown here are the 4 relevant to RG/BY validation.",
+  "notes": "Proportion of correct color naming responses (4AFC identification task). THRESHOLD-level forced-choice, NOT suprathreshold appearance or perceived saturation. Values digitized from published figure, averaged across subjects. 11 hue categories tested; shown here are the 4 relevant to RG/BY validation.",
   "eccentricities_deg": [2, 6, 10, 18, 30, 50],
   "hues": {
     "red": {

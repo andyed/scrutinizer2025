@@ -29,7 +29,7 @@ Stimuli are HTML pages captured through Scrutinizer's full rendering path (shade
 
 ## Wave 1: Chromatic Decay
 
-**Published basis**: Mullen & Kingdom (2002) measured differential distributions of red-green and blue-yellow cone opponency across the visual field. Hansen et al. (2009) measured color naming accuracy across the intermediate periphery. Bowers et al. (2025) measured chromatic contrast sensitivity in the periphery.
+**Published basis**: Mullen & Kingdom (2002) measured differential distributions of red-green and blue-yellow cone opponency across the visual field. Hansen et al. (2009) measured color naming accuracy (threshold-level 4AFC identification, not suprathreshold appearance) across the intermediate periphery. Bowers et al. (2025) measured chromatic contrast detection sensitivity in the far periphery.
 
 **Spec**: [wave1_feature_search_validation.md](../docs/specs/wave1_feature_search_validation.md)
 **Stimulus**: [color-search.html](../tests/reference-pages/color-search.html) — colored dot arrays (red, green, blue, yellow targets among gray distractors) at 5 eccentricity rings
@@ -41,7 +41,7 @@ Stimuli are HTML pages captured through Scrutinizer's full rendering path (shade
 - RG channels (red, green) decay ~5x faster than BY channels (blue, yellow) — per Mullen & Kingdom (2002)
 - Green tracks the RG decay curve, not BY — predicted by Oklab's `a`-axis projection
 - Decay ratio matches Mullen & Kingdom and Bowers et al. within 20%
-- Chroma retention correlates with Hansen et al. (2009) color naming accuracy
+- Chroma retention correlates with Hansen et al. (2009) color naming accuracy (threshold identification, not perceived saturation)
 
 ### Results: Tier 1: 7/7 PASS | Tier 2: 3/3 PASS | Tier 3: 1/2
 

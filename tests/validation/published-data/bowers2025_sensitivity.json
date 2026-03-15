@@ -1,22 +1,28 @@
 {
   "source": "Bowers, N.R., Gegenfurtner, K.R. & Goettker, A. (2025). Chromatic and achromatic contrast sensitivity in the far periphery. Journal of Vision, 25(11):7.",
   "doi": "10.1167/jov.25.11.7",
-  "figure": "Figure 3 — Normalized sensitivity as function of eccentricity",
-  "notes": "Values normalized to 5° baseline (=100%). THRESHOLD detection sensitivity (CSF), NOT suprathreshold appearance. Stimuli: 15° Gabor gratings. Three eccentricities extracted here: 5°, 15°, 75° (paper tested 5, 15, 45, 60, 75, 90°). RG decay is biphasic (steep to ~15°, then slows); castleCSF exponential over-predicts beyond ~20°.",
+  "figure": "Figure 5 — Normalized peak sensitivity as function of eccentricity",
+  "notes": "Values normalized to 5° baseline (=100%). THRESHOLD detection sensitivity (CSF), NOT suprathreshold appearance. Stimuli: 15° Gabor gratings, 10 observers per condition (between-subjects). RG decay is biphasic (steep to ~15°, then slows); castleCSF exponential over-predicts beyond ~20°. 90° omitted: chromatic channels at floor, achromatic ~5-7%.",
   "baseline_deg": 5,
-  "eccentricities_deg": [5, 15, 75],
+  "eccentricities_deg": [5, 15, 45, 60, 75],
   "channels": {
     "achromatic": {
       "label": "Luminance (L+M)",
-      "sensitivity_pct": [100, 76, 12]
+      "sensitivity_pct": [100, 76, 33, 20, 12],
+      "sem_pct":         [null, 14, 7, 5, 5],
+      "digitized":       [false, false, true, true, false]
     },
     "rg": {
       "label": "Red-Green (L-M)",
-      "sensitivity_pct": [100, 29, 4]
+      "sensitivity_pct": [100, 29, 14, 8, 4],
+      "sem_pct":         [null, 9, 3, 2, 2],
+      "digitized":       [false, false, true, true, false]
     },
     "by": {
       "label": "Blue-Yellow (S-(L+M))",
-      "sensitivity_pct": [100, 79, 18]
+      "sensitivity_pct": [100, 79, 42, 28, 18],
+      "sem_pct":         [null, 19, 10, 8, 10],
+      "digitized":       [false, false, true, true, false]
     }
   }
 }

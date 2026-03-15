@@ -66,9 +66,11 @@ uniform vec2  u_velocity_dir;          // Directional velocity (px/ms) for readi
 uniform float u_reading_span;          // 0=strict circle, 1=asymmetric envelope (Rayner 1998)
 uniform float u_reading_span_strength; // 0.7=comfort, 1.0=full Rayner asymmetry
 uniform float u_chromatic_pooling;  // 0.0=off (legacy uniform desat), 1.0=on
-uniform float u_rg_decay;           // RG (L-M) eccentricity decay k_e (default 0.072, Bowers et al. 2025 suprathreshold)
+uniform float u_rg_decay;           // RG (L-M) fast eccentricity decay k_e (default 0.072, <knee°)
+uniform float u_rg_decay_slow;      // RG slow decay beyond knee (default 0.025, Bowers et al. 2025 biphasic)
+uniform float u_rg_knee_deg;        // RG biphasic transition eccentricity (default 20.0°)
 uniform float u_rg_freq_decay;      // RG frequency-dependent decay k_ef (default 0.003)
-uniform float u_yv_decay;           // YV S-(L+M) base decay k_e (default 0.014, Bowers et al. 2025 suprathreshold)
+uniform float u_yv_decay;           // YV S-(L+M) base decay k_e (default 0.014)
 uniform float u_yv_freq_decay;      // YV frequency-dependent decay k_ef (default 0.008)
 uniform float u_supra_exponent;     // Threshold→appearance compression (default 0.5; 1.0=raw threshold)
 
@@ -376,9 +378,13 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         const float bandFreq[9] = float[9](5.657, 4.0, 2.828, 2.0, 1.414, 1.0, 0.707, 0.5, 0.354);
 
         // Per-band RG and YV attenuation
+        // RG uses biphasic decay (Bowers, Gegenfurtner & Goettker 2025):
+        // steep to knee (~20°), then slower — castleCSF exponential over-predicts beyond ~20°.
+        float rg_base = u_rg_decay * min(ecc_deg, u_rg_knee_deg)
+                       + u_rg_decay_slow * max(0.0, ecc_deg - u_rg_knee_deg);
         float rg_atten[9], yv_atten[9];
         for (int k = 0; k < 9; k++) {
-            rg_atten[k] = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * bandFreq[k]) * ecc_deg), supra);
+            rg_atten[k] = pow(pow(10.0, -(rg_base + u_rg_freq_decay * bandFreq[k] * ecc_deg)), supra);
             yv_atten[k] = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * bandFreq[k]) * ecc_deg), supra);
         }
 
@@ -1337,7 +1343,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
 
             // Per-channel chromatic decay directly in Oklab — a and b channels
             // ARE the L-M and S-(L+M) opponent axes. No RGB decomposition needed.
-            // Suprathreshold ramps (Shooner, Jiang & Mullen 2022; Hansen et al. 2009):
+            // Suprathreshold ramps (Jiang, Shooner & Mullen 2022; Mullen & Kingdom 2002):
             //   RG (a): foveal specialization, steep early onset, caps at 70%
             //   YV (b): NOT foveal-specific, slow onset, caps at 35%
             // Per-channel caps make the differential visible: red-green boundaries
