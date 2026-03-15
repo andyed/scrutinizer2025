@@ -318,8 +318,8 @@ const html = `<!DOCTYPE html>
 
 <h1>Wave 1: Chromatic Decay Validation</h1>
 <div class="subtitle">
-  rg_decay=${pred.parameters.rg_decay} &middot; yv_decay=${pred.parameters.yv_decay} &middot;
-  supra=${pred.parameters.supra_exponent} &middot;
+  rg_decay=${pred.parameters.rg_decay}/${pred.parameters.rg_decay_slow} (knee=${pred.parameters.rg_knee_deg}&deg;) &middot;
+  yv_decay=${pred.parameters.yv_decay} &middot; supra=${pred.parameters.supra_exponent} &middot;
   fovea=${pred.geometry.fovea_radius_px}px &middot;
   <span>${new Date().toISOString().split('T')[0]}</span>
 </div>
@@ -327,11 +327,10 @@ const html = `<!DOCTYPE html>
 <div class="intro">
   <strong>What this tests:</strong> Scrutinizer's chromatic pooling model predicts that color information
   decays faster than luminance in peripheral vision, with red-green (RG) channels collapsing ~5&times;
-  faster than blue-yellow (BY). These predictions derive from castleCSF parameters (Bowers et al. 2025)
-  applied to Oklab perceptual color space. We validate by rendering colored dot arrays through
-  Scrutinizer's filter, measuring chroma retention at each eccentricity ring, and comparing
-  the RG/BY decay ratio against published psychophysical data from Mullen &amp; Kingdom (2002),
-  Bowers (2025), and Hansen et al. (2009).
+  faster than blue-yellow (BY). RG decay is biphasic: steep to ~15&deg;, then slower (Bowers et al. 2025).
+  We validate by rendering colored dot arrays through Scrutinizer's filter, measuring chroma retention
+  at each eccentricity ring, and comparing the RG/BY decay ratio against published psychophysical data
+  from Mullen &amp; Kingdom (2002), Bowers, Gegenfurtner &amp; Goettker (2025), and Hansen et al. (2009).
 </div>
 
 <!-- Scorecard -->
@@ -396,6 +395,7 @@ ${['red', 'green', 'blue', 'yellow'].map(color => {
 
 <!-- Charts -->
 <div class="charts">
+${buildBowersBiphasicChart()}
 ${buildRetentionChart()}
 ${buildChannelComparisonChart()}
 ${buildPublishedOverlayChart()}
@@ -415,8 +415,8 @@ ${[1, 2, 3].map(t => {
     Green should track the RG curve (Oklab a-axis), not the BY curve — a prediction that distinguishes
     our Oklab-based model from naive hue-based approaches.</p>`,
     3: `<p class="section-desc"><strong>Observation:</strong> Does our chroma retention curve predict real-world color perception tasks?
-    Hansen et al. (2009) measured color naming accuracy across eccentricity. If our model captures the
-    underlying signal, the correlation should be strong (r &gt; 0.8).</p>`,
+    Hansen et al. (2009) measured color naming accuracy (threshold-level 4AFC identification, not appearance)
+    across eccentricity. If our model captures the underlying signal, the correlation should be strong (r &gt; 0.8).</p>`,
   };
   return `<div class="results" style="margin-bottom:16px">
   <h3>Tier ${t}: ${label}</h3>
@@ -579,7 +579,7 @@ function buildPublishedOverlayChart() {
 
   let svg = `<div class="chart-box">
   <h3>Hansen 2009: Naming Accuracy vs Model Retention</h3>
-  <p class="chart-desc">Hansen et al. (2009) measured how accurately people name colors at different eccentricities.
+  <p class="chart-desc">Hansen et al. (2009) measured color naming accuracy (4AFC threshold-level identification, NOT suprathreshold appearance).
   Solid lines show our model's chroma retention; dashed lines show Hansen's naming accuracy.
   If chroma retention predicts naming ability, these curves should correlate (Tier 3 target: r &gt; 0.8).</p>
   <svg width="${c.w}" height="${c.h}" viewBox="0 0 ${c.w} ${c.h}">
@@ -707,6 +707,130 @@ function buildMeasuredVsModelChart() {
   svg += `<text x="${c.iw - 84}" y="22" class="legend">Measured</text>`;
   svg += `<text x="${c.iw - 100}" y="40" class="legend" fill="#666">Note: Mode 0 base desaturation</text>`;
   svg += `<text x="${c.iw - 100}" y="52" class="legend" fill="#666">compresses measured range</text>`;
+
+  svg += `</g></svg></div>`;
+  return svg;
+}
+
+function buildBowersBiphasicChart() {
+  const c = svgChart(640, 340);
+  const xMin = 0, xMax = 80, yMin = 0, yMax = 100;
+
+  let svg = `<div class="chart-box">
+  <h3>Bowers et al. 2025: Biphasic RG Decay (Full Range)</h3>
+  <p class="chart-desc">Threshold sensitivity retention normalized to 5&deg; baseline (Bowers, Gegenfurtner &amp; Goettker 2025, JOV).
+  Open circles: published data (filled=text-reported, hollow=digitized from Figure 5).
+  Solid lines: model prediction with biphasic piecewise decay. Error bars: &plusmn;1 SEM.
+  Dashed vertical: knee at ${pred.parameters.rg_knee_deg || 15}&deg; where RG rate transitions from fast to slow.</p>
+  <svg width="${c.w}" height="${c.h}" viewBox="0 0 ${c.w} ${c.h}">
+  <g transform="translate(${c.margin.left},${c.margin.top})">`;
+
+  // Grid
+  for (let y = 0; y <= 100; y += 20) {
+    const py = scaleY(y, yMin, yMax, c.ih);
+    svg += `<line x1="0" y1="${py}" x2="${c.iw}" y2="${py}" class="grid-line"/>`;
+    svg += `<text x="-8" y="${py + 3}" text-anchor="end" class="axis-label">${y}%</text>`;
+  }
+  for (let x = 0; x <= 80; x += 10) {
+    svg += `<text x="${scaleX(x, xMin, xMax, c.iw)}" y="${c.ih + 16}" text-anchor="middle" class="axis-label">${x}&deg;</text>`;
+  }
+  svg += `<text x="${c.iw / 2}" y="${c.ih + 32}" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text>`;
+
+  // Knee line
+  const kneeEcc = pred.parameters.rg_knee_deg || 15;
+  const kneeX = scaleX(kneeEcc, xMin, xMax, c.iw);
+  svg += `<line x1="${kneeX}" y1="0" x2="${kneeX}" y2="${c.ih}" stroke="#555" stroke-width="1" stroke-dasharray="4 3"/>`;
+  svg += `<text x="${kneeX + 4}" y="12" class="legend" fill="#777">knee</text>`;
+
+  // Model curves (dense sampling)
+  const rg_k = pred.parameters.rg_decay;
+  const rg_ks = pred.parameters.rg_decay_slow;
+  const rg_knee = pred.parameters.rg_knee_deg;
+  const yv_k = pred.parameters.yv_decay;
+  const supra = pred.parameters.supra_exponent;
+
+  function modelThresholdNorm(ecc, k_fast, k_slow, knee) {
+    const base_ecc = k_fast * Math.min(ecc, knee) + (k_slow || k_fast) * Math.max(0, ecc - knee);
+    const base_5 = k_fast * Math.min(5, knee);
+    return Math.pow(10, -(base_ecc - base_5)) * 100;
+  }
+
+  // RG model curve
+  let dRG = '';
+  for (let ecc = 5; ecc <= 80; ecc += 0.5) {
+    const y = modelThresholdNorm(ecc, rg_k, rg_ks, rg_knee);
+    dRG += (dRG ? ' L' : 'M') + `${scaleX(ecc, xMin, xMax, c.iw)},${scaleY(y, yMin, yMax, c.ih)}`;
+  }
+  svg += `<path d="${dRG}" fill="none" stroke="#e06060" stroke-width="2"/>`;
+
+  // BY model curve (single exponential)
+  let dBY = '';
+  for (let ecc = 5; ecc <= 80; ecc += 0.5) {
+    const y = modelThresholdNorm(ecc, yv_k, yv_k, 999);
+    dBY += (dBY ? ' L' : 'M') + `${scaleX(ecc, xMin, xMax, c.iw)},${scaleY(y, yMin, yMax, c.ih)}`;
+  }
+  svg += `<path d="${dBY}" fill="none" stroke="#6080e0" stroke-width="2"/>`;
+
+  // Achromatic model curve (use Bowers achromatic trend)
+  let dAch = '';
+  for (let ecc = 5; ecc <= 80; ecc += 0.5) {
+    // Simple exponential fit to Bowers achromatic: ~76% at 15°, ~12% at 75° (normalized to 5°)
+    const k_ach = -Math.log(0.12) / (75 - 5);  // rough fit
+    const y = Math.exp(-k_ach * (ecc - 5)) * 100;
+    dAch += (dAch ? ' L' : 'M') + `${scaleX(ecc, xMin, xMax, c.iw)},${scaleY(Math.max(y, 0), yMin, yMax, c.ih)}`;
+  }
+  svg += `<path d="${dAch}" fill="none" stroke="#999" stroke-width="1.5" stroke-dasharray="6 3"/>`;
+
+  // Bowers data points with error bars
+  const channels = [
+    { key: 'rg', color: '#e06060', label: 'RG' },
+    { key: 'by', color: '#6080e0', label: 'BY' },
+    { key: 'achromatic', color: '#999', label: 'Ach' },
+  ];
+  for (const ch of channels) {
+    const data = bowers.channels[ch.key];
+    for (let i = 0; i < bowers.eccentricities_deg.length; i++) {
+      const ecc = bowers.eccentricities_deg[i];
+      const val = data.sensitivity_pct[i];
+      const sem = data.sem_pct ? data.sem_pct[i] : null;
+      const digitized = data.digitized ? data.digitized[i] : false;
+      const cx = scaleX(ecc, xMin, xMax, c.iw);
+      const cy = scaleY(val, yMin, yMax, c.ih);
+
+      // Error bar
+      if (sem) {
+        const y1 = scaleY(Math.min(val + sem, 100), yMin, yMax, c.ih);
+        const y2 = scaleY(Math.max(val - sem, 0), yMin, yMax, c.ih);
+        svg += `<line x1="${cx}" y1="${y1}" x2="${cx}" y2="${y2}" stroke="${ch.color}" stroke-width="1.5" opacity="0.5"/>`;
+        svg += `<line x1="${cx-3}" y1="${y1}" x2="${cx+3}" y2="${y1}" stroke="${ch.color}" stroke-width="1.5" opacity="0.5"/>`;
+        svg += `<line x1="${cx-3}" y1="${y2}" x2="${cx+3}" y2="${y2}" stroke="${ch.color}" stroke-width="1.5" opacity="0.5"/>`;
+      }
+
+      // Data point (filled = text-reported, hollow = digitized)
+      if (digitized) {
+        svg += `<circle cx="${cx}" cy="${cy}" r="4" fill="none" stroke="${ch.color}" stroke-width="2"/>`;
+      } else {
+        svg += `<circle cx="${cx}" cy="${cy}" r="4" fill="${ch.color}" stroke="#1a1a2e" stroke-width="1.5"/>`;
+      }
+    }
+  }
+
+  // Legend
+  let ly = 4;
+  svg += `<rect x="${c.iw - 130}" y="${ly - 4}" width="14" height="3" fill="#e06060" rx="1"/>`;
+  svg += `<text x="${c.iw - 112}" y="${ly}" class="legend">RG (L-M)</text>`;
+  ly += 14;
+  svg += `<rect x="${c.iw - 130}" y="${ly - 4}" width="14" height="3" fill="#6080e0" rx="1"/>`;
+  svg += `<text x="${c.iw - 112}" y="${ly}" class="legend">BY (S-(L+M))</text>`;
+  ly += 14;
+  svg += `<line x1="${c.iw - 130}" y1="${ly - 2}" x2="${c.iw - 116}" y2="${ly - 2}" stroke="#999" stroke-width="1.5" stroke-dasharray="4 2"/>`;
+  svg += `<text x="${c.iw - 112}" y="${ly}" class="legend">Achromatic</text>`;
+  ly += 14;
+  svg += `<circle cx="${c.iw - 123}" cy="${ly - 3}" r="3" fill="#999" stroke="#1a1a2e" stroke-width="1"/>`;
+  svg += `<text x="${c.iw - 112}" y="${ly}" class="legend">Bowers (reported)</text>`;
+  ly += 14;
+  svg += `<circle cx="${c.iw - 123}" cy="${ly - 3}" r="3" fill="none" stroke="#999" stroke-width="1.5"/>`;
+  svg += `<text x="${c.iw - 112}" y="${ly}" class="legend">Bowers (digitized)</text>`;
 
   svg += `</g></svg></div>`;
   return svg;

@@ -14,8 +14,8 @@
     margin: 0 auto;
   }
   h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
-  .subtitle { font-size: 13px; color: #aaa; margin-bottom: 24px; }
-  .subtitle span { color: #bbb; }
+  .subtitle { font-size: 13px; color: #888; margin-bottom: 24px; }
+  .subtitle span { color: #aaa; }
 
   /* Scorecard */
   .scorecard {
@@ -34,7 +34,7 @@
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: #aaa;
+    color: #888;
     margin-bottom: 8px;
   }
   .tier-card .score {
@@ -42,20 +42,19 @@
     font-weight: 700;
     margin-bottom: 4px;
   }
-  .tier-card .score .of { font-size: 16px; color: #999; font-weight: 400; }
+  .tier-card .score .of { font-size: 16px; color: #666; font-weight: 400; }
   .tier-card.all-pass { border-color: #2d6a3080; }
   .tier-card.all-pass .score { color: #4ade80; }
   .tier-card.has-fail { border-color: #a0602080; }
   .tier-card.has-fail .score { color: #fbbf24; }
   .tier-card.all-fail { border-color: #dc262680; }
   .tier-card.all-fail .score { color: #f87171; }
-  .tier-label { font-size: 11px; color: #999; }
-  .intro { font-size: 13px; line-height: 1.7; color: #bbb; margin-bottom: 24px; max-width: 800px; }
-  .intro strong { color: #ddd; font-weight: 600; }
-  .section-desc { font-size: 12px; line-height: 1.6; color: #aaa; margin-bottom: 12px; max-width: 720px; }
-  .section-desc em { color: #bba; }
-  .chart-desc { font-size: 11px; line-height: 1.6; color: #999; margin-top: -8px; margin-bottom: 12px; }
-  .chart-desc .badge { vertical-align: 1px; }
+  .tier-label { font-size: 11px; color: #666; }
+  .intro { font-size: 13px; line-height: 1.7; color: #999; margin-bottom: 24px; max-width: 800px; }
+  .intro strong { color: #bbb; font-weight: 600; }
+  .section-desc { font-size: 12px; line-height: 1.6; color: #888; margin-bottom: 12px; max-width: 720px; }
+  .section-desc em { color: #998; }
+  .chart-desc { font-size: 11px; line-height: 1.5; color: #777; margin-top: -8px; margin-bottom: 12px; }
 
   /* Charts */
   .charts {
@@ -77,25 +76,15 @@
     margin-bottom: 12px;
     color: #ccc;
   }
-  .chart-tier {
-    font-size: 10px;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 4px;
-    margin-left: 8px;
-    vertical-align: middle;
-  }
-  .chart-tier.all-pass { background: #166534; color: #4ade80; }
-  .chart-tier.has-fail { background: #7c2d12; color: #fbbf24; }
   svg { display: block; }
-  .axis-label { fill: #bbb !important; font-size: 11px; }
+  .axis-label { fill: #666; font-size: 10px; }
   .axis-line { stroke: #444; stroke-width: 1; }
   .grid-line { stroke: #2a2a44; stroke-width: 1; }
   .data-line { fill: none; stroke-width: 2; }
   .published-line { fill: none; stroke-width: 1.5; stroke-dasharray: 6 3; opacity: 0.5; }
   .data-dot { stroke-width: 2; }
   .meas-dot { stroke-width: 1.5; }
-  .legend { font-size: 10px; fill: #bbb; }
+  .legend { font-size: 10px; fill: #aaa; }
 
   /* Results table */
   .results {
@@ -134,16 +123,16 @@
   .badge.pass { background: #166534; color: #4ade80; }
   .badge.fail { background: #7c2d12; color: #fbbf24; }
   .badge.skip { background: #374151; color: #9ca3af; }
-  .result-text { color: #ccc; }
+  .result-text { color: #bbb; }
 
   /* Footer */
   .footer {
     margin-top: 24px;
     font-size: 11px;
-    color: #888;
+    color: #555;
     text-align: center;
   }
-  .footer a { color: #999; }
+  .footer a { color: #666; }
 
   /* Go flyout */
   .go-wrap {
@@ -166,7 +155,7 @@
     transition: border-color 0.15s, background 0.15s;
   }
   .go-btn:hover { border-color: #666; background: #2a2a50; }
-  .go-btn .arrow { font-size: 11px; color: #999; transition: transform 0.2s; }
+  .go-btn .arrow { font-size: 11px; color: #666; transition: transform 0.2s; }
   .go-wrap:hover .go-btn .arrow,
   .go-wrap:focus-within .go-btn .arrow { transform: rotate(90deg); }
 
@@ -196,14 +185,14 @@
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: #999;
+    color: #666;
     margin-bottom: 12px;
   }
   .flyout-section { margin-bottom: 16px; }
   .flyout-section:last-child { margin-bottom: 0; }
   .flyout-section h4 {
     font-size: 12px;
-    color: #aaa;
+    color: #888;
     margin-bottom: 8px;
     padding-bottom: 4px;
     border-bottom: 1px solid #2a2a44;
@@ -233,40 +222,39 @@
     border-radius: 3px;
     flex-shrink: 0;
   }
-  .stim-mode { color: #999; font-size: 10px; }
+  .stim-mode { color: #666; font-size: 10px; }
 </style>
 </head>
 <body>
 
 <h1>Wave 1: Chromatic Decay Validation</h1>
 <div class="subtitle">
-  rg_decay=0.072 &middot; yv_decay=0.014 &middot;
-  supra=0.5 &middot;
-  fovea=90px &middot;
-  <span>2026-03-07</span>
+  rg_decay=0.054/0.014 (knee=15&deg;) &middot;
+  yv_decay=0.014 &middot; supra=0.5 &middot;
+  fovea=45px &middot;
+  <span>2026-03-15</span>
 </div>
 
 <div class="intro">
   <strong>What this tests:</strong> Scrutinizer's chromatic pooling model predicts that color information
   decays faster than luminance in peripheral vision, with red-green (RG) channels collapsing ~5&times;
-  faster than blue-yellow (BY). These predictions derive from castleCSF parameters (Bowers et al. 2025)
-  applied to Oklab perceptual color space. We validate by rendering colored dot arrays through
-  Scrutinizer's filter, measuring chroma retention at each eccentricity ring, and comparing
-  the RG/BY decay ratio against published psychophysical data from Mullen &amp; Kingdom (2002),
-  Bowers (2025), and Hansen et al. (2009).
+  faster than blue-yellow (BY). RG decay is biphasic: steep to ~15&deg;, then slower (Bowers et al. 2025).
+  We validate by rendering colored dot arrays through Scrutinizer's filter, measuring chroma retention
+  at each eccentricity ring, and comparing the RG/BY decay ratio against published psychophysical data
+  from Mullen &amp; Kingdom (2002), Bowers, Gegenfurtner &amp; Goettker (2025), and Hansen et al. (2009).
 </div>
 
 <!-- Scorecard -->
 <div class="scorecard">
-  <div class="tier-card all-pass">
+  <div class="tier-card has-fail">
     <h3>Tier 1: Must Pass</h3>
-    <div class="score">5 <span class="of">/ 5</span></div>
-    <div class="tier-label"></div>
+    <div class="score">4 <span class="of">/ 5</span></div>
+    <div class="tier-label">(1 skipped)</div>
   </div>
   <div class="tier-card has-fail">
     <h3>Tier 2: Should Pass</h3>
     <div class="score">1 <span class="of">/ 2</span></div>
-    <div class="tier-label"></div>
+    <div class="tier-label">(1 skipped)</div>
   </div>
   <div class="tier-card all-pass">
     <h3>Tier 3: Stretch</h3>
@@ -349,78 +337,39 @@
 <!-- Charts -->
 <div class="charts">
 <div class="chart-box">
-  <h3>Model: Composite Chroma Retention at 24px <span class="chart-tier all-pass">5/5 Tier 1</span></h3>
-  <p class="chart-desc">
-  <strong>Claim:</strong> Peripheral color information decays monotonically with eccentricity, and green tracks the RG channel (Oklab a-axis), not the BY channel<br>
-  <strong>Basis:</strong> castleCSF (Ashraf et al. 2024), Bowers et al. 2025 chromatic decay constants<br>
-  <span class="badge pass">PASS</span> All 4 colors show monotonic decay. Green tracks red, not blue — the Oklab a-axis projection holds.</p>
-  <svg width="560" height="300" viewBox="0 0 560 300">
-  <g transform="translate(64,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text><line x1="0" y1="195.2" x2="472" y2="195.2" class="grid-line"/><text x="-8" y="198.2" text-anchor="end" class="axis-label">20%</text><line x1="0" y1="146.39999999999998" x2="472" y2="146.39999999999998" class="grid-line"/><text x="-8" y="149.39999999999998" text-anchor="end" class="axis-label">40%</text><line x1="0" y1="97.6" x2="472" y2="97.6" class="grid-line"/><text x="-8" y="100.6" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="48.79999999999998" x2="472" y2="48.79999999999998" class="grid-line"/><text x="-8" y="51.79999999999998" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="67.42857142857143" y="260" text-anchor="middle" class="axis-label">2°</text><text x="134.85714285714286" y="260" text-anchor="middle" class="axis-label">4°</text><text x="202.28571428571428" y="260" text-anchor="middle" class="axis-label">6°</text><text x="269.7142857142857" y="260" text-anchor="middle" class="axis-label">8°</text><text x="337.14285714285717" y="260" text-anchor="middle" class="axis-label">10°</text><text x="404.57142857142856" y="260" text-anchor="middle" class="axis-label">12°</text><text x="472" y="260" text-anchor="middle" class="axis-label">14°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><text x="-122" y="-42" text-anchor="middle" transform="rotate(-90)" class="axis-label">Chroma Retention</text><path d="M0,0 L74.8457142857143,37.42959999999999 L149.6914285714286,68.05160000000001 L224.87428571428572,93.08599999999998 L314.55428571428575,117.16879999999999 L419.4057142857143,138.7628" class="data-line" stroke="#e04040"/><circle cx="74.8457142857143" cy="37.42959999999999" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="68.05160000000001" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="93.08599999999998" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="117.16879999999999" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="138.7628" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><path d="M0,0 L74.8457142857143,31.42719999999997 L149.6914285714286,57.12039999999999 L224.87428571428572,78.202 L314.55428571428575,98.6248 L419.4057142857143,117.3396" class="data-line" stroke="#40a040"/><circle cx="74.8457142857143" cy="31.42719999999997" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="57.12039999999999" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="78.202" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="98.6248" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="117.3396" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><path d="M0,0 L74.8457142857143,13.078399999999988 L149.6914285714286,25.44919999999999 L224.87428571428572,37.136799999999994 L314.55428571428575,50.36160000000001 L419.4057142857143,64.73319999999998" class="data-line" stroke="#4060d0"/><circle cx="74.8457142857143" cy="13.078399999999988" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="25.44919999999999" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="37.136799999999994" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="50.36160000000001" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="64.73319999999998" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><path d="M0,0 L74.8457142857143,13.932400000000001 L149.6914285714286,26.888800000000003 L224.87428571428572,38.96679999999998 L314.55428571428575,52.45999999999998 L419.4057142857143,66.9536" class="data-line" stroke="#c0a020"/><circle cx="74.8457142857143" cy="13.932400000000001" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="26.888800000000003" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="38.96679999999998" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="52.45999999999998" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="66.9536" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><rect x="402" y="2" width="12" height="3" fill="#e04040" rx="1"/><text x="418" y="8" class="legend">red</text><rect x="402" y="16" width="12" height="3" fill="#40a040" rx="1"/><text x="418" y="22" class="legend">green</text><rect x="402" y="30" width="12" height="3" fill="#4060d0" rx="1"/><text x="418" y="36" class="legend">blue</text><rect x="402" y="44" width="12" height="3" fill="#c0a020" rx="1"/><text x="418" y="50" class="legend">yellow</text></g></svg></div>
+  <h3>Bowers et al. 2025: Biphasic RG Decay (Full Range)</h3>
+  <p class="chart-desc">Threshold sensitivity retention normalized to 5&deg; baseline (Bowers, Gegenfurtner &amp; Goettker 2025, JOV).
+  Open circles: published data (filled=text-reported, hollow=digitized from Figure 5).
+  Solid lines: model prediction with biphasic piecewise decay. Error bars: &plusmn;1 SEM.
+  Dashed vertical: knee at 15&deg; where RG rate transitions from fast to slow.</p>
+  <svg width="640" height="340" viewBox="0 0 640 340">
+  <g transform="translate(48,20)"><line x1="0" y1="284" x2="572" y2="284" class="grid-line"/><text x="-8" y="287" text-anchor="end" class="axis-label">0%</text><line x1="0" y1="227.2" x2="572" y2="227.2" class="grid-line"/><text x="-8" y="230.2" text-anchor="end" class="axis-label">20%</text><line x1="0" y1="170.39999999999998" x2="572" y2="170.39999999999998" class="grid-line"/><text x="-8" y="173.39999999999998" text-anchor="end" class="axis-label">40%</text><line x1="0" y1="113.6" x2="572" y2="113.6" class="grid-line"/><text x="-8" y="116.6" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="56.79999999999998" x2="572" y2="56.79999999999998" class="grid-line"/><text x="-8" y="59.79999999999998" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="0" x2="572" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text><text x="0" y="300" text-anchor="middle" class="axis-label">0&deg;</text><text x="71.5" y="300" text-anchor="middle" class="axis-label">10&deg;</text><text x="143" y="300" text-anchor="middle" class="axis-label">20&deg;</text><text x="214.5" y="300" text-anchor="middle" class="axis-label">30&deg;</text><text x="286" y="300" text-anchor="middle" class="axis-label">40&deg;</text><text x="357.5" y="300" text-anchor="middle" class="axis-label">50&deg;</text><text x="429" y="300" text-anchor="middle" class="axis-label">60&deg;</text><text x="500.5" y="300" text-anchor="middle" class="axis-label">70&deg;</text><text x="572" y="300" text-anchor="middle" class="axis-label">80&deg;</text><text x="286" y="316" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><line x1="107.25" y1="0" x2="107.25" y2="284" stroke="#555" stroke-width="1" stroke-dasharray="4 3"/><text x="111.25" y="12" class="legend" fill="#777">knee</text><path d="M35.75,0 L39.325,17.118579799642816 L42.9,33.20530828112817 L46.475,48.322382025904005 L50.05,62.5282486113945 L53.625,75.87783258855123 L57.2,88.42274783822558 L60.775,100.2114971274024 L64.35000000000001,111.2896596368441 L67.925,121.70006718518977 L71.5,131.48296983084825 L75.075,140.67619149195792 L78.65,149.3152761860905 L82.225,157.43362545510905 L85.8,165.0626275065112 L89.375,172.2317785705592 L92.95,178.96879694240437 L96.525,185.29973015012953 L100.1,191.24905566305662 L103.675,196.8397755296911 L107.25,202.09350531120438 L110.825,203.4030995922598 L114.4,204.6917549088596 L117.975,205.95980605189192 L121.55,207.20758245930884 L125.125,208.4354083017138 L128.70000000000002,209.6436025665808 L132.275,210.83247914112684 L135.85,212.00234689385942 L139.42499999999998,213.1535097548201 L143,214.2862667945451 L146.575,215.40091230176367 L150.15,216.4977358598535 L153.725,217.57702242207432 L157.3,218.63905238559835 L160.875,219.68410166435712 L164.45,220.71244176072335 L168.025,221.72433983604725 L171.6,222.72005878006428 L175.175,223.69985727919376 L178.75,224.66398988374527 L182.325,225.61270707405038 L185.9,226.54625532553706 L189.475,227.4648771727639 L193.05,228.36881127242987 L196.625,229.25829246537742 L200.2,230.13355183760345 L203.775,230.99481678029537 L207.35,231.84231104890696 L210.925,232.67625482128966 L214.5,233.4968647548946 L218.075,234.30435404305973 L221.65,235.09893247039741 L225.225,235.88080646729588 L228.8,236.6501791635498 L232.375,237.40725044113307 L235.95,238.15221698612777 L239.525,238.88527233982308 L243.1,239.6066069489969 L246.675,240.3164082153938 L250.25,241.01486054441168 L253.825,241.70214539301 L257.40000000000003,242.3784413168521 L260.97499999999997,243.04392401669372 L264.55,243.69876638402977 L268.125,244.34313854601137 L271.7,244.97720790964456 L275.27500000000003,245.60113920528252 L278.84999999999997,246.2150945294222 L282.425,246.81923338681685 L286,247.41371273191498 L289.575,247.99868700963717 L293.15,248.5743081955004 L296.725,249.14072583510125 L300.3,249.69808708296745 L303.875,250.24653674078866 L307.45,250.78621729503567 L311.025,251.31726895397804 L314.6,251.83982968411019 L318.175,252.35403524599485 L321.75,252.86001922953355 L325.325,253.35791308867286 L328.9,253.8478461755562 L332.475,254.32994577412927 L336.05,254.80433713320815 L339.625,255.27114349901888 L343.2,255.73048614721662 L346.775,256.18248441439295 L350.35,256.62725572907925 L353.925,257.0649156422545 L357.5,257.49557785736545 L361.075,257.9193542598663 L364.65,258.33635494628663 L368.225,258.74668825283425 L371.8,259.1504607835408 L375.375,259.54777743795734 L378.95,259.9387414384071 L382.525,260.3234543568024 L386.1,260.70201614103314 L389.675,261.074525140933 L393.25,261.4410781338304 L396.825,261.8017703496914 L400.4,262.1566954958603 L403.975,262.5059457814043 L407.55,262.8496119410699 L411.125,263.1877832588551 L414.7,263.5205475912056 L418.275,263.84799138983976 L421.85,264.1701997242083 L425.425,264.4872563035958 L429,264.7992434988677 L432.575,265.10624236387054 L436.15,265.4083326564894 L439.725,265.70559285936895 L443.3,265.99810020030327 L446.875,266.2859306722993 L450.45,266.5691590533198 L454.025,266.8478589257108 L457.6,267.1221026953177 L461.175,267.39196161029673 L464.75,267.6575057796247 L468.325,267.9188041913136 L471.9,268.1759247303332 L475.475,268.4289341962477 L479.05,268.67789832057036 L482.625,268.92288178383996 L486.2,269.163948232425 L489.775,269.40116029505907 L493.35,269.63457959911153 L496.925,269.8642667865982 L500.5,270.09028152993614 L504.075,270.3126825474464 L507.65,270.53152761860906 L511.225,270.7468735990742 L514.8000000000001,270.9587764354329 L518.375,271.1672911797522 L521.9499999999999,271.3724720038773 L525.525,271.5743722135056 L529.1,271.7730442620354 L532.6750000000001,271.96853976419305 L536.25,272.1609095094425 L539.8249999999999,272.35020347518036 L543.4,272.53647083972004 L546.975,272.7197599950679 L550.5500000000001,272.90011855949575 L554.125,273.07759338991195 L557.6999999999999,273.25223059403453 L561.275,273.42407554237025 L564.85,273.59317288000153 L568.4250000000001,273.75956653818537 L572,273.9232997457664" fill="none" stroke="#e06060" stroke-width="2"/><path d="M35.75,0 L39.325,4.540845963838024 L42.9,9.009088821805221 L46.475,13.405889417282822 L50.05,17.732390033050024 L53.625,21.989714688047286 L57.2,26.178969429395295 L60.775,30.30124261974416 L64.35000000000001,34.35760522002886 L67.925,38.34911106770309 L71.5,42.276797150525056 L75.075,46.14168387596533 L78.65,49.944775336307345 L82.225,53.68705956950919 L85.8,57.369508815894676 L89.375,60.99307977073963 L92.95,64.55871383282053 L96.525,68.06733734898836 L100.1,71.51986185483216 L103.675,74.91718431149496 L107.25,78.26018733870282 L110.825,81.54973944406848 L114.4,84.7866952487282 L117.975,87.97189570937127 L121.55,91.1061683367196 L125.125,94.19032741051345 L128.70000000000002,97.22517419106057 L132.275,100.2114971274024 L135.85,103.1500720621519 L139.42499999999998,106.04166243305676 L143,108.8870194713391 L146.575,111.68688239686449 L150.15,114.44197861019032 L153.725,117.15302388154342 L157.3,119.82072253677606 L160.875,122.44576764034903 L164.45,125.02884117538872 L168.025,127.57061422086542 L171.6,130.07174712593883 L175.175,132.53288968151566 L178.75,134.9546812890646 L182.325,137.33775112673183 L185.9,139.6827183128008 L189.475,141.9901920665381 L193.05,144.26077186646793 L196.625,146.49504760611578 L200.2,148.69359974726194 L203.775,150.85699947074468 L207.35,152.98580882485226 L210.925,155.0805808713423 L214.5,157.14185982912647 L218.075,159.17018121565786 L221.65,161.16607198605752 L225.225,163.13005067001697 L228.8,165.0626275065112 L232.375,166.96430457635822 L235.95,168.835575932659 L239.525,170.67692772915166 L243.1,172.48883834651363 L246.675,174.27177851664436 L250.25,176.02621144496064 L253.825,177.75259293073685 L257.40000000000003,179.45137148552107 L260.97499999999997,181.1229884496576 L264.55,182.76787810694663 L268.125,184.3864677974707 L271.7,185.97917802861684 L275.27500000000003,187.546422584324 L278.84999999999997,189.08860863258357 L282.425,190.60613683122082 L286,192.09940143198557 L289.575,193.56879038297808 L293.15,195.01468542943738 L296.725,196.43746221291832 L300.3,197.8374903688827 L303.875,199.21513362272992 L307.45,200.57074988429252 L311.025,201.90469134082048 L314.6,203.2173045484792 L318.175,204.50893052238408 L321.75,205.77990482519607 L325.325,207.03055765430005 L328.9,208.26121392759 L332.475,209.47219336788186 L336.05,210.6638105859775 L339.625,211.83637516239975 L343.2,212.99019172782135 L346.775,214.12556004220738 L350.35,215.24277507269255 L353.925,216.3421270702132 L357.5,217.42390164491422 L361.075,218.48837984035004 L364.65,219.53583820649945 L368.225,220.5665488716129 L371.8,221.58077961291096 L375.375,222.57879392615263 L378.95,223.560851094091 L382.525,224.52720625383466 L386.1,225.478110463132 L389.675,226.4138107655956 L393.25,227.33455025488382 L396.825,228.2405681378563 L400.4,229.13209979671936 L403.975,230.00937685017828 L407.55,230.87262721361125 L411.125,231.72207515828165 L414.7,232.55794136960327 L418.275,233.38044300447427 L421.85,234.18979374769398 L425.425,234.9862038674782 L429,235.76988027008647 L432.575,236.5410265535759 L436.15,237.29984306069593 L439.725,238.04652693093692 L443.3,238.78127215174678 L446.875,239.50426960892855 L450.45,240.2157071362325 L454.025,240.91576956415483 L457.6,241.60463876795652 L461.175,242.28249371491418 L464.75,242.94951051081568 L468.325,243.60586244571192 L471.9,244.25172003893766 L475.475,244.8872510834119 L479.05,245.51262068923057 L482.625,246.12799132656158 L486.2,246.73352286785465 L489.775,247.32937262937563 L493.35,247.9156954120774 L496.925,248.49264354181676 L500.5,249.06036690892836 L504.075,249.6190130071663 L507.65,250.16872697202254 L511.225,250.7096516184331 L514.8000000000001,251.24192747788098 L518.375,251.76569283490625 L521.9499999999999,252.28108376303206 L525.525,252.7882341601164 L529.1,253.28727578313857 L532.6750000000001,253.77833828242942 L536.25,254.26154923535444 L539.8249999999999,254.73703417945808 L543.4,255.2049166450783 L546.975,255.66531818743948 L550.5500000000001,256.11835841823245 L554.125,256.5641550366893 L557.6999999999999,257.0028238601616 L561.275,257.43447885420954 L564.85,257.85923216220993 L568.4250000000001,258.2771941344911 L572,258.6884733570016" fill="none" stroke="#6080e0" stroke-width="2"/><path d="M35.75,0 L39.325,4.268700263838468 L42.9,8.47323925323144 L46.475,12.614581352859261 L50.05,16.693676452087914 L53.625,20.711460162843764 L57.2,24.66885403421179 L60.775,28.566765763809258 L64.35000000000001,32.4060894059823 L67.925,36.18770557687253 L71.5,39.91248165640215 L75.075,43.58127198722252 L78.65,47.19491807067271 L82.225,50.75424875979243 L85.8,54.26008044943421 L89.375,57.71321726351775 L92.95,61.11445123946976 L96.525,64.46456250989178 L100.1,67.76431948149713 L103.675,71.01447901135847 L107.25,74.21578658050629 L110.825,77.36897646491806 L114.4,80.47477190393707 L117.975,83.53388526616047 L121.55,86.54701821283302 L125.125,89.51486185878571 L128.70000000000002,92.43809693095494 L132.275,95.31739392451911 L135.85,98.1534132566886 L139.42499999999998,100.94680541818383 L143,103.69821112243693 L146.575,106.40826145255028 L150.15,109.07757800604685 L153.725,111.70677303744418 L157.3,114.29644959868588 L160.875,116.84720167746195 L164.45,119.35961433345054 L168.025,121.83426383251131 L171.6,124.27171777886241 L175.175,126.6725352452703 L178.75,129.03726690128278 L182.325,131.36645513953496 L185.9,133.6606342001563 L189.475,135.92033029330804 L193.05,138.1460617198787 L196.625,140.33833899036543 L200.2,142.4976649419686 L203.775,144.62453485392626 L207.35,146.71943656111517 L210.925,148.78285056594424 L214.5,150.8152501485662 L218.075,152.81710147543268 L221.65,154.78886370621757 L225.225,156.73098909913352 L228.8,158.64392311466514 L232.375,160.5281045177433 L235.95,162.3839654783832 L239.525,164.2119316708107 L243.1,166.0124223710977 L246.675,167.78585055333065 L250.25,169.53262298433333 L253.825,171.25314031696598 L257.40000000000003,172.94779718202204 L260.97499999999997,174.61698227874365 L264.55,176.26107846397667 L268.125,177.88046283998543 L271.7,179.47550684094801 L275.27500000000003,181.04657631815093 L278.84999999999997,182.59403162390367 L282.425,184.11822769419177 L286,185.61951413008774 L289.575,187.09823527793793 L293.15,188.55473030834457 L296.725,189.9893332939604 L300.3,191.40237328611425 L303.875,192.79417439028464 L307.45,194.1650558404388 L311.025,195.51533207225512 L314.6,196.84531279524396 L318.175,198.15530306378514 L321.75,199.44560334709763 L325.325,200.7165095981573 L328.9,201.9683133215789 L332.475,203.2013016404778 L336.05,204.41575736232673 L339.625,205.61195904382257 L343.2,206.79018105477826 L346.775,207.95069364105427 L350.35,209.09376298654428 L353.925,210.21965127422908 L357.5,211.32861674631283 L361.075,212.4209137634555 L364.65,213.49679286311488 L368.225,214.55650081701162 L371.8,215.60028068773093 L375.375,216.62837188447304 L378.95,217.6410102179659 L382.525,218.63842795455258 L386.1,219.62085386946563 L389.675,220.5885132993005 L393.25,221.54162819370072 L396.825,222.48041716626574 L400.4,223.4050955446939 L403.975,224.31587542017147 L407.55,225.21296569601964 L411.125,226.09657213561007 L414.7,226.96689740956032 L418.275,227.82414114221996 L421.85,228.6684999574578 L425.425,229.50016752376126 L429,230.3193345986573 L432.575,231.12618907246622 L436.15,231.9209160113976 L439.725,232.70369769999832 L443.3,233.47471368296294 L446.875,234.23414080631522 L450.45,234.982153257971 L454.025,235.718922607691 L457.6,236.4446178464338 L461.175,237.15940542511643 L464.75,237.86344929279304 L468.325,238.5569109342594 L471.9,239.23994940709235 L475.475,239.9127213781324 L479.05,240.5753811594179 L482.625,241.22808074357945 L486.2,241.87096983870182 L489.775,242.5041959026624 L493.35,243.12790417695282 L496.925,243.74223771999323 L500.5,244.34733743994468 L504.075,244.9433421270292 L507.65,245.5303884853637 L511.225,246.10861116431545 L514.8000000000001,246.67814278938616 L518.375,247.23911399263227 L521.9499999999999,247.79165344262728 L525.525,248.3358878739745 L529.1,248.87194211637566 L532.6750000000001,249.39993912326284 L536.25,249.92 L539.8249999999999,250.43224403166062 L543.4,250.9367887103878 L546.975,251.4337497623431 L550.5500000000001,251.92324117425056 L554.125,252.40537521954124 L557.6999999999999,252.8802624841054 L561.275,253.3480118916571 L564.85,253.80873072871788 L568.4250000000001,254.26252466922472 L572,254.70949779876827" fill="none" stroke="#999" stroke-width="1.5" stroke-dasharray="6 3"/><circle cx="35.75" cy="0" r="4" fill="#e06060" stroke="#1a1a2e" stroke-width="1.5"/><line x1="107.25" y1="176.07999999999998" x2="107.25" y2="227.2" stroke="#e06060" stroke-width="1.5" opacity="0.5"/><line x1="104.25" y1="176.07999999999998" x2="110.25" y2="176.07999999999998" stroke="#e06060" stroke-width="1.5" opacity="0.5"/><line x1="104.25" y1="227.2" x2="110.25" y2="227.2" stroke="#e06060" stroke-width="1.5" opacity="0.5"/><circle cx="107.25" cy="201.64" r="4" fill="#e06060" stroke="#1a1a2e" stroke-width="1.5"/><line x1="321.75" y1="235.72" x2="321.75" y2="252.76" stroke="#e06060" stroke-width="1.5" opacity="0.5"/><line x1="318.75" y1="235.72" x2="324.75" y2="235.72" stroke="#e06060" stroke-width="1.5" opacity="0.5"/><line x1="318.75" y1="252.76" x2="324.75" y2="252.76" stroke="#e06060" stroke-width="1.5" opacity="0.5"/><circle cx="321.75" cy="244.24" r="4" fill="none" stroke="#e06060" stroke-width="2"/><line x1="429" y1="255.6" x2="429" y2="266.96" stroke="#e06060" stroke-width="1.5" opacity="0.5"/><line x1="426" y1="255.6" x2="432" y2="255.6" stroke="#e06060" stroke-width="1.5" opacity="0.5"/><line x1="426" y1="266.96" x2="432" y2="266.96" stroke="#e06060" stroke-width="1.5" opacity="0.5"/><circle cx="429" cy="261.28" r="4" fill="none" stroke="#e06060" stroke-width="2"/><line x1="536.25" y1="266.96" x2="536.25" y2="278.32" stroke="#e06060" stroke-width="1.5" opacity="0.5"/><line x1="533.25" y1="266.96" x2="539.25" y2="266.96" stroke="#e06060" stroke-width="1.5" opacity="0.5"/><line x1="533.25" y1="278.32" x2="539.25" y2="278.32" stroke="#e06060" stroke-width="1.5" opacity="0.5"/><circle cx="536.25" cy="272.64" r="4" fill="#e06060" stroke="#1a1a2e" stroke-width="1.5"/><circle cx="35.75" cy="0" r="4" fill="#6080e0" stroke="#1a1a2e" stroke-width="1.5"/><line x1="107.25" y1="5.680000000000007" x2="107.25" y2="113.6" stroke="#6080e0" stroke-width="1.5" opacity="0.5"/><line x1="104.25" y1="5.680000000000007" x2="110.25" y2="5.680000000000007" stroke="#6080e0" stroke-width="1.5" opacity="0.5"/><line x1="104.25" y1="113.6" x2="110.25" y2="113.6" stroke="#6080e0" stroke-width="1.5" opacity="0.5"/><circle cx="107.25" cy="59.639999999999986" r="4" fill="#6080e0" stroke="#1a1a2e" stroke-width="1.5"/><line x1="321.75" y1="136.32" x2="321.75" y2="193.12" stroke="#6080e0" stroke-width="1.5" opacity="0.5"/><line x1="318.75" y1="136.32" x2="324.75" y2="136.32" stroke="#6080e0" stroke-width="1.5" opacity="0.5"/><line x1="318.75" y1="193.12" x2="324.75" y2="193.12" stroke="#6080e0" stroke-width="1.5" opacity="0.5"/><circle cx="321.75" cy="164.72" r="4" fill="none" stroke="#6080e0" stroke-width="2"/><line x1="429" y1="181.76" x2="429" y2="227.2" stroke="#6080e0" stroke-width="1.5" opacity="0.5"/><line x1="426" y1="181.76" x2="432" y2="181.76" stroke="#6080e0" stroke-width="1.5" opacity="0.5"/><line x1="426" y1="227.2" x2="432" y2="227.2" stroke="#6080e0" stroke-width="1.5" opacity="0.5"/><circle cx="429" cy="204.48" r="4" fill="none" stroke="#6080e0" stroke-width="2"/><line x1="536.25" y1="204.48" x2="536.25" y2="261.28" stroke="#6080e0" stroke-width="1.5" opacity="0.5"/><line x1="533.25" y1="204.48" x2="539.25" y2="204.48" stroke="#6080e0" stroke-width="1.5" opacity="0.5"/><line x1="533.25" y1="261.28" x2="539.25" y2="261.28" stroke="#6080e0" stroke-width="1.5" opacity="0.5"/><circle cx="536.25" cy="232.88" r="4" fill="#6080e0" stroke="#1a1a2e" stroke-width="1.5"/><circle cx="35.75" cy="0" r="4" fill="#999" stroke="#1a1a2e" stroke-width="1.5"/><line x1="107.25" y1="28.400000000000006" x2="107.25" y2="107.91999999999999" stroke="#999" stroke-width="1.5" opacity="0.5"/><line x1="104.25" y1="28.400000000000006" x2="110.25" y2="28.400000000000006" stroke="#999" stroke-width="1.5" opacity="0.5"/><line x1="104.25" y1="107.91999999999999" x2="110.25" y2="107.91999999999999" stroke="#999" stroke-width="1.5" opacity="0.5"/><circle cx="107.25" cy="68.16" r="4" fill="#999" stroke="#1a1a2e" stroke-width="1.5"/><line x1="321.75" y1="170.39999999999998" x2="321.75" y2="210.16" stroke="#999" stroke-width="1.5" opacity="0.5"/><line x1="318.75" y1="170.39999999999998" x2="324.75" y2="170.39999999999998" stroke="#999" stroke-width="1.5" opacity="0.5"/><line x1="318.75" y1="210.16" x2="324.75" y2="210.16" stroke="#999" stroke-width="1.5" opacity="0.5"/><circle cx="321.75" cy="190.28" r="4" fill="none" stroke="#999" stroke-width="2"/><line x1="429" y1="213" x2="429" y2="241.4" stroke="#999" stroke-width="1.5" opacity="0.5"/><line x1="426" y1="213" x2="432" y2="213" stroke="#999" stroke-width="1.5" opacity="0.5"/><line x1="426" y1="241.4" x2="432" y2="241.4" stroke="#999" stroke-width="1.5" opacity="0.5"/><circle cx="429" cy="227.2" r="4" fill="none" stroke="#999" stroke-width="2"/><line x1="536.25" y1="235.72" x2="536.25" y2="264.12" stroke="#999" stroke-width="1.5" opacity="0.5"/><line x1="533.25" y1="235.72" x2="539.25" y2="235.72" stroke="#999" stroke-width="1.5" opacity="0.5"/><line x1="533.25" y1="264.12" x2="539.25" y2="264.12" stroke="#999" stroke-width="1.5" opacity="0.5"/><circle cx="536.25" cy="249.92000000000002" r="4" fill="#999" stroke="#1a1a2e" stroke-width="1.5"/><rect x="442" y="0" width="14" height="3" fill="#e06060" rx="1"/><text x="460" y="4" class="legend">RG (L-M)</text><rect x="442" y="14" width="14" height="3" fill="#6080e0" rx="1"/><text x="460" y="18" class="legend">BY (S-(L+M))</text><line x1="442" y1="30" x2="456" y2="30" stroke="#999" stroke-width="1.5" stroke-dasharray="4 2"/><text x="460" y="32" class="legend">Achromatic</text><circle cx="449" cy="43" r="3" fill="#999" stroke="#1a1a2e" stroke-width="1"/><text x="460" y="46" class="legend">Bowers (reported)</text><circle cx="449" cy="57" r="3" fill="none" stroke="#999" stroke-width="1.5"/><text x="460" y="60" class="legend">Bowers (digitized)</text></g></svg></div>
 <div class="chart-box">
-  <h3>Per-Channel Retention: RG vs BY at 24px <span class="chart-tier has-fail">1/2 Tier 2</span></h3>
-  <p class="chart-desc">
-  <strong>Claim:</strong> RG sensitivity decays ~5&times; faster than BY, and the ratio matches published psychophysical data within 20%<br>
-  <strong>Basis:</strong> Mullen &amp; Kingdom 2002 (chromatic sensitivity), Bowers et al. 2025 (discrete at 5°, 15°, 75°)<br>
-  <span class="badge fail">PARTIAL</span> RG collapses ~5&times; faster than BY. Model tracks Mullen &amp; Kingdom (threshold sensitivity) at all eccentricities. Bowers (suprathreshold appearance) disagrees at both 5° (~95-100% retention vs model's ~83%) and 15° (ratio 21% off, threshold 20%). The divergence is threshold vs suprathreshold measurement — the flat supra=0.5 correction under-compensates in the parafovea. See <a href="https://github.com/andyed/scrutinizer2025/blob/main/ROADMAP.md#suprathreshold-correction" style="color:#7db4e0">ROADMAP: Suprathreshold Correction</a>.</p>
-  <svg width="560" height="300" viewBox="0 0 560 300">
-  <g transform="translate(64,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text><line x1="0" y1="195.2" x2="472" y2="195.2" class="grid-line"/><text x="-8" y="198.2" text-anchor="end" class="axis-label">20%</text><line x1="0" y1="146.39999999999998" x2="472" y2="146.39999999999998" class="grid-line"/><text x="-8" y="149.39999999999998" text-anchor="end" class="axis-label">40%</text><line x1="0" y1="97.6" x2="472" y2="97.6" class="grid-line"/><text x="-8" y="100.6" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="48.79999999999998" x2="472" y2="48.79999999999998" class="grid-line"/><text x="-8" y="51.79999999999998" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="67.42857142857143" y="260" text-anchor="middle" class="axis-label">2°</text><text x="134.85714285714286" y="260" text-anchor="middle" class="axis-label">4°</text><text x="202.28571428571428" y="260" text-anchor="middle" class="axis-label">6°</text><text x="269.7142857142857" y="260" text-anchor="middle" class="axis-label">8°</text><text x="337.14285714285717" y="260" text-anchor="middle" class="axis-label">10°</text><text x="404.57142857142856" y="260" text-anchor="middle" class="axis-label">12°</text><text x="472" y="260" text-anchor="middle" class="axis-label">14°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><text x="-122" y="-42" text-anchor="middle" transform="rotate(-90)" class="axis-label">Chroma Retention</text><path d="M0,0 L74.8457142857143,42.50480000000002 L149.6914285714286,77.6164 L224.87428571428572,106.57919999999999 L314.55428571428575,134.7856 L419.4057142857143,160.45440000000002" class="data-line" stroke="#e06060"/><path d="M0,0 L74.8457142857143,13.054000000000002 L149.6914285714286,25.424800000000005 L224.87428571428572,37.11240000000004 L314.55428571428575,50.337200000000024 L419.4057142857143,64.68440000000001" class="data-line" stroke="#6080e0"/><circle cx="166" cy="0" r="5" fill="none" stroke="#e06060" stroke-width="2" stroke-dasharray="2 2"/><circle cx="171" cy="0" r="5" fill="none" stroke="#6080e0" stroke-width="2" stroke-dasharray="2 2"/><circle cx="462" cy="173.2" r="5" fill="none" stroke="#e06060" stroke-width="2" stroke-dasharray="2 2"/><text x="450" y="185" text-anchor="end" class="legend" fill="#e06060">RG 29%</text><circle cx="462" cy="51.2" r="5" fill="none" stroke="#6080e0" stroke-width="2" stroke-dasharray="2 2"/><text x="450" y="44" text-anchor="end" class="legend" fill="#6080e0">BY 79%</text><text x="462" y="200" text-anchor="middle" class="axis-label">15°</text><path d="M0,0 L168.57142857142858,68.32 L337.14285714285717,126.88000000000001" class="published-line" stroke="#e06060"/><path d="M0,0 L168.57142857142858,29.28 L337.14285714285717,63.44" class="published-line" stroke="#6080e0"/><rect x="220" y="2" width="12" height="3" fill="#e06060" rx="1"/><text x="236" y="8" class="legend">Red-Green (model)</text><rect x="220" y="16" width="12" height="3" fill="#6080e0" rx="1"/><text x="236" y="22" class="legend">Blue-Yellow (model)</text><line x1="220" y1="33" x2="232" y2="33" stroke="#999" stroke-width="1.5" stroke-dasharray="4 2"/><text x="236" y="36" class="legend">Mullen &amp; Kingdom</text><circle cx="226" cy="47" r="3" fill="none" stroke="#999" stroke-width="1.5" stroke-dasharray="2 2"/><text x="236" y="50" class="legend">Bowers 2025</text></g></svg></div>
+  <h3>Model: Composite Chroma Retention at 24px</h3>
+  <p class="chart-desc">Predicted chroma retention per color at each eccentricity ring.
+  Red and green decay fastest (RG channel dominates), blue and yellow slower (BY channel).
+  Green tracks the RG curve, not BY — a non-obvious prediction from its Oklab a-axis projection.</p>
+  <svg width="540" height="300" viewBox="0 0 540 300">
+  <g transform="translate(48,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text><line x1="0" y1="195.2" x2="472" y2="195.2" class="grid-line"/><text x="-8" y="198.2" text-anchor="end" class="axis-label">20%</text><line x1="0" y1="146.39999999999998" x2="472" y2="146.39999999999998" class="grid-line"/><text x="-8" y="149.39999999999998" text-anchor="end" class="axis-label">40%</text><line x1="0" y1="97.6" x2="472" y2="97.6" class="grid-line"/><text x="-8" y="100.6" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="48.79999999999998" x2="472" y2="48.79999999999998" class="grid-line"/><text x="-8" y="51.79999999999998" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="67.42857142857143" y="260" text-anchor="middle" class="axis-label">2°</text><text x="134.85714285714286" y="260" text-anchor="middle" class="axis-label">4°</text><text x="202.28571428571428" y="260" text-anchor="middle" class="axis-label">6°</text><text x="269.7142857142857" y="260" text-anchor="middle" class="axis-label">8°</text><text x="337.14285714285717" y="260" text-anchor="middle" class="axis-label">10°</text><text x="404.57142857142856" y="260" text-anchor="middle" class="axis-label">12°</text><text x="472" y="260" text-anchor="middle" class="axis-label">14°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><path d="M0,0 L74.8457142857143,29.646000000000015 L149.6914285714286,55.19279999999998 L224.87428571428572,77.25039999999998 L314.55428571428575,99.7716 L419.4057142857143,121.43880000000001" class="data-line" stroke="#e04040"/><circle cx="74.8457142857143" cy="29.646000000000015" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="55.19279999999998" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="77.25039999999998" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="99.7716" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="121.43880000000001" r="3" fill="#e04040" class="data-dot" stroke="#1a1a2e"/><path d="M0,0 L74.8457142857143,25.620000000000005 L149.6914285714286,47.775199999999984 L224.87428571428572,66.97800000000001 L314.55428571428575,86.7176 L419.4057142857143,105.94480000000001" class="data-line" stroke="#40a040"/><circle cx="74.8457142857143" cy="25.620000000000005" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="47.775199999999984" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="66.97800000000001" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="86.7176" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="105.94480000000001" r="3" fill="#40a040" class="data-dot" stroke="#1a1a2e"/><path d="M0,0 L74.8457142857143,13.078399999999988 L149.6914285714286,25.424800000000005 L224.87428571428572,37.136799999999994 L314.55428571428575,50.36160000000001 L419.4057142857143,64.7088" class="data-line" stroke="#4060d0"/><circle cx="74.8457142857143" cy="13.078399999999988" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="25.424800000000005" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="37.136799999999994" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="50.36160000000001" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="64.7088" r="3" fill="#4060d0" class="data-dot" stroke="#1a1a2e"/><path d="M0,0 L74.8457142857143,13.664000000000016 L149.6914285714286,26.474000000000018 L224.87428571428572,38.50320000000002 L314.55428571428575,51.99640000000002 L419.4057142857143,66.5144" class="data-line" stroke="#c0a020"/><circle cx="74.8457142857143" cy="13.664000000000016" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="149.6914285714286" cy="26.474000000000018" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="224.87428571428572" cy="38.50320000000002" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="314.55428571428575" cy="51.99640000000002" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><circle cx="419.4057142857143" cy="66.5144" r="3" fill="#c0a020" class="data-dot" stroke="#1a1a2e"/><rect x="402" y="2" width="12" height="3" fill="#e04040" rx="1"/><text x="418" y="8" class="legend">red</text><rect x="402" y="16" width="12" height="3" fill="#40a040" rx="1"/><text x="418" y="22" class="legend">green</text><rect x="402" y="30" width="12" height="3" fill="#4060d0" rx="1"/><text x="418" y="36" class="legend">blue</text><rect x="402" y="44" width="12" height="3" fill="#c0a020" rx="1"/><text x="418" y="50" class="legend">yellow</text></g></svg></div>
 <div class="chart-box">
-  <h3>Hansen 2009: Naming Accuracy vs Model Retention <span class="chart-tier all-pass">3/3 Tier 3</span></h3>
-  <p class="chart-desc">
-  <strong>Claim:</strong> Chroma retention predicts real-world color naming ability — if the model captures the underlying signal, decay curves should correlate (r &gt; 0.8)<br>
-  <strong>Basis:</strong> Hansen et al. 2009 (color naming accuracy by eccentricity, 2°–18°)<br>
-  <span class="badge pass">PASS</span> Dual-axis shows strong shape correlation. Red r=1.000, blue r=1.000. BY always ranks above RG (100%).</p>
-  <svg width="620" height="300" viewBox="0 0 620 300">
-  <g transform="translate(64,20)">
-<!-- Left axis grid (Model: 0-100%) -->
-<line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text>
-<line x1="0" y1="195.2" x2="472" y2="195.2" class="grid-line"/><text x="-8" y="198.2" text-anchor="end" class="axis-label">20%</text>
-<line x1="0" y1="146.4" x2="472" y2="146.4" class="grid-line"/><text x="-8" y="149.4" text-anchor="end" class="axis-label">40%</text>
-<line x1="0" y1="97.6" x2="472" y2="97.6" class="grid-line"/><text x="-8" y="100.6" text-anchor="end" class="axis-label">60%</text>
-<line x1="0" y1="48.8" x2="472" y2="48.8" class="grid-line"/><text x="-8" y="51.8" text-anchor="end" class="axis-label">80%</text>
-<line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text>
-<!-- Right axis labels (Hansen: 50-100%) -->
-<line x1="472" y1="0" x2="476" y2="0" stroke="#666"/><text x="480" y="3" text-anchor="start" class="axis-label" style="fill:#c0a0c0 !important">100%</text>
-<line x1="472" y1="48.8" x2="476" y2="48.8" stroke="#666"/><text x="480" y="51.8" text-anchor="start" class="axis-label" style="fill:#c0a0c0 !important">90%</text>
-<line x1="472" y1="97.6" x2="476" y2="97.6" stroke="#666"/><text x="480" y="100.6" text-anchor="start" class="axis-label" style="fill:#c0a0c0 !important">80%</text>
-<line x1="472" y1="146.4" x2="476" y2="146.4" stroke="#666"/><text x="480" y="149.4" text-anchor="start" class="axis-label" style="fill:#c0a0c0 !important">70%</text>
-<line x1="472" y1="195.2" x2="476" y2="195.2" stroke="#666"/><text x="480" y="198.2" text-anchor="start" class="axis-label" style="fill:#c0a0c0 !important">60%</text>
-<line x1="472" y1="244" x2="476" y2="244" stroke="#666"/><text x="480" y="247" text-anchor="start" class="axis-label" style="fill:#c0a0c0 !important">50%</text>
-<!-- X axis -->
-<text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="118" y="260" text-anchor="middle" class="axis-label">5°</text><text x="236" y="260" text-anchor="middle" class="axis-label">10°</text><text x="354" y="260" text-anchor="middle" class="axis-label">15°</text><text x="472" y="260" text-anchor="middle" class="axis-label">20°</text>
-<text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text>
-<!-- Y axis labels -->
-<text x="-122" y="-42" text-anchor="middle" transform="rotate(-90)" class="axis-label">Model Retention</text>
-<text x="-122" y="524" text-anchor="middle" transform="rotate(-90)" class="axis-label" style="fill:#c0a0c0 !important">Naming Accuracy</text>
-<!-- Hansen naming accuracy (right axis, 50-100%) -->
-<path d="M47.2,9.76 L141.6,39.04 L236,107.36 L424.8,234.24" class="published-line" stroke="#e04040"/>
-<circle cx="47.2" cy="9.76" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/>
-<circle cx="141.6" cy="39.04" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/>
-<circle cx="236" cy="107.36" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/>
-<circle cx="424.8" cy="234.24" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/>
-<path d="M47.2,4.88 L141.6,19.52 L236,39.04 L424.8,97.6" class="published-line" stroke="#4060d0"/>
-<circle cx="47.2" cy="4.88" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/>
-<circle cx="141.6" cy="19.52" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/>
-<circle cx="236" cy="39.04" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/>
-<circle cx="424.8" cy="97.6" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/>
-<!-- Model chroma retention (left axis, 0-100%) -->
-<path d="M0,0 L52.39,37.43 L104.78,68.05 L157.41,93.09 L220.19,117.17 L293.58,138.76" class="data-line" stroke="#e04040"/>
-<circle cx="52.39" cy="37.43" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/>
-<circle cx="104.78" cy="68.05" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/>
-<circle cx="157.41" cy="93.09" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/>
-<circle cx="220.19" cy="117.17" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/>
-<circle cx="293.58" cy="138.76" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/>
-<path d="M0,0 L52.39,13.08 L104.78,25.45 L157.41,37.14 L220.19,50.36 L293.58,64.73" class="data-line" stroke="#4060d0"/>
-<circle cx="52.39" cy="13.08" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/>
-<circle cx="104.78" cy="25.45" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/>
-<circle cx="157.41" cy="37.14" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/>
-<circle cx="220.19" cy="50.36" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/>
-<circle cx="293.58" cy="64.73" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/>
-<!-- Legend -->
-<rect x="4" y="2" width="12" height="3" fill="#e04040" rx="1"/><text x="20" y="8" class="legend">Red model (left axis)</text>
-<rect x="4" y="16" width="12" height="3" fill="#4060d0" rx="1"/><text x="20" y="22" class="legend">Blue model (left axis)</text>
-<line x1="4" y1="33" x2="16" y2="33" stroke="#999" stroke-width="1.5" stroke-dasharray="4 2"/><text x="20" y="36" class="legend">Hansen naming (right axis)</text>
-</g></svg></div>
+  <h3>Per-Channel Retention: RG vs BY at 24px</h3>
+  <p class="chart-desc">Isolating the two chromatic channels: RG collapses ~5&times; faster than BY.
+  Dashed lines show Mullen &amp; Kingdom (2002) published sensitivity. Open circles show Bowers (2025).
+  The model tracks published data within the 20% tolerance at matched eccentricities.</p>
+  <svg width="540" height="300" viewBox="0 0 540 300">
+  <g transform="translate(48,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text><line x1="0" y1="195.2" x2="472" y2="195.2" class="grid-line"/><text x="-8" y="198.2" text-anchor="end" class="axis-label">20%</text><line x1="0" y1="146.39999999999998" x2="472" y2="146.39999999999998" class="grid-line"/><text x="-8" y="149.39999999999998" text-anchor="end" class="axis-label">40%</text><line x1="0" y1="97.6" x2="472" y2="97.6" class="grid-line"/><text x="-8" y="100.6" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="48.79999999999998" x2="472" y2="48.79999999999998" class="grid-line"/><text x="-8" y="51.79999999999998" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="67.42857142857143" y="260" text-anchor="middle" class="axis-label">2°</text><text x="134.85714285714286" y="260" text-anchor="middle" class="axis-label">4°</text><text x="202.28571428571428" y="260" text-anchor="middle" class="axis-label">6°</text><text x="269.7142857142857" y="260" text-anchor="middle" class="axis-label">8°</text><text x="337.14285714285717" y="260" text-anchor="middle" class="axis-label">10°</text><text x="404.57142857142856" y="260" text-anchor="middle" class="axis-label">12°</text><text x="472" y="260" text-anchor="middle" class="axis-label">14°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><path d="M0,0 L74.8457142857143,33.01319999999998 L149.6914285714286,61.56119999999996 L224.87428571428572,86.2296 L314.55428571428575,111.4836 L419.4057142857143,135.8836" class="data-line" stroke="#e06060"/><path d="M0,0 L74.8457142857143,13.054000000000002 L149.6914285714286,25.424800000000005 L224.87428571428572,37.11240000000004 L314.55428571428575,50.337200000000024 L419.4057142857143,64.68440000000001" class="data-line" stroke="#6080e0"/><circle cx="168.57142857142858" cy="0" r="4" fill="none" stroke="#e06060" stroke-width="2" stroke-dasharray="2 2"/><circle cx="168.57142857142858" cy="0" r="4" fill="none" stroke="#6080e0" stroke-width="2" stroke-dasharray="2 2"/><path d="M0,0 L168.57142857142858,68.32 L337.14285714285717,126.88000000000001" class="published-line" stroke="#e06060"/><path d="M0,0 L168.57142857142858,29.28 L337.14285714285717,63.44" class="published-line" stroke="#6080e0"/><rect x="362" y="2" width="12" height="3" fill="#e06060" rx="1"/><text x="378" y="8" class="legend">RG (model)</text><rect x="362" y="16" width="12" height="3" fill="#6080e0" rx="1"/><text x="378" y="22" class="legend">BY (model)</text><line x1="362" y1="33" x2="374" y2="33" stroke="#999" stroke-width="1.5" stroke-dasharray="4 2"/><text x="378" y="36" class="legend">Mullen &amp; Kingdom</text><circle cx="368" cy="47" r="3" fill="none" stroke="#999" stroke-width="1.5" stroke-dasharray="2 2"/><text x="378" y="50" class="legend">Bowers 2025</text></g></svg></div>
+<div class="chart-box">
+  <h3>Hansen 2009: Naming Accuracy vs Model Retention</h3>
+  <p class="chart-desc">Hansen et al. (2009) measured color naming accuracy (4AFC threshold-level identification, NOT suprathreshold appearance).
+  Solid lines show our model's chroma retention; dashed lines show Hansen's naming accuracy.
+  If chroma retention predicts naming ability, these curves should correlate (Tier 3 target: r &gt; 0.8).</p>
+  <svg width="540" height="300" viewBox="0 0 540 300">
+  <g transform="translate(48,20)"><line x1="0" y1="244" x2="472" y2="244" class="grid-line"/><text x="-8" y="247" text-anchor="end" class="axis-label">0%</text><line x1="0" y1="195.2" x2="472" y2="195.2" class="grid-line"/><text x="-8" y="198.2" text-anchor="end" class="axis-label">20%</text><line x1="0" y1="146.39999999999998" x2="472" y2="146.39999999999998" class="grid-line"/><text x="-8" y="149.39999999999998" text-anchor="end" class="axis-label">40%</text><line x1="0" y1="97.6" x2="472" y2="97.6" class="grid-line"/><text x="-8" y="100.6" text-anchor="end" class="axis-label">60%</text><line x1="0" y1="48.79999999999998" x2="472" y2="48.79999999999998" class="grid-line"/><text x="-8" y="51.79999999999998" text-anchor="end" class="axis-label">80%</text><line x1="0" y1="0" x2="472" y2="0" class="grid-line"/><text x="-8" y="3" text-anchor="end" class="axis-label">100%</text><text x="0" y="260" text-anchor="middle" class="axis-label">0°</text><text x="118" y="260" text-anchor="middle" class="axis-label">5°</text><text x="236" y="260" text-anchor="middle" class="axis-label">10°</text><text x="354" y="260" text-anchor="middle" class="axis-label">15°</text><text x="472" y="260" text-anchor="middle" class="axis-label">20°</text><text x="236" y="276" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text><path d="M47.2,4.8799999999999955 L141.6,19.519999999999982 L236,53.68000000000001 L424.8,117.11999999999999" class="published-line" stroke="#e04040"/><circle cx="47.2" cy="4.8799999999999955" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/><circle cx="141.6" cy="19.519999999999982" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/><circle cx="236" cy="53.68000000000001" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/><circle cx="424.8" cy="117.11999999999999" r="3.5" fill="none" stroke="#e04040" stroke-width="1.5"/><path d="M47.2,2.4399999999999977 L141.6,9.76000000000002 L236,19.519999999999982 L424.8,48.79999999999998" class="published-line" stroke="#4060d0"/><circle cx="47.2" cy="2.4399999999999977" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/><circle cx="141.6" cy="9.76000000000002" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/><circle cx="236" cy="19.519999999999982" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/><circle cx="424.8" cy="48.79999999999998" r="3.5" fill="none" stroke="#4060d0" stroke-width="1.5"/><path d="M0,0 L52.39200000000001,29.646000000000015 L104.78400000000002,55.19279999999998 L157.412,77.25039999999998 L220.18800000000002,99.7716 L293.584,121.43880000000001" class="data-line" stroke="#e04040"/><circle cx="52.39200000000001" cy="29.646000000000015" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/><circle cx="104.78400000000002" cy="55.19279999999998" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/><circle cx="157.412" cy="77.25039999999998" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/><circle cx="220.18800000000002" cy="99.7716" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/><circle cx="293.584" cy="121.43880000000001" r="3" fill="#e04040" stroke="#1a1a2e" stroke-width="2"/><path d="M0,0 L52.39200000000001,13.078399999999988 L104.78400000000002,25.424800000000005 L157.412,37.136799999999994 L220.18800000000002,50.36160000000001 L293.584,64.7088" class="data-line" stroke="#4060d0"/><circle cx="52.39200000000001" cy="13.078399999999988" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/><circle cx="104.78400000000002" cy="25.424800000000005" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/><circle cx="157.412" cy="37.136799999999994" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/><circle cx="220.18800000000002" cy="50.36160000000001" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/><circle cx="293.584" cy="64.7088" r="3" fill="#4060d0" stroke="#1a1a2e" stroke-width="2"/><rect x="4" y="2" width="12" height="3" fill="#e04040" rx="1"/><text x="20" y="8" class="legend">Red model</text><rect x="4" y="16" width="12" height="3" fill="#4060d0" rx="1"/><text x="20" y="22" class="legend">Blue model</text><line x1="4" y1="33" x2="16" y2="33" stroke="#999" stroke-width="1.5" stroke-dasharray="4 2"/><text x="20" y="36" class="legend">Hansen naming accuracy</text></g></svg></div>
+<div class="chart-box">
+    <h3>Measured vs Model (no screenshots yet)</h3>
+    <svg width="540" height="300" viewBox="0 0 540 300">
+      <text x="270" y="150" text-anchor="middle" fill="#555" font-size="14">Capture screenshots to populate this chart</text>
+    </svg></div>
 </div>
 
 <!-- Detailed results -->
@@ -431,11 +380,11 @@
     of the chromatic pooling model — if these fail, the model is wrong.</p>
   <div class="result-row">
     <span class="badge pass">PASS</span>
-    <span class="result-text">red composite retention monotonically decreases: 84.7% > 72.1% > 61.9% > 52.0% > 43.1%</span>
+    <span class="result-text">red composite retention monotonically decreases: 87.8% > 77.4% > 68.3% > 59.1% > 50.2%</span>
   </div>
   <div class="result-row">
     <span class="badge pass">PASS</span>
-    <span class="result-text">green composite retention monotonically decreases: 87.1% > 76.6% > 68.0% > 59.6% > 51.9%</span>
+    <span class="result-text">green composite retention monotonically decreases: 89.5% > 80.4% > 72.5% > 64.5% > 56.6%</span>
   </div>
   <div class="result-row">
     <span class="badge pass">PASS</span>
@@ -443,11 +392,15 @@
   </div>
   <div class="result-row">
     <span class="badge pass">PASS</span>
-    <span class="result-text">yellow composite retention monotonically decreases: 94.3% > 89.0% > 84.0% > 78.5% > 72.6%</span>
+    <span class="result-text">yellow composite retention monotonically decreases: 94.4% > 89.1% > 84.2% > 78.7% > 72.7%</span>
   </div>
   <div class="result-row">
-    <span class="badge pass">PASS</span>
-    <span class="result-text">BY retention >= 1.5x RG at ring 5: blue=73.5% / red=43.1% = 1.70x</span>
+    <span class="badge fail">FAIL</span>
+    <span class="result-text">BY retention >= 1.5x RG at ring 5: blue=73.5% / red=50.2% = 1.46x</span>
+  </div>
+  <div class="result-row">
+    <span class="badge skip">SKIP</span>
+    <span class="result-text">Rendered measurement agreement — no screenshots captured yet</span>
   </div>
 </div>
 <div class="results" style="margin-bottom:16px">
@@ -457,18 +410,22 @@
     our Oklab-based model from naive hue-based approaches.</p>
   <div class="result-row">
     <span class="badge fail">FAIL</span>
-    <span class="result-text">BY/RG channel ratio vs Bowers at ~15°: model=2.15 (yv/rg retention) vs Bowers=2.72 (21% off, threshold=20%)</span>
+    <span class="result-text">BY/RG channel ratio vs Bowers at ~15°: model=1.66 (yv/rg retention) vs Bowers=2.72 (39% off, threshold=20%)</span>
   </div>
   <div class="result-row">
     <span class="badge pass">PASS</span>
-    <span class="result-text">Green closer to red than blue: green-red gap=8.8pp, green-blue gap=21.6pp (threshold: <15pp and closer to red)</span>
+    <span class="result-text">Green closer to red than blue: green-red gap=6.3pp, green-blue gap=16.9pp (threshold: <15pp and closer to red)</span>
+  </div>
+  <div class="result-row">
+    <span class="badge skip">SKIP</span>
+    <span class="result-text">Rendered vs model agreement — no screenshots captured yet</span>
   </div>
 </div>
 <div class="results" style="margin-bottom:16px">
   <h3>Tier 3: Stretch</h3>
   <p class="section-desc"><strong>Observation:</strong> Does our chroma retention curve predict real-world color perception tasks?
-    Hansen et al. (2009) measured color naming accuracy across eccentricity. If our model captures the
-    underlying signal, the correlation should be strong (r &gt; 0.8).</p>
+    Hansen et al. (2009) measured color naming accuracy (threshold-level 4AFC identification, not appearance)
+    across eccentricity. If our model captures the underlying signal, the correlation should be strong (r &gt; 0.8).</p>
   <div class="result-row">
     <span class="badge pass">PASS</span>
     <span class="result-text">red model retention correlates with Hansen naming accuracy: r=1.000 (threshold: r>0.8)</span>
