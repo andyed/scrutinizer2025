@@ -36,7 +36,13 @@ function loadPredictions(filePath) {
 // ── Load or generate measurements ──
 function loadMeasurements(filePath) {
   if (filePath) return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  return null; // No screenshots available yet
+  // Try to run analyze-color-search.js against existing captures
+  try {
+    const cmd = `node "${path.join(SCRIPTS_DIR, 'analyze-color-search.js')}" --json`;
+    return JSON.parse(execSync(cmd, { encoding: 'utf8', timeout: 60000 }));
+  } catch (e) {
+    return null; // No screenshots available yet
+  }
 }
 
 // ── Load published data ──
