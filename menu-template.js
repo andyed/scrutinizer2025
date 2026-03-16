@@ -247,6 +247,43 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         },
                         { type: 'separator' },
                         {
+                            label: 'Figma (UI Density)',
+                            click: () => {
+                                const win = BrowserWindow.getFocusedWindow();
+                                if (win && win.scrutinizerView) {
+                                    win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/figma.html');
+                                }
+                            }
+                        },
+                        {
+                            label: 'Techmeme (Dense Text)',
+                            click: () => {
+                                const win = BrowserWindow.getFocusedWindow();
+                                if (win && win.scrutinizerView) {
+                                    win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/techmeme.html');
+                                }
+                            }
+                        },
+                        {
+                            label: 'Face Detection Test',
+                            click: () => {
+                                const win = BrowserWindow.getFocusedWindow();
+                                if (win && win.scrutinizerView) {
+                                    win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/face-test.html');
+                                }
+                            }
+                        },
+                        {
+                            label: 'Halverson Mixed Density',
+                            click: () => {
+                                const win = BrowserWindow.getFocusedWindow();
+                                if (win && win.scrutinizerView) {
+                                    win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/halverson-mixed-density.html');
+                                }
+                            }
+                        },
+                        { type: 'separator' },
+                        {
                             label: 'Color Spectrum',
                             click: () => {
                                 const win = BrowserWindow.getFocusedWindow();
@@ -256,11 +293,39 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             }
                         },
                         {
+                            label: 'Color Spectrum v2 (Desaturation)',
+                            click: () => {
+                                const win = BrowserWindow.getFocusedWindow();
+                                if (win && win.scrutinizerView) {
+                                    win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/color-spectrum-v2.html');
+                                }
+                            }
+                        },
+                        {
+                            label: 'Chromatically Uniform Stimulus',
+                            click: () => {
+                                const win = BrowserWindow.getFocusedWindow();
+                                if (win && win.scrutinizerView) {
+                                    win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/chroma-uniform.html');
+                                }
+                            }
+                        },
+                        { type: 'separator' },
+                        {
                             label: 'Grid (Distortion Check)',
                             click: () => {
                                 const win = BrowserWindow.getFocusedWindow();
                                 if (win && win.scrutinizerView) {
                                     win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/grid.html');
+                                }
+                            }
+                        },
+                        {
+                            label: 'Grid Comparison (MIP vs Cortical)',
+                            click: () => {
+                                const win = BrowserWindow.getFocusedWindow();
+                                if (win && win.scrutinizerView) {
+                                    win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/grid-comparison.html');
                                 }
                             }
                         },

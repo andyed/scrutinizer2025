@@ -43,13 +43,21 @@ const yv_decay = castlePeripheral.yv_decay ?? 0.014;
 const yv_freq_decay = castlePeripheral.yv_freq_decay ?? 0.008;
 const supra_exponent = castlePeripheral.supra_exponent ?? 0.5;
 
-// Band spatial frequencies (cpd)
+// Band spatial frequencies (cpd) — 12 half-octave bands + residual
 const bands = [
-  { name: 'band0', freq: 4.0, label: '~4 cpd (serifs, fine text)' },
-  { name: 'band1', freq: 2.0, label: '~2 cpd (letter bodies, small icons)' },
-  { name: 'band2', freq: 1.0, label: '~1 cpd (words, UI elements)' },
-  { name: 'band3', freq: 0.5, label: '~0.5 cpd (buttons, cards)' },
-  { name: 'residual', freq: 0.25, label: '~0.25 cpd (backgrounds, large fields)' },
+  { name: 'band0',    freq: 5.657, label: '~5.66 cpd (finest detail, serifs)' },
+  { name: 'band1',    freq: 4.0,   label: '~4.0 cpd (thin strokes)' },
+  { name: 'band2',    freq: 2.828, label: '~2.83 cpd (letter bodies)' },
+  { name: 'band3',    freq: 2.0,   label: '~2.0 cpd (small icons)' },
+  { name: 'band4',    freq: 1.414, label: '~1.41 cpd (words, UI labels)' },
+  { name: 'band5',    freq: 1.0,   label: '~1.0 cpd (word groups)' },
+  { name: 'band6',    freq: 0.707, label: '~0.71 cpd (buttons, panels)' },
+  { name: 'band7',    freq: 0.5,   label: '~0.5 cpd (layout blocks)' },
+  { name: 'band8',    freq: 0.354, label: '~0.354 cpd (large panels)' },
+  { name: 'band9',    freq: 0.250, label: '~0.250 cpd (page sections)' },
+  { name: 'band10',   freq: 0.177, label: '~0.177 cpd (half-page regions)' },
+  { name: 'band11',   freq: 0.125, label: '~0.125 cpd (full-width fields)' },
+  { name: 'residual', freq: 0.088, label: '~0.088 cpd (DC, always preserved)' },
 ];
 
 function atten(k_e, k_ef, freq, ecc_deg, supra) {

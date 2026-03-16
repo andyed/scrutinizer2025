@@ -1,11 +1,13 @@
 # Isotropic Cortical Sampling — FOVI-Derived Sector Geometry
 
-> **Last updated:** 2026-03-13
+> **Last updated:** 2026-03-15
 
-**Status**: Spec (not yet implemented)
+**Status**: Geometry implemented + verified; rendering approach TBD (see [Implementation Attempt 1](#implementation-attempt-1-v25-2026-03-15) and [Revised Approach](#revised-approach-color-first))
 **Created**: 2026-03-13
-**Dependencies**: `renderer/shaders/peripheral.frag` (computeMipLevel, computePolarSector), `shared/modes.json`
+**Dependencies**: `renderer/shaders/peripheral.frag` (computeMipLevel, computeCorticalSector), `shared/modes.json`
 **Collaboration**: Nicholas Blauch (Harvard/Kempner → NVIDIA), potential co-author. Implementation must be mathematically traceable to Blauch, Alvarez & Konkle (2026), arxiv:2602.03766.
+**Implementation journal**: `docs/specs/isotropic_implementation_journal.md` — detailed record of all rendering approaches tried and why each failed.
+**Test suite**: `tests/unit/isotropic-sectors.test.js` — 19 tests verify sector math matches Blauch Python to 3 decimal places.
 
 ## Context
 
@@ -80,55 +82,62 @@ return clamp(maxMipLevel * cortical_dist / u_cortical_max * eccScale, 0.0, maxMi
 
 The MIP chain provides spatial averaging over the sector area. `textureLod()` at the sector center, at the MIP level corresponding to that eccentricity, pools pixel information the same way Blauch's kNN receptive fields pool from the input image — the GPU hardware does the Gaussian averaging.
 
-## GLSL Implementation Plan
+## GLSL Implementation — Geometry (DONE)
 
-### New function: `computeCorticalSector()`
+### `computeCorticalSector()` — implemented and verified
 
-Replace the ad-hoc `computePolarSector()` with a CMF-derived version for modes that claim FOVI lineage:
+The sector geometry function is implemented in `peripheral.frag` and verified against Blauch's Python to 3 decimal places. It coexists with the existing `computePolarSector()` — modes select which to use via `v1_distortion_type`.
 
 ```glsl
 struct CorticalSector {
-    float r;              // distance from fovea
-    float angle;          // polar angle
+    float r;              // distance from fovea (aspect-corrected)
+    float angle;          // polar angle (-PI to PI)
     float ring_inner;     // inner ring boundary (visual space)
     float ring_outer;     // outer ring boundary (visual space)
     float ring_center;    // ring center (visual space)
+    float dr;             // half-width radial spacing: (r_{i+1} - r_{i-1}) / 2
     float spoke_count;    // isotropic spoke count at this ring
+    float spoke_width;    // 2*PI / spoke_count
     float spoke_center;   // center angle of this spoke
-    vec2  sector_center;  // UV of sector center (for textureLod sampling)
+    float n_idx;          // ring index
+    vec2  sector_center;  // UV of sector center (ready for textureLod sampling)
+    vec2  mouse_c;        // aspect-corrected mouse position (for UV reconstruction)
 };
-
-CorticalSector computeCorticalSector(vec2 uv, float fovea_radius) {
-    // 1. Convert to gaze-relative polar coordinates
-    // 2. Compute w = log(r_deg + cmf_a) in cortical space
-    // 3. Quantize w to ring index: floor((w - w_min) / w_step)
-    // 4. Back-project ring boundaries: r = exp(w) - cmf_a
-    // 5. Compute isotropic spoke count: 2π * r_center / dr
-    // 6. Snap angle to nearest spoke center
-    // 7. Reconstruct sector center UV
-}
 ```
 
-### Parameters (uniforms)
+### Parameters (uniforms) — implemented
 
-- `u_cmf_a`: Already exists (default 2.78°)
-- `u_cortical_max`: Already exists
-- `u_num_cortical_rings`: New — controls grid resolution. ~50 rings for smooth appearance, ~20 for visible Minecraft-like blocks.
+- `u_cmf_a`: Exists (default 2.78°)
+- `u_cortical_max`: Exists
+- `u_num_cortical_rings`: Exists (default 0, mode 12 sets 50)
+- `u_show_sector_grid`: Exists (debug overlay, default off)
 
-### New mode entry in `modes.json`
+### Mode 12 entry in `modes.json` — implemented
 
 ```json
 {
     "id": 12,
-    "label": "FOVI Isotropic",
+    "label": "FOVI Cortical Grid (Blauch)",
     "v1_distortion_type": 5,
-    "v4_style_id": 9,
+    "v4_style_id": 0,
     "cmf_enabled": true,
     "cmf_a": 2.78,
-    "dog_enabled": false,
-    "description": "Isotropic cortical sampling derived from Blauch, Alvarez & Konkle (2026). Ring spacing from uniform cortical sampling (w = log(r + a)), spoke count matched to radial spacing at each eccentricity. MIP chain provides spatial averaging within each sector."
+    "dog_enabled": true,
+    "dog_e2": 0.15,
+    "num_cortical_rings": 50,
+    "chromatic_pooling": true
 }
 ```
+
+Note: `v4_style_id` is 0 (standard DoG), not 9 (mongrel). `dog_enabled` is true — the DoG reconstruction is the primary rendering path; the question is how sector geometry modulates it.
+
+## GLSL Implementation — Rendering (TBD)
+
+### What the V1 type 5 block needs to do
+
+The `computeCorticalSector()` function provides sector geometry. The V1 type 5 block must use this to produce peripheral degradation. The rendering question — what the sector geometry *drives* — is unresolved.
+
+See next section.
 
 ### Relationship to existing modes
 
@@ -151,6 +160,76 @@ For Nick's review — line-by-line traceability:
 | `GaussianKNNGridSampler` | `textureLod(u_texture, sectorUV, mipLevel)` | GPU MIP ≈ kNN Gaussian pooling |
 | `GaussianColorDecay(sigma)` | Oklab `rgFade`/`yvFade` smoothstep | Per-channel chromatic decay |
 
+## Implementation Attempt 1 (v2.5, 2026-03-15)
+
+Seven rendering approaches were tried for the V1 type 5 block. All failed. Full details in `isotropic_implementation_journal.md`. Summary:
+
+| Approach | Result | Root cause |
+|----------|--------|------------|
+| UV snap to sector center | Gray blobs | Averaging destroys contrast (text + bg = gray) |
+| textureGrad with sector derivatives | Gray blobs | All DoG bands at same MIP → differences = 0 |
+| Per-pixel hash jitter | No effect | 2.5px noise vs 20px letters — wrong scale |
+| Simplex noise scaled by sector | Minimal effect | Smooth warp shifts letters rigidly, doesn't break identity |
+| Sector-coherent scramble | Tile artifacts | Sector boundaries visible as hard edges |
+| Discrete scramble (mode 0's cutter) | Pixel dust | 4px cells scatter individual pixels into wrong regions |
+| Noise + sector lodFloor | Best but insufficient | lodFloor kills texture; text still readable |
+
+### Key insights
+
+1. **UV snap = spatial averaging = gray.** Any mechanism that converges pixels to a common point produces mean color. This is not peripheral vision — peripheral vision preserves local contrast and texture statistics (Rosenholtz TTM).
+
+2. **Displacement must be coherent at feature scale.** Noise at 800+ cycles/UV creates ~2.5px cells. A 20px letter survives intact. Need ~10-20px coherent displacement, but that creates visible tiles.
+
+3. **Mode 0's two-stage mechanism works.** "Bender" (smooth noise warp) shifts features around; "Cutter" (discrete scramble) breaks within-feature coherence. Neither alone is sufficient. Together they produce realistic peripheral degradation on typical web content.
+
+4. **lodFloor is a dimmer switch, not a scalpel.** It removes spatial frequency bands uniformly — can't selectively destroy feature identity while preserving texture.
+
+5. **The sector geometry is correct; the rendering question is what it drives.** The math matches Blauch. The problem is translating "approximately square cortical sampling" into a degradation mechanism that doesn't produce sector-shaped artifacts.
+
+### Decision
+
+Revert shader to v2.4.1 baseline. Work on peripheral color first (fix Oklab cube root UB, recalibrate YV decay, restore far-periphery color kill, extend DoG range). Then return to isotropic rendering with the revised approach below.
+
+## Revised Approach: Color First, Then Isotropic
+
+### Phase 1: Fix peripheral color (prerequisite)
+
+These are bugs in the current pipeline that affect all modes, not just mode 12:
+
+1. **Oklab cube root UB** — `chromaticAttenuate()` called on DoG bands with negative RGB; `pow(negative, 1/3)` undefined in GLSL ES 3.0. Per-band chromatic attenuation is currently a no-op.
+2. **YV decay too gentle** — 0.004 (detection threshold) should be ~0.014 (suprathreshold appearance per Bowers 2025).
+3. **Far-periphery color kill missing** — legacy 95% chrominance kill was removed when per-channel path was added; replacement is broken due to bugs 1-2.
+4. **Suprathreshold exponent** — power-law 0.5 measured for luminance only; applying to RG/YV without evidence over-desaturates parafovea.
+5. **Large swatch preservation** — color patches and images should retain hue longer than fine text; need size-aware chromatic decay.
+6. **DoG range** — current bands top out at MIP 4.0; far periphery on wide screens exceeds this.
+
+### Phase 2: Isotropic rendering (after color is correct)
+
+The sector geometry drives degradation **rate** (where transitions happen), not degradation **mechanism** (how pixels change). This means:
+
+1. **Use mode 0's proven noise+scramble mechanism** for UV displacement. The "bender" (smooth simplex warp) and "cutter" (discrete scramble) are proven, tuned, and visually acceptable.
+
+2. **Sector geometry controls the spatial profile.** Instead of ad-hoc smoothstep transitions keyed to `fovea_radius` and `parafovea_radius`, derive transition eccentricities from sector size:
+   - When sector size > feature scale → features fully scrambled
+   - When sector size ≈ feature scale → partial scramble (transition zone)
+   - When sector size < feature scale → no scramble (foveal protection)
+
+3. **Sector-derived lodFloor as supplement (0.3-0.4x), not replacement.** A gentle lodFloor alongside noise+scramble softens the finest DoG bands without killing texture. The scramble handles feature destruction.
+
+4. **Isotropy in DoG attenuation.** The DoG band rolloff profile should respect isotropic sector dimensions. Currently the rolloff is purely radial — tangential extent is ignored. With isotropic sectors, the rolloff can use sector area (radial × tangential) rather than just radial distance.
+
+5. **Isotropy in MIP sampling.** The MIP level at each point should reflect isotropic sector size, not just eccentricity. For a correctly isotropic grid, these are the same — but this ensures the correspondence is explicit and traceable.
+
+### What "isotropic mode 12" should look like
+
+At equal eccentricity, degradation should be the same in all directions from fixation. The existing mode 0 is already close to this (it uses radial distance, which is rotationally symmetric). Mode 12's contribution is:
+
+- **CMF-derived transition profile** instead of ad-hoc smoothstep thresholds
+- **Principled DoG attenuation** where band rolloff traces to sector geometry
+- **Traceable to Blauch** — the sector math, transition profile, and rolloff are all derivable from `w = log(r + a)` and the isotropy condition
+
+Mode 12 should NOT look dramatically different from mode 0. It should look slightly more principled — smoother transitions, better calibrated to the CMF — but the visual character should be the same: text destroys into scrambled texture, not fog.
+
 ## What This Is and Isn't
 
 **Is:** A real-time GPU implementation of FOVI's isotropic foveated sampling grid, using MIP-chain hardware for spatial averaging. The sector geometry is mathematically derived from the same CMF and isotropy condition as the FOVI paper.
@@ -159,17 +238,28 @@ For Nick's review — line-by-line traceability:
 
 ## Verification
 
-1. **Ring boundary check**: At `cmf_a=2.78`, `fov=30°`, `N=30` rings, verify ring radii match Blauch's `_compute_isotropic_r_and_num_theta()` output to 3 decimal places.
-2. **Spoke count check**: At each ring, verify `n_spokes` matches Blauch's Python output.
-3. **Visual isotropy**: Render grid lines at ring/spoke boundaries. Cells should be approximately square at all eccentricities.
-4. **Comparison capture**: Same COCO image through current polar quantize vs new FOVI isotropic mode — visually confirm the radial stretching is eliminated.
+### Geometry (DONE)
+
+1. **Ring boundary check**: ✅ At `cmf_a=2.78`, `fov=30°`, `N=30` and `N=50` rings, ring radii match Blauch's Python to 3 decimal places. (`isotropic-sectors.test.js`)
+2. **Spoke count check**: ✅ At each ring, `n_spokes` matches Blauch's Python output. (`isotropic-sectors.test.js`)
+3. **Isotropy check**: ✅ Tangential/radial aspect ratio within 30% of 1.0 at eccentricities 2°, 5°, 8°, 12°, 15°. (`isotropic-sectors.test.js`)
+4. **Spoke count at r_max**: ✅ N=30 → 85 spokes, N=50 → 142 spokes. (`isotropic-sectors.test.js`)
+
+### Rendering (TODO — after Phase 1 color work)
+
+5. **Visual isotropy**: Render grid overlay at ring/spoke boundaries. Cells should be approximately square at all eccentricities. (Use `u_show_sector_grid` debug uniform.)
+6. **Readability destruction**: OCR word count in parafovea (1-2.5°) should be ≤ mode 0. Use `scripts/ocr-readability-comparison.js`.
+7. **Texture preservation**: Peripheral content should retain type identity (paragraph vs image vs nav). Visual comparison via `scripts/capture-isotropic-comparison.js`.
+8. **Dark mode artifacts**: No scattered bright pixels on dark backgrounds. Test with dark-mode reference pages.
+9. **Comparison capture**: Same stimuli through mode 0 vs mode 12 — mode 12 should look comparable in visual quality, with more principled transition profile.
 
 ## Open Questions for Nick
 
 1. Does MIP-chain spatial averaging faithfully substitute for kNN Gaussian pooling? The MIP chain does box filtering at each level — is the receptive field shape difference (box vs Gaussian) significant?
-2. Should `n_spokes` be forced even (current polar quantize does this) or is odd acceptable?
-3. The `u_num_cortical_rings` parameter controls grid granularity. Is there a principled value from the paper, or is this a free parameter for the renderer?
-4. For the continuous (non-Minecraft) rendering mode: should sector boundaries be hard (snap to center) or soft (weighted blend across boundary)?
+2. ~~Should `n_spokes` be forced even?~~ **Resolved:** odd is fine; floor() produces both even and odd counts naturally.
+3. ~~`u_num_cortical_rings` — principled value?~~ **Resolved:** 50 rings for N=50 at r_max=15°. Free parameter for renderer; Blauch's paper uses variable N.
+4. ~~Hard vs soft sector boundaries?~~ **Resolved by failure:** hard boundaries (snap) produce sector-shaped artifacts. Soft blending or no boundaries needed. Revised approach avoids sector-level operations entirely — uses sector geometry to parameterize continuous degradation.
+5. **NEW:** Is the "sector drives rate, not mechanism" approach acceptable for co-authorship? Mode 12 would use Blauch's sector geometry for transition profile calibration, but the rendering mechanism (noise warp + scramble) is not derived from FOVI.
 
 ## References
 

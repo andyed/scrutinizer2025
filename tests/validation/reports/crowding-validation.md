@@ -1,6 +1,6 @@
 # Wave 3: Crowding Geometry Validation Report
 
-Generated: 2026-03-15
+Generated: 2026-03-16
 Parameters: fovea_radius=90px, ppd=45.0, cmf_a=2.78, radial_bias=2
 
 ## Tier 1: Must Pass

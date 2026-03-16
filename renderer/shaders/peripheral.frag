@@ -156,7 +156,8 @@ vec4 sampleBlurred(vec2 uv, float radius) {
     return sum / totalWeight;
 }
 
-// Forward declaration — defined after Oklab conversion functions
+// Forward declarations — defined after Oklab conversion functions
+vec3 rgbToOklab(vec3 srgb);
 vec4 chromaticAttenuate(vec4 color, float rg_atten, float yv_atten);
 
 // === DoG PERIPHERAL RECONSTRUCTION ===
@@ -255,70 +256,87 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         }
     }
 
-    // Sample 9 MIP levels at half-octave spacing (LOD 0.0 to 4.0 in 0.5 steps)
+    // Sample 13 MIP levels at half-octave spacing (LOD 0.0 to 6.0 in 0.5 steps)
     // Half-integer LODs trigger hardware trilinear interpolation (2 bilinear reads + lerp),
-    // giving us the half-octave Gaussian we need. 9 samples = 13 bilinear lookups total.
-    vec4 mip[9];
-    mip[0] = textureLod(u_texture, uv, 0.0);
-    mip[1] = textureLod(u_texture, uv, 0.5);
-    mip[2] = textureLod(u_texture, uv, 1.0);
-    mip[3] = textureLod(u_texture, uv, 1.5);
-    mip[4] = textureLod(u_texture, uv, 2.0);
-    mip[5] = textureLod(u_texture, uv, 2.5);
-    mip[6] = textureLod(u_texture, uv, 3.0);
-    mip[7] = textureLod(u_texture, uv, 3.5);
-    mip[8] = textureLod(u_texture, uv, 4.0);
+    // giving us the half-octave Gaussian we need. 13 samples = 21 bilinear lookups total.
+    // MIP 5-6 textures are tiny (60×33, 30×16 for 1920×1080) — reads are cache-free.
+    vec4 mip[13];
+    mip[0]  = textureLod(u_texture, uv, 0.0);
+    mip[1]  = textureLod(u_texture, uv, 0.5);
+    mip[2]  = textureLod(u_texture, uv, 1.0);
+    mip[3]  = textureLod(u_texture, uv, 1.5);
+    mip[4]  = textureLod(u_texture, uv, 2.0);
+    mip[5]  = textureLod(u_texture, uv, 2.5);
+    mip[6]  = textureLod(u_texture, uv, 3.0);
+    mip[7]  = textureLod(u_texture, uv, 3.5);
+    mip[8]  = textureLod(u_texture, uv, 4.0);
+    mip[9]  = textureLod(u_texture, uv, 4.5);
+    mip[10] = textureLod(u_texture, uv, 5.0);
+    mip[11] = textureLod(u_texture, uv, 5.5);
+    mip[12] = textureLod(u_texture, uv, 6.0);
 
-    // 8 half-octave DoG bands — geometric sqrt(2) spacing
-    // Odd-indexed new cutoffs match old 4-band anchors exactly.
+    // 12 half-octave DoG bands — geometric sqrt(2) spacing
+    // Odd-indexed cutoffs match old 4-band anchors exactly.
     // At intermediate eccentricities, 3-4 bands carry distinct fractional weights
     // simultaneously — measurable frequency-selective behavior that single-sample
     // Gaussian blur cannot reproduce.
-    vec4 band[8];
-    band[0] = mip[0] - mip[1];  // ~5.66 cpd  (finest detail, serifs)
-    band[1] = mip[1] - mip[2];  // ~4.0 cpd   (thin strokes)
-    band[2] = mip[2] - mip[3];  // ~2.83 cpd  (letter bodies)
-    band[3] = mip[3] - mip[4];  // ~2.0 cpd   (small icons)
-    band[4] = mip[4] - mip[5];  // ~1.41 cpd  (words, UI labels)
-    band[5] = mip[5] - mip[6];  // ~1.0 cpd   (word groups)
-    band[6] = mip[6] - mip[7];  // ~0.71 cpd  (buttons, panels)
-    band[7] = mip[7] - mip[8];  // ~0.5 cpd   (layout blocks)
-    // residual = mip[8]         // ~0.35 cpd  (DC, always preserved)
+    vec4 band[12];
+    band[0]  = mip[0]  - mip[1];   // ~5.66 cpd  (finest detail, serifs)
+    band[1]  = mip[1]  - mip[2];   // ~4.0 cpd   (thin strokes)
+    band[2]  = mip[2]  - mip[3];   // ~2.83 cpd  (letter bodies)
+    band[3]  = mip[3]  - mip[4];   // ~2.0 cpd   (small icons)
+    band[4]  = mip[4]  - mip[5];   // ~1.41 cpd  (words, UI labels)
+    band[5]  = mip[5]  - mip[6];   // ~1.0 cpd   (word groups)
+    band[6]  = mip[6]  - mip[7];   // ~0.71 cpd  (buttons, panels)
+    band[7]  = mip[7]  - mip[8];   // ~0.5 cpd   (layout blocks)
+    band[8]  = mip[8]  - mip[9];   // ~0.354 cpd (large panels)
+    band[9]  = mip[9]  - mip[10];  // ~0.250 cpd (page sections)
+    band[10] = mip[10] - mip[11];  // ~0.177 cpd (half-page regions)
+    band[11] = mip[11] - mip[12];  // ~0.125 cpd (full-width color fields)
+    // residual = mip[12]           // ~0.088 cpd (DC, always preserved)
 
     // Per-band cutoff eccentricities — half-octave M-scaling
     // cutoff_k = E2 × (2^(k/2) − 1) for linear path
     // Odd-indexed cutoffs (c[1], c[3], c[5], c[7]) match old 4-band cutoffs exactly:
     //   c[1]=E2*1.0, c[3]=E2*3.0, c[5]=E2*7.0, c[7]=E2*15.0
-    float c[8];
+    float c[12];
     float e2 = max(dog_e2, 0.01);
     if (u_cmf_enabled > 0.5) {
         // CMF-derived: c_k = cmf_a × (exp(k×0.5×scale) − 1) / fovea_deg
         // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
         float fovea_deg = 1.0;  // 1° foveal radius (2° diameter)
-        float maxMipLevel = 4.0;
+        float maxMipLevel = 6.0;
         float scale = u_cortical_max / maxMipLevel / (u_ecc_scaling / 0.75);
-        c[0] = u_cmf_a * (exp(0.5 * scale) - 1.0) / fovea_deg;
-        c[1] = u_cmf_a * (exp(1.0 * scale) - 1.0) / fovea_deg;  // == old c0
-        c[2] = u_cmf_a * (exp(1.5 * scale) - 1.0) / fovea_deg;
-        c[3] = u_cmf_a * (exp(2.0 * scale) - 1.0) / fovea_deg;  // == old c1
-        c[4] = u_cmf_a * (exp(2.5 * scale) - 1.0) / fovea_deg;
-        c[5] = u_cmf_a * (exp(3.0 * scale) - 1.0) / fovea_deg;  // == old c2
-        c[6] = u_cmf_a * (exp(3.5 * scale) - 1.0) / fovea_deg;
-        c[7] = u_cmf_a * (exp(4.0 * scale) - 1.0) / fovea_deg;  // == old c3
+        c[0]  = u_cmf_a * (exp(0.5 * scale) - 1.0) / fovea_deg;
+        c[1]  = u_cmf_a * (exp(1.0 * scale) - 1.0) / fovea_deg;  // == old c0
+        c[2]  = u_cmf_a * (exp(1.5 * scale) - 1.0) / fovea_deg;
+        c[3]  = u_cmf_a * (exp(2.0 * scale) - 1.0) / fovea_deg;  // == old c1
+        c[4]  = u_cmf_a * (exp(2.5 * scale) - 1.0) / fovea_deg;
+        c[5]  = u_cmf_a * (exp(3.0 * scale) - 1.0) / fovea_deg;  // == old c2
+        c[6]  = u_cmf_a * (exp(3.5 * scale) - 1.0) / fovea_deg;
+        c[7]  = u_cmf_a * (exp(4.0 * scale) - 1.0) / fovea_deg;  // == old c3
+        c[8]  = u_cmf_a * (exp(4.5 * scale) - 1.0) / fovea_deg;
+        c[9]  = u_cmf_a * (exp(5.0 * scale) - 1.0) / fovea_deg;
+        c[10] = u_cmf_a * (exp(5.5 * scale) - 1.0) / fovea_deg;
+        c[11] = u_cmf_a * (exp(6.0 * scale) - 1.0) / fovea_deg;
     } else {
-        // Linear M-scaling: cutoff_k = E2 * (2^(k/2) - 1), k=1..8
-        c[0] = e2 * 0.41421;   // sqrt(2) - 1
-        c[1] = e2 * 1.0;       // == old c0
-        c[2] = e2 * 1.82843;   // 2*sqrt(2) - 1
-        c[3] = e2 * 3.0;       // == old c1
-        c[4] = e2 * 4.65685;   // 4*sqrt(2) - 1
-        c[5] = e2 * 7.0;       // == old c2
-        c[6] = e2 * 10.31371;  // 8*sqrt(2) - 1
-        c[7] = e2 * 15.0;      // == old c3
+        // Linear M-scaling: cutoff_k = E2 * (2^(k/2) - 1), k=1..12
+        c[0]  = e2 * 0.41421;   // sqrt(2) - 1
+        c[1]  = e2 * 1.0;       // == old c0
+        c[2]  = e2 * 1.82843;   // 2*sqrt(2) - 1
+        c[3]  = e2 * 3.0;       // == old c1
+        c[4]  = e2 * 4.65685;   // 4*sqrt(2) - 1
+        c[5]  = e2 * 7.0;       // == old c2
+        c[6]  = e2 * 10.31371;  // 8*sqrt(2) - 1
+        c[7]  = e2 * 15.0;      // == old c3
+        c[8]  = e2 * 21.62742;  // 16*sqrt(2) - 1
+        c[9]  = e2 * 31.0;
+        c[10] = e2 * 44.25483;  // 32*sqrt(2) - 1
+        c[11] = e2 * 63.0;
     }
 
     // Oriented DoG: push cutoffs outward for cardinal-aligned content
-    // Finest bands (k=0) get up to 50% boost, coarsest (k=7) get 10% — fine detail
+    // Finest bands (k=0) get up to 50% boost, coarsest (k=11) get 10% — fine detail
     // benefits most from the oblique effect, coarse structure is already robust.
     // When orientBonus=0 (disabled or flat region), all boosts are 1.0 — no change.
     //
@@ -329,12 +347,12 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     float px_per_deg = max(fovea_radius / 1.0, 1.0);
     float visual_ecc_deg = visual_ecc / px_per_deg;
 
-    for (int k = 0; k < 8; k++) {
+    for (int k = 0; k < 12; k++) {
         // Per-band eccentricity fade:
         //   Band 0 (finest, >4 cpd): fades 3°–10° (Berkley 1975: gone by 8–18°)
-        //   Band 7 (coarsest, <0.25 cpd): fades 8°–25° (Essock 1990: persists to 40°)
-        float fadeStart = mix(3.0, 8.0, float(k) / 7.0);
-        float fadeEnd   = mix(10.0, 25.0, float(k) / 7.0);
+        //   Band 11 (coarsest, <0.125 cpd): fades 8°–25° (Essock 1990: persists to 40°)
+        float fadeStart = mix(3.0, 8.0, float(k) / 11.0);
+        float fadeEnd   = mix(10.0, 25.0, float(k) / 11.0);
         float eccFade   = 1.0 - smoothstep(fadeStart, fadeEnd, visual_ecc_deg);
 
         // For exaggerated demo/capture mode (bias > 3), bypass eccFade so the
@@ -343,7 +361,7 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         // differences that don't survive JPEG compression.
         float effectiveEccFade = u_dog_orient_bias > 3.0 ? 1.0 : eccFade;
 
-        float boost = 1.0 + orientBonus * effectiveEccFade * mix(0.5, 0.1, float(k) / 7.0);
+        float boost = 1.0 + orientBonus * effectiveEccFade * mix(0.5, 0.1, float(k) / 11.0);
         c[k] *= boost;
     }
 
@@ -351,8 +369,8 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     float transMult = mix(0.4, 0.05, dog_sharpness);
 
     // Per-band weights via smoothstep rolloff
-    float w[8];
-    for (int k = 0; k < 8; k++) {
+    float w[12];
+    for (int k = 0; k < 12; k++) {
         w[k] = 1.0 - smoothstep(c[k] - c[k] * transMult, c[k] + c[k] * transMult, normEcc);
     }
 
@@ -372,32 +390,45 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         float supra = max(u_supra_exponent, 0.01);
 
         // Half-octave band center frequencies (cpd)
-        // 9 values: 8 bands + 1 residual (mip[8])
-        const float bandFreq[9] = float[9](5.657, 4.0, 2.828, 2.0, 1.414, 1.0, 0.707, 0.5, 0.354);
+        // 13 values: 12 bands + 1 residual (mip[12])
+        const float bandFreq[13] = float[13](5.657, 4.0, 2.828, 2.0, 1.414, 1.0, 0.707, 0.5, 0.354, 0.250, 0.177, 0.125, 0.088);
 
         // Per-band RG and YV attenuation
-        float rg_atten[9], yv_atten[9];
-        for (int k = 0; k < 9; k++) {
+        float rg_atten[13], yv_atten[13];
+        for (int k = 0; k < 13; k++) {
             rg_atten[k] = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * bandFreq[k]) * ecc_deg), supra);
             yv_atten[k] = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * bandFreq[k]) * ecc_deg), supra);
         }
 
         // BGRA → RGBA before Oklab round-trips (Electron capture quirk)
         // chromaticAttenuate() uses rgbToOklab() which assumes RGB channel order
-        mip[8] = mip[8].bgra;
-        for (int k = 0; k < 8; k++) { band[k] = band[k].bgra; }
+        mip[12] = mip[12].bgra;
+        for (int k = 0; k < 12; k++) { band[k] = band[k].bgra; }
 
-        // Reconstruct with per-band Oklab chromatic attenuation
-        result = chromaticAttenuate(mip[8], rg_atten[8], yv_atten[8]);
-        for (int k = 7; k >= 0; k--) {
-            result += chromaticAttenuate(band[k], rg_atten[k], yv_atten[k]) * w[k];
+        // Swatch preservation: large uniform color regions retain more chrominance.
+        // mip[12] at LOD 6.0 averages ~64×64 source pixels — its Oklab chrominance
+        // magnitude measures whether this region is a large color swatch (high chroma)
+        // or mixed/text content (low chroma). Biology: S-cone signals pool over large
+        // areas; isolated colored targets lose hue faster than uniform fields.
+        vec3 swatchLab = rgbToOklab(mip[12].rgb);  // already RGBA after swap above
+        float swatchChroma = length(vec2(swatchLab.y, swatchLab.z));
+        float swatchBoost = smoothstep(0.01, 0.04, swatchChroma);  // 0 for achromatic/text, 1 for saturated swatch
+        float swatchRetain = 1.0 + swatchBoost * 0.3;  // up to 30% more color for large swatches
+
+        // Residual: NO swatch boost (prevents color halos at region boundaries)
+        result = chromaticAttenuate(mip[12], rg_atten[12], yv_atten[12]);
+        // Bands: swatch-modulated attenuation (clamped to 1.0 — never amplify beyond original)
+        for (int k = 11; k >= 0; k--) {
+            float eff_rg = min(rg_atten[k] * swatchRetain, 1.0);
+            float eff_yv = min(yv_atten[k] * swatchRetain, 1.0);
+            result += chromaticAttenuate(band[k], eff_rg, eff_yv) * w[k];
         }
         result = clamp(result, 0.0, 1.0);
         // Already in RGBA — skip the swap below
     } else {
         // Legacy: luminance-only reconstruction (no per-channel decay)
-        result = mip[8];
-        for (int k = 0; k < 8; k++) { result += band[k] * w[k]; }
+        result = mip[12];
+        for (int k = 0; k < 12; k++) { result += band[k] * w[k]; }
         result = clamp(result, 0.0, 1.0);
 
         // BGRA → RGBA (Electron capture quirk)
@@ -447,10 +478,10 @@ float sampleBoumaEdgeDensity(float dist, float fovea_radius, vec2 uv) {
 
 // === CMF MIP LEVEL COMPUTATION ===
 // Shared by MIP pooling, Minecraft block sizing, and any eccentricity→resolution mapping.
-// Returns 0.0 at fovea, up to maxMipLevel (4.0) in far periphery.
+// Returns 0.0 at fovea, up to maxMipLevel (6.0) in far periphery.
 float computeMipLevel(float eccentricity, float fovea_radius) {
     float normalizedEcc = max(0.0, eccentricity) / fovea_radius;
-    float maxMipLevel = 4.0;
+    float maxMipLevel = 6.0;
     if (u_cmf_enabled > 0.5) {
         // Cortical distance: d(r) = log(1 + r/a), numerically stable form
         // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
@@ -1147,16 +1178,20 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         desaturationFactor *= strengthMult;
         
         float fade = desaturationFactor * bypassTransition;
-        
+
         // Apply Base Desaturation (Chrominance only)
-        // Always runs: removes overall chroma with eccentricity (rod dominance).
-        // When chromatic pooling + DoG are active, sampleDoGReconstructed() applies
-        // differential RG/YV decay upstream — the two are complementary:
-        //   per-band: castleCSF threshold model (supra-corrected) → handles frequency-dependent differential
-        //   base desat: smoothstep/Gaussian ramp → ensures sufficient total chroma loss
-        // Combined at corner (~10°): per-band (50%) × base (20%) ≈ 10% residual warmth.
-        lab.y *= (1.0 - fade);
-        lab.z *= (1.0 - fade);
+        // When per-band chromatic pooling is active (castleCSF + Bowers 2025),
+        // sampleDoGReconstructed() already applies differential RG/YV decay.
+        // Stacking full base desat on top over-desaturates — periphery goes gray
+        // when it should retain blue tint (YV persists biologically).
+        // Reduce base desat to 40% strength when per-band is handling the work.
+        // Without per-band (legacy path), base desat is the only color reduction.
+        float baseFade = fade;
+        if (u_chromatic_pooling > 0.5 && u_dog_enabled > 0.5) {
+            baseFade *= 0.4;  // per-band does frequency-selective; base adds gentle rod ramp
+        }
+        lab.y *= (1.0 - baseFade);
+        lab.z *= (1.0 - baseFade);
         
         // === DIVERGENCE: USABILITY VS BIOLOGY ===
         

@@ -92,7 +92,7 @@ fn linear_to_oklab(rgb: vec3<f32>) -> vec3<f32> {
 // (UV-normalized, matching the fragment shader's aspect-corrected distance).
 fn compute_mip_level_uv(eccentricity: f32, fovea_radius: f32) -> f32 {
     let normalized_ecc = max(0.0, eccentricity) / fovea_radius;
-    let max_mip: f32 = 4.0;
+    let max_mip: f32 = 6.0;
 
     // CMF logarithmic scaling: Schwartz (1980), FOVI (Blauch et al. 2026)
     let r_deg = normalized_ecc * 2.0;

@@ -30,8 +30,9 @@ const OUTPUT_DIR = path.join(ROOT, 'tests', 'golden-captures', 'validation', 'co
 // Reference page URL — GitHub Pages or local override
 const BASE_URL = process.env.BASE_URL || 'https://andyed.github.io/scrutinizer-www/reference-pages';
 
-// Capture geometry — must match spec predictions (fovea_radius=90, 1920x1080)
-const CAPTURE_FOVEA_RADIUS = '90';
+// Capture geometry — must match spec predictions (fovea_radius=45, ppd=45, 1920x1080)
+// Updated from 90→45 after fovea_deg correction (2026-03-13); fovea_deg=1.0 means ppd=fovea_radius
+const CAPTURE_FOVEA_RADIUS = '45';
 const CAPTURE_WIDTH = '1920';
 const CAPTURE_HEIGHT = '1080';
 const SEED = '42';
