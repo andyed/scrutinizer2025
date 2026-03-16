@@ -255,6 +255,15 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                 }
                             }
                         },
+                        {
+                            label: 'Grid (Distortion Check)',
+                            click: () => {
+                                const win = BrowserWindow.getFocusedWindow();
+                                if (win && win.scrutinizerView) {
+                                    win.scrutinizerView.webContents.loadURL('https://andyed.github.io/scrutinizer-www/reference-pages/grid.html');
+                                }
+                            }
+                        },
                         { type: 'separator' },
                         {
                             label: 'Crowding (Letters)',
@@ -494,10 +503,16 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             checked: true,
                             click: (menuItem) => sendToOverlays('menu:toggle-reading-span', menuItem.checked)
                         },
+                        {
+                            label: 'Congestion-Gated Pooling',
+                            type: 'checkbox',
+                            checked: true,
+                            click: (menuItem) => sendToOverlays('menu:toggle-congestion-pooling', menuItem.checked)
+                        },
                         { type: 'separator' },
                         // === EXPERIMENTAL MODELS (alternative simulation pipelines) ===
                         {
-                            label: 'Control (Default Pipeline)',
+                            label: 'Control (Smoothstep)',
                             type: 'radio',
                             checked: currentAestheticMode === 0 || (currentAestheticMode >= 1 && currentAestheticMode <= 5),
                             click: () => { sendToOverlays('menu:set-aesthetic-mode', 0); app.emit('aesthetic-mode-changed', 0); }
@@ -520,12 +535,11 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             checked: currentAestheticMode === 10,
                             click: () => { sendToOverlays('menu:set-aesthetic-mode', 10); app.emit('aesthetic-mode-changed', 10); }
                         },
-                        { type: 'separator' },
                         {
-                            label: 'Congestion-Gated Pooling',
-                            type: 'checkbox',
-                            checked: true,
-                            click: (menuItem) => sendToOverlays('menu:toggle-congestion-pooling', menuItem.checked)
+                            label: 'Isotropic Cortical Sampling (FOVI)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 12,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 12); app.emit('aesthetic-mode-changed', 12); }
                         }
                     ]
                 },
@@ -681,12 +695,6 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         },
                         // Effect Type disabled — mongrelMode is set per-mode via modes.json,
                         // manual toggle was confusing and overridden on mode switch anyway.
-                        {
-                            label: 'Chromatic Aberration',
-                            type: 'checkbox',
-                            checked: true,
-                            click: (menuItem) => sendToOverlays('menu:toggle-ca', menuItem.checked)
-                        }
                     ]
                 },
 

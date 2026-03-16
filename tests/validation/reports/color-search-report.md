@@ -1,8 +1,8 @@
 # Wave 1: Color Search Validation Report
 
-Generated: 2026-03-12
+Generated: 2026-03-15
 Parameters: rg_decay=0.072, yv_decay=0.014, supra=0.5
-Geometry: fovea_radius=90px, ppd=45
+Geometry: fovea_radius=45px, ppd=45
 
 ## Tier 1: Must Pass
 

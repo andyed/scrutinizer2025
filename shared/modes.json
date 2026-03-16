@@ -382,6 +382,50 @@
                 "technique": "Summary statistic synthesis (Rosenholtz 2012, Walton 2021)",
                 "biological_basis": "Pooling regions scale with eccentricity via CMF (Schwartz 1980, FOVI 2026)"
             }
+        },
+        "fovi_isotropic": {
+            "id": 12,
+            "label": "FOVI Cortical Grid (Blauch)",
+            "shortLabel": "FOVI Iso",
+            "category": "research",
+            "description": "Isotropic cortical sampling derived from Blauch, Alvarez & Konkle (2026). Ring spacing from uniform cortical sampling (w = log(r + a)), spoke count matched to radial spacing at each eccentricity. Cells are approximately square in cortical space at all distances.",
+            "pipeline": {
+                "lgn_use_structure_mask": true,
+                "lgn_use_saliency_gate": true,
+                "lgn_ramp_end_mult": 2.0,
+                "v1_distortion_type": 5,
+                "v1_strength_mult": 1.0,
+                "v1_animate": false,
+                "v4_style_id": 0,
+                "dog_enabled": true,
+                "dog_e2": 0.15,
+                "dog_sharpness": 0.0,
+                "dog_oriented": true,
+                "dog_orient_bias": 1.0,
+                "dog_radial_bias": 0.0,
+                "cmf_enabled": true,
+                "cmf_a": 2.78,
+                "ecc_scaling": 0.75,
+                "num_cortical_rings": 50,
+                "chromatic_pooling": true,
+                "rg_decay": 0.072,
+                "rg_freq_decay": 0.003,
+                "yv_decay": 0.014,
+                "yv_freq_decay": 0.008,
+                "supra_exponent": 0.5,
+                "reading_span": false,
+                "reading_span_strength": 1.0
+            },
+            "tests": [
+                "cortical_ring_spacing",
+                "isotropic_spoke_count",
+                "sector_isotropy"
+            ],
+            "architectural_purpose": "FOVI isotropic sampling grid — cells are square in cortical space, ring boundaries derived from CMF, not ad-hoc geometry",
+            "citations": {
+                "technique": "Isotropic cortical sampling with CMF-derived ring spacing and matched spoke counts",
+                "biological_basis": "Blauch, Alvarez & Konkle (2026), arxiv:2602.03766 — FOVI sensing stage"
+            }
         }
     },
     "v1_distortion_types": {
@@ -409,6 +453,11 @@
             "name": "polar_quantize",
             "label": "Polar Quantize (Radial Sectors)",
             "description": "Fovea-relative polar sector quantization with CMF-driven ring spacing"
+        },
+        "5": {
+            "name": "cortical_isotropic",
+            "label": "Cortical Isotropic (FOVI)",
+            "description": "FOVI-derived isotropic sector snapping — ring boundaries from uniform cortical sampling, spoke count matched for isotropy"
         }
     },
     "categories": {

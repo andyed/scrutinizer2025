@@ -36,6 +36,7 @@ function groupKey(spec) {
 
 /**
  * Run a batch of shots through a single Electron process.
+ * Writes shot specs to a temp JSON file; main.js reads TEST_BATCH_FILE and iterates.
  *
  * @param {object[]} shots - Array of shot specs for this batch
  * @param {object} opts - { outputDir }

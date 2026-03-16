@@ -29,6 +29,7 @@ const MODES = [
     { id: 'mode7_legacy',     mode: '7', label: 'Mode 7 — Legacy v1.6' },
     { id: 'mode9_congestion', mode: '9', label: 'Mode 9 — Congestion-Gated Pooling' },
     { id: 'mode10_texture_synth', mode: '10', label: 'Mode 10 — Texture Synthesis (WebGPU)' },
+    { id: 'mode12_fovi_isotropic', mode: '12', label: 'Mode 12 — FOVI Cortical Grid (Blauch 2026)' },
 ];
 
 const BASE_URL = process.env.BASE_URL || 'https://andyed.github.io/scrutinizer-www/reference-pages';

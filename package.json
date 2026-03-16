@@ -18,6 +18,7 @@
     "test:perf": "node scripts/run-electron.js tests/run-test.js tests/perf-test.html",
     "test:integration": "cross-env TEST_MODE=true node scripts/run-electron.js .",
     "test": "npm run test:unit && npm run test:visual && npm run test:memory && npm run test:integration",
+    "capture-smoke": "node scripts/capture-smoke.js",
     "capture-golden": "node scripts/capture-golden.js",
     "capture-raw": "node scripts/capture-raw-pages.js",
     "generate-brown": "../PooledStatisticsMetamers/.venv/bin/python scripts/generate-brown-metamers.py --batch",

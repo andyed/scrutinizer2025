@@ -25,7 +25,7 @@ let currentStartPage;
 
 let currentVisualMemory;
 let currentMobileEmulation;
-let currentAestheticMode = 10;
+let currentAestheticMode = 0;
 
 // Tier 1 keyboard shortcut state (cycling modes)
 let currentCongestionMode = 0;   // 0=Off, 1=Stats, 2=Heatmap, 3=Saliency vs Congestion
@@ -1865,6 +1865,204 @@ function runIntegrationTest() {
 }
 
 
+/**
+ * Batch capture mode: reads TEST_BATCH_FILE JSON, iterates shots in a single Electron instance.
+ * Each shot spec has: { filename, url, mode, fixationX, fixationY, selector, overlay, radius,
+ *                       width, height, mobile, outputDir, chromaticPooling? }
+ * Shots in a batch share URL+viewport (grouped by capture-runner), so we navigate once
+ * and iterate through modes/fixations/filenames.
+ */
+function runBatchCapture() {
+    const batchFile = process.env.TEST_BATCH_FILE;
+    const fs = require('fs');
+    const p = require('path');
+
+    let shots;
+    try {
+        shots = JSON.parse(fs.readFileSync(batchFile, 'utf-8'));
+    } catch (e) {
+        console.error(`[Batch] Failed to read batch file: ${e.message}`);
+        app.exit(1);
+        return;
+    }
+
+    console.log(`[Batch] Loaded ${shots.length} shots from ${batchFile}`);
+
+    // Use first shot's shared properties for window setup
+    const firstShot = shots[0];
+    const testMobileEmulationRaw = firstShot.mobile || 'false';
+    const testMobileEmulation = testMobileEmulationRaw !== 'false' && testMobileEmulationRaw !== '';
+
+    const settingsManager = require('./settings-manager');
+    settingsManager.init();
+    if (testMobileEmulation) {
+        settingsManager.set('mobileEmulation', testMobileEmulationRaw === 'true' ? true : testMobileEmulationRaw);
+    } else {
+        settingsManager.set('mobileEmulation', false);
+    }
+
+    createWindow();
+
+    const checkWindow = setInterval(() => {
+        if (mainWindow && mainWindow.scrutinizerView && mainWindow.scrutinizerHud) {
+            clearInterval(checkWindow);
+            startBatch();
+        }
+    }, 100);
+
+    function startBatch() {
+        settingsManager.set('mobileEmulation', false);
+
+        // Navigate to the shared URL (all shots in batch have the same URL)
+        const testUrl = firstShot.url;
+        console.log(`[Batch] Navigating to ${testUrl}...`);
+        mainWindow.scrutinizerView.webContents.loadURL(testUrl);
+
+        const loadTimeoutMs = parseInt(process.env.TEST_LOAD_TIMEOUT || '15000', 10);
+        let loadResolved = false;
+        mainWindow.scrutinizerView.webContents.once('did-finish-load', () => onPageReady());
+        setTimeout(() => {
+            if (!loadResolved) {
+                console.log(`[Batch] Load timeout (${loadTimeoutMs}ms) — proceeding`);
+                onPageReady();
+            }
+        }, loadTimeoutMs);
+
+        const onPageReady = async () => {
+            if (loadResolved) return;
+            loadResolved = true;
+            console.log('[Batch] Page loaded. Starting shot sequence...');
+
+            // Handle scroll if specified
+            const scrollY = firstShot.scrollY || 0;
+            if (scrollY > 0) {
+                await mainWindow.scrutinizerView.webContents.executeJavaScript(`window.scrollTo(0, ${scrollY});`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+
+            // Wait for initial render
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            const { width, height } = mainWindow.getContentBounds();
+            const winBounds = mainWindow.getBounds();
+
+            // Determine output directory — use per-shot outputDir or version-based default
+            const packageVersion = require('./package.json').version.replace(/\.\d+$/, '');
+            const defaultScreenshotsDir = p.join(__dirname, 'tests', 'golden-captures', `v${packageVersion}`);
+
+            for (let i = 0; i < shots.length; i++) {
+                const shot = shots[i];
+                console.log(`[Batch] Shot ${i + 1}/${shots.length}: ${shot.filename} (mode=${shot.mode})`);
+
+                // Position fixation for this shot
+                let targetX, targetY;
+                if (shot.selector) {
+                    try {
+                        const bounds = await mainWindow.scrutinizerView.webContents.executeJavaScript(`
+                            (() => {
+                                const el = document.querySelector('${shot.selector}');
+                                if (!el) return null;
+                                const rect = el.getBoundingClientRect();
+                                return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+                            })()
+                        `);
+                        if (bounds) {
+                            targetX = bounds.x + (bounds.width / 2);
+                            targetY = bounds.y + (bounds.height / 2);
+                        }
+                    } catch (e) { /* fall through */ }
+                }
+                if (targetX === undefined) {
+                    targetX = shot.fixationX != null ? width * shot.fixationX : width / 2;
+                    targetY = shot.fixationY != null ? height * shot.fixationY : height / 2;
+                }
+
+                const screenTargetX = winBounds.x + targetX;
+                const screenTargetY = winBounds.y + targetY;
+                mainWindow.scrutinizerHud.webContents.send('browser:mousemove', screenTargetX, screenTargetY, 1.0);
+
+                // Apply radius override
+                if (shot.radius) {
+                    mainWindow.scrutinizerHud.webContents.send('menu:set-foveal-radius', parseFloat(shot.radius));
+                }
+
+                // Set mode
+                const mode = shot.mode;
+                if (mode === 'saliency') {
+                    mainWindow.scrutinizerHud.webContents.send('menu:toggle-saliency-map', true);
+                } else if (mode === 'structure') {
+                    mainWindow.scrutinizerHud.webContents.send('menu:toggle-structure-map', true);
+                } else if (mode === 'congestion_overlay') {
+                    mainWindow.scrutinizerHud.webContents.send('menu:set-show-congestion', 1);
+                } else if (mode === 'congestion_solo') {
+                    mainWindow.scrutinizerHud.webContents.send('menu:set-show-congestion', 2);
+                } else {
+                    const modeNum = parseFloat(mode);
+                    mainWindow.scrutinizerHud.webContents.send('menu:set-aesthetic-mode', isNaN(modeNum) ? mode : modeNum);
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // Apply per-shot overrides after mode switch
+                if (shot.chromaticPooling !== undefined) {
+                    mainWindow.scrutinizerHud.webContents.send('menu:toggle-chromatic-pooling', shot.chromaticPooling);
+                }
+
+                // Toggle overlay if requested
+                if (shot.overlay) {
+                    mainWindow.scrutinizerHud.webContents.send('menu:set-debug-boundary', 2.0);
+                }
+
+                // Wait for render
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+                // Capture
+                try {
+                    const captureTarget = mainWindow.scrutinizerHud;
+                    const image = await captureTarget.capturePage();
+                    let buffer = image.toPNG();
+
+                    // Embed citation metadata
+                    try {
+                        const citationExport = require('./renderer/citation-export');
+                        buffer = await citationExport.embedMetadata(buffer, {
+                            modeId: typeof mode === 'number' ? mode : 0,
+                            modeName: String(mode),
+                            foveaRadius: parseFloat(shot.radius) || currentRadius || 180,
+                            url: testUrl,
+                            pipeline: { aestheticMode: parseFloat(mode) || currentAestheticMode }
+                        });
+                    } catch (metaErr) { /* non-fatal */ }
+
+                    const screenshotsDir = shot.outputDir || defaultScreenshotsDir;
+                    if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir, { recursive: true });
+
+                    const filePath = p.join(screenshotsDir, shot.filename);
+                    fs.writeFileSync(filePath, buffer);
+                    console.log(`[Batch] ✓ ${shot.filename}`);
+                } catch (err) {
+                    console.error(`[Batch] ✗ ${shot.filename}: ${err.message}`);
+                }
+
+                // Clean up mode state for next shot
+                if (mode === 'saliency') {
+                    mainWindow.scrutinizerHud.webContents.send('menu:toggle-saliency-map', false);
+                } else if (mode === 'structure') {
+                    mainWindow.scrutinizerHud.webContents.send('menu:toggle-structure-map', false);
+                } else if (mode === 'congestion_overlay' || mode === 'congestion_solo') {
+                    mainWindow.scrutinizerHud.webContents.send('menu:set-show-congestion', 0);
+                }
+                if (shot.overlay) {
+                    mainWindow.scrutinizerHud.webContents.send('menu:set-debug-boundary', 0);
+                }
+            }
+
+            console.log(`[Batch] ✅ All ${shots.length} shots complete`);
+            app.exit(0);
+        };
+    }
+}
+
 
 // Register global shortcut for Open URL
 // Register global shortcut for Open URL
@@ -2048,7 +2246,9 @@ function checkForAppUpdates({ manual = false } = {}) {
 
 // App Startup Logic
 app.whenReady().then(() => {
-    if (process.env.TEST_MODE === 'true') {
+    if (process.env.TEST_MODE === 'true' && process.env.TEST_BATCH_FILE) {
+        runBatchCapture();
+    } else if (process.env.TEST_MODE === 'true') {
         runIntegrationTest();
     } else {
         createWindow();

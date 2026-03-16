@@ -35,6 +35,9 @@ tests/validation/results-*/
 tests/golden-captures/
 tests/smoke-captures/
 
+# Isotropic comparison captures — bulk PNGs, regenerate with capture-isotropic-comparison.js
+docs/golden/isotropic-comparison/
+
 # Capture pipeline manifests (per-directory skip cache)
 .capture-manifest.json
 

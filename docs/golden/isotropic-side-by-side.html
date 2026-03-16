@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>v2.5 Isotropic Comparison — Mode 0 vs Mode 8 (Polar) vs Mode 12 (FOVI Isotropic)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, system-ui, sans-serif; background: #111; color: #eee; padding: 20px; }
+  h1 { font-size: 1.4em; margin-bottom: 4px; }
+  .subtitle { color: #888; font-size: 0.85em; margin-bottom: 24px; }
+  .pair { margin-bottom: 32px; }
+  .pair h2 { font-size: 1em; color: #aaa; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+  .compare { display: flex; gap: 4px; }
+  .compare .side { flex: 1; position: relative; }
+  .compare .side img { width: 100%; display: block; border: 1px solid #333; cursor: zoom-in; }
+  .compare .side .label {
+    position: absolute; top: 8px; left: 8px;
+    background: rgba(0,0,0,0.7); color: #fff; font-size: 11px;
+    padding: 2px 8px; border-radius: 3px; font-weight: 600;
+  }
+  .compare .side .label.polar { background: rgba(180,80,40,0.8); }
+  .compare .side .label.iso { background: rgba(40,120,200,0.8); }
+  .notes { font-size: 0.8em; color: #777; margin-top: 6px; }
+
+  .controls { margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .controls button {
+    background: #333; color: #eee; border: 1px solid #555; padding: 4px 12px;
+    border-radius: 4px; cursor: pointer; font-size: 0.85em;
+  }
+  .controls button.active { background: #2878c8; border-color: #2878c8; }
+  .controls .sep { color: #444; }
+
+  /* Lightbox */
+  .lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; cursor: zoom-out; }
+  .lightbox img { max-width: 95vw; max-height: 95vh; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+  .lightbox.active { display: block; }
+</style>
+</head>
+<body>
+<h1>v2.5 Isotropic Cortical Sampling</h1>
+<p class="subtitle">Mode 0 (Smoothstep) vs Mode 8 (Polar Quantize, v2.4) vs Mode 12 (FOVI Isotropic, v2.5)</p>
+
+<div class="controls">
+  <span style="color:#888;font-size:0.85em">Fixation:</span>
+  <button class="active" onclick="setFixation('center')">Center</button>
+  <button onclick="setFixation('topleft')">Top-Left</button>
+  <span class="sep">|</span>
+  <span style="color:#888;font-size:0.85em">Show:</span>
+  <button id="btn-3" class="active" onclick="setCols(3)">3-Way</button>
+  <button id="btn-2" onclick="setCols(2)">Mode 0 vs 12</button>
+</div>
+
+<div id="pairs"></div>
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('active')"><img id="lightbox-img"></div>
+
+<script>
+const CMP = 'isotropic-comparison/';
+
+const PAGES = [
+  { name: 'grid', label: 'Grid (Distortion Check)',
+    notes: 'Geometric regularity makes sector geometry most visible. Look for radial elongation (polar) vs uniform tiling (isotropic).' },
+  { name: 'dashboard', label: 'Dashboard',
+    notes: 'Real UI at multiple eccentricities. Compare peripheral structure organization.' },
+  { name: 'crowding', label: 'Crowding (Letters)',
+    notes: 'Flanker legibility sensitive to tangential sampling. Key stimulus for isotropy validation.' },
+  { name: 'article', label: 'Article (Text-Heavy)',
+    notes: 'Reading-relevant content. Isotropic sampling should show more uniform degradation at equal eccentricities.' },
+];
+
+let fixation = 'center';
+let cols = 3;
+
+function setFixation(f) {
+  fixation = f;
+  document.querySelectorAll('.controls button').forEach(b => {
+    if (b.textContent === 'Center' || b.textContent === 'Top-Left')
+      b.classList.toggle('active', b.textContent.toLowerCase().replace('-','') === f);
+  });
+  render();
+}
+function setCols(n) {
+  cols = n;
+  document.getElementById('btn-3').classList.toggle('active', n === 3);
+  document.getElementById('btn-2').classList.toggle('active', n === 2);
+  render();
+}
+
+function render() {
+  const container = document.getElementById('pairs');
+  container.innerHTML = '';
+
+  for (const page of PAGES) {
+    const div = document.createElement('div');
+    div.className = 'pair';
+
+    const mode0 = `${CMP}${page.name}_${fixation}_mode0_smoothstep.png`;
+    const mode8 = `${CMP}${page.name}_${fixation}_mode8_polar.png`;
+    const mode12 = `${CMP}${page.name}_${fixation}_mode12_isotropic.png`;
+
+    let html = `<h2>${page.label} &mdash; ${fixation} fixation</h2><div class="compare">`;
+    html += `<div class="side"><span class="label">Mode 0 (Smoothstep)</span><img src="${mode0}" loading="lazy" onclick="zoom(this)"></div>`;
+    if (cols === 3) {
+      html += `<div class="side"><span class="label polar">Mode 8 (Polar Quantize)</span><img src="${mode8}" loading="lazy" onclick="zoom(this)"></div>`;
+    }
+    html += `<div class="side"><span class="label iso">Mode 12 (FOVI Isotropic)</span><img src="${mode12}" loading="lazy" onclick="zoom(this)"></div>`;
+    html += `</div><p class="notes">${page.notes}</p>`;
+
+    div.innerHTML = html;
+    container.appendChild(div);
+  }
+}
+
+function zoom(img) {
+  const lb = document.getElementById('lightbox');
+  document.getElementById('lightbox-img').src = img.src;
+  lb.classList.add('active');
+}
+
+render();
+</script>
+</body>
+</html>

@@ -145,6 +145,8 @@
                     v4_style_id: 0, // High-Key
                     lgn_ramp_end_mult: 3.0,
                     v1_animate: false,
+                    num_cortical_rings: 0,
+                    show_sector_grid: false,
                     dog_enabled: false,
                     dog_e2: 0.5,
                     dog_sharpness: 0.0,
@@ -247,6 +249,8 @@
                 this.lgnRampEndMultLocation = gl.getUniformLocation(this.program, "u_lgn_ramp_end_mult");
                 this.v1AnimateLocation = gl.getUniformLocation(this.program, "u_v1_animate");
                 this.crowdingRadialBiasLocation = gl.getUniformLocation(this.program, "u_crowding_radial_bias");
+                this.numCorticalRingsLocation = gl.getUniformLocation(this.program, "u_num_cortical_rings");
+                this.showSectorGridLocation = gl.getUniformLocation(this.program, "u_show_sector_grid");
 
                 // DoG uniform lookups
                 this.dogEnabledLocation = gl.getUniformLocation(this.program, "u_dog_enabled");
@@ -554,6 +558,8 @@
                     v4_style_id: 0,
                     lgn_ramp_end_mult: 2.0,
                     v1_animate: false,
+                    num_cortical_rings: 0,
+                    show_sector_grid: false,
                     dog_enabled: false,
                     dog_e2: 0.5,
                     dog_sharpness: 0.0,
@@ -589,6 +595,8 @@
                         this.config.v1_distortion_type = p.v1_distortion_type ?? defaults.v1_distortion_type;
                         this.config.v1_strength_mult = p.v1_strength_mult ?? defaults.v1_strength_mult;
                         this.config.v1_animate = p.v1_animate ?? defaults.v1_animate;
+                        this.config.num_cortical_rings = p.num_cortical_rings ?? defaults.num_cortical_rings;
+                        this.config.show_sector_grid = p.show_sector_grid ?? defaults.show_sector_grid;
                         this.config.v4_style_id = p.v4_style_id ?? defaults.v4_style_id;
                         this.config.dog_enabled = p.dog_enabled ?? defaults.dog_enabled;
                         this.config.dog_e2 = p.dog_e2 ?? defaults.dog_e2;
@@ -798,6 +806,8 @@
                 gl.uniform1i(this.v4StyleIdLocation, this.config.v4_style_id);
                 gl.uniform1f(this.lgnRampEndMultLocation, this.config.lgn_ramp_end_mult);
                 gl.uniform1f(this.v1AnimateLocation, this.config.v1_animate ? 1.0 : 0.0);
+                gl.uniform1f(this.numCorticalRingsLocation, this.config.num_cortical_rings ?? 0.0);
+                gl.uniform1f(this.showSectorGridLocation, this.config.show_sector_grid ? 1.0 : 0.0);
                 gl.uniform1f(this.crowdingRadialBiasLocation, this.config.crowdingRadialBias ?? 2.0);
                 gl.uniform1f(this.dogEnabledLocation, this.config.dog_enabled ? 1.0 : 0.0);
                 gl.uniform1f(this.dogE2Location, this.config.dog_e2);
