@@ -103,6 +103,37 @@ This pipeline generates the "Saliency Map" used to guide the user's attention (h
     - **Smoothing**: The render loop blends `saliencyCurrentCanvas` towards `target` over ~60 frames to remove flicker.
     - `WebGLRenderer` uploads existing smoothened canvas to the GPU (`u_saliencyMap`).
 
+### E. WebGPU Compute Texture Synthesis (Tier 2.5)
+
+When the active mode has `compute_tier >= 2.5`, a WebGPU compute pipeline generates texture-synthesized peripheral content alongside the MIP chain.
+
+**Pipeline:**
+1.  **Downsample**: `scrutinizer.js` downsamples the source frame to half-res CPU-side.
+2.  **Upload + Dispatch**: `webgpu-crowding-compute.js` uploads to GPU, dispatches two passes (tile statistics → oriented noise synthesis).
+3.  **Readback**: Async `mapAsync` copies results back to CPU (1-3 frames latency).
+4.  **Upload to WebGL**: `uploadComputeTexture()` binds result to TEXTURE5.
+5.  **Fragment Shader**: If `u_compute_tier > 2.0` AND `_hasComputeData`, shader blends TEXTURE5 with MIP fallback using alpha (0 at fovea, 1 at periphery).
+
+**Gating**: Compute runs every 2nd frame (`shouldCompute()`). Resynthesis triggers on saccade landing, gaze drift beyond `fovealRadius * 2`, or `_metamerInitialized = false`.
+
+#### Frame Synchronization Invariant
+
+The MIP chain (TEXTURE0) is **synchronous** — `gl.texImage2D()` + `gl.generateMipmap()` complete before the draw call. TEXTURE0 always reflects the current frame.
+
+The compute texture (TEXTURE5) is **asynchronous** — 2-5 frame latency from dispatch to readback. During this window, TEXTURE5 contains data from a previous frame.
+
+**The invalidation pattern** prevents stale artifacts:
+
+| Event | Action | Effect |
+|-------|--------|--------|
+| Navigation (`did-navigate`) | `invalidateComputeTexture()` + reset metamer state + `frameCounter = -1` | Shader falls back to MIP until fresh compute arrives |
+| Scroll (`structure-update`, `trigger=scroll`) | `invalidateComputeTexture()` + `_metamerInitialized = false` | Same — MIP fallback during resynth |
+| Readback complete (`.then()` callback) | `uploadComputeTexture()` sets `_hasComputeData = true` + `_metamerInitialized = false` | Shader uses fresh compute; forces another resynth next cycle for dynamic content |
+
+`invalidateComputeTexture()` sets `_hasComputeData = false`. The shader uniform `u_compute_tier` is gated: `this._hasComputeData ? this._computeTier : 0.0`. When false, the shader ignores TEXTURE5 entirely and renders from the fresh MIP chain — the same path as mode 0.
+
+**Design principle**: The compute texture is a **progressive enhancement**. When it's fresh, the periphery gets texture-synthesized content. When it's stale or pending, the system degrades gracefully to MIP-based rendering. The user sees clean content at all times; the metamer snaps in when available.
+
 ---
 
 ## 3. Key Data Structures
