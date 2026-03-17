@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.5.0] - 2026-03-16
+
+### Added
+- **12-Band DoG Decomposition**: Extended from 8 half-octave bands (LOD 0.0–4.0) to 12 bands (LOD 0.0–6.0), covering 5.66–0.088 cpd. The four new low-frequency bands capture panel backgrounds, hero images, and page-level color regions — scales where peripheral color perception is strongest.
+- **Swatch-Aware Chromatic Preservation**: `mip[12]` Oklab chrominance magnitude distinguishes large uniform color regions from mixed/text content. Swatches retain up to 30% more color at the same eccentricity. Boost applies to frequency bands only (not DC residual) to prevent color halos.
+- **Color Search Validation (Wave 1)**: Three-tier validation suite against published psychophysics. 24px dots at 5 eccentricity rings (2.5°–12.4°). Tier 1: 9/9 (monotonic decrease, BY ≥ 1.5× RG). Tier 2: 2/3 (Bowers ratio pass, green tracking pass, rendered-vs-model 5/20). Tier 3: 3/3 (Hansen correlation r=1.000, BY > RG every ring).
+- **Smoke Test Pipeline**: `npm run capture-smoke` — 6-shot sanity check across 3 Electron batches. Covers basic render, mode switch, saliency debug, scroll, off-center fixation.
+- **Capture Infrastructure**: Manifest-based skip logic (`capture-manifest.js`), batch orchestrator (`capture-runner.js`). Golden captures group shots by URL and reuse Electron instances.
+- **New Test Suites**: `mip-fidelity.test.js` (DoG vs rect sampling), `isotropic-sectors.test.js` (cortical grid geometry), `stimulus-domain.test.js` (spectral mismatch, gamut, crowding). 258 tests across 11 suites (was 138).
+- **Reference Pages**: `color-spectrum-v2.html` (improved band layout), `chroma-uniform.html` (uniform chromaticity stimulus), `grid-comparison.html` (MIP vs cortical grid), `ocr-text-grid.html` (readability testing).
+- **Mode 12 Infrastructure**: Isotropic cortical sampling mode scaffolding (grid geometry not yet active in rendering).
+
+### Changed
+- **RG Decay Calibration**: `rg_decay` 0.072 → 0.085. BY/RG sensitivity ratio at ring 5 (12.4°) now 2.59 vs Bowers et al. (2025) 2.72 at 15° (5% off, was 21%). Single-exponential cannot capture biphasic RG decay at far eccentricities — documented limitation.
+- **Base Desaturation Ramp**: `lgn_ramp_end_mult` 2.0 → 6.0 for mode 0. Extends smoothstep from 1°–2° to 1°–6°, eliminating color cliff at parafoveal boundary. When per-band chromatic pooling is active, base ramp reduced to 40% strength to prevent stacking.
+- **Base Desat Stacking Fix**: Per-band attenuation and base desaturation were multiplying, over-desaturating the periphery. Base ramp now scales to 40% when per-band is active.
+
+### Fixed
+- **Analyzer Sample Offset**: `analyze-color-search.js` was sampling at `RINGS[r] + halfBand` (outer edge of band) instead of `RINGS[r]` (band center). At outer rings the sample landed in the gap between bands, causing spurious monotonicity failures.
+- **Foveal Boundary LOD**: `textureGrad` callers now use V1-distorted UV derivatives (`dFdx(distortedUV)`), fixing over-blur radially and under-blur tangentially at the foveal boundary.
+- **Validation Eccentricity Label**: Bowers comparison now correctly labeled as ring 5 (12.44°), not "~15°".
+
 ## [2.4.0] - 2026-03-13
 
 ### Added
