@@ -389,6 +389,14 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         float sectorExtent_px = dr_deg * ppd;
         float lodFloor = log2(max(1.0, sectorExtent_px)) - 1.5;
 
+        // Displacement-distance boost: if the cutter threw this pixel N px,
+        // suppress bands finer than N px. Scattered color from small saturated
+        // elements collapses into the DC residual (a neighborhood tint, not
+        // isolated pixel dust). Uses undistortedUV to measure throw distance.
+        float displaceDist = length(uv - undistortedUV) * u_resolution.x;
+        float displaceLodBoost = log2(max(1.0, displaceDist * 2.0));
+        lodFloor = max(lodFloor, displaceLodBoost);
+
         for (int k = 0; k < 12; k++) {
             float bandLod = float(k) * 0.5;
             w[k] *= smoothstep(lodFloor - 0.5, lodFloor + 0.5, bandLod);
