@@ -374,6 +374,27 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         w[k] = 1.0 - smoothstep(c[k] - c[k] * transMult, c[k] + c[k] * transMult, normEcc);
     }
 
+    // Cortical resolution floor: suppress DoG bands finer than the local cortical
+    // sector can resolve (Nyquist limit of the pooling region). The sector radial
+    // extent grows with eccentricity via CMF: dr ≈ (r + a) × (exp(w_step) - 1).
+    // Bands below this floor carry no information the cortical grid could represent.
+    // The 1.5 LOD shift models the CSF roll-off — suppression starts ~3× finer than
+    // the hard Nyquist limit, not at the limit itself (see Rovamo & Virsu 1979).
+    if (u_cmf_enabled > 0.5) {
+        float ppd = px_per_deg;
+        float r_deg_floor = normEcc * 1.0;  // fovea_deg = 1.0
+        float N_rings = 50.0;  // Blauch default cortical ring count
+        float w_step_floor = u_cortical_max / (N_rings - 1.0);
+        float dr_deg = (r_deg_floor + u_cmf_a) * (exp(w_step_floor) - 1.0);
+        float sectorExtent_px = dr_deg * ppd;
+        float lodFloor = log2(max(1.0, sectorExtent_px)) - 1.5;
+
+        for (int k = 0; k < 12; k++) {
+            float bandLod = float(k) * 0.5;
+            w[k] *= smoothstep(lodFloor - 0.5, lodFloor + 0.5, bandLod);
+        }
+    }
+
     // Reconstruct: residual (always full) + weighted bands
     // Clamp to [0,1] — band differences can be negative, partial attenuation
     // may produce out-of-range values
