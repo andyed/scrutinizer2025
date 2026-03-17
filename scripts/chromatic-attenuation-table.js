@@ -60,8 +60,22 @@ const bands = [
   { name: 'residual', freq: 0.088, label: '~0.088 cpd (DC, always preserved)' },
 ];
 
+// Cortical-mapped eccentricity: log(r+a) compresses far periphery.
+// Anchored so effectiveEcc(15°) = 15° (Bowers reference eccentricity).
+const cmf_a = castlePeripheral.cmf_a ?? 2.78;
+const cmf_enabled = castlePeripheral.cmf_enabled ?? true;
+
+function corticalEcc(r_deg) {
+  if (!cmf_enabled || r_deg <= fovea_deg) return r_deg;
+  const w = Math.log(1 + r_deg / cmf_a);
+  const w_fov = Math.log(1 + fovea_deg / cmf_a);
+  const w_ref = Math.log(1 + 15.0 / cmf_a);
+  return fovea_deg + (15.0 - fovea_deg) * (w - w_fov) / (w_ref - w_fov);
+}
+
 function atten(k_e, k_ef, freq, ecc_deg, supra) {
-  const threshold = Math.pow(10, -(k_e + k_ef * freq) * ecc_deg);
+  const eff_ecc = corticalEcc(ecc_deg);
+  const threshold = Math.pow(10, -(k_e + k_ef * freq) * eff_ecc);
   const appearance = Math.pow(threshold, supra);
   return { threshold, appearance };
 }

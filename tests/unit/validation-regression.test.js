@@ -44,12 +44,29 @@ const bowers = JSON.parse(fs.readFileSync(bowersPath, 'utf8'));
 // ─── Core formulas (mirrors chromatic-attenuation-table.js & shader) ────────
 
 /**
- * Per-channel chromatic attenuation.
- * threshold = 10^(-(k_e + k_ef × freq) × ecc)
+ * Cortical-mapped eccentricity: log(r+a) compresses far periphery.
+ * Anchored so effectiveEcc(15°) = 15° (Bowers reference).
+ */
+const CMF_A = pipeline.cmf_a ?? 2.78;
+const CMF_ENABLED = pipeline.cmf_enabled ?? true;
+const FOVEA_DEG = 1.0;
+
+function corticalEcc(r_deg) {
+    if (!CMF_ENABLED || r_deg <= FOVEA_DEG) return r_deg;
+    const w = Math.log(1 + r_deg / CMF_A);
+    const w_fov = Math.log(1 + FOVEA_DEG / CMF_A);
+    const w_ref = Math.log(1 + 15.0 / CMF_A);
+    return FOVEA_DEG + (15.0 - FOVEA_DEG) * (w - w_fov) / (w_ref - w_fov);
+}
+
+/**
+ * Per-channel chromatic attenuation with cortical eccentricity mapping.
+ * threshold = 10^(-(k_e + k_ef × freq) × corticalEcc(ecc))
  * appearance = threshold^supra
  */
 function attenuation(k_e, k_ef, freq, ecc_deg, supra) {
-    const threshold = Math.pow(10, -(k_e + k_ef * freq) * ecc_deg);
+    const eff_ecc = corticalEcc(ecc_deg);
+    const threshold = Math.pow(10, -(k_e + k_ef * freq) * eff_ecc);
     return Math.pow(threshold, supra);
 }
 

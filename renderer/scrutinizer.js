@@ -93,7 +93,7 @@
 
             // ── Frame state ──────────────────────────────────────────
             this.lastFrameBitmap = null;
-            this.aestheticMode = 0;
+            this.aestheticMode = 0; // Highkey: CMF + chromatic + DoG (compute mongrel has scroll/nav artifacts)
             this.dpr = window.devicePixelRatio || 1;
             this._congestionReportMode = 0;
             this._lastCongestionGeneration = 0;

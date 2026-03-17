@@ -384,7 +384,21 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         // RG (L-M): steep base decay + weak freq dependence (suprathreshold spatial summation)
         // YV S-(L+M): slow base decay + strong freq dependence (coarse bands persist)
         float fovea_deg = 1.0;  // 1° foveal radius (2° diameter)
-        float ecc_deg = chromNormEcc * fovea_deg;
+        float r_deg = chromNormEcc * fovea_deg;
+        float ecc_deg;
+        if (u_cmf_enabled > 0.5 && r_deg > fovea_deg) {
+            // Cortical-mapped eccentricity: log(r+a) compresses far periphery.
+            // Bowers (2025) measured biphasic RG decay — steep to ~15°, then slowing.
+            // The log transform produces this shape naturally: fast cortical distance
+            // growth near fovea, slowing with eccentricity. No explicit knee needed.
+            // Anchored so effectiveEcc(15°) = 15° (Bowers reference eccentricity).
+            float w = log(1.0 + r_deg / u_cmf_a);
+            float w_fov = log(1.0 + fovea_deg / u_cmf_a);
+            float w_ref = log(1.0 + 15.0 / u_cmf_a);
+            ecc_deg = fovea_deg + (15.0 - fovea_deg) * (w - w_fov) / (w_ref - w_fov);
+        } else {
+            ecc_deg = r_deg;  // legacy linear path
+        }
 
         // Threshold sensitivity → appearance compression (Jiang, Shooner & Mullen 2022)
         float supra = max(u_supra_exponent, 0.01);
