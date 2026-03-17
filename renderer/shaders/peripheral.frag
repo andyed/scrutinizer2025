@@ -946,14 +946,12 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
             vec2 jitter = hash22(cellID) - 0.5;
             
             // SCRAMBLE AMPLITUDE — radial/tangential (Toet & Levi 1992)
-            // 2:1 radial:tangential ratio matches crowding zone ellipticity.
+            // Throw distance scales with sector extent: cells displace by up to
+            // one sector width. This replaces the old unbounded progressive scaling
+            // that reached 18× at wide-screen edges, throwing cells 100+px.
             // Edge density modulation: high-edge regions crowd more strongly.
             float edgeCrowdMult = 1.0 + lgn.edgeDensity * 0.4;
-            float throwMag = 0.003 * u_intensity * edgeCrowdMult;
-
-            // PROGRESSIVE SCALING: Grow distortion with eccentricity
-            float progressive = 1.0 + max(0.0, (dist - parafovea_radius * 1.5) / parafovea_radius);
-            throwMag *= progressive;
+            float throwMag = (cellPx / u_resolution.x) * u_intensity * edgeCrowdMult;
 
             // Project jitter onto radial/tangential axes relative to fixation
             vec2 throwVec = (jitter.x * radDir * 2.0 + jitter.y * tanDir * 1.0) * throwMag;
