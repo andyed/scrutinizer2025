@@ -3,7 +3,7 @@
 Open research directions building on Scrutinizer's infrastructure — a real-time, gaze-contingent foveated rendering system running in Electron/WebGL2. Suitable for thesis work, independent study, or collaboration.
 
 The modular pipeline (GazeModel, VisualMemory, ContentAnalysis, pipeline orchestrator) means each module can be independently swapped, extended, or instrumented without touching the rest. As of v2.1, the system includes:
-- **8 half-octave DoG bands**: Difference-of-Gaussians peripheral reconstruction at √2 frequency spacing (5.66–0.5 cpd), validated against Rovamo & Virsu 1979 spatial frequency data
+- **12 half-octave DoG bands**: Difference-of-Gaussians peripheral reconstruction at √2 frequency spacing (5.66–0.088 cpd), validated against Rovamo & Virsu 1979 spatial frequency data
 - **Per-channel chromatic pooling**: castleCSF-based RG/YV decay in Oklab color space, validated against Hansen 2009 and Mullen & Kingdom 2002
 - **Density-gated crowding**: Sigmoid gate on structure density modulates V1 distortion, validated against Halverson & Hornof 2011 behavioral data
 - **Five-wave psychophysical validation**: Automated pipeline testing against published data — see [validation published data](https://github.com/andyed/scrutinizer2025/tree/main/tests/validation/published-data) and [v2.1 release notes](docs/release_notes_v2.1.0.md)
@@ -25,7 +25,7 @@ The modular pipeline (GazeModel, VisualMemory, ContentAnalysis, pipeline orchest
 
 **Spec**: `docs/specs/oriented_dog_bands.md`
 **Depends on**: 1.3 (Calibrated Visual Angles) for publishable results
-**Baseline**: Isotropic 8-band DoG validated in Wave 2 (`docs/specs/wave2_spatial_acuity_validation.md`).
+**Baseline**: Isotropic 12-band DoG validated in Wave 2 (`docs/specs/wave2_spatial_acuity_validation.md`).
 
 The current DoG band decomposition is isotropic — all edge orientations attenuate equally with eccentricity. Real V1 cells are orientation-selective, and humans show ~30–50% better acuity for cardinal (horizontal/vertical) edges than oblique ones (Appelle, 1972). This project adds a 4-tap gradient analysis to modulate per-band M-scaling cutoffs by local edge orientation. Horizontal text strokes would persist ~50% further into the periphery than diagonal noise.
 

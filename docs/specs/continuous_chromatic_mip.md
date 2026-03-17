@@ -120,12 +120,12 @@ Optionally calibrate `u_rg_decay` too. Current 0.059 is threshold. Bowers report
 k_rg = 0.072
 ```
 
-Modest increase: 0.059 → 0.072. The RG channel was already reasonably aggressive; YV is the bigger gap.
+Modest increase: 0.059 → 0.072. The RG channel was already reasonably aggressive; YV is the bigger gap. *(Note: v2.5 further revised rg_decay to 0.085.)*
 
-| Parameter | Current (threshold) | Revised (suprathreshold) | Source |
-|-----------|-------------------|------------------------|--------|
-| u_rg_decay | 0.059 | 0.072 | Bowers 2025: 29% at 15° |
-| u_yv_decay | 0.004 | 0.014 | Bowers 2025: 79% at 15° |
+| Parameter | Current (threshold) | Revised (suprathreshold) | v2.5 | Source |
+|-----------|-------------------|------------------------|------|--------|
+| u_rg_decay | 0.059 | 0.072 | **0.085** | Bowers 2025: 29% at 15° |
+| u_yv_decay | 0.004 | 0.014 | 0.014 | Bowers 2025: 79% at 15° |
 
 ### Phase 3: Continuous size dependence (deferred)
 

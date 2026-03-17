@@ -83,7 +83,7 @@ The biological grounding matters. If you're adding or modifying a pipeline stage
 ## Testing
 
 ```bash
-npm test              # Run 138 unit tests (oklab-utils, gestalt-processor, color-saliency-map)
+npm test              # Run 258 unit tests across 11 suites
 npm start             # Visual verification — check golden captures in tests/golden-captures/
 ```
 

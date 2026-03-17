@@ -92,7 +92,7 @@ S(ecc, ρ) = S_foveal × 10^(-(k_e + ρ × k_ef) × ecc)
 
 The RG channel decays 2.5× faster than achromatic and **15× faster** than YV at low spatial frequencies.
 
-**Note:** These are *detection threshold* parameters. The implementation defaults use suprathreshold-corrected values derived from Bowers et al. (2025) appearance measurements: `u_rg_decay = 0.072` (from 29% at 15°), `u_yv_decay = 0.014` (from 79% at 15°). See §3 Uniforms table.
+**Note:** These are *detection threshold* parameters (pre-v2.0 detection threshold). The implementation defaults use suprathreshold-corrected values derived from Bowers et al. (2025) appearance measurements: `u_rg_decay = 0.085` (from 29% at 15°), `u_yv_decay = 0.014` (from 79% at 15°). See §3 Uniforms table.
 
 ### Derived Half-Life Eccentricities
 
@@ -187,7 +187,7 @@ vec4 sampleDoGReconstructedChromatic(vec2 uv, float eccentricity, float fovea_ra
     float ecc_deg = chromNormEcc * 2.0;  // fovea ≈ 2° radius
 
     // RG attenuation: per-band, steep base + weak frequency dependence
-    // u_rg_decay default = 0.072 (suprathreshold, Bowers 2025: 29% at 15°)
+    // u_rg_decay default = 0.085 (suprathreshold, Bowers 2025: 29% at 15°)
     // u_rg_freq_decay default = 0.003 (suprathreshold spatial summation)
     float rg_atten_band0 = pow(10.0, -(u_rg_decay + u_rg_freq_decay * 4.0) * ecc_deg);  // 4cpd
     float rg_atten_band1 = pow(10.0, -(u_rg_decay + u_rg_freq_decay * 2.0) * ecc_deg);  // 2cpd
@@ -232,7 +232,7 @@ vec4 chromaticAttenuate(vec4 color, float rg_atten, float yv_atten) {
 | Uniform | Type | Default | Purpose |
 |---------|------|---------|---------|
 | `u_chromatic_pooling` | float | 0.0 | 0=off (legacy uniform desat), 1=on (per-channel per-band) |
-| `u_rg_decay` | float | 0.072 | RG base eccentricity decay (suprathreshold; Bowers 2025) |
+| `u_rg_decay` | float | 0.085 | RG base eccentricity decay (suprathreshold; Bowers 2025) |
 | `u_rg_freq_decay` | float | 0.003 | RG frequency-dependent decay (suprathreshold spatial summation) |
 | `u_yv_decay` | float | 0.014 | YV base eccentricity decay (suprathreshold; Bowers 2025) |
 | `u_yv_freq_decay` | float | 0.008 | YV frequency-dependent decay (castleCSF k_ef) |
@@ -247,7 +247,7 @@ Two independent biological mechanisms reduce peripheral chrominance. The shader 
 
 2. **Cone-to-rod population shift** (base desaturation, in V4 pipeline). Rods outnumber cones increasingly with eccentricity. Rod signals are achromatic. Even if the remaining cones could resolve chrominance perfectly, there are fewer of them relative to rods — overall chromatic signal strength drops. This is a photoreceptor density problem — modeled by the smoothstep ramp on Oklab `a` and `b`.
 
-These multiply because they're independent: a peripheral pixel can have both degraded opponent-channel resolution (per-band) AND reduced cone contribution (base desat). At 10° with suprathreshold defaults (k_rg=0.072, k_yv=0.014):
+These multiply because they're independent: a peripheral pixel can have both degraded opponent-channel resolution (per-band) AND reduced cone contribution (base desat). At 10° with suprathreshold defaults (k_rg=0.085, k_yv=0.014):
 
 | Stage | RG | YV |
 |-------|:--:|:--:|

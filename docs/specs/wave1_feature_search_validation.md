@@ -22,7 +22,7 @@ Parameters from `shared/modes.json` (castleCSF Chromatic Pooling mode):
 
 | Parameter | Value | Source |
 |-----------|-------|--------|
-| `rg_decay` (k_e) | 0.072 | Bowers et al. 2025, suprathreshold |
+| `rg_decay` (k_e) | 0.085 | Bowers et al. 2025, suprathreshold |
 | `rg_freq_decay` (k_ef) | 0.003 | Conservative estimate (~1/3 of YV) |
 | `yv_decay` (k_e) | 0.014 | Bowers et al. 2025, suprathreshold |
 | `yv_freq_decay` (k_ef) | 0.008 | castleCSF spatial frequency interaction |
@@ -40,7 +40,7 @@ Eccentricity mapping at `fovea_radius=45px`, `fovea_deg=1.0`, `ppd=45`:
 
 ### Prediction A: RG collapses ~5x faster than BY
 
-The decay rate ratio is `rg_decay / yv_decay = 0.072 / 0.014 = 5.14`. At 1 cpd (representative of 24px dots at 45 ppd), predicted appearance retention:
+The decay rate ratio is `rg_decay / yv_decay = 0.085 / 0.014 = 6.07`. At 1 cpd (representative of 24px dots at 45 ppd), predicted appearance retention:
 
 | Ring | ecc (deg) | RG retention | BY retention | BY/RG ratio |
 |------|-----------|-------------|-------------|-------------|
@@ -142,15 +142,15 @@ Luminance-matched targets and their Oklab chromatic profiles:
 
 Extend `scripts/chromatic-attenuation-table.js` to accept `--json` flag and output structured predictions.
 
-**Stale parameters:** The script currently hardcodes `rg_decay=0.059, yv_decay=0.004` (pre-Bowers values). Must update to read from `shared/modes.json` or accept `--mode=castleCSF` to use current parameters (0.072/0.014).
+**Stale parameters:** The script currently hardcodes `rg_decay=0.059, yv_decay=0.004` (pre-v2.0 detection threshold values). Must update to read from `shared/modes.json` or accept `--mode=castleCSF` to use current v2.5 parameters (0.085/0.014).
 
-**Bowers derivation note:** The `k_e` values (0.072 RG, 0.014 YV) were fit to Bowers et al. (2025) suprathreshold data, but the fit uses a different baseline normalization than Bowers' published table (which normalizes to 5 deg). At 15 deg with `supra=1.0`, the threshold model gives RG=7.5% vs Bowers' 29% — a gap explained by the suprathreshold correction (`supra=0.5` gives 27.4%, close to Bowers). The validation should compare model appearance (supra=0.5) against Bowers' suprathreshold measurements, not raw threshold.
+**Bowers derivation note:** The `k_e` values (0.085 RG, 0.014 YV; previously 0.072 RG pre-v2.5) were fit to Bowers et al. (2025) suprathreshold data, but the fit uses a different baseline normalization than Bowers' published table (which normalizes to 5 deg). At 15 deg with `supra=1.0`, the threshold model gives RG=7.5% vs Bowers' 29% — a gap explained by the suprathreshold correction (`supra=0.5` gives 27.4%, close to Bowers). The validation should compare model appearance (supra=0.5) against Bowers' suprathreshold measurements, not raw threshold.
 
 Output format:
 
 ```json
 {
-  "parameters": { "rg_decay": 0.072, "rg_freq_decay": 0.003, ... },
+  "parameters": { "rg_decay": 0.085, "rg_freq_decay": 0.003, ... },
   "predictions": [
     { "color": "red", "size_px": 24, "freq_cpd": 0.94, "ring": 1, "ecc_deg": 2.22,
       "rg_retention": 0.826, "yv_retention": 0.945, "primary_channel": "rg" }

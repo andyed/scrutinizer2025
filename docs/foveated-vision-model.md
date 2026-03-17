@@ -255,21 +255,21 @@ The simple MIP pooling approach uniformly blurs content, progressively destroyin
 **Key insight**: The hardware MIP chain (generated every frame by `gl.generateMipmap()`) provides an approximate multi-scale decomposition using box/bilinear filtering (not true Gaussian convolution as in Burt & Adelson 1983). Subtracting adjacent MIP levels gives **approximate Laplacian pyramid bands** that function analogously to DoG, with some spectral leakage between bands:
 
 ```glsl
-// 9 MIP levels at half-octave spacing (LOD 0.0 to 4.0 in 0.5 steps)
+// 13 MIP levels at half-octave spacing (LOD 0.0 to 6.0 in 0.5 steps)
 // Half-integer LODs use hardware trilinear interpolation natively
-vec4 mip[9];
+vec4 mip[13];
 mip[0] = textureLod(tex, uv, 0.0);
 mip[1] = textureLod(tex, uv, 0.5);
-// ... mip[2] through mip[7] at LOD 1.0, 1.5, 2.0, 2.5, 3.0, 3.5
-mip[8] = textureLod(tex, uv, 4.0);
+// ... mip[2] through mip[11] at LOD 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5
+mip[12] = textureLod(tex, uv, 6.0);
 
-// 8 half-octave DoG bands — geometric √2 spacing
-vec4 band[8];
+// 12 half-octave DoG bands — geometric √2 spacing
+vec4 band[12];
 band[0] = mip[0] - mip[1];  // ~5.66 cpd: finest detail, serifs
 band[1] = mip[1] - mip[2];  // ~4.0 cpd:  thin strokes
 band[2] = mip[2] - mip[3];  // ~2.83 cpd: letter bodies
-// ... band[3] through band[7] down to ~0.5 cpd (layout blocks)
-// residual = mip[8]         // ~0.35 cpd: DC, always preserved
+// ... band[3] through band[11] down to ~0.125 cpd (large-scale structure)
+// residual = mip[12]        // ~0.088 cpd: DC, always preserved
 ```
 
 Each band is attenuated by a **smoothstep rolloff** based on normalized eccentricity, with cutoff distances derived from **linear M-scaling** (Rovamo & Virsu 1979, Levi, Klein & Aitsebaomo 1985):
@@ -731,14 +731,14 @@ vec3 oklabToRgb(vec3 lab);
 float chromNormEcc = max(0.0, visual_ecc) / max(fovea_radius, 0.001);
 float ecc_deg = chromNormEcc * 2.0;  // fovea ≈ 2° radius
 
-// RG: frequency-independent steep decay (castleCSF k_e = 0.059)
+// RG: frequency-independent steep decay (castleCSF k_e = 0.085)
 float rg_atten = pow(pow(10.0, -u_rg_decay * ecc_deg), supra);
 
 // Per-band frequency-dependent decay — large color fields persist
-// 8 bands + residual, frequencies from 5.66 cpd (serifs) to 0.35 cpd (DC)
-const float bandFreq[9] = float[9](5.657, 4.0, 2.828, 2.0, 1.414, 1.0, 0.707, 0.5, 0.354);
-float rg_atten[9], yv_atten[9];
-for (int k = 0; k < 9; k++) {
+// 12 bands + residual, frequencies from 5.66 cpd (serifs) to 0.088 cpd (DC)
+const float bandFreq[13] = float[13](5.657, 4.0, 2.828, 2.0, 1.414, 1.0, 0.707, 0.5, 0.354, 0.25, 0.177, 0.125, 0.088);
+float rg_atten[13], yv_atten[13];
+for (int k = 0; k < 13; k++) {
     rg_atten[k] = pow(pow(10.0, -(u_rg_decay + u_rg_freq_decay * bandFreq[k]) * ecc_deg), supra);
     yv_atten[k] = pow(pow(10.0, -(u_yv_decay + u_yv_freq_decay * bandFreq[k]) * ecc_deg), supra);
 }

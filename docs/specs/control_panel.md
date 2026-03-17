@@ -26,7 +26,7 @@ The ComplexityHUD proves the architectural pattern works: a fixed-position overl
 
 ### Vision/HCI Researchers (30+ controls visible)
 
-1. **Parameter tuning** — Type exact values for `rg_decay` (0.072), `cmf_a` (2.78), `dog_e2` (0.15) to match psychophysics data from a specific paper.
+1. **Parameter tuning** — Type exact values for `rg_decay` (0.085), `cmf_a` (2.78), `dog_e2` (0.15) to match psychophysics data from a specific paper.
 2. **Model comparison** — Switch between aesthetic modes (Legacy, FOVI Isotropic, Log-Polar MIP, Texture Synthesis) while keeping other parameters fixed. Diff view showing which parameters changed.
 3. **Export/import** — Save current parameter set as JSON, share with collaborator, load their parameter set to reproduce their viewing conditions.
 
@@ -77,7 +77,7 @@ Presets are the modes defined in `shared/modes.json`. Selecting a preset applies
 {
     activePreset: 'highkey',           // Currently loaded preset key
     overrides: {                       // Parameters changed since preset load
-        'rg_decay': 0.09,             // User increased from 0.072
+        'rg_decay': 0.09,             // User increased from 0.085
         'chromatic_pooling': false     // User disabled
     }
 }
@@ -166,7 +166,7 @@ Scrollable panel, organized by pipeline stage. Parameters that don't exist in th
 │                                     │
 │ ─── V4 (Chromatic) ─────────────   │
 │  Chromatic Pooling   [✓]          │
-│    RG Decay       [0.072  ]        │
+│    RG Decay       [0.085  ]        │
 │    RG Freq Decay  [0.003  ]        │
 │    YV Decay       [0.014  ]        │
 │    YV Freq Decay  [0.008  ]        │
@@ -215,7 +215,7 @@ Each control maps to exactly one IPC channel. Type indicates the DOM control ren
 | Structure Map (enable) | `menu:toggle-enable-structure-map` | toggle | on/off | on | No |
 | Saliency Modulation | `menu:toggle-saliency-modulation` | toggle | on/off | on | No |
 | Chromatic Pooling | `menu:toggle-chromatic-pooling` | toggle | on/off | on | No |
-| RG Decay | `menu:set-chromatic-pool-scale` | number | 0.01-0.2, step 0.001 | 0.072 | No |
+| RG Decay | `menu:set-chromatic-pool-scale` | number | 0.01-0.2, step 0.001 | 0.085 | No |
 | RG Freq Decay | (new) `menu:set-rg-freq-decay` | number | 0.001-0.05, step 0.001 | 0.003 | No |
 | YV Decay | (new) `menu:set-yv-decay` | number | 0.005-0.1, step 0.001 | 0.014 | No |
 | YV Freq Decay | (new) `menu:set-yv-freq-decay` | number | 0.001-0.05, step 0.001 | 0.008 | No |

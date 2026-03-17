@@ -20,8 +20,8 @@ planStatus:
 
 ## Goals
 - Replace uniform Oklab chrominance reduction with biologically accurate per-channel chromatic pooling
-- RG (red-green, Oklab `a`) decays ~2.5× faster than achromatic with eccentricity (k_e=0.059)
-- YV (blue-yellow, Oklab `b`) persists far into periphery and is frequency-dependent (k_e=0.004, k_ef=0.008)
+- RG (red-green, Oklab `a`) decays ~2.5× faster than achromatic with eccentricity (k_e=0.059, pre-v2.0 detection threshold; current v2.5 default: 0.085)
+- YV (blue-yellow, Oklab `b`) persists far into periphery and is frequency-dependent (k_e=0.004, pre-v2.0 detection threshold; current v2.5 default: 0.014; k_ef=0.008)
 - Use existing DoG band decomposition to solve size dependence (small red text loses color fast; large blue background retains it)
 - Ship as part of v1.9.0 alongside CMF fix and oriented DoG bands
 - Demo-ready for Rosenholtz/Blauch meeting (~March 14)
@@ -42,8 +42,8 @@ Add after existing FOVI uniforms (line ~48):
 
 ```glsl
 uniform float u_chromatic_pooling;  // 0=off (legacy uniform desat), 1=on
-uniform float u_rg_decay;           // castleCSF k_e for RG (default 0.059)
-uniform float u_yv_decay;           // castleCSF k_e for YV (default 0.004)
+uniform float u_rg_decay;           // castleCSF k_e for RG (default 0.059 pre-v2.0 detection threshold; v2.5: 0.085)
+uniform float u_yv_decay;           // castleCSF k_e for YV (default 0.004 pre-v2.0 detection threshold; v2.5: 0.014)
 uniform float u_yv_freq_decay;      // castleCSF k_ef for YV (default 0.008)
 ```
 
@@ -118,8 +118,8 @@ this.yvFreqDecayLocation = null;
 **Config defaults** (in config object ~line 115):
 ```javascript
 chromatic_pooling: false,
-rg_decay: 0.059,
-yv_decay: 0.004,
+rg_decay: 0.059,  // pre-v2.0 detection threshold; v2.5 default: 0.085
+yv_decay: 0.004,  // pre-v2.0 detection threshold; v2.5 default: 0.014
 yv_freq_decay: 0.008,
 ```
 
@@ -165,8 +165,8 @@ Enable chromatic pooling on the two research modes where DoG is active:
 Add to mode 0, 1, and 9 pipeline objects:
 ```json
 "chromatic_pooling": true,
-"rg_decay": 0.059,
-"yv_decay": 0.004,
+"rg_decay": 0.059,  // pre-v2.0 detection threshold; v2.5 default: 0.085
+"yv_decay": 0.004,  // pre-v2.0 detection threshold; v2.5 default: 0.014
 "yv_freq_decay": 0.008
 ```
 
