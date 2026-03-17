@@ -7,7 +7,7 @@
 
 Live site: **[scrutinizer.app](https://andyed.github.io/scrutinizer-www/)** | [Blog](https://andyed.github.io/scrutinizer-www/blog/) | [YouTube](https://www.youtube.com/@scrutinizer-app/playlists)
 
-macOS Installer: **[Download v2.4.0](https://github.com/andyed/scrutinizer2025/releases/tag/v2.4.0)** | [Changelog](CHANGELOG.md)
+macOS Installer: **[Download v2.5.0](https://github.com/andyed/scrutinizer2025/releases/tag/v2.5.0)** | [Changelog](CHANGELOG.md)
 
 ---
 
