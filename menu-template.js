@@ -583,12 +583,6 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             click: () => { sendToOverlays('menu:set-aesthetic-mode', 0); app.emit('aesthetic-mode-changed', 0); }
                         },
                         {
-                            label: 'Log-Polar MIP (Blauch 2026)',
-                            type: 'radio',
-                            checked: currentAestheticMode === 6,
-                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 6); app.emit('aesthetic-mode-changed', 6); }
-                        },
-                        {
                             label: 'Legacy v1.6 (Comparison)',
                             type: 'radio',
                             checked: currentAestheticMode === 7,
@@ -599,12 +593,6 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             type: 'radio',
                             checked: currentAestheticMode === 10,
                             click: () => { sendToOverlays('menu:set-aesthetic-mode', 10); app.emit('aesthetic-mode-changed', 10); }
-                        },
-                        {
-                            label: 'Isotropic Cortical Sampling (FOVI)',
-                            type: 'radio',
-                            checked: currentAestheticMode === 12,
-                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 12); app.emit('aesthetic-mode-changed', 12); }
                         }
                     ]
                 },
