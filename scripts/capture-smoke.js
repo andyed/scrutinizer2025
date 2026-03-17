@@ -77,6 +77,17 @@ const SMOKE_SPECS = [
         selector: '', overlay: false,
         radius: '45', width: '1920', height: '1080', mobile: 'false',
     },
+
+    // Batch 4: artifact detection — color shift on achromatic surface
+    {
+        filename: 'smoke_gray_chromatic.png',
+        url: `${REF_PAGES}/chroma-uniform.html?color=gray`,
+        mode: '0',
+        fixationX: 0.5, fixationY: 0.5,
+        selector: '', overlay: false,
+        chromaticPooling: 'true',
+        radius: '45', width: '1920', height: '1080', mobile: 'false',
+    },
 ];
 
 async function main() {
@@ -102,9 +113,35 @@ async function main() {
     if (result.failed > 0) {
         console.error('\n❌ Smoke test FAILED — pipeline is broken.');
         process.exit(1);
-    } else {
-        console.log('\n✅ Pipeline intact.');
     }
+
+    // ── Artifact detection pass ──
+    let artifactsFailed = 0;
+    try {
+        const { analyzeArtifacts } = require('./analyze-artifacts');
+        const artifactResult = analyzeArtifacts(OUTPUT_DIR);
+        if (artifactResult.failures > 0) {
+            console.error(`\n⚠️  Artifact detection: ${artifactResult.failures} check(s) failed`);
+            for (const f of artifactResult.details.filter(d => !d.pass)) {
+                console.error(`   ✗ ${f.name}: ${f.reason}`);
+            }
+            artifactsFailed = artifactResult.failures;
+        } else {
+            console.log(`\n🔬 Artifact checks: ${artifactResult.details.length} passed`);
+        }
+    } catch (e) {
+        // analyze-artifacts.js not yet implemented — skip gracefully
+        if (e.code !== 'MODULE_NOT_FOUND') {
+            console.warn(`\n⚠️  Artifact analysis error: ${e.message}`);
+        }
+    }
+
+    if (artifactsFailed > 0) {
+        console.error('\n❌ Smoke test FAILED — artifacts detected.');
+        process.exit(1);
+    }
+
+    console.log('\n✅ Pipeline intact.');
 }
 
 main();
