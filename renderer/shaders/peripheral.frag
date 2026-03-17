@@ -885,23 +885,38 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     
     // === TIER 3: NUCLEAR SCRAMBLE (The Shredder) ===
     if (config.v1_distortion_type == 1) {
-        
+
+        // Cortical sector extent: controls noise wavelength and scramble cell size.
+        // At the fovea edge (~7px sectors), matches current fixed values.
+        // In periphery (~31px at 15°), noise and cells grow with the cortical grid.
+        float sectorPx_v1 = 7.0;  // default: foveal sector size
+        if (u_cmf_enabled > 0.5) {
+            float ppd_v1 = max(fovea_radius / 1.0, 1.0);
+            float r_deg_v1 = max(0.0, dist - fovea_radius) / ppd_v1;
+            float w_step_v1 = u_cortical_max / 49.0;  // 50 cortical rings (Blauch default)
+            float dr_deg_v1 = (r_deg_v1 + u_cmf_a) * (exp(w_step_v1) - 1.0);
+            sectorPx_v1 = max(7.0, dr_deg_v1 * ppd_v1);
+        }
+
         // 1. Base Fractal Warp (The "Bender")
         // Use uv_corrected for aspect-correct noise shapes
-        vec2 warpUV = uv_corrected; 
+        vec2 warpUV = uv_corrected;
+
+        // Noise frequency inversely proportional to sector extent.
+        // At fovea (7px sectors): 150/300 (current values).
+        // At 15° (31px sectors): ~34/68 — feature-scale displacement.
+        float baseFreq = 150.0 * 7.0 / sectorPx_v1;
+        float n1 = snoise(warpUV * baseFreq);
+        float n2 = snoise(warpUV * baseFreq * 2.0) * 0.5;
         
-        // High-frequency noise to create "heat haze" foundation
-        // FIX: Removed u_time to kill jitter/animation. Static distortion only.
-        // FIX: Reduced freq (800->150) to remove "fuzz/grain". Now more "glassy".
-        float n1 = snoise(warpUV * 150.0); 
-        float n2 = snoise(warpUV * 300.0) * 0.5;
-        
-        // Amplitude modulated by standard strength (initially)
-        // FIX: Reduced base amp (0.003 -> 0.0024) to "turn down all distortion by 20%"
-        vec2 fractalWarp = vec2(n1 + n2) * 0.0024 * strength * u_intensity;
-        
-        // Anisotropic Smash: 2x Horizontal Bias (Was 8x - too strong compared to scramble)
-        fractalWarp.x *= 2.0; 
+        // Amplitude modulated by standard strength.
+        // Radial/tangential projection: 2:1 radial bias (Toet & Levi 1992, Greenwood 2017).
+        // Crowding zones are elongated radially — positional uncertainty is greater
+        // along the fovea-to-periphery axis than tangentially.
+        float warpMag = (n1 + n2) * 0.0024 * strength * u_intensity;
+        vec2 radDir = delta_dir;
+        vec2 tanDir = vec2(-delta_dir.y, delta_dir.x);
+        vec2 fractalWarp = (radDir * 2.0 + tanDir * 1.0) * warpMag;
 
         // 2. Discrete Scramble (The "Cutter")
         // ZONE TUNING: Start immediately at Parafovea edge (1.0) -> Full by 1.5
@@ -910,31 +925,33 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         vec2 discreteScramble = vec2(0.0);
         
         if (scrambleZone > 0.01) {
-            // GRID TUNING: 400x300 (Was 800x300).
-            // 800 was creating 2px cells -> Fuzz. 400 is ~4px cells -> Shreds.
-            vec2 cellFreq = vec2(400.0, 300.0); 
+            // Cell size tracks cortical sector extent: small near fovea, large in periphery.
+            // 0.5× sector avoids alignment with ring boundaries.
+            // At fovea (~7px sector): cellPx ≈ 4px (current behavior).
+            // At 15° (~31px sector): cellPx ≈ 16px (scrambles at letter scale).
+            float cellPx = max(4.0, sectorPx_v1 * 0.5);
+            vec2 cellFreq = u_resolution / cellPx;
             // Use uv_corrected for consistent square-ish cells.
             vec2 cellID = floor(uv_corrected * cellFreq);
             
             // Generate stable random offset per cell using Gold Noise
             vec2 jitter = hash22(cellID) - 0.5;
             
-            // SCRAMBLE AMPLITUDE
-            // Horizontal: +/- 0.8% (~16px) base (Was 1.0%)
-            // Vertical: +/- 0.16% (~3px) base (Was 0.2%)
-            // Edge density modulation: high-edge regions crowd more strongly
+            // SCRAMBLE AMPLITUDE — radial/tangential (Toet & Levi 1992)
+            // 2:1 radial:tangential ratio matches crowding zone ellipticity.
+            // Edge density modulation: high-edge regions crowd more strongly.
             float edgeCrowdMult = 1.0 + lgn.edgeDensity * 0.4;
-            vec2 throwDist = vec2(0.008, 0.0016) * u_intensity * edgeCrowdMult;
-            
+            float throwMag = 0.003 * u_intensity * edgeCrowdMult;
+
             // PROGRESSIVE SCALING: Grow distortion with eccentricity
-            // At 1.5 radii (start of full scramble): 1.0x
-            // At 4.0 radii (far edge): ~2.0x+
-            // This prevents the effect from plateauing/maxing out too early.
             float progressive = 1.0 + max(0.0, (dist - parafovea_radius * 1.5) / parafovea_radius);
-            throwDist *= progressive;
-            
+            throwMag *= progressive;
+
+            // Project jitter onto radial/tangential axes relative to fixation
+            vec2 throwVec = (jitter.x * radDir * 2.0 + jitter.y * tanDir * 1.0) * throwMag;
+
             // Apply quadratic falloff so it ramps in aggressively
-            discreteScramble = jitter * throwDist * scrambleZone * scrambleZone;
+            discreteScramble = throwVec * scrambleZone * scrambleZone;
         }
 
         // 3. The Replacement Logic (Mix)
