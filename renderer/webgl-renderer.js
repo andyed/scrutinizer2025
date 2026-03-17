@@ -533,6 +533,14 @@
                 }
             }
 
+            /**
+             * Mark compute texture as stale — shader falls back to MIP chain
+             * until next uploadComputeTexture() call with fresh data.
+             */
+            invalidateComputeTexture() {
+                this._hasComputeData = false;
+            }
+
             updateConfigFromMode(modeId) {
                 // Preserve runtime toggles that aren't mode-specific.
                 // show_congestion is set by setShowCongestion() and must survive

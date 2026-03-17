@@ -93,7 +93,7 @@
 
             // ── Frame state ──────────────────────────────────────────
             this.lastFrameBitmap = null;
-            this.aestheticMode = 0; // Highkey: CMF + chromatic + DoG (compute mongrel has scroll/nav artifacts)
+            this.aestheticMode = 10; // Compute mongrel: full pipeline (CMF + chromatic + DoG + texture synthesis)
             this.dpr = window.devicePixelRatio || 1;
             this._congestionReportMode = 0;
             this._lastCongestionGeneration = 0;
@@ -238,6 +238,12 @@
 
                     if (isScroll) {
                         // Scroll = viewport content changed significantly.
+                        // Invalidate compute texture so shader falls back to MIP
+                        // during the resynth gap, then force resynth on next cycle.
+                        this._metamerInitialized = false;
+                        if (this.renderer) {
+                            this.renderer.invalidateComputeTexture();
+                        }
                         // Full pending state (dim to 0.35) + debounced recompute.
                         if (this.complexityHud) {
                             this.complexityHud.setPending(true);
@@ -298,6 +304,20 @@
             ipcRenderer.on('browser:did-navigate', () => {
                 // New page — reset all dirty checks so first frame goes through
                 this.contentAnalysis.resetDirtyChecks();
+
+                // Reset WebGPU compute state — old page's metamer texture is stale.
+                // invalidateComputeTexture() makes shader fall back to fresh MIP chain
+                // during the 2-5 frame gap while new compute runs.
+                this._metamerInitialized = false;
+                this._metamerSaccading = false;
+                this._lastSynthGazeX = 0;
+                this._lastSynthGazeY = 0;
+                if (this.webgpuCompute) {
+                    this.webgpuCompute.frameCounter = -1;
+                }
+                if (this.renderer) {
+                    this.renderer.invalidateComputeTexture();
+                }
 
                 if (this._congestionReportMode > 0 || this.renderer?.config.congestion_pooling) {
                     // Clear stale heatmap immediately — old page's overlay shouldn't linger
@@ -612,6 +632,10 @@
                     this.webgpuCompute.readback().then((data) => {
                         if (data && this.renderer) {
                             this.renderer.uploadComputeTexture(data, halfW, halfH, cw, ch);
+                            // Always invalidate after upload so next content change triggers resynth.
+                            // Without this, hover effects / CSS animations / dynamic content
+                            // show stale tiles until the next saccade or drift threshold.
+                            this._metamerInitialized = false;
                         }
                     });
                 }
