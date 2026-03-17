@@ -41,7 +41,15 @@ Run each step sequentially. After each step, verify before proceeding. **STOP on
 - All tests must pass. **STOP on failure.**
 
 ### 4. Capture golden screenshots
-- `npm run capture-golden`
+- **Staleness check**: Compare the timestamp of existing captures against shader/mode changes:
+  ```bash
+  # Oldest capture vs newest code change
+  CAPTURE_TIME=$(stat -f %m tests/golden-captures/v*/$(ls tests/golden-captures/v*/ | head -1) 2>/dev/null || echo 0)
+  CODE_TIME=$(stat -f %m renderer/shaders/peripheral.frag shared/modes.json)
+  ```
+  If code is newer than captures, captures are stale — must recapture.
+  If only non-visual changes (scripts, tests, docs), captures may still be valid — check `git diff` between capture commit and HEAD for shader/mode changes.
+- `npm run capture-golden -- --force` (use `--force` if captures are stale)
 - Captures to `tests/golden-captures/v{VERSION}/`
 - Also run mode comparison: `node scripts/capture-mode-comparison.js`
 - Verify captures exist: `ls tests/golden-captures/v{VERSION}/ | head -10`

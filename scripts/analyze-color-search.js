@@ -79,11 +79,10 @@ function getBandSamplePositions(pixelW, pixelH) {
   });
 
   // Sample each ring band along the RIGHT horizontal axis.
-  // CSS border extends OUTWARD from the ring radius, so band center
-  // is at RINGS[r] + BAND_WIDTH/2 from the page center.
-  // Also sample at 4 cardinal directions to average out any asymmetry.
+  // Bands are centered AT the ring distance (CSS border extends symmetrically).
+  // Verified by pixel probing: green band at ring 3 spans 275-325 CSS = centered at 300.
   for (let r = 0; r < RINGS.length; r++) {
-    const bandCenterCSS = RINGS[r] + halfBand; // center of the 60px band
+    const bandCenterCSS = RINGS[r]; // band is centered at the ring distance
     const bandCenterPx = bandCenterCSS * dpr;
     positions.push({
       ring: r + 1,

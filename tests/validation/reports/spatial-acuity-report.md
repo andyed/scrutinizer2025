@@ -6,11 +6,11 @@ Geometry: fovea_radius=45px, ppd=45
 
 ## Tier 1: Must Pass
 
-- [PASS] Ring 1: frequency ordering preserved (4cpd=0%, 2cpd=0%, 1cpd=0%, 0.5cpd=68%, 0.25cpd=100%)
-- [PASS] Ring 2: frequency ordering preserved (4cpd=0%, 2cpd=0%, 1cpd=0%, 0.5cpd=0%, 0.25cpd=100%)
-- [PASS] Ring 3: frequency ordering preserved (4cpd=0%, 2cpd=0%, 1cpd=0%, 0.5cpd=0%, 0.25cpd=100%)
-- [PASS] Ring 4: frequency ordering preserved (4cpd=0%, 2cpd=0%, 1cpd=0%, 0.5cpd=0%, 0.25cpd=100%)
-- [PASS] Ring 5: frequency ordering preserved (4cpd=0%, 2cpd=0%, 1cpd=0%, 0.5cpd=0%, 0.25cpd=100%)
+- [PASS] Ring 1: frequency ordering preserved (4cpd=0%, 2cpd=68%, 1cpd=100%, 0.5cpd=100%, 0.25cpd=100%)
+- [PASS] Ring 2: frequency ordering preserved (4cpd=0%, 2cpd=0%, 1cpd=100%, 0.5cpd=100%, 0.25cpd=100%)
+- [PASS] Ring 3: frequency ordering preserved (4cpd=0%, 2cpd=0%, 1cpd=100%, 0.5cpd=100%, 0.25cpd=100%)
+- [PASS] Ring 4: frequency ordering preserved (4cpd=0%, 2cpd=0%, 1cpd=96%, 0.5cpd=100%, 0.25cpd=100%)
+- [PASS] Ring 5: frequency ordering preserved (4cpd=0%, 2cpd=0%, 1cpd=0%, 0.5cpd=100%, 0.25cpd=100%)
 - [PASS] band0: monotonic decrease (0% >= 0% >= 0% >= 0% >= 0%)
 - [PASS] band1: monotonic decrease (0% >= 0% >= 0% >= 0% >= 0%)
 - [PASS] band2: monotonic decrease (0% >= 0% >= 0% >= 0% >= 0%)

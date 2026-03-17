@@ -169,7 +169,7 @@ function validate() {
     const pass = withinPct <= 0.20;
     tier2Total++;
     if (pass) tier2Pass++;
-    log(`- [${pass ? 'PASS' : 'FAIL'}] BY/RG channel ratio vs Bowers at ~15°: model=${modelRatio.toFixed(2)} (yv/rg retention) vs Bowers=${bowersRatio.toFixed(2)} (${(withinPct * 100).toFixed(0)}% off, threshold=20%)`);
+    log(`- [${pass ? 'PASS' : 'FAIL'}] BY/RG channel ratio vs Bowers (ring 5, ${modelAny_r5.ecc_deg}°): model=${modelRatio.toFixed(2)} (yv/rg retention) vs Bowers=${bowersRatio.toFixed(2)} at 15° (${(withinPct * 100).toFixed(0)}% off, threshold=20%)`);
   }
 
   // Green tracks RG more than BY
