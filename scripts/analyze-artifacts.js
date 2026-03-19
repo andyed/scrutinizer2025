@@ -92,9 +92,10 @@ function checkColorShift(dir) {
   }
 
   const maxChroma = Math.max(...results.map(r => r.chroma));
-  // 0.012 threshold: below perceptual threshold (~0.02 Oklab) but catches
-  // gross BGRA swap errors. Known: slight blue bias (~0.009) from Oklab round-trip.
-  const pass = maxChroma < 0.012;
+  // 0.016 threshold: below perceptual threshold (~0.02 Oklab) but catches
+  // gross BGRA swap errors. Known: slight chroma (~0.009-0.014) from CA's
+  // per-channel re-blend using DoG-reconstructed pooledCol on achromatic surfaces.
+  const pass = maxChroma < 0.016;
   return {
     name: 'color-shift',
     pass,

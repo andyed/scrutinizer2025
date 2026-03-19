@@ -1,0 +1,140 @@
+{
+  "timestamp": "2026-03-18T00:48:31.815Z",
+  "filtered": "smoke_dashboard_mode0.png",
+  "unfiltered": null,
+  "fixation": {
+    "x": 0.5,
+    "y": 0.5
+  },
+  "foveaRadius": 360,
+  "pyramidLevels": 4,
+  "rings": [
+    {
+      "ring": "fovea",
+      "rMin": 0,
+      "rMax": 0.75,
+      "sampleCount": 57197,
+      "totalSE": 11.36862375847273,
+      "bandEntropies": [
+        1.9080499357436915,
+        5.204705303001031,
+        0,
+        0,
+        3.2636608398232587
+      ],
+      "orientSE": 1.9844153598094978,
+      "fc": 0.28407899874608245,
+      "refSE": null,
+      "seRatio": null,
+      "hfLfRatio": 3.269069116475615
+    },
+    {
+      "ring": "parafovea",
+      "rMin": 0.75,
+      "rMax": 1.5,
+      "sampleCount": 171768,
+      "totalSE": 5.354198390408688,
+      "bandEntropies": [
+        1.2168693795337069,
+        1.2618804996086657,
+        0,
+        0,
+        2.3811808069476403
+      ],
+      "orientSE": 0.9885354086373478,
+      "fc": 2.7807184573824917,
+      "refSE": null,
+      "seRatio": null,
+      "hfLfRatio": 1.5614626188255332
+    },
+    {
+      "ring": "near_periph",
+      "rMin": 1.5,
+      "rMax": 3,
+      "sampleCount": 669861,
+      "totalSE": 5.318583610438686,
+      "bandEntropies": [
+        1.2436089024528825,
+        1.3023252153339295,
+        0,
+        0,
+        2.2491169997456972
+      ],
+      "orientSE": 1.0470649858123535,
+      "fc": 5.284695283691303,
+      "refSE": null,
+      "seRatio": null,
+      "hfLfRatio": 1.6979557653568103
+    },
+    {
+      "ring": "mid_periph",
+      "rMin": 3,
+      "rMax": 5,
+      "sampleCount": 821588,
+      "totalSE": 9.204735428073906,
+      "bandEntropies": [
+        1.3509598027051526,
+        1.4473452877446455,
+        1.5736953557157205,
+        1.5135860849365133,
+        2.7479661587575235
+      ],
+      "orientSE": 1.1423654764287006,
+      "fc": 5.922856818192406,
+      "refSE": null,
+      "seRatio": null,
+      "hfLfRatio": 0.7193281114753854
+    },
+    {
+      "ring": "far_periph",
+      "rMin": 5,
+      "rMax": 8,
+      "sampleCount": 222626,
+      "totalSE": 10.11243803582657,
+      "bandEntropies": [
+        1.5139451082515079,
+        1.7767010629506736,
+        1.4169562332299694,
+        1.780529505362825,
+        2.8091040564766576
+      ],
+      "orientSE": 1.6304041391098691,
+      "fc": 5.975118574906494,
+      "refSE": null,
+      "seRatio": null,
+      "hfLfRatio": 0.8217590055600258
+    }
+  ],
+  "checks": [
+    {
+      "name": "6.1a HF/LF ratio monotonic",
+      "pass": false,
+      "reason": "near_periph (1.698) > parafovea (1.561)"
+    },
+    {
+      "name": "6.1a HF/LF ratio monotonic",
+      "pass": false,
+      "reason": "far_periph (0.822) > mid_periph (0.719)"
+    },
+    {
+      "name": "6.1b HF SE monotonic",
+      "pass": false,
+      "reason": "HF non-monotonic: 3.56 → 1.24 → 1.27 → 1.40 → 1.65"
+    },
+    {
+      "name": "6.4 No fog (LF retention)",
+      "pass": true,
+      "reason": "LF min/max = 49.0% (threshold: ≥30%)"
+    },
+    {
+      "name": "6.5 HF/LF-ecc correlation",
+      "pass": true,
+      "reason": "Spearman ρ = -0.800 (threshold: ρ < -0.7)"
+    },
+    {
+      "name": "6.6 FC→HF/LF correlation",
+      "pass": true,
+      "reason": "Spearman ρ = 0.800 (threshold: ρ > 0.3)"
+    }
+  ]
+}

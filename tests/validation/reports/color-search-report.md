@@ -6,11 +6,11 @@ Geometry: fovea_radius=45px, ppd=45
 
 ## Tier 1: Must Pass
 
-- [PASS] red composite retention monotonically decreases: 82.5% > 68.7% > 57.8% > 47.9% > 39.4%
-- [PASS] green composite retention monotonically decreases: 85.5% > 74.1% > 65.2% > 56.9% > 49.6%
-- [PASS] blue composite retention monotonically decreases: 94.6% > 89.6% > 84.8% > 79.4% > 73.5%
-- [PASS] yellow composite retention monotonically decreases: 94.2% > 88.9% > 83.9% > 78.4% > 72.5%
-- [PASS] BY retention >= 1.5x RG at ring 5: blue=73.5% / red=39.4% = 1.86x
+- [PASS] red composite retention monotonically decreases: 73.9% > 57.0% > 48.1% > 41.6% > 37.0%
+- [PASS] green composite retention monotonically decreases: 78.5% > 64.5% > 57.0% > 51.5% > 47.4%
+- [PASS] blue composite retention monotonically decreases: 91.6% > 84.4% > 79.5% > 75.1% > 71.4%
+- [PASS] yellow composite retention monotonically decreases: 91.0% > 83.5% > 78.5% > 74.2% > 70.4%
+- [PASS] BY retention >= 1.5x RG at ring 5: blue=71.4% / red=37.0% = 1.93x
 - [PASS] red measured retention monotonically decreases
 - [PASS] green measured retention monotonically decreases
 - [PASS] blue measured retention monotonically decreases
@@ -18,9 +18,9 @@ Geometry: fovea_radius=45px, ppd=45
 
 ## Tier 2: Should Pass
 
-- [PASS] BY/RG channel ratio vs Bowers (ring 5, 12.44°): model=2.59 (yv/rg retention) vs Bowers=2.72 at 15° (5% off, threshold=20%)
-- [PASS] Green closer to red than blue: green-red gap=10.2pp, green-blue gap=23.9pp (threshold: <15pp and closer to red)
-- [FAIL] Rendered matches model within 15%: 5/20 (25%)
+- [PASS] BY/RG channel ratio vs Bowers (ring 5, 12.44°): model=2.82 (yv/rg retention) vs Bowers=2.72 at 15° (4% off, threshold=20%)
+- [PASS] Green closer to red than blue: green-red gap=10.4pp, green-blue gap=24.0pp (threshold: <15pp and closer to red)
+- [FAIL] Rendered matches model within 15%: 10/20 (50%)
 
 ## Tier 3: Stretch
 

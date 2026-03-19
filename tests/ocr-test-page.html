@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, initial-scale=1.0">
+    <title>OCR Validation Test Page</title>
+    <style>
+        /* Dense text layout designed for OCR validation across eccentricities.
+           Text at known positions: center (fovea), mid-range (parafovea/near-periph),
+           and edges (far-periph). All text is high-contrast black on white. */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            font-size: 16px;
+            line-height: 1.5;
+            color: #000;
+            background: #fff;
+            width: 1920px;
+            height: 1012px;
+            overflow: hidden;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+            width: 100%;
+            height: 100%;
+            gap: 20px;
+            padding: 30px;
+        }
+        .cell {
+            overflow: hidden;
+            padding: 12px;
+        }
+        .cell h2 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        .cell p {
+            font-size: 14px;
+            margin-bottom: 6px;
+        }
+        /* Center cell is where fixation lands — foveal region */
+        .center {
+            border: 1px solid #ccc;
+            background: #fafafa;
+        }
+    </style>
+</head>
+<body>
+<div class="grid">
+    <!-- Row 1: Top-left, Top-center, Top-right (far periphery) -->
+    <div class="cell">
+        <h2>Navigation Panel</h2>
+        <p>Dashboard overview showing quarterly metrics and performance indicators across all regional markets.</p>
+        <p>Select category: Electronics, Furniture, Apparel, Groceries, Automotive, Healthcare, Education.</p>
+        <p>Last updated: March 2026. Next review scheduled for June 2026.</p>
+    </div>
+    <div class="cell">
+        <h2>System Status Monitor</h2>
+        <p>All services operational. Uptime: 99.97% over the past thirty days. Latency: 42ms average.</p>
+        <p>Database connections: 847 active, 153 idle. Memory utilization: 67% of allocated capacity.</p>
+        <p>Scheduled maintenance window: Saturday 0200-0600 UTC. No downtime expected.</p>
+    </div>
+    <div class="cell">
+        <h2>Recent Activity Log</h2>
+        <p>User authentication successful from Portland, Oregon. Browser: Firefox 128.0 on macOS.</p>
+        <p>Configuration change: timeout increased from 30 seconds to 45 seconds by administrator.</p>
+        <p>Backup completed successfully. Archive size: 2.4 gigabytes compressed.</p>
+    </div>
+
+    <!-- Row 2: Left (near-periph), Center (fovea), Right (near-periph) -->
+    <div class="cell">
+        <h2>Project Timeline</h2>
+        <p>Phase one completed ahead of schedule. Deliverables reviewed and approved by stakeholders.</p>
+        <p>Phase two begins next Monday with frontend development and integration testing milestones.</p>
+        <p>Critical path items: API migration, database schema update, load testing framework setup.</p>
+        <p>Resource allocation: three senior engineers, two junior developers, one quality analyst.</p>
+    </div>
+    <div class="cell center">
+        <h2>Executive Summary Report</h2>
+        <p>The quarterly performance review indicates strong growth across all primary business segments. Revenue increased by fourteen percent compared to the previous quarter, driven primarily by expansion in digital services and enterprise solutions.</p>
+        <p>Customer satisfaction scores improved to 4.7 out of 5.0, reflecting investments in support infrastructure and response time optimization. Net promoter score reached 72, up from 65 in the prior period.</p>
+        <p>Operating expenses remained within budget at 94% utilization. Capital expenditure for technology infrastructure was approved at twelve million dollars for the upcoming fiscal year.</p>
+    </div>
+    <div class="cell">
+        <h2>Technical Specifications</h2>
+        <p>Processor: Apple M4 Ultra with 32-core CPU and 80-core GPU. Unified memory: 192 gigabytes.</p>
+        <p>Storage: 4 terabyte solid state drive. Display: 6K Retina at 6016 by 3384 pixels.</p>
+        <p>Network interface: Thunderbolt 5 at 120 gigabits per second. WiFi 7 with tri-band support.</p>
+        <p>Operating temperature range: 10 to 35 degrees Celsius. Power consumption: 370 watts maximum.</p>
+    </div>
+
+    <!-- Row 3: Bottom-left, Bottom-center, Bottom-right (far periphery) -->
+    <div class="cell">
+        <h2>Financial Overview</h2>
+        <p>Total revenue: 847 million dollars. Gross margin: 62.3 percent. EBITDA: 234 million dollars.</p>
+        <p>Cash reserves: 1.2 billion dollars. Debt-to-equity ratio: 0.34. Current ratio: 2.8.</p>
+        <p>Dividend yield: 1.8 percent. Share price: 287 dollars. Market capitalization: 42 billion.</p>
+    </div>
+    <div class="cell">
+        <h2>Research Publications</h2>
+        <p>Peripheral vision and crowding: mechanisms of feature integration beyond the fovea.</p>
+        <p>Journal of Vision, Volume 26, Issue 3, pages 112-128. Published February 2026.</p>
+        <p>Authors: Chen, Rodriguez, Nakamura, and Okonkwo. Citations: 47 since publication.</p>
+    </div>
+    <div class="cell">
+        <h2>Contact Information</h2>
+        <p>Customer support available Monday through Friday, 8am to 6pm Pacific Standard Time.</p>
+        <p>Email: support@example.com. Phone: 1-800-555-0142. Live chat available on website.</p>
+        <p>Headquarters: 1600 Technology Drive, Suite 400, San Francisco, California 94107.</p>
+    </div>
+</div>
+</body>
+</html>
