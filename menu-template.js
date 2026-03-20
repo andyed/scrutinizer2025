@@ -622,7 +622,6 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     checked: isClosest(RADIUS_OPTIONS[1], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[1])
                                 },
-                                { type: 'separator' },
                                 {
                                     label: 'Relaxed (70px radius, 70 px/°)',
                                     type: 'radio',
@@ -647,7 +646,6 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     checked: isClosest(RADIUS_OPTIONS[5], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[5])
                                 },
-                                { type: 'separator' },
                                 {
                                     label: 'Huge (180px radius, 180 px/°)',
                                     type: 'radio',
@@ -666,7 +664,6 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     checked: isClosest(RADIUS_OPTIONS[8], 'radius'),
                                     click: () => sendToOverlays('menu:set-radius', RADIUS_OPTIONS[8])
                                 },
-                                { type: 'separator' },
                                 /*
                                 {
                                     label: 'Calibrate Fovea...',
