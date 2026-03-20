@@ -1834,16 +1834,22 @@ void main() {
     float scrollbarWidth = 17.0;
     float distFromRightEdge = u_resolution.x - (uv.x * u_resolution.x);
     bool isScrollbar = distFromRightEdge < scrollbarWidth;
-    
-    if (!isScrollbar) {
-        if (u_useMask < 1.5 && u_useMask > 0.5 && u_debug_structure < 0.5) {
-            if (memoryStrength > 0.9) {
-                vec4 clearColor = sampleSource(uv);
-                color.rgb = clearColor.rgb;
-            } else if (memoryStrength > 0.0) {
-                vec4 clearColor = sampleSource(uv);
-                color.rgb = mix(color.rgb, clearColor.rgb, memoryStrength);
-            }
+
+    // Scrollbar protection: bypass entire pipeline output.
+    // V1 displacement + V4 color effects would scramble the scrollbar
+    // since it's always in the far periphery.
+    if (isScrollbar) {
+        fragColor = sampleSource(uv);
+        return;
+    }
+
+    if (u_useMask < 1.5 && u_useMask > 0.5 && u_debug_structure < 0.5) {
+        if (memoryStrength > 0.9) {
+            vec4 clearColor = sampleSource(uv);
+            color.rgb = clearColor.rgb;
+        } else if (memoryStrength > 0.0) {
+            vec4 clearColor = sampleSource(uv);
+            color.rgb = mix(color.rgb, clearColor.rgb, memoryStrength);
         }
     }
     
