@@ -93,7 +93,7 @@
 
             // ── Frame state ──────────────────────────────────────────
             this.lastFrameBitmap = null;
-            this.aestheticMode = 10; // Compute mongrel: full pipeline (CMF + chromatic + DoG + texture synthesis)
+            this.aestheticMode = 12; // FOVI Cortical Grid (Blauch): isotropic cortical sampling
             this.dpr = window.devicePixelRatio || 1;
             this._congestionReportMode = 0;
             this._lastCongestionGeneration = 0;

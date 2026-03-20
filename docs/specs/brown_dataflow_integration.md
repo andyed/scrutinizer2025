@@ -61,7 +61,7 @@ This **spatially remaps** the image: peripheral pixels get compressed into fewer
 
 **Why MIP-level blur is a valid real-time approximation:**
 
-MIP sampling averages texels within the MIP kernel, destroying high-frequency detail at a rate that scales with eccentricity (when the MIP level is derived from a log CMF). The perceptual effect is similar to spatial pooling: fine detail is lost, coarse structure survives. The CMF path already implements this with the correct logarithmic falloff from Blauch, Konkle & Alvarez (2026).
+MIP sampling averages texels within the MIP kernel, destroying high-frequency detail at a rate that scales with eccentricity (when the MIP level is derived from a log CMF). The perceptual effect is similar to spatial pooling: fine detail is lost, coarse structure survives. The CMF path already implements this with the correct logarithmic falloff from Blauch, Alvarez & Konkle (2026).
 
 **Where MIP-level blur breaks down:**
 
@@ -342,7 +342,7 @@ Main thread (60fps)     Web Workers (async, ~2-3 Hz)
 - Portilla & Simoncelli (2000). "A parametric texture model." Int. J. Computer Vision.
 - Freeman & Simoncelli (2011). "Metamers of the ventral stream." Nature Neuroscience.
 - Rosenholtz et al. (2012). "Rethinking the role of top-down attention." Frontiers in Psychology.
-- Blauch, Konkle & Alvarez (2026). "Foveated vision in neural networks." arXiv:2602.03766.
+- Blauch, N. M., Alvarez, G. A., & Konkle, T. (2026). FOVI: A biologically-inspired foveated interface for deep vision models. arXiv:2602.03766.
 - Bouma (1970). "Interaction effects in parafoveal letter recognition." Nature.
 - Schwartz (1980). "Computational anatomy and functional architecture of striate cortex." Vision Research.
 - Parent spec: `mongrel_textures.md` (Tiers 1-3)

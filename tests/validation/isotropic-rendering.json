@@ -1,0 +1,80 @@
+{
+  "timestamp": "2026-03-20T00:30:19.305Z",
+  "results": [
+    {
+      "id": "5",
+      "label": "Angular isotropy (grid/center)",
+      "pass": true,
+      "detail": "CV=0.127 across quadrants (threshold: <0.50). stdDevs: 0.4325, 0.3306, 0.3357, 0.4268"
+    },
+    {
+      "id": "5",
+      "label": "Angular isotropy (dashboard/center)",
+      "pass": true,
+      "detail": "CV=0.437 across quadrants (threshold: <0.50). stdDevs: 0.0330, 0.0319, 0.0891, 0.0691"
+    },
+    {
+      "id": "5",
+      "label": "Angular isotropy (article/center)",
+      "pass": true,
+      "detail": "CV=0.196 across quadrants (threshold: <0.50). stdDevs: 0.1373, 0.2193, 0.2205, 0.2430"
+    },
+    {
+      "id": "6",
+      "label": "Readability destruction (article)",
+      "pass": true,
+      "detail": "mode12/mode0 parafoveal stdDevL ratio=1.000 (threshold: <1.20). m0=0.1329, m12=0.1329"
+    },
+    {
+      "id": "6",
+      "label": "Readability destruction (dashboard)",
+      "pass": true,
+      "detail": "mode12/mode0 parafoveal stdDevL ratio=1.000 (threshold: <1.20). m0=0.0642, m12=0.0642"
+    },
+    {
+      "id": "7",
+      "label": "Texture preservation (grid)",
+      "pass": true,
+      "detail": "far-periph/fovea stdDevL ratio=3.476 (threshold: >0.15). fovea=0.0612, farPeriph=0.2128"
+    },
+    {
+      "id": "7",
+      "label": "Texture preservation (dashboard)",
+      "pass": true,
+      "detail": "far-periph/fovea stdDevL ratio=0.557 (threshold: >0.15). fovea=0.0846, farPeriph=0.0471"
+    },
+    {
+      "id": "7",
+      "label": "Texture preservation (article)",
+      "pass": true,
+      "detail": "far-periph/fovea stdDevL ratio=2.097 (threshold: >0.15). fovea=0.0662, farPeriph=0.1389"
+    },
+    {
+      "id": "8",
+      "label": "Dark mode scatter",
+      "pass": true,
+      "detail": "scatter rate=0.000% (threshold: <0.1%). 0/431944 pixels"
+    },
+    {
+      "id": "9",
+      "label": "Mode comparison (grid)",
+      "pass": true,
+      "detail": "meanL ratio=1.000 (0.90-1.10), stdDevL ratio=1.000 (0.70-1.30)"
+    },
+    {
+      "id": "9",
+      "label": "Mode comparison (dashboard)",
+      "pass": true,
+      "detail": "meanL ratio=1.000 (0.90-1.10), stdDevL ratio=0.999 (0.70-1.30)"
+    },
+    {
+      "id": "9",
+      "label": "Mode comparison (article)",
+      "pass": true,
+      "detail": "meanL ratio=1.000 (0.90-1.10), stdDevL ratio=0.999 (0.70-1.30)"
+    }
+  ],
+  "passCount": 12,
+  "failCount": 0,
+  "skipCount": 0
+}

@@ -235,10 +235,11 @@ No saliency worker changes needed. Delta-C computation from screenshots is suffi
 
 ## 6. References
 
-- Ashraf, M., Ahumada, A., & Kim, J. (2024). castleCSF — A contrast sensitivity function of color, area, spatiotemporal frequency, luminance, and eccentricity. *Journal of Vision*.
-- Bowers, N. R., Tyson, T. L., & Bhatt, S. (2025). Suprathreshold chromatic sensitivity across the visual field. *Vision Research*.
+- Ashraf, M. & Mantiuk, R. K. (2024). castleCSF — A contrast sensitivity function of color, area, spatiotemporal frequency, luminance, and eccentricity. *Journal of Vision*, 24(4):5.
+- Bowers, N. R., Gegenfurtner, K. R., & Goettker, A. (2025). Chromatic sensitivity across the visual field. *Journal of Vision*, 25.
 - Hansen, T., Pracejus, L., & Gegenfurtner, K. R. (2009). Color perception in the intermediate periphery of the visual field. *Journal of Vision*, 9(4), 26.
-- Jiang, Y., Shooner, C., & Mullen, K. T. (2022). Power-law relationship between detection threshold and perceived saturation at high contrasts. *Journal of Vision*.
+- Jiang, Y., Shooner, C., & Mullen, K. T. (2022). Suprathreshold chromatic contrast perception across the visual field. *Journal of Vision*, 22(14):4319.
+  <!-- NOTE: BibTeX (references.bib) title is "Suprathreshold chromatic contrast perception across the visual field" but the PMC-linked version in chromatic_pooling.md (PMC9639675) gives "Achromatic and chromatic perceived contrast are reduced in the visual periphery." Verify which is the ARVO abstract vs the full paper. -->
 - Mullen, K. T. & Kingdom, F. A. A. (2002). Differential distributions of red-green and blue-yellow cone opponency across the visual field. *Visual Neuroscience*, 19, 109-118.
 - Rosenholtz, R. (2001). Search asymmetries? What search asymmetries? *Perception & Psychophysics*, 63(3), 476-489.
 - Treisman, A. M. & Gelade, G. (1980). A feature-integration theory of attention. *Cognitive Psychology*, 12(1), 97-136.

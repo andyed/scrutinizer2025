@@ -137,5 +137,6 @@ The structure map density difference between a 5-letter crowded group (~0.53) an
 - Pelli, D. G., & Tillman, K. A. (2008). The uncrowded window of object recognition. *Nature Neuroscience*, 11(10), 1129-1135.
 - Rosenholtz, R., Huang, J., Raj, A., Balas, B. J., & Ilie, L. (2012). A summary statistic representation in peripheral vision explains visual search. *Journal of Vision*, 12(4):14.
 - Freeman, J., & Simoncelli, E. P. (2011). Metamers of the ventral stream. *Nature Neuroscience*, 14(9), 1195-1201.
-- Zhang, J.-Y., Zhang, T., Xue, F., Liu, L., & Yu, C. (2015). Crowding is unlike ordinary masking. *Journal of Vision*, 9(11):23.
+- Pelli, D. G., Palomares, M., & Majaj, N. J. (2004). Crowding is unlike ordinary masking: Distinguishing feature integration from detection. *Journal of Vision*, 4(12):12.
+  <!-- NOTE: Previously attributed to "Zhang et al. 2015" which was fabricated. The title "Crowding is unlike ordinary masking" belongs to Pelli, Palomares & Majaj (2004). Not in references.bib — verify and add if needed. -->
 - Toet, A., & Levi, D. M. (1992). The two-dimensional shape of spatial interaction zones in the parafovea. *Vision Research*, 32(7), 1349-1357.

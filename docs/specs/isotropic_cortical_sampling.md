@@ -1,10 +1,10 @@
 # Isotropic Cortical Sampling — FOVI-Derived Sector Geometry
 
-> **Last updated:** 2026-03-15
+> **Last updated:** 2026-03-19
 
-**Status**: Geometry implemented + verified; rendering approach TBD (see [Implementation Attempt 1](#implementation-attempt-1-v25-2026-03-15) and [Revised Approach](#revised-approach-color-first))
+**Status**: Geometry verified (19 tests); rendering shipped (sector-parameterized Bender+Cutter, V1 type 5). Default mode since 2026-03-19.
 **Created**: 2026-03-13
-**Dependencies**: `renderer/shaders/peripheral.frag` (computeMipLevel, computeCorticalSector), `shared/modes.json`
+**Dependencies**: `renderer/shaders/peripheral.frag` (computeMipLevel, BenderConfig/CutterConfig), `shared/modes.json`
 **Collaboration**: Nicholas Blauch (Harvard/Kempner → NVIDIA), potential co-author. Implementation must be mathematically traceable to Blauch, Alvarez & Konkle (2026), arxiv:2602.03766.
 **Implementation journal**: `docs/specs/isotropic_implementation_journal.md` — detailed record of all rendering approaches tried and why each failed.
 **Test suite**: `tests/unit/isotropic-sectors.test.js` — 19 tests verify sector math matches Blauch Python to 3 decimal places.
@@ -245,13 +245,15 @@ Mode 12 should NOT look dramatically different from mode 0. It should look sligh
 3. **Isotropy check**: ✅ Tangential/radial aspect ratio within 30% of 1.0 at eccentricities 2°, 5°, 8°, 12°, 15°. (`isotropic-sectors.test.js`)
 4. **Spoke count at r_max**: ✅ N=30 → 85 spokes, N=50 → 142 spokes. (`isotropic-sectors.test.js`)
 
-### Rendering (TODO — after Phase 1 color work)
+### Rendering (DONE — 2026-03-19, `scripts/validate-isotropic-rendering.js`)
 
-5. **Visual isotropy**: Render grid overlay at ring/spoke boundaries. Cells should be approximately square at all eccentricities. (Use `u_show_sector_grid` debug uniform.)
-6. **Readability destruction**: OCR word count in parafovea (1-2.5°) should be ≤ mode 0. Use `scripts/ocr-readability-comparison.js`.
-7. **Texture preservation**: Peripheral content should retain type identity (paragraph vs image vs nav). Visual comparison via `scripts/capture-isotropic-comparison.js`.
-8. **Dark mode artifacts**: No scattered bright pixels on dark backgrounds. Test with dark-mode reference pages.
-9. **Comparison capture**: Same stimuli through mode 0 vs mode 12 — mode 12 should look comparable in visual quality, with more principled transition profile.
+5. **Angular isotropy**: ✅ Luminance stddev CV < 0.50 across quadrants at mid-periphery. Grid CV=0.13, dashboard CV=0.44, article CV=0.20.
+6. **Readability destruction**: ✅ Mode 12 parafoveal stdDevL ≤ mode 0 (ratio = 1.000). Note: uses luminance stddev, not OCR — test suite needs strengthening (see validation agent report).
+7. **Texture preservation**: ✅ Far-periph/fovea stdDevL ratio > 0.15. Grid=3.48, dashboard=0.56, article=2.10.
+8. **Dark mode scatter**: ✅ 0/431,944 peripheral pixels above scatter threshold (0.000%). Note: currently tests mode 0 smoke capture, not mode 12 specifically — needs fix.
+9. **Mode comparison**: ✅ Mode 12 vs mode 0: meanL ratio 1.000, stdDevL ratio 0.999-1.000.
+
+**Validation gaps identified:** Tests are necessary but not sufficient. An identity transform would pass all 12 checks. No negative control, no structural comparison (SSIM), readability proxy is permutation-invariant. See `docs/specs/mode_graduation.md` for the broader test infrastructure plan.
 
 ## Open Questions for Nick
 

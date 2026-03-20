@@ -53,6 +53,7 @@ uniform float u_gaussian_blur_mode; // 0.0 = normal, 1.0 = comparison Gaussian
 uniform float u_cmf_enabled;     // 0.0 = legacy linear, 1.0 = CMF logarithmic
 uniform float u_cmf_a;            // Cortical magnification constant (default 2.78)
 uniform float u_cortical_max;     // ln(r_max+a) - ln(a), precomputed on JS side
+uniform float u_num_cortical_rings; // Number of cortical sampling rings
 uniform float u_cmf_color_sigma; // Gaussian color decay sigma (0.0 = disabled)
 uniform float u_ecc_scaling;     // Pooling growth rate (Brown et al. 2023, Bouma scaling, default 0.75)
 uniform float u_desat_floor;      // Min desaturation multiplier in salient regions (1.0 = full desat, 0.85 = 15% cap)
@@ -740,6 +741,41 @@ float rand(vec2 co){
     return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
 }
 
+// === DISTORTION COMPONENTS (Bender + Cutter) ===
+// Parameterized for researcher swappability. Each V1 type builds its own
+// config; researchers fork by inlining or replacing these functions.
+
+struct BenderConfig {
+    float freq;            // base noise frequency (150 for type 1, sector-derived for type 5)
+    float octave2_scale;   // 2nd octave freq multiplier (2.0)
+    float octave2_weight;  // 2nd octave amplitude (0.5)
+    float amplitude;       // UV-space warp magnitude (0.0024)
+    vec2  bias;            // per-axis strength (vec2(2.0, 1.0) for horiz/radial bias)
+};
+
+struct CutterConfig {
+    vec2  cellFreq;        // grid frequency in UV space (vec2(400, 300))
+    vec2  baseThrow;       // base displacement (vec2(0.008, 0.0016))
+    float progressive;     // eccentricity growth factor
+    float onset;           // scrambleZone (0–1)
+};
+
+vec2 applyBender(vec2 uv_in, BenderConfig cfg, float strength, float intensity) {
+    float n1 = snoise(uv_in * cfg.freq);
+    float n2 = snoise(uv_in * cfg.freq * cfg.octave2_scale) * cfg.octave2_weight;
+    vec2 warp = vec2(n1 + n2) * cfg.amplitude * strength * intensity;
+    warp *= cfg.bias;
+    return warp;
+}
+
+vec2 applyCutter(vec2 uv_in, CutterConfig cfg, float intensity, float edgeCrowdMult) {
+    if (cfg.onset < 0.01) return vec2(0.0);
+    vec2 cellID = floor(uv_in * cfg.cellFreq);
+    vec2 jitter = hash22(cellID) - 0.5;
+    vec2 throwDist = cfg.baseThrow * intensity * edgeCrowdMult * cfg.progressive;
+    return jitter * throwDist * cfg.onset * cfg.onset;
+}
+
 // === NEURO-ARCHITECTURE PIPELINE ===
 
 struct ModeConfig {
@@ -906,58 +942,41 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     // corticalStrength-based scramble onset replacing zone boundaries.
     if (config.v1_distortion_type == 1) {
 
-        // 1. Base Fractal Warp (The "Bender")
-        vec2 warpUV = uv_corrected;
-        float n1 = snoise(warpUV * 150.0);
-        float n2 = snoise(warpUV * 300.0) * 0.5;
-        vec2 fractalWarp = vec2(n1 + n2) * 0.0024 * strength * u_intensity;
-        fractalWarp.x *= 2.0;  // horizontal bias
+        // 1. Bender (fractal warp)
+        BenderConfig bc;
+        bc.freq = 150.0;
+        bc.octave2_scale = 2.0;
+        bc.octave2_weight = 0.5;
+        bc.amplitude = 0.0024;
+        bc.bias = vec2(2.0, 1.0);  // horizontal bias
+        vec2 fractalWarp = applyBender(uv_corrected, bc, strength, u_intensity);
 
-        // 2. Discrete Scramble (The "Cutter")
+        // 2. Cutter (discrete scramble)
         // Crowding onset from corticalStrength: absent in central fovea (~0.5°),
         // ramps in by ~2.5° (Pelli & Tillman 2008 uncrowded window).
-        // Onset at ~0.5° (cs=0.02), full by ~4° (cs=0.15).
-        // Matches v2.3's effective scramble onset (~2.5° at fovea_deg=2.0).
         float scrambleZone = smoothstep(0.02, 0.15, corticalStrength);
         signal.scrambleZone = scrambleZone;
+        float edgeCrowdMult = 1.0 + lgn.edgeDensity * 0.4;
 
-        vec2 discreteScramble = vec2(0.0);
+        CutterConfig cc;
+        cc.cellFreq = vec2(400.0, 300.0);
+        cc.baseThrow = vec2(0.008, 0.0016);
+        cc.progressive = 1.0 + corticalStrength * ecc_max * 0.20;
+        cc.onset = scrambleZone;
+        vec2 discreteScramble = applyCutter(uv_corrected, cc, u_intensity, edgeCrowdMult);
 
-        if (scrambleZone > 0.01) {
-            // Fixed cell grid (v2.3): ~4px cells at ~400×300 frequency.
-            vec2 cellFreq = vec2(400.0, 300.0);
-            vec2 cellID = floor(uv_corrected * cellFreq);
-            vec2 jitter = hash22(cellID) - 0.5;
-
-            // Fixed base throw (v2.3): 8px horizontal, 1.6px vertical.
-            float edgeCrowdMult = 1.0 + lgn.edgeDensity * 0.4;
-            vec2 throwDist = vec2(0.008, 0.0016) * u_intensity * edgeCrowdMult;
-
-            // Progressive scaling driven by corticalStrength — replaces the old
-            // zone-based `(dist - parafovea_radius * 1.5) / parafovea_radius`.
-            // Linear growth with eccentricity (Bouma's law).
-            float progressive = 1.0 + corticalStrength * ecc_max * 0.20;
-            throwDist *= progressive;
-
-            discreteScramble = jitter * throwDist * scrambleZone * scrambleZone;
-        }
-
-        // 3. The Replacement Logic (Mix)
-        // Transition from "Bending" (Parafovea) to "Shredding" (Periphery)
-        // FIX: Removed +fractalWarp. User wants STABLE (static) periphery, not boiling.
+        // 3. Mix: transition from bending (parafovea) to shredding (periphery)
         signal.displacement = mix(fractalWarp, discreteScramble, scrambleZone);
-        
         signal.distortedUV = uv + signal.displacement;
-        
-        // 4. Bypass Strength Gating in Scramble Zone
-        // CRITICAL FIX: If we are in the scramble zone, ignore saliency gating.
-        // Saliency would otherwise allocate bandwidth to text, keeping it readable.
+
+        // 4. Bypass strength gating in scramble zone —
+        // saliency would otherwise keep text readable
         if (scrambleZone > 0.5) {
-             signal.distortionStrength = 1.0; // Force full effect
+             signal.distortionStrength = 1.0;
         } else {
              signal.distortionStrength = strength;
         }
-        
+
     } else if (config.v1_distortion_type == 0) {
         // === RADIAL/TANGENTIAL ANISOTROPIC CROWDING ===
         // Crowding ~2:1 stronger radially (Toet & Levi 1992, Pelli et al. 2004).
@@ -1060,6 +1079,62 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
             signal.distortedUV = mix(uv, quantizedUV, blockBlend);
             signal.distortionStrength = strength;
         }
+    } else if (config.v1_distortion_type == 5) {
+        // === CORTICAL ISOTROPIC (Blauch FOVI) ===
+        // Sector geometry drives transition rate; mechanism is type 1's Bender+Cutter.
+        // See docs/specs/isotropic_cortical_sampling.md
+
+        if (u_num_cortical_rings > 1.5) {
+            float ppd = max(fovea_radius / 1.0, 1.0);
+            float r_deg = ecc_deg;  // already computed above
+
+            // Sector extent (same formula as sampleDoGReconstructed)
+            float N_rings = u_num_cortical_rings;
+            float w_step = u_cortical_max / (N_rings - 1.0);
+            float dr_deg = (r_deg + u_cmf_a) * (exp(w_step) - 1.0);
+            float sectorPx = dr_deg * ppd;
+
+            // === BENDER: frequency inversely proportional to sector extent ===
+            float benderFreq = 150.0 * 7.0 / max(sectorPx, 4.0);
+
+            BenderConfig bc;
+            bc.freq = benderFreq;
+            bc.octave2_scale = 2.0;
+            bc.octave2_weight = 0.5;
+            bc.amplitude = 0.0024;
+            bc.bias = vec2(2.0, 1.0);  // 2:1 radial bias (Toet & Levi 1992)
+            vec2 fractalWarp = applyBender(uv_corrected, bc, strength, u_intensity);
+
+            // === CUTTER: cell size tracks sector extent ===
+            // Floor at 8px prevents sub-character displacement at fovea.
+            // Cap at 16px prevents visible grid artifacts on uniform backgrounds.
+            float cellSizePx = clamp(sectorPx * 0.5, 8.0, 16.0);
+            vec2 cellFreq = u_resolution / vec2(cellSizePx);
+
+            // Match type 1's calibrated throw values — the distortion mechanism
+            // (Bender+Cutter) is the same, only the cell geometry differs.
+            // The isotropic sector grid provides the pooling structure;
+            // displacement strength should match the proven shatter calibration.
+            float scrambleZone = smoothstep(0.02, 0.15, corticalStrength);
+            signal.scrambleZone = scrambleZone;
+            float edgeCrowdMult = 1.0 + lgn.edgeDensity * 0.4;
+
+            CutterConfig cc;
+            cc.cellFreq = cellFreq;
+            cc.baseThrow = vec2(0.008, 0.0016);  // matched to type 1 (shatter)
+            cc.progressive = 1.0 + corticalStrength * ecc_max * 0.20;
+            cc.onset = scrambleZone;
+            vec2 discreteScramble = applyCutter(uv_corrected, cc, u_intensity, edgeCrowdMult);
+
+            signal.displacement = mix(fractalWarp, discreteScramble, scrambleZone);
+            signal.distortedUV = uv + signal.displacement;
+
+            if (scrambleZone > 0.5) {
+                signal.distortionStrength = 1.0;
+            } else {
+                signal.distortionStrength = strength;
+            }
+        }
     }
 
     return signal;
@@ -1134,30 +1209,22 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     } else {
         pooledCol = sampleMIPPooledGrad(v1.distortedUV, distDuvdx, distDuvdy, coupledEccentricity, fovea_radius).rgb;
     }
-    
-    // corticalStrength in processV4 — same continuous function as processV1/LGN.
-    float v4_ecc_deg = max(0.0, dist) / max(fovea_radius, 0.001);
-    float v4_ecc_max = u_cortical_max > 0.1
-        ? u_cmf_a * (exp(u_cortical_max) - 1.0) : 25.0;
-    float v4_cs = clamp(v4_ecc_deg / v4_ecc_max, 0.0, 1.0);
 
-    // Blur blend: pow(cs, 1.2) — gradual onset, protects fovea.
-    // The Shredder handles degradation in the scramble zone;
-    // blur supplements in the parafoveal transition.
-    float baseBlend = pow(v4_cs, 1.5);
+    // Smooth content detection: DoG band decomposition isn't identity on gradients —
+    // hardware MIP uses box filtering, and per-band chromatic attenuation introduces
+    // small color errors that compound across 12 bands. When pooledCol ≈ foveaCol
+    // (smooth content), snap pooledCol to foveaCol so subsequent blend transitions
+    // have nothing to amplify into Mach bands. On structured content (text, edges),
+    // colorDelta is large and this is a no-op.
+    float colorDelta = length(pooledCol - foveaCol);
+    float smoothContent = 1.0 - smoothstep(0.01, 0.05, colorDelta);
+    pooledCol = mix(pooledCol, foveaCol, smoothContent);
+
+    // Blur blend: pixel-space transition from fovea edge outward.
+    // Tight range keeps Mach bands at the fovea boundary where content masks them.
+    // (corticalStrength transitions are too wide — visible rings on gradients.)
+    float baseBlend = smoothstep(0.0, fovea_radius * 0.5, eccentricity);
     float blendFactor = baseBlend * u_intensity;
-
-    // Suppress blur everywhere — the DoG reconstruction isn't transparent on
-    // smooth content (band decomposition artifacts create color shifts on gradients).
-    // On text, the Shredder's feature displacement IS the degradation.
-    // On gradients, foveaCol = original color everywhere (no visible artifacts).
-    // Full blur suppression — the Shredder's feature displacement IS the degradation.
-    // The DoG reconstruction creates color artifacts on smooth content (gradients).
-    // With 100% suppression, col = foveaCol (sharp at displaced UV) everywhere.
-    // Full blur suppression — the DoG reconstruction creates color artifacts
-    // on smooth content (gradients). The Shredder's displacement IS the degradation.
-    float blurSuppress = 1.0 - smoothstep(0.01, 0.20, v4_cs);
-    blendFactor *= blurSuppress;
 
     vec3 col = mix(foveaCol, pooledCol, blendFactor);
     
@@ -1169,24 +1236,23 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         
         float lumaRatio = cleanLuma / max(distortedLuma, 0.01);
         
-        float contrastRamp = smoothstep(0.0, 0.01, v4_cs);
+        float contrastRamp = smoothstep(0.0, fovea_radius * 0.5, eccentricity);
 
         // Contrast preservation: 60% inner, 10% far periphery
-        float contrastPreservation = mix(0.6, 0.1, smoothstep(0.0, 0.2, v4_cs));
+        float contrastPreservation = mix(0.6, 0.1, smoothstep(0.0, parafovea_radius - fovea_radius, eccentricity));
         
         col *= mix(1.0, lumaRatio, contrastPreservation * contrastRamp);
     }
     
-    // === FOVEA PROTECTION — corticalStrength-based ===
-    if (v4_cs < 0.001) {
+    // === FOVEA PROTECTION ===
+    if (dist < fovea_radius * 0.5) {
         return col;
     }
 
     float effectFactor = v1.distortionStrength;
-    // Color effects onset: 0.5°→20° — very gradual to prevent visible ring
-    // on gradients. Combined with 100% blur suppression, eliminates the halo.
-    // Wide bypass — gradual color effect onset prevents halo on gradients.
-    float bypassTransition = smoothstep(0.02, 0.80, v4_cs);
+    // Color effects onset: tight pixel-space transition at fovea edge.
+    // Wide corticalStrength transitions create visible Mach bands on gradients.
+    float bypassTransition = smoothstep(fovea_radius * 0.5, fovea_radius * 0.7, dist);
 
     if (config.v4_style_id <= 1) { // Research Modes: 0=Usability, 1=Biological(Purkinje)
     
@@ -1216,9 +1282,9 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             float offset = 0.005 * caFactor;
             float eccR = max(0.0, eccentricity - offset * fovea_radius * 4.0);
             float eccB = eccentricity + offset * fovea_radius * 4.0;
-            float blendR = smoothstep(0.0, fovea_radius * 0.5, eccR) * u_intensity * blurSuppress;
-            float blendG = smoothstep(0.0, fovea_radius * 0.5, eccentricity) * u_intensity * blurSuppress;
-            float blendB = smoothstep(0.0, fovea_radius * 0.5, eccB) * u_intensity * blurSuppress;
+            float blendR = smoothstep(0.0, fovea_radius * 0.5, eccR) * u_intensity;
+            float blendG = smoothstep(0.0, fovea_radius * 0.5, eccentricity) * u_intensity;
+            float blendB = smoothstep(0.0, fovea_radius * 0.5, eccB) * u_intensity;
             col.r = mix(foveaCol.r, pooledCol.r, blendR);
             col.g = mix(foveaCol.g, pooledCol.g, blendG);
             col.b = mix(foveaCol.b, pooledCol.b, blendB);
@@ -1737,7 +1803,7 @@ void main() {
         config.lgn_use_saliency_gate = false;
     }
     
-    if (config.v4_style_id != 5 && config.v1_distortion_type != 2 && config.v1_distortion_type != 3 && config.v1_distortion_type != 4) {
+    if (config.v4_style_id != 5 && config.v1_distortion_type != 2 && config.v1_distortion_type != 3 && config.v1_distortion_type != 4 && config.v1_distortion_type != 5) {
         if (u_mongrel_mode < 0.5) {
             config.v1_distortion_type = 0; 
         }

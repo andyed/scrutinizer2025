@@ -299,9 +299,10 @@ At 1024px analysis resolution: ~1M fragments × 150 ops = 150M extra ops. On int
 
 - **Abramov, Gordon & Chan (1991)** — "Color appearance in the peripheral retina: effects of stimulus size." *JOSA A* 8:404-414. [DOI](https://doi.org/10.1364/JOSAA.8.000404)
 - **Ashraf et al. (2024)** — "castleCSF — A contrast sensitivity function of color, area, spatiotemporal frequency, luminance and eccentricity." *Journal of Vision* 24(4):5. [DOI](https://doi.org/10.1167/jov.24.4.5)
-- **Bowers, Gegenfurtner & Goettker (2025)** — "Chromatic and achromatic contrast sensitivity in the far periphery." *Journal of Vision*. [bioRxiv](https://doi.org/10.1101/2025.03.22.644503)
+- **Bowers, Gegenfurtner & Goettker (2025)** — "Chromatic sensitivity across the visual field." *Journal of Vision*, 25. [bioRxiv](https://doi.org/10.1101/2025.03.22.644503)
 - **Hansen, Pracejus & Gegenfurtner (2009)** — "Color perception in the intermediate periphery of the visual field." *Journal of Vision* 9(4):26. [DOI](https://doi.org/10.1167/9.4.26)
 - **Jiang, Shooner & Mullen (2022)** — "Achromatic and chromatic perceived contrast are reduced in the visual periphery." *Journal of Vision*. [PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC9639675/)
+  <!-- NOTE: BibTeX (references.bib) has title "Suprathreshold chromatic contrast perception across the visual field" (JoV 22(14):4319) which may be the ARVO abstract. The PMC-linked title here may be the full paper. Verify which is authoritative and reconcile. -->
 - **Mullen (1985)** — "The contrast sensitivity of human colour vision to red-green and blue-yellow chromatic gratings." *Journal of Physiology* 359:381-400.
 - **Mullen (1991)** — "Colour vision as a post-receptoral specialization of the central visual field." *Vision Research* 31:119-130.
 - **Mullen & Kingdom (2002)** — "Differential distributions of red-green and blue-yellow cone opponency across the visual field." *Visual Neuroscience* 19:109-118.

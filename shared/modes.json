@@ -388,7 +388,7 @@
             "label": "FOVI Cortical Grid (Blauch)",
             "shortLabel": "FOVI Iso",
             "category": "research",
-            "description": "Isotropic cortical sampling derived from Blauch, Alvarez & Konkle (2026). Ring spacing from uniform cortical sampling (w = log(r + a)), spoke count matched to radial spacing at each eccentricity. Cells are approximately square in cortical space at all distances.",
+            "description": "Sector-parameterized displacement derived from Blauch, Alvarez & Konkle (2026). Noise frequency and scramble cell size scale with cortical sector extent (w = log(r + a)). Sector geometry drives transition rate, not rendering mechanism. 12px cell cap prevents grid artifacts.",
             "pipeline": {
                 "lgn_use_structure_mask": true,
                 "lgn_use_saliency_gate": true,

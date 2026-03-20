@@ -128,7 +128,7 @@ uniform float u_cortical_max;  // ln(r_max + a) - ln(a), precomputed on JS side
 MIP equation (replacing lines 192 and 217):
 ```glsl
 // Cortical distance: d(r) = ln(r+a) - ln(a)
-// Schwartz (1980), Blauch, Konkle & Alvarez (2026)
+// Schwartz (1980), Blauch, Alvarez & Konkle (2026)
 float cortical_dist = log(r_deg + u_cmf_a) - log(u_cmf_a);
 mipLevel = clamp(maxMipLevel * cortical_dist / u_cortical_max, 0.0, maxMipLevel);
 ```
@@ -195,6 +195,6 @@ Pixel-identical for all non-FOVI modes.
 
 ## References
 
-- Blauch, N. M., Konkle, T., & Alvarez, G. A. (2026). FOVI: Foveation for cortical magnification in visual AI. arXiv:2602.03766
+- Blauch, N. M., Alvarez, G. A., & Konkle, T. (2026). FOVI: A biologically-inspired foveated interface for deep vision models. arXiv:2602.03766
 - Schwartz, E. L. (1980). Computational anatomy and functional architecture of striate cortex: A spatial mapping approach to perceptual coding. Vision Research, 20(8), 645–669.
 - Rovamo, J. & Virsu, V. (1979). An estimation and application of the human cortical magnification factor. Experimental Brain Research, 37, 495–510.

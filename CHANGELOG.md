@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.6.0] - 2026-03-19
+
+### Added
+- **FOVI Cortical Grid (Mode 12, Default)**: Isotropic cortical sampling from Blauch, Alvarez & Konkle (2026, arxiv:2602.03766) is now the default mode. Sector geometry derived from `w = log(r + a)` parameterizes the displacement pipeline — noise frequency scales inversely with sector extent, scramble cell size tracks sector extent (capped at 16px, floor 8px). Sector geometry drives *transition rate*, not rendering mechanism. 19-test geometry suite validates math against Blauch's Python to 3 decimal places.
+- **Bender/Cutter Extraction**: V1 displacement components extracted as parameterized GLSL structs (`BenderConfig`, `CutterConfig`) with `applyBender()` and `applyCutter()` functions. Researchers can swap implementations by constructing different configs. Type 1 (Shredder) refactored to use extracted functions — behavior-identical.
+- **Smooth Content Detection**: DoG band reconstruction artifacts on gradients (the "halo") eliminated by detecting when `pooledCol ≈ foveaCol` and snapping pooledCol to foveaCol. On structured content (text, edges), the detection is a no-op.
+- **Isotropic Rendering Validation**: `scripts/validate-isotropic-rendering.js` — 12-check suite covering angular isotropy, readability destruction, texture preservation, dark mode scatter, and mode comparison. 24 comparison captures across 4 pages × 3 modes × 2 fixations.
+- **Mode Graduation Spec**: `docs/specs/mode_graduation.md` — process for promoting modes to default (test baselines, toggles, docs).
+- **ArXiv Figure: FOVI Geometry**: Print-quality 2×3 composite figure (`docs/arxiv-paper/figures/fig-fovi-geometry.html`) showing Gaussian → Polar → Isotropic progression with pooled-content visualization. Self-contained HTML with PNG export.
+- **Interactive Grid Demo**: Side-by-side visualization of uniform, polar, and isotropic cortical sampling grids (`scrutinizer-www/demos/isotropic-grid-demo.html`). Aspect-ratio coloring, pooled-content mode with selectable stimuli (checkerboard, text, radial, noise). Interactive controls for rings, spokes, field extent.
+
+### Changed
+- **Default Mode**: 10 (Compute Mongrel) → 12 (FOVI Cortical Grid). The sector-parameterized displacement produces fewer implausible long-range pixel scatters with a smoother degradation profile. Previous default accessible via menu.
+- **V4 Halo Fix**: Restored pixel-space transitions for blur blend, contrast ramp, bypass transition, and fovea protection. corticalStrength-based transitions were too wide — created visible Mach bands on smooth gradients. Widened magnocellular contrast ramp from 4.5px to 22.5px to match blur blend zone.
+- **Isotropic Cutter Cell Size**: Floor raised from 4px to 8px, cap from 12px to 16px. At 4px the Cutter grid fragmented characters at the fovea, dropping OCR recognition to 56% (below the 70% threshold). At 8px, foveal recognition is 84% while far-peripheral degradation remains at 52% — passing all four OCR validation criteria.
+
+### Fixed
+- **Isotropic Mode Was Inert (Ship-Blocking)**: `v1_distortion_type: 5` (cortical_isotropic) was silently overwritten to type 1 (shatter) every frame by a legacy `mongrelMode` override on `peripheral.frag` line 1806. The guard condition exempted types 2, 3, and 4 but not type 5 — so mode 12's sector geometry was computed but never reached the shader's isotropic code path. All captures, demos, and validation prior to this fix were running shatter distortion with isotropic uniforms ignored. Fixed by adding `config.v1_distortion_type != 5` to the exemption list.
+- **Arxiv Citation Accuracy**: Corrected FOVI paper title to "A biologically-inspired foveated interface for deep vision models" across 6 files. Fixed author order (Alvarez before Konkle) where reversed. AI-confabulated title variants ("Foveation of inputs...", "Foveated vision in neural networks") replaced with actual paper title.
+- **Missing Uniform Declaration**: `u_num_cortical_rings` was passed from JS but not declared in the shader.
+- **OCR Baseline Stale**: Re-frozen OCR baseline at 1x DPR (1920×944) after mode 12 graduation changed capture geometry. Previous baseline was frozen at 2x DPR (3840×1888), causing foveal radius mismatch.
+
+### Validation
+- **OCR Profile (Mode 12)**: Fovea 84% | Parafovea 60% | Near 62% | Far 52%. Monotonically declining. Overall 57% recognition (mode 0 baseline: 40%). Far-peripheral degradation passes ≤55% threshold. Foveal preservation passes ≥70% threshold.
+- **OCR Profile (Mode 0, reference)**: Fovea 100% | Parafovea 67% | Near 44% | Far 31%. Overall 40%.
+
 ## [2.5.0] - 2026-03-16
 
 ### Added

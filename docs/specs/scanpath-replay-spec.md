@@ -617,7 +617,7 @@ after the validation suite.
 ## References
 
 - Bahill, A. T., Clark, M. R., & Stark, L. (1975). The main sequence, a tool for studying human eye movements. *Mathematical Biosciences*, 24(3-4), 191-204.
-- Blauch, N. M., Bao, P., Konkle, T., & Alvarez, G. A. (2026). FOVI: Foveated vision models for spatial resolution and receptive field asymmetries.
+- Blauch, N. M., Alvarez, G. A., & Konkle, T. (2026). FOVI: A biologically-inspired foveated interface for deep vision models. arXiv:2602.03766.
 - Flash, T., & Hogan, N. (1985). The coordination of arm movements: an experimentally confirmed mathematical model. *Journal of Neuroscience*, 5(7), 1688-1703.
 - Mullen, K. T., & Kingdom, F. A. (2002). Differential distributions of red-green and blue-yellow cone opponency across the visual field. *Visual Neuroscience*, 19(1), 109-118.
 - Rosenholtz, R. (2012). Summary statistics and pooling regions. In *Oxford Handbook of Perceptual Organization*.

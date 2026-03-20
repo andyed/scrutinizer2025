@@ -1,9 +1,9 @@
 # Isotropic Cortical Rendering — Migration Spec
 
-> **Date:** 2026-03-17 (updated 2026-03-18 session 5)
-> **Status:** Pipeline refactored — corticalStrength() replaces zone boundaries, halo P0 resolved, v2.3 Shredder restored. Isotropic sector-scaled Shredder is NEXT (Mode 12/FOVI), now on solid foundation.
+> **Date:** 2026-03-17 (updated 2026-03-19 — shipped as v2.6.0)
+> **Status:** Shipped. Sector-parameterized Bender+Cutter (V1 type 5) is default mode since 2026-03-19. See implementation journal attempt #8.
 > **Prerequisite:** v2.5.0 (12-band DoG, calibrated chromatic decay)
-> **Goal:** Replace rectangular MIP-based spatial degradation with isotropic cortical geometry
+> **Goal:** ~~Replace rectangular MIP-based spatial degradation with isotropic cortical geometry~~ Parameterize existing displacement pipeline from isotropic cortical sector geometry
 
 ## Context
 
@@ -15,13 +15,15 @@ The isotropic migration replaces this with sector geometry from Blauch, Alvarez 
 
 | Component | Status | Location |
 |-----------|--------|----------|
-| Sector geometry math | Verified (19 tests) | `computeCorticalSector()` in peripheral.frag |
+| Sector geometry math | Verified (19 tests) | JS reference in `isotropic-sectors.test.js`; GLSL computes extent inline |
 | Mode 12 config | Complete | `shared/modes.json` (fovi_isotropic) |
-| Grid visualizations | Working | `grid-comparison.html`, `cortical-manifold.html` |
+| Grid visualizations | Working | `grid-comparison.html`, `cortical-manifold.html`, [CodePen](https://codepen.io/andy-edmonds/pen/019ced00-b472-7c33-8ebb-20982aa039ad) |
 | Capture infrastructure | Ready | `scripts/capture-isotropic-comparison.js` |
-| Blog draft | Content written | `scrutinizer-www/src/blog/drafts/isotropic-cortical-sampling.html` |
-| 7 failed rendering attempts | Documented | `docs/specs/isotropic_implementation_journal.md` |
-| V1 type 5 shader block | Missing | Reverted after all attempts failed |
+| Rendering validation | 12/12 checks | `scripts/validate-isotropic-rendering.js` |
+| Blog draft | Updated for shipped impl | `scrutinizer-www/src/blog/drafts/isotropic-cortical-sampling.html` |
+| 8 rendering attempts (7 failed, 1 shipped) | Documented | `docs/specs/isotropic_implementation_journal.md` |
+| V1 type 5 shader block | **Shipped** | `BenderConfig`/`CutterConfig` parameterized by sector extent |
+| `computeCorticalSector()` | **Reverted** | Not needed — type 5 computes sector extent inline |
 
 ## The Core Problem
 
@@ -93,7 +95,7 @@ Replace fixed-frequency simplex noise with noise scaled by sector extent. **Ship
 
 ### Phase 3: Sector-scaled cutter (scramble)
 
-**Root causes identified. Code changes drafted but NOT shipped (2026-03-17 session 3).** The coordinate fix (Phase 2) changes sectorPx from constant-7 to eccentricity-scaled (7→150+px at screen edges). All Phase 3 parameters that were tuned against sectorPx=7 are now wrong. Applying the science-informed parameters (1× sector cells, 1.5× throw, structure gating) on top of the coordinate fix produced total OCR destruction (0.1% recognition). The shader passes SE correlation checks but visually creates massive block artifacts.
+**Root causes identified (2026-03-17 session 3). Shipped in v2.6.0 with 12px cell cap and sector-bounded throw (2026-03-19).** The coordinate fix (Phase 2) changes sectorPx from constant-7 to eccentricity-scaled (7→150+px at screen edges). All Phase 3 parameters that were tuned against sectorPx=7 are now wrong. Applying the science-informed parameters (1× sector cells, 1.5× throw, structure gating) on top of the coordinate fix produced total OCR destruction (0.1% recognition). The shader passes SE correlation checks but visually creates massive block artifacts.
 
 **See:** `docs/specs/images/v1-distortion-journey-visual.png` and `docs/specs/images/v1-distortion-ocr-metrics.png` for the full comparison.
 

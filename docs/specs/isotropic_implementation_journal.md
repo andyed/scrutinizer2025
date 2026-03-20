@@ -1,7 +1,7 @@
 # Isotropic Mode 12: Implementation Journal
 
-> **Date:** 2026-03-15
-> **Status:** Abandoned — reverting to v2.4.1 baseline for spec-first redesign
+> **Date:** 2026-03-15 (attempts 1-7), 2026-03-19 (attempt 8 — shipped)
+> **Status:** Shipped — attempt 8 is the default mode (mode 12)
 > **Parent spec:** `isotropic_cortical_sampling.md`
 
 ## Goal
@@ -119,6 +119,30 @@ Mode 12 needs to replicate this two-stage destruction using sector geometry as t
 
 4. **lodFloor as supplement, not replacement.** Use a gentle lodFloor (0.3-0.4x) alongside noise+scramble, not instead of it. The lodFloor softens the finest bands; the scramble handles feature destruction.
 
+### 8. Sector-parameterized Bender + Cutter (2026-03-19) — SHIPPED
+
+**Idea:** Don't use sectors as a rendering primitive at all. Use the proven noise-warp ("Bender") and discrete-scramble ("Cutter") from type 1, but parameterize their spatial frequency and cell size from sector extent. Sector geometry drives *where and how fast* degradation changes — not *how pixels change*.
+
+**Implementation:**
+- Extract Bender and Cutter as parameterized GLSL functions (`applyBender`, `applyCutter`) with config structs
+- Bender frequency inversely proportional to sector extent: `150 * 7 / sectorPx`
+- Cutter cell size tracks sector extent, capped at 12px: `clamp(sectorPx * 0.5, 4, 12)`
+- Throw distance bounded by sector width in UV space, 2:1 radial bias
+- Same scrambleZone onset as type 1 (corticalStrength-based, Pelli & Tillman 2008)
+
+**Result:** Works. Passes all tests (smoke 7/7, unit 274/274, visual, memory, perf, integration). Rendering validation: angular isotropy CV < 0.5, zero dark scatter, texture preserved, mode-comparable statistics. Visual difference from type 1 is subtle — fewer implausible long-range scatters, smoother degradation profile.
+
+**Why it worked:** Every previous attempt tried to make sectors the rendering unit — snap to sector center, average within sectors, gate at sector boundaries. All produced sector-shaped artifacts because sectors are large relative to features (a 13px sector at 5° spans less than one letter). The Bender/Cutter already operates at sub-feature scale. Parameterizing it from sector extent gives the CMF-derived spatial profile without introducing sector-scale coherence.
+
+**The principle:** Sector geometry drives transition rate, not mechanism. This is the key insight from the failure of attempts 1-7.
+
+**Known approximations:**
+1. Forward-difference for `dr` (~3% from central difference at N=50)
+2. Radial/tangential bias in screen coordinates, not true polar
+3. Progressive multiplier pushes throw to ~3.25x sector at max eccentricity
+
+**Shipped as:** V1 distortion type 5, mode 12 (FOVI Cortical Grid), default mode since 2026-03-19.
+
 ## What to Carry Forward
 
 | Item | Status | Rationale |
@@ -126,13 +150,13 @@ Mode 12 needs to replicate this two-stage destruction using sector geometry as t
 | `tests/unit/isotropic-sectors.test.js` | KEEP | Pure math — validates sector geometry against Blauch Python |
 | `scripts/ocr-readability-comparison.js` | KEEP | Mode-agnostic validation tool |
 | `scripts/capture-isotropic-comparison.js` | KEEP | Comparison capture infrastructure |
+| `scripts/validate-isotropic-rendering.js` | NEW | Rendering validation (spec items 5-9), 12 checks |
 | `docs/golden/isotropic-side-by-side.html` | KEEP | 3-way visual comparison viewer |
-| `docs/specs/isotropic_cortical_sampling.md` | KEEP | Mathematical spec (correct, pre-dates implementation) |
-| `computeCorticalSector()` in peripheral.frag | KEEP | Correct math, needed for any future isotropic work |
-| V1 type 5 distortion block | REVERT | All rendering code in this block failed — start fresh |
-| `sampleDoGReconstructed` signature changes | REVERT | Removed sectorDx/sectorDy params — restore original |
-| `scripts/capture-smoke.js` mode 12 shot | KEEP | Pipeline crash test, independent of rendering quality |
-| Remove "Chromatic Aberration" menu item | DO | Vestigial toggle, unrelated to isotropic work |
+| `docs/specs/isotropic_cortical_sampling.md` | UPDATE | Mathematical spec needs status update (rendering shipped) |
+| `docs/specs/mode_graduation.md` | NEW | Process spec for promoting modes to default |
+| `BenderConfig`/`CutterConfig` structs in peripheral.frag | NEW | Extracted, parameterized distortion components |
+| V1 type 5 distortion block | SHIPPED | Sector-parameterized Bender + Cutter (attempt 8) |
+| `computeCorticalSector()` in peripheral.frag | REVERTED | Not needed — type 5 computes sector extent inline |
 
 ## References
 

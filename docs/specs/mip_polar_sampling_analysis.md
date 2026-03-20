@@ -165,5 +165,5 @@ The `equivalentMipLevel` column should produce a smooth, monotonically increasin
 - Burt, P. J., & Adelson, E. H. (1983). The Laplacian pyramid as a compact image code. *IEEE Transactions on Communications*, 31(4), 532–540.
 - Rovamo, J., & Virsu, V. (1979). An estimation and application of the human cortical magnification factor. *Experimental Brain Research*, 37(3), 495–510.
 - Toet, A., & Levi, D. M. (1992). The two-dimensional shape of spatial interaction zones in the parafovea. *Vision Research*, 32(7), 1349–1357.
-- Blauch, N. M., Alvarez, G. A., & Konkle, T. (2026). A model of foveated visual processing. *arXiv:2602.03766*.
+- Blauch, N. M., Alvarez, G. A., & Konkle, T. (2026). FOVI: A biologically-inspired foveated interface for deep vision models. *arXiv:2602.03766*.
 - OpenGL ES 3.0 Specification, §3.8.9 — Texture Minification (LOD selection from implicit derivatives).

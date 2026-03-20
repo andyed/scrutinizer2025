@@ -801,6 +801,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                     type: 'radio',
                                     checked: currentAestheticMode === 5,
                                     click: () => { sendToOverlays('menu:set-aesthetic-mode', 5); app.emit('aesthetic-mode-changed', 5); }
+                                },
+                                {
+                                    label: 'FOVI Cortical Grid (Blauch) (Default)',
+                                    type: 'radio',
+                                    checked: currentAestheticMode === 12,
+                                    click: () => { sendToOverlays('menu:set-aesthetic-mode', 12); app.emit('aesthetic-mode-changed', 12); }
                                 }
                             ]
                         },
