@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Figure: Cortical Sampling Geometry</title>
+<style>
+  body {
+    margin: 0;
+    padding: 20px;
+    background: #fff;
+    font-family: Georgia, "Times New Roman", serif;
+    color: #000;
+  }
+  .figure-wrap {
+    display: inline-block;
+  }
+  canvas {
+    display: block;
+  }
+  .caption {
+    max-width: 660px;
+    font-size: 11px;
+    line-height: 1.45;
+    margin-top: 8px;
+    text-align: justify;
+  }
+  .caption strong {
+    font-weight: bold;
+  }
+  button#saveBtn {
+    margin-top: 12px;
+    font-family: Georgia, serif;
+    font-size: 12px;
+    padding: 6px 16px;
+    cursor: pointer;
+    background: #f0f0f0;
+    border: 1px solid #999;
+    border-radius: 3px;
+  }
+  button#saveBtn:hover {
+    background: #e0e0e0;
+  }
+</style>
+</head>
+<body>
+<div class="figure-wrap">
+  <canvas id="fig" width="660" height="480"></canvas>
+  <p class="caption">
+    <strong>Figure N:</strong> Cortical sampling geometry. Ring boundaries from uniform cortical sampling
+    (<em>w</em> = log(<em>r</em> + <em>a</em>), <em>a</em> = 2.78&deg;). (a) Gaussian blur has no discrete pooling
+    regions. (b) Polar grid with fixed spoke count: outer cells stretch into arcs (red).
+    (c) FOVI-derived isotropic grid: spoke count adapted per ring for locally square cells in cortical
+    coordinates (green). Bottom row: checkerboard stimulus averaged within each cell.
+    Implementation validated against Blauch et al. (2026) to 3 decimal places.
+  </p>
+  <button id="saveBtn">Save as PNG</button>
+</div>
+
+<script>
+// ======================================================================
+// Parameters
+// ======================================================================
+const CMF_A   = 2.78;   // cortical magnification constant (degrees)
+const N_RINGS = 30;
+const R_MAX   = 15;     // degrees
+const FIXED_SPOKES = 24;
+
+const PANEL_W = 200;
+const PANEL_H = 200;
+const COL_GAP = 10;
+const ROW_GAP = 10;
+const LEFT_LABEL_W = 50;
+const TOP_LABEL_H = 30;
+
+const CANVAS_W = 660;
+const CANVAS_H = 480;
+
+// ======================================================================
+// Ring geometry (shared)
+// ======================================================================
+const wMin = Math.log(CMF_A);
+const wMax = Math.log(R_MAX + CMF_A);
+const wStep = (wMax - wMin) / (N_RINGS - 1);
+
+// Precompute ring radii and dr
+const rings = []; // { r, dr, spokesFixed, spokesIso }
+for (let i = 0; i < N_RINGS; i++) {
+  const w = wMin + i * wStep;
+  const r = Math.exp(w) - CMF_A;
+
+  // Central difference for dr
+  let dr;
+  if (i === 0) {
+    const wNext = wMin + wStep;
+    dr = (Math.exp(wNext) - CMF_A) - r;
+  } else if (i === N_RINGS - 1) {
+    const wPrev = wMin + (i - 1) * wStep;
+    dr = r - (Math.exp(wPrev) - CMF_A);
+  } else {
+    const wPrev = wMin + (i - 1) * wStep;
+    const wNext = wMin + (i + 1) * wStep;
+    dr = ((Math.exp(wNext) - CMF_A) - (Math.exp(wPrev) - CMF_A)) / 2;
+  }
+
+  const spokesFixed = FIXED_SPOKES;
+  const spokesIso = (i === 0) ? 1 : Math.max(4, Math.floor(2 * Math.PI * r / dr));
+
+  rings.push({ r, dr, spokesFixed, spokesIso });
+}
+
+// Inner/outer boundaries for each ring
+const ringBounds = [];
+for (let i = 0; i < N_RINGS; i++) {
+  let rInner, rOuter;
+  if (i === 0) {
+    rInner = 0;
+    rOuter = (rings[0].r + rings[1].r) / 2;
+  } else if (i === N_RINGS - 1) {
+    rInner = (rings[i - 1].r + rings[i].r) / 2;
+    rOuter = R_MAX;
+  } else {
+    rInner = (rings[i - 1].r + rings[i].r) / 2;
+    rOuter = (rings[i].r + rings[i + 1].r) / 2;
+  }
+  ringBounds.push({ rInner, rOuter });
+}
+
+// ======================================================================
+// Canvas setup
+// ======================================================================
+const canvas = document.getElementById('fig');
+const ctx = canvas.getContext('2d');
+ctx.fillStyle = '#fff';
+ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+// Pixel ratio for crisp text (draw at 2x internally)
+const dpr = 1; // keep 1:1 for PNG export consistency
+
+// ======================================================================
+// Helpers
+// ======================================================================
+function degToPixel(deg, panelSize) {
+  // Map 0..R_MAX to 0..panelSize/2 from center
+  return (deg / R_MAX) * (panelSize / 2);
+}
+
+function aspectRatioColor(ratio) {
+  // ratio = tangential_extent / radial_extent
+  // 1.0 = green (isotropic), >1.3 = red (stretched)
+  const t = Math.min(1, Math.max(0, (ratio - 1.0) / 0.3));
+  const r = Math.round(40 + 200 * t);
+  const g = Math.round(160 - 120 * t);
+  const b = Math.round(60 - 20 * t);
+  return `rgb(${r},${g},${b})`;
+}
+
+function panelOrigin(col, row) {
+  const x = LEFT_LABEL_W + col * (PANEL_W + COL_GAP);
+  const y = TOP_LABEL_H + row * (PANEL_H + ROW_GAP);
+  return { x, y };
+}
+
+function clipPanel(ctx, px, py) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(px, py, PANEL_W, PANEL_H);
+  ctx.clip();
+}
+
+// ======================================================================
+// Checkerboard generation (offscreen)
+// ======================================================================
+function makeCheckerboard(size, cellDeg) {
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width = size;
+  offCanvas.height = size;
+  const offCtx = offCanvas.getContext('2d');
+  const cx = size / 2;
+  const cy = size / 2;
+  const cellPx = degToPixel(cellDeg, size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = x - cx;
+      const dy = y - cy;
+      const col = Math.floor((x - cx + size) / cellPx);
+      const row = Math.floor((y - cy + size) / cellPx);
+      const white = (col + row) % 2 === 0;
+      offCtx.fillStyle = white ? '#fff' : '#222';
+      offCtx.fillRect(x, y, 1, 1);
+    }
+  }
+  return offCanvas;
+}
+
+// Get checkerboard pixel data
+const checkerSize = PANEL_W;
+const checkerCanvas = makeCheckerboard(checkerSize, 1.2);
+const checkerCtx = checkerCanvas.getContext('2d');
+const checkerData = checkerCtx.getImageData(0, 0, checkerSize, checkerSize);
+
+// ======================================================================
+// Row 1, Col A: Gaussian blur (concentric gradient rings)
+// ======================================================================
+function drawGaussianGeometry(px, py) {
+  clipPanel(ctx, px, py);
+  const cx = px + PANEL_W / 2;
+  const cy = py + PANEL_H / 2;
+
+  // Draw concentric rings with increasing blur/transparency
+  const maxR = PANEL_W / 2;
+  const numRings = 12;
+  for (let i = numRings; i >= 0; i--) {
+    const frac = i / numRings;
+    const r = frac * maxR;
+    const alpha = 0.08 + 0.07 * (1 - frac);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(0,0,0,${alpha + 0.15})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Radial gradient fill to show blur falloff
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+  grad.addColorStop(0.15, 'rgba(200,200,200,0.3)');
+  grad.addColorStop(0.5, 'rgba(140,140,140,0.25)');
+  grad.addColorStop(1, 'rgba(80,80,80,0.3)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(px, py, PANEL_W, PANEL_H);
+
+  // Thin dashed lines for "no tiling" visual
+  ctx.setLineDash([2, 4]);
+  for (let i = 1; i <= 6; i++) {
+    const r = (i / 6) * maxR * 0.9;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Label: sigma symbol increasing
+  ctx.font = 'italic 11px Georgia';
+  ctx.fillStyle = '#555';
+  ctx.textAlign = 'center';
+  ctx.fillText('\u03C3 increases', cx, py + PANEL_H - 8);
+
+  // Foveal dot
+  ctx.beginPath();
+  ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// ======================================================================
+// Row 1, Col B: Polar grid (fixed spokes)
+// ======================================================================
+function drawPolarGeometry(px, py) {
+  clipPanel(ctx, px, py);
+  const cx = px + PANEL_W / 2;
+  const cy = py + PANEL_H / 2;
+
+  // Draw cells
+  for (let i = 1; i < N_RINGS; i++) {
+    const { rInner, rOuter } = ringBounds[i];
+    const rInPx = degToPixel(rInner, PANEL_W);
+    const rOutPx = degToPixel(rOuter, PANEL_W);
+    const spokes = FIXED_SPOKES;
+    const dTheta = (2 * Math.PI) / spokes;
+
+    // Aspect ratio: tangential extent vs radial extent
+    const rMid = (rInner + rOuter) / 2;
+    const tangentialExtent = rMid * dTheta;
+    const radialExtent = rOuter - rInner;
+    const aspectRatio = tangentialExtent / radialExtent;
+
+    for (let s = 0; s < spokes; s++) {
+      const thetaStart = s * dTheta;
+      const thetaEnd = (s + 1) * dTheta;
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, rOutPx, thetaStart, thetaEnd);
+      ctx.arc(cx, cy, rInPx, thetaEnd, thetaStart, true);
+      ctx.closePath();
+      ctx.fillStyle = aspectRatioColor(aspectRatio);
+      ctx.globalAlpha = 0.6;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+  }
+
+  // Foveal dot
+  const fovR = degToPixel(rings[0].r + rings[0].dr * 0.5, PANEL_W);
+  ctx.beginPath();
+  ctx.arc(cx, cy, Math.max(fovR, 3), 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// ======================================================================
+// Row 1, Col C: Isotropic (FOVI) grid
+// ======================================================================
+function drawIsoGeometry(px, py) {
+  clipPanel(ctx, px, py);
+  const cx = px + PANEL_W / 2;
+  const cy = py + PANEL_H / 2;
+
+  for (let i = 1; i < N_RINGS; i++) {
+    const { rInner, rOuter } = ringBounds[i];
+    const rInPx = degToPixel(rInner, PANEL_W);
+    const rOutPx = degToPixel(rOuter, PANEL_W);
+    const spokes = rings[i].spokesIso;
+    const dTheta = (2 * Math.PI) / spokes;
+
+    const rMid = (rInner + rOuter) / 2;
+    const tangentialExtent = rMid * dTheta;
+    const radialExtent = rOuter - rInner;
+    const aspectRatio = tangentialExtent / radialExtent;
+
+    for (let s = 0; s < spokes; s++) {
+      const thetaStart = s * dTheta;
+      const thetaEnd = (s + 1) * dTheta;
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, rOutPx, thetaStart, thetaEnd);
+      ctx.arc(cx, cy, rInPx, thetaEnd, thetaStart, true);
+      ctx.closePath();
+      ctx.fillStyle = aspectRatioColor(aspectRatio);
+      ctx.globalAlpha = 0.6;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+  }
+
+  // Foveal dot
+  const fovR = degToPixel(rings[0].r + rings[0].dr * 0.5, PANEL_W);
+  ctx.beginPath();
+  ctx.arc(cx, cy, Math.max(fovR, 3), 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// ======================================================================
+// Row 2: Pooled checkerboard helpers
+// ======================================================================
+function getCheckerLuma(x, y) {
+  // x,y in panel pixel coords (0..PANEL_W)
+  const idx = (y * checkerSize + x) * 4;
+  if (x < 0 || x >= checkerSize || y < 0 || y >= checkerSize) return 128;
+  return checkerData.data[idx]; // R channel suffices (grayscale)
+}
+
+function drawGaussianPooled(px, py) {
+  clipPanel(ctx, px, py);
+  const cx = PANEL_W / 2;
+  const cy = PANEL_H / 2;
+
+  // Create offscreen canvas for Gaussian-blurred checkerboard
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width = PANEL_W;
+  offCanvas.height = PANEL_H;
+  const offCtx = offCanvas.getContext('2d');
+  const imgData = offCtx.createImageData(PANEL_W, PANEL_H);
+
+  for (let y = 0; y < PANEL_H; y++) {
+    for (let x = 0; x < PANEL_W; x++) {
+      const dx = x - cx;
+      const dy = y - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const distDeg = dist / (PANEL_W / 2) * R_MAX;
+
+      // Gaussian blur kernel radius proportional to eccentricity
+      const sigma = Math.max(0.5, distDeg * 0.7);
+      const sigmaPx = sigma / R_MAX * (PANEL_W / 2);
+      const kernelR = Math.ceil(sigmaPx * 2);
+
+      let sum = 0;
+      let weight = 0;
+      for (let ky = -kernelR; ky <= kernelR; ky += Math.max(1, Math.floor(kernelR / 3))) {
+        for (let kx = -kernelR; kx <= kernelR; kx += Math.max(1, Math.floor(kernelR / 3))) {
+          const w = Math.exp(-(kx * kx + ky * ky) / (2 * sigmaPx * sigmaPx));
+          const sx = Math.round(x + kx);
+          const sy = Math.round(y + ky);
+          sum += getCheckerLuma(
+            Math.max(0, Math.min(checkerSize - 1, sx)),
+            Math.max(0, Math.min(checkerSize - 1, sy))
+          ) * w;
+          weight += w;
+        }
+      }
+      const val = Math.round(sum / weight);
+      const idx = (y * PANEL_W + x) * 4;
+      imgData.data[idx] = val;
+      imgData.data[idx + 1] = val;
+      imgData.data[idx + 2] = val;
+      imgData.data[idx + 3] = 255;
+    }
+  }
+
+  offCtx.putImageData(imgData, 0, 0);
+  ctx.drawImage(offCanvas, px, py);
+
+  // Foveal dot
+  ctx.beginPath();
+  ctx.arc(px + cx, py + cy, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawCellPooled(px, py, useIso) {
+  clipPanel(ctx, px, py);
+  const cx = PANEL_W / 2;
+  const cy = PANEL_H / 2;
+
+  // For each ring, average checkerboard within each cell
+  for (let i = 0; i < N_RINGS; i++) {
+    const { rInner, rOuter } = ringBounds[i];
+    const rInPx = degToPixel(rInner, PANEL_W);
+    const rOutPx = degToPixel(rOuter, PANEL_W);
+    const spokes = useIso ? rings[i].spokesIso : FIXED_SPOKES;
+    const dTheta = (2 * Math.PI) / spokes;
+
+    for (let s = 0; s < spokes; s++) {
+      const thetaStart = s * dTheta;
+      const thetaEnd = (s + 1) * dTheta;
+      const thetaMid = (thetaStart + thetaEnd) / 2;
+
+      // Sample within the cell to get average luma
+      let lumaSum = 0;
+      let count = 0;
+      const rSteps = Math.max(2, Math.ceil((rOutPx - rInPx) / 2));
+      const tSteps = Math.max(2, Math.ceil((thetaEnd - thetaStart) * ((rInPx + rOutPx) / 2) / 2));
+
+      for (let ri = 0; ri <= rSteps; ri++) {
+        const rPx = rInPx + (rOutPx - rInPx) * ri / rSteps;
+        for (let ti = 0; ti <= tSteps; ti++) {
+          const theta = thetaStart + (thetaEnd - thetaStart) * ti / tSteps;
+          const sx = Math.round(cx + rPx * Math.cos(theta));
+          const sy = Math.round(cy + rPx * Math.sin(theta));
+          lumaSum += getCheckerLuma(
+            Math.max(0, Math.min(checkerSize - 1, sx)),
+            Math.max(0, Math.min(checkerSize - 1, sy))
+          );
+          count++;
+        }
+      }
+
+      const avgLuma = Math.round(lumaSum / count);
+      const color = `rgb(${avgLuma},${avgLuma},${avgLuma})`;
+
+      ctx.beginPath();
+      if (i === 0 && spokes === 1) {
+        // Central circle
+        ctx.arc(px + cx, py + cy, rOutPx, 0, Math.PI * 2);
+      } else {
+        ctx.arc(px + cx, py + cy, rOutPx, thetaStart, thetaEnd);
+        ctx.arc(px + cx, py + cy, rInPx, thetaEnd, thetaStart, true);
+      }
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+      ctx.lineWidth = 0.3;
+      ctx.stroke();
+    }
+  }
+
+  // Foveal dot
+  ctx.beginPath();
+  ctx.arc(px + cx, py + cy, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// ======================================================================
+// Labels
+// ======================================================================
+function drawLabels() {
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'center';
+
+  // Column headers
+  ctx.font = '12px Georgia';
+  const colLabels = ['(a) Gaussian', '(b) Polar', '(c) Isotropic (FOVI)'];
+  for (let c = 0; c < 3; c++) {
+    const { x } = panelOrigin(c, 0);
+    ctx.fillText(colLabels[c], x + PANEL_W / 2, TOP_LABEL_H - 10);
+  }
+
+  // Row labels (rotated)
+  ctx.save();
+  ctx.font = '12px Georgia';
+  const rowLabels = ['Geometry', 'Pooled'];
+  for (let r = 0; r < 2; r++) {
+    const { y } = panelOrigin(0, r);
+    ctx.save();
+    ctx.translate(15, y + PANEL_H / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillText(rowLabels[r], 0, 0);
+    ctx.restore();
+  }
+  ctx.restore();
+
+  // Panel borders
+  ctx.strokeStyle = '#bbb';
+  ctx.lineWidth = 0.5;
+  for (let r = 0; r < 2; r++) {
+    for (let c = 0; c < 3; c++) {
+      const { x, y } = panelOrigin(c, r);
+      ctx.strokeRect(x, y, PANEL_W, PANEL_H);
+    }
+  }
+}
+
+// ======================================================================
+// Aspect ratio legend
+// ======================================================================
+function drawLegend() {
+  const lx = LEFT_LABEL_W + 2 * (PANEL_W + COL_GAP) + PANEL_W - 100;
+  const ly = TOP_LABEL_H + 2 * (PANEL_H + ROW_GAP) + 8;
+
+  ctx.font = '9px Georgia';
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'left';
+  ctx.fillText('Aspect ratio:', lx - 65, ly + 9);
+
+  // Gradient bar
+  const barW = 60;
+  const barH = 8;
+  for (let i = 0; i < barW; i++) {
+    const ratio = 1.0 + (i / barW) * 0.4;
+    ctx.fillStyle = aspectRatioColor(ratio);
+    ctx.fillRect(lx + i, ly + 2, 1, barH);
+  }
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 0.5;
+  ctx.strokeRect(lx, ly + 2, barW, barH);
+
+  ctx.fillStyle = '#000';
+  ctx.font = '8px Georgia';
+  ctx.textAlign = 'center';
+  ctx.fillText('1.0', lx, ly + 20);
+  ctx.fillText('1.3+', lx + barW, ly + 20);
+
+  ctx.font = '8px Georgia';
+  ctx.fillStyle = '#555';
+  ctx.textAlign = 'left';
+  ctx.fillText('isotropic', lx - 4, ly + 20);
+  ctx.fillText('stretched', lx + barW - 6, ly + 20);
+}
+
+// ======================================================================
+// Render everything
+// ======================================================================
+function render() {
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  // Row 1: Geometry
+  const p00 = panelOrigin(0, 0);
+  drawGaussianGeometry(p00.x, p00.y);
+
+  const p10 = panelOrigin(1, 0);
+  drawPolarGeometry(p10.x, p10.y);
+
+  const p20 = panelOrigin(2, 0);
+  drawIsoGeometry(p20.x, p20.y);
+
+  // Row 2: Pooled
+  const p01 = panelOrigin(0, 1);
+  drawGaussianPooled(p01.x, p01.y);
+
+  const p11 = panelOrigin(1, 1);
+  drawCellPooled(p11.x, p11.y, false);
+
+  const p21 = panelOrigin(2, 1);
+  drawCellPooled(p21.x, p21.y, true);
+
+  drawLabels();
+  drawLegend();
+}
+
+render();
+
+// ======================================================================
+// Save as PNG
+// ======================================================================
+document.getElementById('saveBtn').addEventListener('click', function() {
+  canvas.toBlob(function(blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'fig-fovi-geometry.png';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, 'image/png');
+});
+</script>
+</body>
+</html>

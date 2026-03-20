@@ -25,7 +25,7 @@ The published literature reports a critical constraint we don't model:
 | Berkley, Kitterle & Watkins (1975) | Oblique effect disappears at 8–18° eccentricity for high spatial frequencies (acuity) |
 | Essock (1990) | "Global oblique effect" persists to 40°+ for low-medium spatial frequencies |
 | Barbot et al. (2021, eLife) | Horizontal-vertical anisotropy is 20–120% at 6°, not eliminated by M-scaling |
-| PNAS MT cortex data | 10.1% more cortical space for cardinal orientations in central MT, only 3.6% in peripheral MT |
+| **UNCITED — verify or remove** | 10.1% more cortical space for cardinal orientations in central MT, only 3.6% in peripheral MT |
 
 The oblique effect has a **spatial frequency × eccentricity interaction**: it diminishes with eccentricity, and the rate of diminishment depends on spatial frequency. Fine spatial frequencies lose the cardinal advantage faster.
 

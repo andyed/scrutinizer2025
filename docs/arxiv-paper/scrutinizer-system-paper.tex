@@ -59,7 +59,7 @@ Gaze-contingent tools used in HCI research (BubbleView, ViewSer, ScreenMasker) s
 % ============================================================
 \section{Introduction}
 
-Peripheral vision is not blurry; it is \emph{differently encoded}. The retina compresses ${\sim}10^7$ photoreceptor signals into ${\sim}10^6$ optic nerve fibers~\citep{curcio1990}, with ganglion cell receptive fields growing with eccentricity~\citep{dacey1993}. Existing gaze-contingent tools (BubbleView~\citep{kim2017}, ViewSer~\citep{lagun2011}, ScreenMasker~\citep{orlov2016}) apply Gaussian blur as a peripheral proxy, uniformly destroying spatial structure and preventing layout-level judgments that real peripheral vision supports. These tools also operate on static images, not live interactive content (Table~\ref{tab:comparison}).
+Peripheral vision is not blurry; it is \emph{differently encoded}. The retina compresses ${\sim}130$ million photoreceptor signals into ${\sim}1.2$ million optic nerve fibers~\citep{curcio1990}, with ganglion cell receptive fields growing with eccentricity~\citep{dacey1993}. Existing gaze-contingent tools (BubbleView~\citep{kim2017}, ViewSer~\citep{lagun2011}, ScreenMasker~\citep{orlov2016}) apply Gaussian blur as a peripheral proxy, uniformly destroying spatial structure and preventing layout-level judgments that real peripheral vision supports. These tools also operate on static images, not live interactive content (Table~\ref{tab:comparison}).
 
 An earlier Scrutinizer prototype~\citep{edmonds2007} demonstrated mouse-contingent Gaussian blur on live web pages using Adobe AIR (2007), establishing real-time fidelity as the key technical challenge. Modern GPU APIs make biologically-grounded filtering practical at 60\,fps, but full Portilla-Simoncelli texture synthesis~\citep{portilla2000} remains iterative (${\sim}$seconds per frame). \citet{rosenholtz2012}'s texture-synthesis ``mongrels'' are the most perceptually accurate peripheral model; \citet{freeman2011} showed that textures matching pooled summary statistics are indistinguishable from originals in peripheral vision. \citet{walton2021} demonstrated real-time ventral metamers via smooth moments of steerable filter responses on GPU compute shaders, but their approach required CUDA/DirectX compute not available in WebGL2. Scrutinizer bridges these constraints: a DoG band decomposition provides per-channel chromatic decay and saliency-gated protection in the fragment shader, and as of v2.3, a WebGPU compute path adds oriented noise synthesis preserving luminance statistics in the periphery~\citep{freeman2011}, running in ${<}$0.3\,ms on Apple M3.
 
@@ -103,7 +103,7 @@ The default pipeline combines a fragment shader (${\sim}$1200~LOC, GLSL~ES~3.0) 
 \textbf{Biology} & \textbf{Computation} & \textbf{Source} \\
 \midrule
 Oculomotor & Velocity, fixation, saccade & --- \\
-Retinal GC & DoG via MIP chain & \citet{kuffler1953} \\
+Retinal GC & DoG via MIP chain & \citet{kuffler1953,rodieck1965} \\
 LGN gating & Structure + saliency gate & \citet{mcalonan2008} \\
 V1 features & Noise crowding, scramble & \citet{pelli2008} \\
 Chromatic atten. & castleCSF pooling & \citet{ashraf2024} \\
@@ -319,13 +319,13 @@ Across all five waves, the pipeline matches published data where the mechanism m
 % ============================================================
 \section{Applications}
 
-\textbf{Design audit.} The \texttt{scrutinizer-audit} CLI tool and MCP server provide batch Feature Congestion scoring without launching the Electron renderer, enabling CI integration. Designers see which elements survive peripheral vision before deployment. \citet{queen2006} showed that desktop icons with distinct low-spatial-frequency silhouettes are identified ${\sim}$0.5\,s faster in visual search ($N{=}20$, target-among-distractors task), but this analysis requires spatial-frequency filtering that most designers lack access to.
+\textbf{Design audit.} The \texttt{scrutinizer-audit} CLI tool and MCP server provide batch Feature Congestion scoring without launching the Electron renderer, enabling CI integration. Designers see which elements survive peripheral vision before deployment. \citet{queen2006} showed that desktop icons with distinct low-spatial-frequency silhouettes are identified ${\sim}$0.5\,s faster in a match-to-sample task ($N{=}10$, 20 trial images), but this analysis requires spatial-frequency filtering that most designers lack access to.
 
 \textbf{Research platform.} The five branch points and declarative mode registry make Scrutinizer a platform for perceptual experiments. Researchers can compare frequency-selective filtering against Gaussian blur on reading speed, swap in eye tracker SDKs or scanpath replay, or test how saliency models interact with crowding---all without modifying the core shader.
 
 \textbf{Education.} Side-by-side comparison modes let users manipulate parameters and see results on their own content.
 
-\textbf{Cognitive architecture integration.} The saliency branch point accepts any bitmap as attentional input, making Scrutinizer a rendering front-end for cognitive models. SNIF-ACT~\citep{fu2007} predicts web navigation via spreading activation between user goals and link text (``information scent''~\citep{pirolli1999}), coupling ACT-R's declarative memory~\citep{anderson2004} with the visual environment. ACT-R's vision module models foveal/parafoveal encoding asymmetries~\citep{salvucci2001}; Scrutinizer could provide the perceptual ground truth it currently approximates with attention parameters. A scent map ($\cos(\vec{g}, \vec{c}_i)$ between goal vector and DOM text nodes) could feed the saliency texture as a top-down prior~\citep{itti2001}, so the texture reflects goal relevance, not just stimulus contrast.
+\textbf{Cognitive architecture integration.} The saliency branch point accepts any bitmap as attentional input, making Scrutinizer a rendering front-end for cognitive models. SNIF-ACT~\citep{fu2007} predicts web navigation via cosine similarity between goal and link-text word vectors (``information scent''~\citep{pirolli1999}), coupling ACT-R's production system~\citep{anderson2004} with the visual environment. ACT-R's vision module models foveal/parafoveal encoding asymmetries~\citep{salvucci2001}; Scrutinizer could provide the perceptual ground truth it currently approximates with attention parameters. A scent map ($\cos(\vec{g}, \vec{c}_i)$ between goal vector and DOM text nodes) could feed the saliency texture as a top-down prior~\citep{itti2001}, so the texture reflects goal relevance, not just stimulus contrast.
 
 % ============================================================
 \section{Open Problems}
