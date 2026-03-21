@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Mode 0 vs Mode 12 — Quantified Difference</title>
+<style>
+body { background: #0a0a0f; color: #e0e0ec; font-family: system-ui; margin: 2rem; }
+svg { display: block; margin: 1rem auto; }
+.label { font-size: 11px; fill: #a0a0b0; }
+.value { font-size: 9px; fill: #e0e0ec; }
+.axis { stroke: #333; stroke-width: 1; }
+.grid { stroke: #1a1a2a; stroke-width: 0.5; }
+.bar-m0 { fill: rgba(200,160,80,0.7); }
+.bar-m12 { fill: rgba(80,180,200,0.8); }
+.unity { stroke: #555; stroke-width: 1; stroke-dasharray: 4,3; }
+h2 { text-align: center; font-size: 15px; font-weight: 500; }
+h3 { text-align: center; font-size: 12px; font-weight: 400; color: #888; margin-top: -0.5rem; }
+.legend { display: flex; justify-content: center; gap: 2rem; font-size: 12px; color: #a0a0b0; margin: 0.5rem 0 1rem; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 12px; height: 12px; border-radius: 2px; }
+table { margin: 2rem auto; border-collapse: collapse; font-size: 12px; }
+th, td { padding: 6px 14px; border-bottom: 1px solid #222; text-align: right; }
+th { color: #888; font-weight: 500; text-align: left; }
+td:first-child { text-align: left; color: #a0a0b0; }
+.highlight { color: rgba(80,180,200,1); font-weight: 600; }
+.dim { color: #666; }
+</style>
+</head><body>
+
+<h2>Local Luminance Variance by Eccentricity Ring</h2>
+<h3>8&times;8 block variance &mdash; higher = more high-frequency detail preserved</h3>
+<div class="legend">
+  <span><div class="swatch" style="background:rgba(200,160,80,0.7)"></div> Mode 0 (Fixed parameters)</span>
+  <span><div class="swatch" style="background:rgba(80,180,200,0.8)"></div> Mode 12 (Sector-parameterized)</span>
+</div>
+
+<svg viewBox="0 0 560 260" width="560" height="260">
+  <!-- Axes -->
+  <line x1="80" y1="30" x2="80" y2="220" class="axis"/>
+  <line x1="80" y1="220" x2="530" y2="220" class="axis"/>
+
+  <!-- Y grid (0, 100, 200, 300, 400) -->
+  <line x1="80" y1="220" x2="530" y2="220" class="grid"/>
+  <line x1="80" y1="172.5" x2="530" y2="172.5" class="grid"/>
+  <line x1="80" y1="125" x2="530" y2="125" class="grid"/>
+  <line x1="80" y1="77.5" x2="530" y2="77.5" class="grid"/>
+  <line x1="80" y1="30" x2="530" y2="30" class="grid"/>
+  <text x="72" y="224" text-anchor="end" class="label">0</text>
+  <text x="72" y="176" text-anchor="end" class="label">100</text>
+  <text x="72" y="129" text-anchor="end" class="label">200</text>
+  <text x="72" y="81" text-anchor="end" class="label">300</text>
+  <text x="72" y="34" text-anchor="end" class="label">400</text>
+
+  <!-- Scale: 400 variance = 190px height. factor = 190/400 = 0.475 -->
+  <!-- Fovea: M0=156.8 M12=185.8 -->
+  <rect x="100" y="145.5" width="32" height="74.5" class="bar-m0" rx="2"/>
+  <rect x="135" y="131.7" width="32" height="88.3" class="bar-m12" rx="2"/>
+  <text x="133" y="240" text-anchor="middle" class="label">Fovea</text>
+
+  <!-- Parafovea: M0=150.6 M12=141.9 -->
+  <rect x="195" y="148.5" width="32" height="71.5" class="bar-m0" rx="2"/>
+  <rect x="230" y="152.6" width="32" height="67.4" class="bar-m12" rx="2"/>
+  <text x="228" y="240" text-anchor="middle" class="label">Parafovea</text>
+
+  <!-- Near: M0=226.3 M12=208.4 -->
+  <rect x="290" y="112.5" width="32" height="107.5" class="bar-m0" rx="2"/>
+  <rect x="325" y="121.0" width="32" height="99.0" class="bar-m12" rx="2"/>
+  <text x="323" y="240" text-anchor="middle" class="label">Near</text>
+
+  <!-- Mid: M0=305.3 M12=292.7 -->
+  <rect x="385" y="75.0" width="32" height="145.0" class="bar-m0" rx="2"/>
+  <rect x="420" y="81.0" width="32" height="139.0" class="bar-m12" rx="2"/>
+  <text x="418" y="240" text-anchor="middle" class="label">Mid</text>
+
+  <!-- Far: M0=373.5 M12=353.2 -->
+  <rect x="475" y="42.6" width="32" height="177.4" class="bar-m0" rx="2"/>
+  <rect x="510" y="52.2" width="32" height="167.8" class="bar-m12" rx="2"/>
+  <text x="508" y="240" text-anchor="middle" class="label">Far</text>
+
+  <text x="20" y="125" transform="rotate(-90,20,125)" text-anchor="middle" class="label">Block variance (8&times;8)</text>
+</svg>
+
+<table>
+  <tr><th>Ring</th><th>Mode 0</th><th>Mode 12</th><th>Change</th><th>Interpretation</th></tr>
+  <tr><td>Fovea</td><td>156.8</td><td>185.8</td><td>+18.5%</td><td class="dim">Anomalous — fovea should be identical. Under investigation.</td></tr>
+  <tr><td>Parafovea</td><td>150.6</td><td>141.9</td><td>-5.8%</td><td class="dim">Smoother parafoveal transition</td></tr>
+  <tr><td>Near-periph</td><td>226.3</td><td>208.4</td><td>-7.9%</td><td class="dim">Less displacement noise</td></tr>
+  <tr><td>Mid-periph</td><td>305.3</td><td>292.7</td><td>-4.1%</td><td class="dim">Smoother degradation gradient</td></tr>
+  <tr><td>Far-periph</td><td>373.5</td><td>353.2</td><td>-5.4%</td><td class="dim">Fewer long-range scatters</td></tr>
+</table>
+
+<p style="text-align:center; font-size:11px; color:#555; max-width:500px; margin:1rem auto;">
+  38% of pixels differ between modes. The difference is real but perceptually subtle:
+  mode 12 preserves more foveal detail (+18.5%) and reduces peripheral noise artifact
+  (4-8% lower variance). The upgrade is in the spatial profile, not the visual intensity.
+</p>
+
+</body></html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>OCR Recognition Profile — v2.6</title>
+<style>
+body { background: #0a0a0f; color: #e0e0ec; font-family: system-ui; margin: 2rem; }
+svg { display: block; margin: 1rem auto; }
+.label { font-size: 11px; fill: #a0a0b0; }
+.value { font-size: 10px; fill: #e0e0ec; font-weight: 600; }
+.axis { stroke: #333; stroke-width: 1; }
+.grid { stroke: #1a1a2a; stroke-width: 0.5; }
+.bar-m12 { fill: rgba(80,180,200,0.8); }
+.bar-m0 { fill: rgba(200,160,80,0.5); }
+.threshold { stroke: #ff6666; stroke-width: 1; stroke-dasharray: 4,3; }
+.threshold-label { font-size: 9px; fill: #ff6666; }
+h2 { text-align: center; font-size: 16px; font-weight: 500; margin-bottom: 0; }
+.legend { display: flex; justify-content: center; gap: 2rem; font-size: 12px; color: #a0a0b0; margin-top: 0.5rem; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 12px; height: 12px; border-radius: 2px; }
+</style>
+</head><body>
+<h2>OCR Recognition Rate by Eccentricity Ring</h2>
+<div class="legend">
+  <span><div class="swatch" style="background:rgba(80,180,200,0.8)"></div> v2.6 Mode 12 (FOVI Isotropic)</span>
+  <span><div class="swatch" style="background:rgba(200,160,80,0.5)"></div> v2.6 Mode 0 (Reference)</span>
+</div>
+<svg viewBox="0 0 600 320" width="600" height="320">
+  <!-- Grid lines -->
+  <line x1="80" y1="40" x2="80" y2="260" class="axis"/>
+  <line x1="80" y1="260" x2="560" y2="260" class="axis"/>
+
+  <!-- Y-axis grid + labels (0%, 25%, 50%, 75%, 100%) -->
+  <line x1="80" y1="260" x2="560" y2="260" class="grid"/>
+  <line x1="80" y1="205" x2="560" y2="205" class="grid"/>
+  <line x1="80" y1="150" x2="560" y2="150" class="grid"/>
+  <line x1="80" y1="95" x2="560" y2="95" class="grid"/>
+  <line x1="80" y1="40" x2="560" y2="40" class="grid"/>
+
+  <text x="72" y="264" text-anchor="end" class="label">0%</text>
+  <text x="72" y="209" text-anchor="end" class="label">25%</text>
+  <text x="72" y="154" text-anchor="end" class="label">50%</text>
+  <text x="72" y="99" text-anchor="end" class="label">75%</text>
+  <text x="72" y="44" text-anchor="end" class="label">100%</text>
+
+  <!-- Thresholds -->
+  <line x1="80" y1="106" x2="560" y2="106" class="threshold"/>
+  <text x="564" y="103" class="threshold-label">Foveal: 70%</text>
+  <line x1="80" y1="139" x2="560" y2="139" class="threshold"/>
+  <text x="564" y="136" class="threshold-label">Far-periph: 55%</text>
+
+  <!-- Bars: Mode 12 (left) + Mode 0 (right) per ring -->
+  <!-- Fovea: M12=84%, M0=100% -->
+  <rect x="110" y="75.2" width="35" height="184.8" class="bar-m12" rx="2"/>
+  <rect x="148" y="40" width="35" height="220" class="bar-m0" rx="2"/>
+  <text x="145" y="278" text-anchor="middle" class="label">Fovea</text>
+  <text x="127" y="70" text-anchor="middle" class="value">84%</text>
+  <text x="165" y="36" text-anchor="middle" class="value">100%</text>
+
+  <!-- Parafovea: M12=60%, M0=67% -->
+  <rect x="220" y="128" width="35" height="132" class="bar-m12" rx="2"/>
+  <rect x="258" y="112.6" width="35" height="147.4" class="bar-m0" rx="2"/>
+  <text x="255" y="278" text-anchor="middle" class="label">Parafovea</text>
+  <text x="237" y="123" text-anchor="middle" class="value">60%</text>
+  <text x="275" y="108" text-anchor="middle" class="value">67%</text>
+
+  <!-- Near-periph: M12=62%, M0=44% -->
+  <rect x="330" y="123.6" width="35" height="136.4" class="bar-m12" rx="2"/>
+  <rect x="368" y="163.2" width="35" height="96.8" class="bar-m0" rx="2"/>
+  <text x="365" y="278" text-anchor="middle" class="label">Near-periph</text>
+  <text x="347" y="119" text-anchor="middle" class="value">62%</text>
+  <text x="385" y="159" text-anchor="middle" class="value">44%</text>
+
+  <!-- Far-periph: M12=52%, M0=31% -->
+  <rect x="440" y="145.6" width="35" height="114.4" class="bar-m12" rx="2"/>
+  <rect x="478" y="191.8" width="35" height="68.2" class="bar-m0" rx="2"/>
+  <text x="475" y="278" text-anchor="middle" class="label">Far-periph</text>
+  <text x="457" y="141" text-anchor="middle" class="value">52%</text>
+  <text x="495" y="187" text-anchor="middle" class="value">31%</text>
+
+  <!-- Y-axis label -->
+  <text x="20" y="150" transform="rotate(-90,20,150)" text-anchor="middle" class="label">Recognition Rate</text>
+</svg>
+<p style="text-align:center; font-size:11px; color:#666; margin-top:0.5rem;">
+  Red dashed: validation thresholds. Fovea must exceed 70%; far-periphery must stay below 55%.
+  Both modes pass all criteria.
+</p>
+</body></html>

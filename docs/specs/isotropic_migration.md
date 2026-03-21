@@ -159,8 +159,10 @@ OCR relative recognition rate (frozen baseline, consistent 1x DPR, `tests/ocr-te
 | v2.5 + coord fix (uncapped) | 96.9% | 64.1% | 80.4% | 82.1% | 80.2% | No | No |
 | v2.5 + v2.3 Shredder restored | 22.8% | 11.1% | 36.9% | 25.3% | 26.6% | No | No |
 | v2.5 + v2.3 Shredder + parafovea 5× | 48.9% | 65.2% | 66.3% | 41.4% | 50.2% | No | No |
+| **v2.6 mode 12 (shipped)** | **84%** | **60%** | **62%** | **52%** | **57%** | **Yes** | **YES** |
+| v2.6 mode 0 (reference) | 100% | 67% | 44% | 31% | 40% | Yes | YES |
 
-v2.3 is the only version that passes. v2.4 introduced the fovea_deg correction which degraded the fovea from 95.7% to 47.8%. v2.5 added the sector-scaled Shredder (with a coordinate bug that neutered it) + lodFloor + 12-band DoG on top of the already-broken spatial profile.
+v2.3 and v2.6 are the only versions that pass. v2.4 introduced the fovea_deg correction which degraded the fovea from 95.7% to 47.8%. v2.5 added the sector-scaled Shredder (with a coordinate bug that neutered it) + lodFloor + 12-band DoG on top of the already-broken spatial profile.
 
 ### What v2.3's Shredder Did (and why it worked)
 
