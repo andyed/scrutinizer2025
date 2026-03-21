@@ -109,7 +109,7 @@ Generated 2026-03-19. Every claim below attributes a specific finding or number 
 - [ ] `scanpath-replay-spec.md:245` — "peak_vel approx amplitude_deg x 500 deg/s." Oversimplification of main sequence — saturates for saccades >20 deg.
 - [ ] `peripheral.frag:1495-1503` — "RG caps at 70%; YV caps at 35%." Attributed to Jiang/Hansen but these appear to be implementation choices, not directly reported values.
 - [ ] `oblique_effect_validation.md:48` — "0 deg (fovea): 30-50% cardinal advantage (Appelle 1972)." Appelle is a review — some studies report 15-20% for contrast sensitivity. Range may be overstated.
-- [ ] `oblique_effect_validation.md:27` — "Barbot et al. (2021, eLife): HVA is 20-120% at 6 deg." Very wide range — verify conditions that produce extremes.
+- [x] `oblique_effect_validation.md:27` — **FIXED: compound confabulation.** "Barbot et al. (2021, eLife)" merged two Carrasco-lab papers: the eLife paper (e84205) is Jigo, Tavdy, Himmelberg & Carrasco (2023); Barbot, Xue & Carrasco (2021) is a JOV paper (doi:10.1167/jov.21.1.2) about acuity asymmetries. Both now cited separately with DOIs.
 - [ ] `peripheral.frag:418` — "Bowers (2025) biphasic RG decay — steep to ~15 deg then slowing." "Biphasic" is an interpretation — verify if paper uses this term.
 - [ ] `chromatic_pooling.md:69-74` — Abramov, Gordon & Chan (1991): "fovea-like color to 20 degrees with large stimuli; largest stimuli fail at 40 degrees." Specific boundaries need verification.
 - [ ] `applied_ui_saliency_validation.md:45` — "Halverson & Hornof (2011): text within 1 deg, color within 7.5 deg." These may be EPIC model parameters, not empirical findings.

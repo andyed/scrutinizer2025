@@ -24,7 +24,8 @@ The published literature reports a critical constraint we don't model:
 |--------|---------|
 | Berkley, Kitterle & Watkins (1975) | Oblique effect disappears at 8–18° eccentricity for high spatial frequencies (acuity) |
 | Essock (1990) | "Global oblique effect" persists to 40°+ for low-medium spatial frequencies |
-| Barbot et al. (2021, eLife) | Horizontal-vertical anisotropy is 20–120% at 6°, not eliminated by M-scaling |
+| Jigo, Tavdy, Himmelberg & Carrasco (2023, eLife) | Cortical magnification eliminates differences in contrast sensitivity across but not around the visual field. HVA persists after M-scaling. doi:10.7554/eLife.84205 |
+| Barbot, Xue & Carrasco (2021, JOV) | Asymmetries in visual acuity around the visual field. doi:10.1167/jov.21.1.2 |
 | **UNCITED — verify or remove** | 10.1% more cortical space for cardinal orientations in central MT, only 3.6% in peripheral MT |
 
 The oblique effect has a **spatial frequency × eccentricity interaction**: it diminishes with eccentricity, and the rate of diminishment depends on spatial frequency. Fine spatial frequencies lose the cardinal advantage faster.
@@ -47,7 +48,7 @@ At lower spatial frequencies, the relevant receptive fields are already large in
 |-------------|-------------------|-------------------|------------------|
 | 0° (fovea) | 30–50% cardinal advantage (Appelle 1972) | 20–30% | ~10% |
 | 3° | ~25% | ~20% | ~10% |
-| 6° | ~10% | ~15% (Barbot 2021: HVA 20–120%) | ~10% |
+| 6° | ~10% | ~15% (Jigo et al. 2023: HVA persists after M-scaling) | ~10% |
 | 10° | ~0% (Berkley 1975: disappears) | ~10% | ~8% |
 | 15° | 0% | ~5% | ~5% (Essock 1990: persists) |
 | 40° | 0% | 0% | ~3% (Essock 1990) |
@@ -243,7 +244,9 @@ Following the v2.2 Claim/Basis/Result structure:
 
 5. **Furmanski, C. S. & Engel, S. A.** (2000). An oblique effect in human primary visual cortex. *Nature Neuroscience*, 3(6), 535-536. doi:10.1038/75702
 
-6. **Barbot, A., Xue, S. & Carrasco, M.** (2021). Cortical magnification eliminates differences in contrast sensitivity across but not around the visual field. *eLife*, 10, e84205.
+6. **Jigo, M., Tavdy, D., Himmelberg, M. M. & Carrasco, M.** (2023). Cortical magnification eliminates differences in contrast sensitivity across but not around the visual field. *eLife*, 12, e84205. doi:10.7554/eLife.84205
+
+7b. **Barbot, A., Xue, S. & Carrasco, M.** (2021). Asymmetries in visual acuity around the visual field. *Journal of Vision*, 21(1):2. doi:10.1167/jov.21.1.2
 
 7. **Toet, A. & Levi, D. M.** (1992). The two-dimensional shape of spatial interaction zones in the parafovea. *Vision Research*, 32(7), 1349-1357.
 

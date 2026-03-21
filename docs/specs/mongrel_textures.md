@@ -32,7 +32,7 @@ This is the Texture Tiling Model (TTM, Rosenholtz et al. 2012): peripheral visio
 | **1.5** | Density-gated V1 crowding | Shipped (v2.0) | `peripheral.frag` — crowding sigmoid |
 | **1.6** | Per-channel chromatic decay (RG/YV) | Shipped (v1.9) | `peripheral.frag` — `chromaticAttenuate()` |
 | **1.7** | CMF logarithmic MIP + isotropic grid | Shipped (v2.6) | `peripheral.frag` — type 5, `BenderConfig`/`CutterConfig` |
-| **2** | Contrast-preserving pooling | Planned | Statistical MIP texture (mean + variance per tile) |
+| **2** | Contrast-preserving pooling (WebGL2) | Planned | Fragment shader fallback for non-WebGPU hardware |
 | **2.5** | Tile-based Oklab stats + oriented noise | Shipped (v2.3) | `crowding-stats.wgsl`, `crowding-synth.wgsl` |
 | **3** | Full TTM synthesis within isotropic sectors | **Next target** | See below |
 

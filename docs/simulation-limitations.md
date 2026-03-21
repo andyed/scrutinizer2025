@@ -114,7 +114,7 @@ L-M (red-green) sensitivity decays ~2.5× faster than achromatic with eccentrici
 **Status**: Accepted tradeoff (Tier 1)
 **Documented in**: `mongrel_textures.md`
 
-Hardware mipmaps use box/bilinear filtering, not true Gaussian decomposition. This produces spectral leakage between frequency bands. Tier 2 (contrast-preserving pooling) and Tier 3 (statistical texture synthesis via WebGPU) remain unimplemented.
+Hardware mipmaps use box/bilinear filtering, not true Gaussian decomposition. This produces spectral leakage between frequency bands. Tier 2.5 (tile-based Oklab statistics + oriented noise synthesis via WebGPU compute) shipped in v2.3, preserving 3–4% more luminance variance than MIP blur. Tier 2 (WebGL2 fragment shader fallback) and Tier 3 (full TTM synthesis within isotropic sectors) remain unimplemented.
 
 ---
 
