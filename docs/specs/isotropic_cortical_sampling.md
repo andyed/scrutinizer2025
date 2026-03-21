@@ -5,17 +5,13 @@
 **Status**: Geometry verified (19 tests); rendering shipped (sector-parameterized Bender+Cutter, V1 type 5). Default mode since 2026-03-19.
 **Created**: 2026-03-13
 **Dependencies**: `renderer/shaders/peripheral.frag` (computeMipLevel, BenderConfig/CutterConfig), `shared/modes.json`
-**Collaboration**: Nicholas Blauch (Harvard/Kempner → NVIDIA), potential co-author. Implementation must be mathematically traceable to Blauch, Alvarez & Konkle (2026), arxiv:2602.03766.
+**Based on**: Blauch, Alvarez & Konkle (2026), arxiv:2602.03766. Implementation is mathematically traceable to this formulation.
 **Implementation journal**: `docs/specs/isotropic_implementation_journal.md` — detailed record of all rendering approaches tried and why each failed.
 **Test suite**: `tests/unit/isotropic-sectors.test.js` — 19 tests verify sector math matches Blauch Python to 3 decimal places.
 
 ## Context
 
-In the 2026-03-13 meeting, Nick identified the key property from FOVI that Scrutinizer's sampling grid should adopt (FOVI's full contribution includes the 3D manifold, kNN-convolution, and model adaptation — isotropic sampling is the sensing-stage property relevant here):
-
-> "The more important thing is the idea of local isotropy and having those — whatever is happening with the MIP-level falling off — you want it to be consistent in how it's affecting local angular versus radial distances."
-
-> "We don't actually need the 3D model to do that isotropic sampling. [...] It's basically — first do your sampling along — figure out the distance between local radial samples as a function of eccentricity. [...] then you just kind of, in a discrete sense, at every eccentricity, you can locally compute the angular distance that would be the same as the average of the two radial distances around that point. And then from that, you can compute the number of angles that you would need."
+The key property from FOVI relevant to Scrutinizer is local isotropy: angular and radial sampling resolution should degrade together, not at different rates. FOVI's full contribution includes the 3D cortical manifold, kNN-convolution, and model adaptation — isotropic sampling is the sensing-stage property adopted here.
 
 The existing `computePolarSector()` uses ad-hoc geometric ring spacing (`ef=1.007`, `bias=2.0`). This produces sectors that grow with eccentricity but are **not derived from the CMF** and are **not isotropic** — the radial:tangential aspect ratio is fixed at 2:1 regardless of eccentricity, and the ring boundaries don't correspond to uniform cortical sampling.
 
@@ -25,7 +21,7 @@ In log-polar sampling, the number of angular samples is constant at every ring. 
 
 Isotropic sampling matches angular spacing to radial spacing at every eccentricity. Cells are approximately square in cortical space at every distance. A circle in visual space maps to approximately a circle in the sampling grid.
 
-This is the difference between Schwartz (1980) log-polar and Blauch's (2026) isotropic manifold. In FOVI, this is achieved via the 3D cylindrical cortical manifold, but Nick confirmed the 3D geometry is only needed for the deep learning perception pipeline — the sampling grid can be computed directly in 2D.
+This is the difference between Schwartz (1980) log-polar and Blauch's (2026) isotropic manifold. In FOVI, isotropy is achieved via the 3D cylindrical cortical manifold. For 2D sampling (without the deep learning pipeline), the grid can be computed directly from the CMF without the 3D geometry.
 
 ## Mathematical Derivation
 
@@ -261,7 +257,7 @@ Mode 12 should NOT look dramatically different from mode 0. It should look sligh
 2. ~~Should `n_spokes` be forced even?~~ **Resolved:** odd is fine; floor() produces both even and odd counts naturally.
 3. ~~`u_num_cortical_rings` — principled value?~~ **Resolved:** 50 rings for N=50 at r_max=15°. Free parameter for renderer; Blauch's paper uses variable N.
 4. ~~Hard vs soft sector boundaries?~~ **Resolved by failure:** hard boundaries (snap) produce sector-shaped artifacts. Soft blending or no boundaries needed. Revised approach avoids sector-level operations entirely — uses sector geometry to parameterize continuous degradation.
-5. **NEW:** Is the "sector drives rate, not mechanism" approach acceptable for co-authorship? Mode 12 would use Blauch's sector geometry for transition profile calibration, but the rendering mechanism (noise warp + scramble) is not derived from FOVI.
+5. Is the "sector drives rate, not mechanism" approach a faithful adoption of the FOVI sensing stage? Mode 12 uses the sector geometry for transition profile calibration, but the rendering mechanism (noise warp + scramble) is not derived from FOVI.
 
 ## References
 
