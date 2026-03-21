@@ -1,7 +1,7 @@
 # Scrutinizer v2.6.0 — Isotropic Cortical Sampling
 
 **Date:** 2026-03-19
-**Blog post:** [Isotropic Cortical Sampling](https://andyed.github.io/scrutinizer-www/blog/drafts/isotropic-cortical-sampling.html)
+**Blog post:** [Isotropic Cortical Sampling](https://andyed.github.io/scrutinizer-www/blog/2026-03-21-v2.6.html)
 
 Scrutinizer's default mode now derives its peripheral distortion profile from the FOVI cortical magnification model (Blauch, Alvarez & Konkle 2026). Seven rendering approaches failed before the eighth succeeded: sector geometry drives *where and how fast* degradation changes — not how pixels change.
 
