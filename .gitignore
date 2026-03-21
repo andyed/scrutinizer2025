@@ -61,3 +61,4 @@ docs/arxiv-paper/*.out
 build/certs/
 build_error.txt
 build_error.txt
+docs/drafts/
