@@ -214,6 +214,9 @@ The Magnocellular pathway (motion/luminance) processes information faster than t
   - **Summary**: This study introduced "BubbleView," a methodology where users click to reveal "bubbles" (foveal windows) on blurred images. They found that these discrete clicks serve as a high-fidelity proxy for eye fixations (0.9 correlation), enabling large-scale "eye tracking" via crowdsourcing (Mechanical Turk) without hardware.
   - **Relevance**: Directly validates Scrutinizer's premise that restricted peripheral viewing forces users to externalize their attentional strategy. It also supports the "blur-to-fovea" user interface pattern as a scientifically grounded research tool.
 
+- **Anwyl-Irvine, A. L., Armstrong, T., & Dalmaijer, E. S. (2022)**: ["MouseView.js: Reliable and valid attention tracking in web-based experiments using a cursor-directed aperture"](https://doi.org/10.3758/s13428-021-01703-5). *Behavior Research Methods*, 54(4), 1663–1687.
+  - **Summary**: A JavaScript library that implements a cursor-directed aperture with Gaussian blur for online experiments. Validated that mouse-contingent viewing produces attention maps comparable to eye-tracking data across scene viewing and visual search tasks. Demonstrated reliable test-retest performance and cross-platform browser compatibility.
+  - **Relevance**: The closest prior art to Scrutinizer's browser-based approach. Both use cursor position as a gaze proxy on live web content. MouseView.js applies uniform Gaussian blur; Scrutinizer replaces this with biologically-grounded DoG band decomposition, chromatic attenuation, and saliency gating. MouseView.js's validation data supports the cursor-as-gaze paradigm that Scrutinizer extends.
 
 
 ### Ensemble Perception & Saccade Planning
@@ -316,6 +319,7 @@ The Magnocellular pathway (motion/luminance) processes information faster than t
 | Bednarik & Tukiainen | 2007 | RFV validation vs eye-tracking |
 | Lagun & Agichtein | 2011 | ViewSer for SERP attention |
 | Kim et al. | 2017 | BubbleView (Crowdsourced Attention) |
+| Anwyl-Irvine et al. | 2022 | MouseView.js (cursor-directed aperture) |
 
 ### Cognitive & UX Applications
 | Author | Year | Key Contribution |
