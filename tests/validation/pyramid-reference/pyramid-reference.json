@@ -1,0 +1,634 @@
+{
+  "generated_by": "generate-pyramid-reference.py",
+  "pyramid_levels": 4,
+  "image_size": 256,
+  "gaussian_sigma": 1.0,
+  "downsample": "box_2x2",
+  "upsample": "nearest_neighbor_2x",
+  "images": {
+    "solid_gray": {
+      "source": {
+        "width": 256,
+        "height": 256,
+        "energy": 16384.0
+      },
+      "pyramid_levels": 4,
+      "bands": [
+        {
+          "level": 0,
+          "label": "band_0",
+          "width": 256,
+          "height": 256,
+          "stats": {
+            "mean": 0.0,
+            "std": 0.0,
+            "abs_mean": 0.0,
+            "energy": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "skewness": 0.0
+          }
+        },
+        {
+          "level": 1,
+          "label": "band_1",
+          "width": 128,
+          "height": 128,
+          "stats": {
+            "mean": 0.0,
+            "std": 0.0,
+            "abs_mean": 0.0,
+            "energy": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "skewness": 0.0
+          }
+        },
+        {
+          "level": 2,
+          "label": "band_2",
+          "width": 64,
+          "height": 64,
+          "stats": {
+            "mean": 0.0,
+            "std": 0.0,
+            "abs_mean": 0.0,
+            "energy": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "skewness": 0.0
+          }
+        },
+        {
+          "level": 3,
+          "label": "band_3",
+          "width": 32,
+          "height": 32,
+          "stats": {
+            "mean": 0.0,
+            "std": 0.0,
+            "abs_mean": 0.0,
+            "energy": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "skewness": 0.0
+          }
+        },
+        {
+          "level": 4,
+          "label": "residual",
+          "width": 16,
+          "height": 16,
+          "stats": {
+            "mean": 0.5,
+            "std": 0.0,
+            "abs_mean": 0.5,
+            "energy": 64.0,
+            "min": 0.5,
+            "max": 0.5,
+            "skewness": 0.0
+          }
+        }
+      ],
+      "cross_scale_correlations": [
+        {
+          "parent": 0,
+          "child": 1,
+          "correlation": 0.0
+        },
+        {
+          "parent": 1,
+          "child": 2,
+          "correlation": 0.0
+        },
+        {
+          "parent": 2,
+          "child": 3,
+          "correlation": 0.0
+        }
+      ],
+      "reconstruction_mse": 0.0,
+      "energy_conservation_ratio": 1.0
+    },
+    "grating_horizontal_4cpx": {
+      "source": {
+        "width": 256,
+        "height": 256,
+        "energy": 24544.0
+      },
+      "pyramid_levels": 4,
+      "bands": [
+        {
+          "level": 0,
+          "label": "band_0",
+          "width": 256,
+          "height": 256,
+          "stats": {
+            "mean": 6.789816105190472e-17,
+            "std": 0.01759686727859027,
+            "abs_mean": 0.015770604687621263,
+            "energy": 20.29320523089975,
+            "min": -0.03660282121607694,
+            "max": 0.03660282121607694,
+            "skewness": -9.922618282587337e-16
+          }
+        },
+        {
+          "level": 1,
+          "label": "band_1",
+          "width": 128,
+          "height": 128,
+          "stats": {
+            "mean": 6.852157730108388e-17,
+            "std": 0.03526149192497677,
+            "abs_mean": 0.031323096270970574,
+            "energy": 20.371420164508905,
+            "min": -0.06452339020780995,
+            "max": 0.06452339020781028,
+            "skewness": 4.2327252813834093e-16
+          }
+        },
+        {
+          "level": 2,
+          "label": "band_2",
+          "width": 64,
+          "height": 64,
+          "stats": {
+            "mean": 5.854691731421724e-17,
+            "std": 0.07113864117595596,
+            "abs_mean": 0.06131997972274772,
+            "energy": 20.72865287520836,
+            "min": -0.10753184105462943,
+            "max": 0.1075318410546297,
+            "skewness": 3.3306690738754696e-16
+          }
+        },
+        {
+          "level": 3,
+          "label": "band_3",
+          "width": 32,
+          "height": 32,
+          "stats": {
+            "mean": 4.85722573273506e-17,
+            "std": 0.13674413616526065,
+            "abs_mean": 0.11624778332918506,
+            "energy": 19.147733786197346,
+            "min": -0.1975763547244105,
+            "max": 0.19757635472441037,
+            "skewness": -3.3306690738754696e-16
+          }
+        },
+        {
+          "level": 4,
+          "label": "residual",
+          "width": 16,
+          "height": 16,
+          "stats": {
+            "mean": 0.4999999999999998,
+            "std": 0.22557980672589184,
+            "abs_mean": 0.4999999999999998,
+            "energy": 77.02687979583757,
+            "min": 0.19509330827815563,
+            "max": 0.8049066917218435,
+            "skewness": -8.049116928532385e-16
+          }
+        }
+      ],
+      "cross_scale_correlations": [
+        {
+          "parent": 0,
+          "child": 1,
+          "correlation": 0.7389776253065374
+        },
+        {
+          "parent": 1,
+          "child": 2,
+          "correlation": 0.2664731671557831
+        },
+        {
+          "parent": 2,
+          "child": 3,
+          "correlation": -0.6597194018169994
+        }
+      ],
+      "reconstruction_mse": 4.81482486096809e-35,
+      "energy_conservation_ratio": 0.8709979433647048
+    },
+    "grating_horizontal_32cpx": {
+      "source": {
+        "width": 256,
+        "height": 256,
+        "energy": 24544.00000000003
+      },
+      "pyramid_levels": 4,
+      "bands": [
+        {
+          "level": 0,
+          "label": "band_0",
+          "width": 256,
+          "height": 256,
+          "stats": {
+            "mean": 6.711211447685272e-17,
+            "std": 0.16143239611435578,
+            "abs_mean": 0.13716710872895183,
+            "energy": 1707.8955878136069,
+            "min": -0.22812976402986634,
+            "max": 0.22812976402986596,
+            "skewness": -1.6167622796103842e-15
+          }
+        },
+        {
+          "level": 1,
+          "label": "band_1",
+          "width": 128,
+          "height": 128,
+          "stats": {
+            "mean": 6.787105599759258e-17,
+            "std": 0.17203586041048946,
+            "abs_mean": 0.16326069462542492,
+            "energy": 484.90638978543484,
+            "min": -0.24970810133236482,
+            "max": 0.24970810133236165,
+            "skewness": -1.6063539387545234e-15
+          }
+        },
+        {
+          "level": 2,
+          "label": "band_2",
+          "width": 64,
+          "height": 64,
+          "stats": {
+            "mean": 6.245004513516506e-17,
+            "std": 0.07169464302649459,
+            "abs_mean": 0.07049114989635807,
+            "energy": 21.053939051300812,
+            "min": -0.130844903717093,
+            "max": 0.13084490371709367,
+            "skewness": 1.4641066137244252e-15
+          }
+        },
+        {
+          "level": 3,
+          "label": "band_3",
+          "width": 32,
+          "height": 32,
+          "stats": {
+            "mean": 7.632783294297951e-17,
+            "std": 0.011761225083707515,
+            "abs_mean": 0.004486947604025203,
+            "energy": 0.14164624944090198,
+            "min": -0.035895180050907416,
+            "max": 0.035895180050907416,
+            "skewness": -2.7755575615628914e-14
+          }
+        },
+        {
+          "level": 4,
+          "label": "residual",
+          "width": 16,
+          "height": 16,
+          "stats": {
+            "mean": 0.5000000000000002,
+            "std": 0.012261397611315932,
+            "abs_mean": 0.5000000000000002,
+            "energy": 64.03848751907407,
+            "min": 0.46543854673217466,
+            "max": 0.5345614532678253,
+            "skewness": -5.3734794391857577e-14
+          }
+        }
+      ],
+      "cross_scale_correlations": [
+        {
+          "parent": 0,
+          "child": 1,
+          "correlation": -0.27501156350724176
+        },
+        {
+          "parent": 1,
+          "child": 2,
+          "correlation": -0.14379404200726315
+        },
+        {
+          "parent": 2,
+          "child": 3,
+          "correlation": 0.6792653345639702
+        }
+      ],
+      "reconstruction_mse": 8.425943506694157e-35,
+      "energy_conservation_ratio": 0.8306430221896722
+    },
+    "grating_vertical_8cpx": {
+      "source": {
+        "width": 256,
+        "height": 256,
+        "energy": 24543.999999999993
+      },
+      "pyramid_levels": 4,
+      "bands": [
+        {
+          "level": 0,
+          "label": "band_0",
+          "width": 256,
+          "height": 256,
+          "stats": {
+            "mean": 6.320898665590491e-17,
+            "std": 0.035618966866528476,
+            "abs_mean": 0.031817911254338006,
+            "energy": 83.1462310306679,
+            "min": -0.07203403667316655,
+            "max": 0.07203403667316655,
+            "skewness": 6.106226635438361e-16
+          }
+        },
+        {
+          "level": 1,
+          "label": "band_1",
+          "width": 128,
+          "height": 128,
+          "stats": {
+            "mean": 6.787105599759258e-17,
+            "std": 0.07203299711718368,
+            "abs_mean": 0.0626080995513027,
+            "energy": 85.01252380564182,
+            "min": -0.11413171203928518,
+            "max": 0.11413171203928552,
+            "skewness": 5.551115123125783e-17
+          }
+        },
+        {
+          "level": 2,
+          "label": "band_2",
+          "width": 64,
+          "height": 64,
+          "stats": {
+            "mean": 5.551115123125783e-17,
+            "std": 0.1404800279134692,
+            "abs_mean": 0.11872860064422652,
+            "energy": 80.83307824156296,
+            "min": -0.20033007484827575,
+            "max": 0.20033007484827636,
+            "skewness": 6.661338147750939e-16
+          }
+        },
+        {
+          "level": 3,
+          "label": "band_3",
+          "width": 32,
+          "height": 32,
+          "stats": {
+            "mean": 4.163336342344337e-17,
+            "std": 0.14470204982191398,
+            "abs_mean": 0.14200567548135362,
+            "energy": 21.441211620007607,
+            "min": -0.17157331806861653,
+            "max": 0.1715733180686161,
+            "skewness": -1.1102230246251565e-16
+          }
+        },
+        {
+          "level": 4,
+          "label": "residual",
+          "width": 16,
+          "height": 16,
+          "stats": {
+            "mean": 0.49999999999999967,
+            "std": 0.08599839030333126,
+            "abs_mean": 0.49999999999999967,
+            "energy": 65.89330512249953,
+            "min": 0.3162131207963649,
+            "max": 0.6837868792036342,
+            "skewness": -1.3322676295501878e-15
+          }
+        }
+      ],
+      "cross_scale_correlations": [
+        {
+          "parent": 0,
+          "child": 1,
+          "correlation": 0.29641938506307286
+        },
+        {
+          "parent": 1,
+          "child": 2,
+          "correlation": -0.6814631889605449
+        },
+        {
+          "parent": 2,
+          "child": 3,
+          "correlation": 0.021938141658707288
+        }
+      ],
+      "reconstruction_mse": 1.2037062152420224e-35,
+      "energy_conservation_ratio": 0.8131294505035289
+    },
+    "checkerboard_16": {
+      "source": {
+        "width": 256,
+        "height": 256,
+        "energy": 22282.240000000005
+      },
+      "pyramid_levels": 4,
+      "bands": [
+        {
+          "level": 0,
+          "label": "band_0",
+          "width": 256,
+          "height": 256,
+          "stats": {
+            "mean": 9.476604613881112e-17,
+            "std": 0.07679241694286545,
+            "abs_mean": 0.048919972849504105,
+            "energy": 386.4707268560086,
+            "min": -0.17670242638246864,
+            "max": 0.1767024263824687,
+            "skewness": -1.3384475819333552e-15
+          }
+        },
+        {
+          "level": 1,
+          "label": "band_1",
+          "width": 128,
+          "height": 128,
+          "stats": {
+            "mean": 5.687318021044274e-17,
+            "std": 0.08522770362234548,
+            "abs_mean": 0.06137926213378746,
+            "energy": 119.00946783827328,
+            "min": -0.1971644000472152,
+            "max": 0.19716440004721536,
+            "skewness": -4.285851187835199e-16
+          }
+        },
+        {
+          "level": 2,
+          "label": "band_2",
+          "width": 64,
+          "height": 64,
+          "stats": {
+            "mean": 9.194034422677078e-17,
+            "std": 0.11350900710177259,
+            "abs_mean": 0.09074203440368467,
+            "energy": 52.77407106347115,
+            "min": -0.2017792244525877,
+            "max": 0.20177922445258778,
+            "skewness": -8.569533971325427e-16
+          }
+        },
+        {
+          "level": 3,
+          "label": "band_3",
+          "width": 32,
+          "height": 32,
+          "stats": {
+            "mean": 8.516408064873637e-17,
+            "std": 0.0883643544606786,
+            "abs_mean": 0.08613324554444315,
+            "energy": 7.995657358594508,
+            "min": -0.19498153207658098,
+            "max": 0.1949815320765811,
+            "skewness": 2.8189256484623115e-17
+          }
+        },
+        {
+          "level": 4,
+          "label": "residual",
+          "width": 16,
+          "height": 16,
+          "stats": {
+            "mean": 0.49999999999999983,
+            "std": 0.018202653165870043,
+            "abs_mean": 0.49999999999999983,
+            "energy": 64.08482216506282,
+            "min": 0.40571714781707824,
+            "max": 0.5942828521829211,
+            "skewness": -2.2648549702353193e-14
+          }
+        }
+      ],
+      "cross_scale_correlations": [
+        {
+          "parent": 0,
+          "child": 1,
+          "correlation": -0.2998979828456585
+        },
+        {
+          "parent": 1,
+          "child": 2,
+          "correlation": -0.5470262043597258
+        },
+        {
+          "parent": 2,
+          "child": 3,
+          "correlation": -0.09733144494820113
+        }
+      ],
+      "reconstruction_mse": 0.0,
+      "energy_conservation_ratio": 0.8358374328806605
+    },
+    "white_noise": {
+      "source": {
+        "width": 256,
+        "height": 256,
+        "energy": 21912.000736721355
+      },
+      "pyramid_levels": 4,
+      "bands": [
+        {
+          "level": 0,
+          "label": "band_0",
+          "width": 256,
+          "height": 256,
+          "stats": {
+            "mean": 6.972944628386851e-17,
+            "std": 0.26735851431861574,
+            "abs_mean": 0.2293186174657763,
+            "energy": 4684.550974908496,
+            "min": -0.6496702209789013,
+            "max": 0.6652058332775485,
+            "skewness": 0.0010568693068780956
+          }
+        },
+        {
+          "level": 1,
+          "label": "band_1",
+          "width": 128,
+          "height": 128,
+          "stats": {
+            "mean": 6.836911137057811e-17,
+            "std": 0.05698939805468596,
+            "abs_mean": 0.04567743549317003,
+            "energy": 53.211815782571115,
+            "min": -0.20638209086858694,
+            "max": 0.19729158166736266,
+            "skewness": 0.003966185359592216
+          }
+        },
+        {
+          "level": 2,
+          "label": "band_2",
+          "width": 64,
+          "height": 64,
+          "stats": {
+            "mean": 6.739671754713017e-17,
+            "std": 0.025362951017950885,
+            "abs_mean": 0.020345598368971065,
+            "energy": 2.634871948652445,
+            "min": -0.08607868412788916,
+            "max": 0.0899890923057709,
+            "skewness": -0.006247732839805158
+          }
+        },
+        {
+          "level": 3,
+          "label": "band_3",
+          "width": 32,
+          "height": 32,
+          "stats": {
+            "mean": 6.7166324585477e-17,
+            "std": 0.011995647272913757,
+            "abs_mean": 0.009474524642474563,
+            "energy": 0.14734904678007116,
+            "min": -0.04191038460991148,
+            "max": 0.039465212475423284,
+            "skewness": 0.01937288521996435
+          }
+        },
+        {
+          "level": 4,
+          "label": "residual",
+          "width": 16,
+          "height": 16,
+          "stats": {
+            "mean": 0.5010936300093323,
+            "std": 0.007224587058003018,
+            "abs_mean": 0.5010936300093323,
+            "energy": 64.29363729768662,
+            "min": 0.4808050097669072,
+            "max": 0.520928184847633,
+            "skewness": -0.11843815592275138
+          }
+        }
+      ],
+      "cross_scale_correlations": [
+        {
+          "parent": 0,
+          "child": 1,
+          "correlation": -0.06837818421767733
+        },
+        {
+          "parent": 1,
+          "child": 2,
+          "correlation": 0.07594289179067859
+        },
+        {
+          "parent": 2,
+          "child": 3,
+          "correlation": 0.11011427929942227
+        }
+      ],
+      "reconstruction_mse": 4.4386666687049576e-35,
+      "energy_conservation_ratio": 0.9770060677545492
+    }
+  }
+}

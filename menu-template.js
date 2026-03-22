@@ -593,6 +593,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             type: 'radio',
                             checked: currentAestheticMode === 10,
                             click: () => { sendToOverlays('menu:set-aesthetic-mode', 10); app.emit('aesthetic-mode-changed', 10); }
+                        },
+                        {
+                            label: 'Pyramid Mongrel (Tier 2.75)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 14,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 14); app.emit('aesthetic-mode-changed', 14); }
                         }
                     ]
                 },

@@ -51,6 +51,19 @@ AI-confabulated paper titles, authors, and article numbers corrected across 8 fi
 | Subband entropy | 4/5 (pre-existing) |
 | OCR | Needs recalibration for mode 12 |
 
+## Post-Release Fixes (2026-03-19 → 2026-03-22)
+
+### Code
+- **Scrollbar protection bypass**: Scrollbar detection now bypasses the full pipeline (not just the memory mask), preventing peripheral distortion from bleeding into native scrollbar rendering.
+- **Foveal radius menu**: Removed separator elements from the foveal radius radio group for cleaner menu layout.
+
+### Documentation
+- ArXiv paper: Reframed as "Restricted Focus Viewer," 25% trim, 4 empirical claim corrections, citation audit fixes.
+- Science agent (`scripts/science-agent/`) added for automated citation validation.
+- Reading span (Rayner 1998) added to simulation limitations; limitations section reframed.
+- Mongrel textures spec rewritten as architectural plan with Tier 3 synthesis path.
+- ROADMAP condensed from narrative to table format.
+
 ## Breaking Changes
 
 - Default mode changed from 10 (Compute Mongrel) to 12 (FOVI Cortical Grid)

@@ -1,7 +1,7 @@
 # Mongrel Textures — Architectural Plan
 
-> **Last updated:** 2026-03-21 (v2.6)
-> **Status:** Tiers 1–2.5 shipped. Tier 3 (full TTM synthesis) is the next major target.
+> **Last updated:** 2026-03-22 (v2.7)
+> **Status:** Tiers 1–2.5 shipped. Tier 2.75 code complete (untracked — pyramid shaders + compute manager). Tier 3 (full TTM synthesis) is the next major target.
 > **Key question:** How to connect isotropic cortical sectors (v2.6) to summary-statistic pooling.
 
 ## The gap
@@ -34,6 +34,7 @@ This is the Texture Tiling Model (TTM, Rosenholtz et al. 2012): peripheral visio
 | **1.7** | CMF logarithmic MIP + isotropic grid | Shipped (v2.6) | `peripheral.frag` — type 5, `BenderConfig`/`CutterConfig` |
 | **2** | Contrast-preserving pooling (WebGL2) | Planned | Fragment shader fallback for non-WebGPU hardware |
 | **2.5** | Tile-based Oklab stats + oriented noise | Shipped (v2.3) | `crowding-stats.wgsl`, `crowding-synth.wgsl` |
+| **2.75** | Laplacian pyramid + cross-scale correlations | Code complete (untracked) | `pyramid-decompose.wgsl`, `pyramid-stats.wgsl`, `pyramid-synth.wgsl`, `webgpu-pyramid-compute.js` |
 | **3** | Full TTM synthesis within isotropic sectors | **Next target** | See below |
 
 ### What each tier adds
@@ -43,6 +44,8 @@ This is the Texture Tiling Model (TTM, Rosenholtz et al. 2012): peripheral visio
 **Tier 2 (planned):** Generate a statistical MIP texture encoding mean luminance + contrast variance per tile. The fragment shader reads these statistics and modulates noise amplitude to preserve local contrast during pooling. Prevents the "washed out" look of pure MIP averaging. WebGL2 compatible.
 
 **Tier 2.5 (shipped):** WebGPU compute pipeline extracts per-tile Oklab statistics (luminance mean, luminance variance, chrominance variance) and synthesizes oriented sine gratings that match. Two-pass: stats extraction → noise synthesis. Under 0.3ms on integrated GPU. Auto-fallback to fragment shader if frame budget exceeded.
+
+**Tier 2.75 (code complete, untracked):** Laplacian pyramid decomposition (4-scale) via WebGPU compute. Cross-scale magnitude correlation extraction and matching. Pyramid-based noise synthesis replaces oriented sine gratings. Mode 14 (`pyramid_mongrel`) defined in `modes.json`. 511-line test suite (`pyramid-decompose.test.js`). Validation scaffolding: Wave 7a/7b/7c scripts created (see `docs/specs/wave7_pyramid_validation.md`). **Risk:** `scrutinizer.js` defaults to mode 14 with a hard require on `webgpu-pyramid-compute.js` — needs try-catch fallback before commit.
 
 **Tier 3 (next target):** Full summary-statistic synthesis within isotropic cortical sectors. This is where the v2.6 isotropic grid connects to the v2.3 compute pipeline:
 
@@ -88,10 +91,17 @@ Text becomes horizontal stripes with matching density and color. Faces become bl
 | `renderer/webgpu-crowding-compute.js` | Tier 2.5: WebGPU compute pipeline manager |
 | `renderer/shaders/crowding-stats.wgsl` | Tier 2.5 pass 1: tile statistics extraction |
 | `renderer/shaders/crowding-synth.wgsl` | Tier 2.5 pass 2: oriented noise synthesis |
+| `renderer/webgpu-pyramid-compute.js` | Tier 2.75: pyramid pipeline manager (untracked) |
+| `renderer/shaders/pyramid-decompose.wgsl` | Tier 2.75: Laplacian pyramid decomposition (untracked) |
+| `renderer/shaders/pyramid-stats.wgsl` | Tier 2.75: cross-scale statistics extraction (untracked) |
+| `renderer/shaders/pyramid-synth.wgsl` | Tier 2.75: spectrum-matching synthesis (untracked) |
 | `renderer/webgpu-safety.js` | Frame budget monitor with auto-fallback |
-| `shared/modes.json` | Mode definitions (mode 10 = compute mongrel, mode 12 = isotropic default) |
+| `shared/modes.json` | Mode definitions (mode 10 = compute mongrel, mode 12 = isotropic default, mode 14 = pyramid mongrel) |
 | `tests/unit/isotropic-sectors.test.js` | 19-test geometry validation suite |
+| `tests/unit/pyramid-decompose.test.js` | 511-line pyramid decomposition test suite (untracked) |
 | `docs/specs/isotropic_cortical_sampling.md` | Isotropic grid math and verification |
+| `docs/specs/wave7_pyramid_validation.md` | Wave 7 validation spec (pyramid + crowding) |
+| `docs/specs/tier3_ttm_synthesis_plan.md` | Detailed Tier 3 implementation plan |
 
 ## References
 

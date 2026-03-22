@@ -1,0 +1,75 @@
+{
+  "timestamp": "2026-03-22T17:12:56.398Z",
+  "checks": [
+    {
+      "name": "mode14_isolated_recognized",
+      "tier": 1,
+      "pass": false,
+      "detail": "confidence 0.00 >= 0.5"
+    },
+    {
+      "name": "mode14_flanked_crowded",
+      "tier": 1,
+      "pass": true,
+      "detail": "confidence 0.00 < 0.5"
+    },
+    {
+      "name": "mode14_asymmetry_ratio",
+      "tier": 2,
+      "pass": false,
+      "detail": "ratio 1.00 > 2.0"
+    }
+  ],
+  "modeResults": {
+    "mode10": {
+      "isolated": {
+        "text": "",
+        "confidence": 0,
+        "method": "tesseract"
+      },
+      "flanked": {
+        "text": "",
+        "confidence": 0,
+        "method": "tesseract"
+      }
+    },
+    "mode12": {
+      "isolated": {
+        "text": "",
+        "confidence": 0,
+        "method": "tesseract"
+      },
+      "flanked": {
+        "text": "",
+        "confidence": 0,
+        "method": "tesseract"
+      }
+    },
+    "mode14": {
+      "isolated": {
+        "text": "",
+        "confidence": 0,
+        "method": "tesseract"
+      },
+      "flanked": {
+        "text": "",
+        "confidence": 0,
+        "method": "tesseract"
+      }
+    }
+  },
+  "summary": {
+    "tier1": {
+      "pass": 1,
+      "fail": 1
+    },
+    "tier2": {
+      "pass": 0,
+      "fail": 1
+    },
+    "tier3": {
+      "pass": 0,
+      "fail": 0
+    }
+  }
+}

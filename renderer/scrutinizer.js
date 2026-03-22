@@ -24,6 +24,7 @@
     const { probeWebGPU } = require('./webgpu-probe');
     const { WebGPUSafetyHarness } = require('./webgpu-safety');
     const { WebGPUCrowdingCompute } = require('./webgpu-crowding-compute');
+    const { WebGPUPyramidCompute } = require('./webgpu-pyramid-compute');
 
     // Architecture: Explicit require for optional dependencies
     let SVGOverlay;
@@ -93,7 +94,7 @@
 
             // ── Frame state ──────────────────────────────────────────
             this.lastFrameBitmap = null;
-            this.aestheticMode = 12; // FOVI Cortical Grid (Blauch): isotropic cortical sampling
+            this.aestheticMode = 14; // Pyramid Mongrel (Tier 2.75): multi-scale cross-correlation synthesis
             this.dpr = window.devicePixelRatio || 1;
             this._congestionReportMode = 0;
             this._lastCongestionGeneration = 0;
@@ -543,7 +544,7 @@
                 this.complexityHud.update(contentState.congestionStats, contentState.edgeDensityStats, perfStats);
             }
 
-            // 7c. WebGPU compute dispatch (Tier 2.5)
+            // 7c. WebGPU compute dispatch (Tier 2.5 or 2.75)
             // Runs every other frame. Uploads half-res source, dispatches stats+synth,
             // async readback → WebGL TEXTURE5.
             if (this.webgpuDevice && this.webgpuSafety?.isAlive() &&
@@ -555,11 +556,18 @@
                 const frameH = this.imageData.height;
                 const halfW = Math.ceil(frameW / 2);
                 const halfH = Math.ceil(frameH / 2);
+                const usePyramid = this.renderer.config.compute_tier >= 2.75;
                 if (!this.webgpuCompute) {
                     try {
-                        this.webgpuCompute = new WebGPUCrowdingCompute(this.webgpuDevice, halfW, halfH);
-                        this.webgpuTier = 2.5;
-                        this.renderer.setComputeTier(2.5);
+                        if (usePyramid) {
+                            this.webgpuCompute = new WebGPUPyramidCompute(this.webgpuDevice, halfW, halfH);
+                            this.webgpuTier = 2.75;
+                            this.renderer.setComputeTier(2.75);
+                        } else {
+                            this.webgpuCompute = new WebGPUCrowdingCompute(this.webgpuDevice, halfW, halfH);
+                            this.webgpuTier = 2.5;
+                            this.renderer.setComputeTier(2.5);
+                        }
                     } catch (e) {
                         console.warn('[Scrutinizer] WebGPU compute init failed:', e.message);
                         this._fallbackToTier16();
@@ -591,27 +599,40 @@
 
                 const shouldResynth = saccadeLanded || driftExceeded || !this._metamerInitialized;
 
-                if (this.webgpuCompute?.shouldCompute() && this.imageDataBuffer && shouldResynth) {
+                // Both tiers use shouldCompute() for frame-skip (every 2nd frame)
+                const canCompute = this.webgpuCompute?.shouldCompute() && this.webgpuCompute && shouldResynth;
+                if (canCompute && this.imageDataBuffer) {
                     // Downsample source to half-res using frame dimensions (not canvas)
                     const halfBuf = this._downsampleToHalf(this.imageDataBuffer, frameW, frameH);
-
-                    // Compute cortical_max for half-res coordinates
-                    const foveaDeg = 1.0;
-                    const halfDiag = Math.sqrt(halfW * halfW + halfH * halfH) / 2;
                     const halfFovea = this.config.fovealRadius / 2;
-                    const rMaxDeg = (halfDiag / halfFovea) * foveaDeg;
-                    const cmfA = this.renderer.config.cmf_a || 2.78;
-                    const corticalMax = Math.log1p(rMaxDeg / cmfA);
 
-                    this.webgpuCompute.uploadAndConfigure(
-                        halfBuf,
-                        gazeFrameX / 2, gazeFrameY / 2,
-                        halfFovea,
-                        this.renderer.config,
-                        corticalMax,
-                        aspectRatio  // fovea_aspect_ratio (same as fragment shader)
-                    );
-                    this.webgpuCompute.dispatch();
+                    if (usePyramid) {
+                        // Tier 2.75: Pyramid decompose → stats → synthesize
+                        this.webgpuCompute.compute(
+                            halfBuf,
+                            gazeFrameX / frameW,  // normalized 0-1
+                            gazeFrameY / frameH,
+                            halfFovea,
+                            2  // synthesis iterations
+                        );
+                    } else {
+                        // Tier 2.5: Original crowding compute
+                        const foveaDeg = 1.0;
+                        const halfDiag = Math.sqrt(halfW * halfW + halfH * halfH) / 2;
+                        const rMaxDeg = (halfDiag / halfFovea) * foveaDeg;
+                        const cmfA = this.renderer.config.cmf_a || 2.78;
+                        const corticalMax = Math.log1p(rMaxDeg / cmfA);
+
+                        this.webgpuCompute.uploadAndConfigure(
+                            halfBuf,
+                            gazeFrameX / 2, gazeFrameY / 2,
+                            halfFovea,
+                            this.renderer.config,
+                            corticalMax,
+                            aspectRatio
+                        );
+                        this.webgpuCompute.dispatch();
+                    }
 
                     // Clear saccade flag and track synthesis position inside the dispatch
                     // block so a saccade-landing isn't lost to shouldCompute() frame-skip.
@@ -629,7 +650,10 @@
 
                     // Async readback — non-blocking, result arrives next frame
                     const cw = this.canvas.width, ch = this.canvas.height;
-                    this.webgpuCompute.readback().then((data) => {
+                    const readbackFn = usePyramid
+                        ? this.webgpuCompute.readbackOutput()
+                        : this.webgpuCompute.readback();
+                    readbackFn.then((data) => {
                         if (data && this.renderer) {
                             this.renderer.uploadComputeTexture(data, halfW, halfH, cw, ch);
                             // Always invalidate after upload so next content change triggers resynth.
@@ -839,11 +863,27 @@
         }
 
         setAestheticMode(mode) {
+            const prevTier = this.renderer?.config.compute_tier || 0;
             this.aestheticMode = Number(mode);
             this.contentAnalysis.setAestheticMode(this.aestheticMode);
             const msg = `[Scrutinizer] Aesthetic Mode set to: ${this.aestheticMode}`;
             console.log(msg);
             ipcRenderer.send('log:renderer', msg);
+
+            // Look up the new mode's compute_tier from modes.json
+            const modesRegistry = require('../shared/modes.json');
+            const newModeEntry = Object.values(modesRegistry.modes).find(m => m.id === this.aestheticMode);
+            const newTier = newModeEntry?.pipeline?.compute_tier || 0;
+
+            // Destroy compute pipeline if tier changed (Pyramid vs Crowding use different APIs)
+            const prevIsPyramid = prevTier >= 2.75;
+            const newIsPyramid = newTier >= 2.75;
+            if (this.webgpuCompute && (prevIsPyramid !== newIsPyramid || (prevTier > 0) !== (newTier > 0))) {
+                console.log(`[Scrutinizer] Compute tier changed (${prevTier} → ${newTier}), recreating pipeline`);
+                this.webgpuCompute.destroy();
+                this.webgpuCompute = null;
+                this._metamerInitialized = false;
+            }
 
             // Auto-start high-res congestion worker for congestion-gated modes
             if (this.renderer?.config.congestion_pooling) {

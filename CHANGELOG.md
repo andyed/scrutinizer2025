@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.6.1] - 2026-03-22
+
+### Fixed
+- **Scrollbar protection bypass**: Scrollbar detection now bypasses the full pipeline, not just the memory mask. Prevents peripheral distortion from bleeding into native scrollbar rendering.
+- **Foveal radius menu separators**: Removed separator elements from foveal radius radio group for cleaner layout.
+
+### Changed
+- **ArXiv paper**: Reframed as "Restricted Focus Viewer," 25% trim, 4 empirical claim corrections, citation audit fixes.
+- **Mongrel textures spec**: Rewritten as architectural plan with Tier 3 TTM synthesis path.
+- **ROADMAP**: Condensed from narrative to table format.
+
+### Added
+- **Science agent**: `scripts/science-agent/` for automated citation validation against source papers.
+- **Reading span (Rayner 1998)**: Added to simulation limitations documentation.
+
 ## [2.6.0] - 2026-03-19
 
 ### Added
