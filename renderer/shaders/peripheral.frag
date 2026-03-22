@@ -79,6 +79,11 @@ uniform int u_show_congestion;    // 0=off, 1=overlay, 2=solo
 // Congestion-gated pooling (hypothesis mode)
 uniform float u_congestion_pooling; // 0.0=off, 1.0=on
 
+// Resolution-gated saliency: acuity decay suppresses peripheral saliency protection.
+// E2 = half-sensitivity eccentricity in degrees (Strasburger et al. 2011).
+// acuity(ecc) = 1 / (1 + ecc/E2). At E2=6.0: 75% at 2°, 43% at 8°, 29% at 15°.
+uniform float u_saliency_acuity_e2; // default 6.0 deg
+
 // Density-gated crowding (Bouma 1970 approximation)
 // Dense content (text clusters) gets full V1 distortion; sparse content (isolated elements) is spared.
 uniform float u_crowding_density_threshold; // Density below this = minimal crowding (default 0.3)
@@ -517,6 +522,18 @@ float sampleBoumaEdgeDensity(float dist, float fovea_radius, vec2 uv) {
     }
 }
 
+// === ECCENTRICITY-WEIGHTED CONGESTION ===
+// Blends foveal congestion (R, high-res σ=2.5) with peripheral congestion
+// (B, coarse σ=5.0) based on eccentricity. The visual system pools features
+// at coarser scales in the periphery — fine-grained clutter is invisible there.
+float sampleEccentricityCongestion(float ecc_deg, vec2 uv) {
+    float fovealCong = texture(u_congestionMap, uv).r;
+    float periphCong = texture(u_congestionMap, uv).b;
+    // Foveal: 0-3° (pure R), parafoveal: 3-8° (blend), peripheral: 8°+ (pure B)
+    float t = smoothstep(3.0, 8.0, ecc_deg);
+    return mix(fovealCong, periphCong, t);
+}
+
 // === CMF MIP LEVEL COMPUTATION ===
 // Shared by MIP pooling, Minecraft block sizing, and any eccentricity→resolution mapping.
 // Returns 0.0 at fovea, up to maxMipLevel (6.0) in far periphery.
@@ -826,7 +843,12 @@ LGN_Signal processLGN(vec2 uv, ModeConfig config, float dist, float fovea_radius
 
     // Saliency texture: R=saliency, G=feature congestion, B=edge density
     vec4 salTex = texture(u_saliencyMap, uv);
-    signal.saliency    = salTex.r;
+    // Resolution-gated saliency: peripheral features must be proportionally MORE
+    // salient to earn protection. Acuity decay follows Strasburger et al. (2011).
+    float sal_ppd = max(fovea_radius, 1.0);
+    float sal_ecc_deg = max(0.0, dist - fovea_radius) / sal_ppd;
+    float sal_acuity = 1.0 / (1.0 + sal_ecc_deg / max(u_saliency_acuity_e2, 0.1));
+    signal.saliency    = salTex.r * sal_acuity;
 
     // Congestion + edge density: prefer high-res dedicated worker when available
     if (u_hasCongestionMap > 0.5) {
@@ -969,10 +991,12 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         signal.displacement = mix(fractalWarp, discreteScramble, scrambleZone);
         signal.distortedUV = uv + signal.displacement;
 
-        // 4. Bypass strength gating in scramble zone —
-        // saliency would otherwise keep text readable
+        // 4. Saliency-aware scramble zone: high-saliency content (product images,
+        // faces) retains protection even in the scramble zone. Low-saliency
+        // backgrounds get full displacement. lgn.saliency already includes
+        // acuity gating, so protection naturally weakens with eccentricity.
         if (scrambleZone > 0.5) {
-             signal.distortionStrength = 1.0;
+             signal.distortionStrength = mix(strength, 1.0, 1.0 - lgn.saliency);
         } else {
              signal.distortionStrength = strength;
         }
@@ -1129,8 +1153,9 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
             signal.displacement = mix(fractalWarp, discreteScramble, scrambleZone);
             signal.distortedUV = uv + signal.displacement;
 
+            // Saliency-aware scramble (same logic as V1 type 5 above)
             if (scrambleZone > 0.5) {
-                signal.distortionStrength = 1.0;
+                signal.distortionStrength = mix(strength, 1.0, 1.0 - lgn.saliency);
             } else {
                 signal.distortionStrength = strength;
             }
@@ -1156,15 +1181,20 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     float blurMult = 1.0 + (u_blurRadius * 0.3);
     float coupledEccentricity = v1.distortionStrength * u_intensity * fovea_radius * blurMult;
 
-    // Congestion-gated pooling: Bouma-scaled edge density modulates MIP blur.
-    // Dense flankers within critical spacing → stronger pooling (information loss).
-    // Isolated elements → less blur, preserving identifiability.
+    // Congestion-gated pooling: Bouma-scaled edge density + eccentricity-weighted
+    // congestion modulate MIP blur. Dense flankers within critical spacing →
+    // stronger pooling (information loss). Isolated elements → less blur.
     // Rosenholtz et al. (2007, 2012): clutter and crowding share pooling substrate.
     if (u_congestion_pooling > 0.5) {
         float boumaEdge = sampleBoumaEdgeDensity(dist, fovea_radius, uv);
-        // Edge density 0.0 → 1.0x MIP (no change)
-        // Edge density 1.0 → 2.0x MIP (double pooling)
-        float congestionBoost = 1.0 + boumaEdge * 1.0;
+        // Eccentricity-weighted congestion: foveal (fine σ=2.5) → peripheral (coarse σ=5.0)
+        float cong_ppd = max(fovea_radius, 1.0);
+        float cong_ecc_deg = max(0.0, dist - fovea_radius) / cong_ppd;
+        float eccCong = (u_hasCongestionMap > 0.5)
+            ? sampleEccentricityCongestion(cong_ecc_deg, uv)
+            : texture(u_saliencyMap, uv).g;
+        // Blend edge density (spatial packing) with congestion (visual complexity)
+        float congestionBoost = 1.0 + (boumaEdge * 0.5 + eccCong * 0.5);
         coupledEccentricity *= congestionBoost;
     }
 
@@ -1216,9 +1246,15 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     // (smooth content), snap pooledCol to foveaCol so subsequent blend transitions
     // have nothing to amplify into Mach bands. On structured content (text, edges),
     // colorDelta is large and this is a no-op.
-    float colorDelta = length(pooledCol - foveaCol);
-    float smoothContent = 1.0 - smoothstep(0.01, 0.05, colorDelta);
-    pooledCol = mix(pooledCol, foveaCol, smoothContent);
+    //
+    // Skip for Tier 2.75+ compute: pyramid synthesis produces intentionally subtle
+    // differences from foveaCol that this detector would kill. The synthesis
+    // output IS the peripheral representation — don't snap it away.
+    if (u_compute_tier < 2.5) {
+        float colorDelta = length(pooledCol - foveaCol);
+        float smoothContent = 1.0 - smoothstep(0.01, 0.05, colorDelta);
+        pooledCol = mix(pooledCol, foveaCol, smoothContent);
+    }
 
     // Blur blend: pixel-space transition from fovea edge outward.
     // Tight range keeps Mach bands at the fovea boundary where content masks them.
