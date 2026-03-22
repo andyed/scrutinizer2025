@@ -90,26 +90,54 @@ fn seed_noise(
     let seed = config.frame_seed;
     let idx = y * config.width + x;
 
-    // Each band gets noise at its appropriate spatial frequency.
-    // Use sine gratings modulated by hash jitter — produces smooth spatial
-    // variation at the correct scale instead of blocky pixel noise.
+    // Isotropic noise at each band's spatial frequency.
+    // Sum 4 rotated sine gratings (0°, 45°, 90°, 135°) per band — cancels
+    // orientation bias. Per-pixel phase jitter breaks spatial regularity.
     let px = vec2<f32>(f32(x), f32(y));
-    let jitter0 = noise_at(x, y, 10u, seed) * 3.14159;
-    let jitter1 = noise_at(x, y, 11u, seed) * 3.14159;
-    let jitter2 = noise_at(x, y, 12u, seed) * 3.14159;
-    let jitter3 = noise_at(x, y, 13u, seed) * 3.14159;
 
-    // Band 0: high frequency — ~4px wavelength
-    noise0[idx] = sin(px.x * 1.57 + jitter0) * cos(px.y * 1.57 + jitter0 * 0.7);
+    // Band-specific frequencies (wavelength doubles per octave)
+    let freq0 = 1.57;   // ~4px wavelength (high freq)
+    let freq1 = 0.785;  // ~8px
+    let freq2 = 0.393;  // ~16px
+    let freq3 = 0.196;  // ~32px (low freq)
 
-    // Band 1: medium-high — ~8px wavelength
-    noise1[idx] = sin(px.x * 0.785 + jitter1) * cos(px.y * 0.785 + jitter1 * 0.7);
+    // Per-pixel phase offsets from hash (different per band)
+    let ph0 = noise_at(x, y, 10u, seed) * 6.283;
+    let ph1 = noise_at(x, y, 11u, seed) * 6.283;
+    let ph2 = noise_at(x, y, 12u, seed) * 6.283;
+    let ph3 = noise_at(x, y, 13u, seed) * 6.283;
 
-    // Band 2: medium-low — ~16px wavelength
-    noise2[idx] = sin(px.x * 0.393 + jitter2) * cos(px.y * 0.393 + jitter2 * 0.7);
+    // 4-orientation sum: 0°, 45°, 90°, 135° — isotropic
+    let d45x = 0.7071;  // cos(45°)
+    let d45y = 0.7071;  // sin(45°)
 
-    // Band 3: low frequency — ~32px wavelength
-    noise3[idx] = sin(px.x * 0.196 + jitter3) * cos(px.y * 0.196 + jitter3 * 0.7);
+    noise0[idx] = 0.5 * (
+        sin(px.x * freq0 + ph0) +
+        sin(px.y * freq0 + ph0 * 1.3) +
+        sin((px.x * d45x + px.y * d45y) * freq0 + ph0 * 0.7) +
+        sin((px.x * d45x - px.y * d45y) * freq0 + ph0 * 1.7)
+    );
+
+    noise1[idx] = 0.5 * (
+        sin(px.x * freq1 + ph1) +
+        sin(px.y * freq1 + ph1 * 1.3) +
+        sin((px.x * d45x + px.y * d45y) * freq1 + ph1 * 0.7) +
+        sin((px.x * d45x - px.y * d45y) * freq1 + ph1 * 1.7)
+    );
+
+    noise2[idx] = 0.5 * (
+        sin(px.x * freq2 + ph2) +
+        sin(px.y * freq2 + ph2 * 1.3) +
+        sin((px.x * d45x + px.y * d45y) * freq2 + ph2 * 0.7) +
+        sin((px.x * d45x - px.y * d45y) * freq2 + ph2 * 1.7)
+    );
+
+    noise3[idx] = 0.5 * (
+        sin(px.x * freq3 + ph3) +
+        sin(px.y * freq3 + ph3 * 1.3) +
+        sin((px.x * d45x + px.y * d45y) * freq3 + ph3 * 0.7) +
+        sin((px.x * d45x - px.y * d45y) * freq3 + ph3 * 1.7)
+    );
 }
 
 // ─── Entry point 2: Match statistics (one iteration) ───
@@ -171,8 +199,8 @@ fn match_stats(
     // Step 1: Scale magnitudes to match target variance
     // target_var ≈ E[x^2] for zero-mean bandpass signals
     // Scale noise so its variance matches: noise *= sqrt(target_var / current_var)
-    // Sine grating noise: sin(x)*cos(y) has variance ≈ 0.125 (product of two sinusoids)
-    let noise_var = 0.125;
+    // 4-orientation sine sum scaled by 0.5: variance ≈ 0.5
+    let noise_var = 0.5;
     let scale0 = select(0.0, sqrt(max(target_var0, 0.0) / noise_var), target_var0 > eps);
     let scale1 = select(0.0, sqrt(max(target_var1, 0.0) / noise_var), target_var1 > eps);
     let scale2 = select(0.0, sqrt(max(target_var2, 0.0) / noise_var), target_var2 > eps);
