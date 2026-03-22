@@ -53,7 +53,7 @@ struct TileStatsTier3 {
     skew0: f32, skew1: f32, skew2: f32, skew3: f32,
 };
 
-const STATS_STRIDE: u32 = 18u;
+const STATS_STRIDE: u32 = 14u;
 
 // ─── Hash functions for deterministic noise ───
 

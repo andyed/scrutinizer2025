@@ -48,7 +48,7 @@ struct StatsConfig {
     _pad1: u32,
 };
 
-// Output: 18 floats per tile
+// Output: 14 floats per tile
 struct TileStatsTier3 {
     // Per-band mean absolute magnitude (4)
     mag0: f32, mag1: f32, mag2: f32, mag3: f32,
@@ -58,8 +58,6 @@ struct TileStatsTier3 {
     corr01: f32, corr12: f32, corr23: f32,
     // Mean color in Oklab (3)
     mean_L: f32, mean_a: f32, mean_b: f32,
-    // Marginal skewness (4)
-    skew0: f32, skew1: f32, skew2: f32, skew3: f32,
 };
 
 // ─── Accumulator structure (raw sums for finalize) ───
@@ -74,7 +72,7 @@ struct TileStatsTier3 {
 
 const FP_SCALE: f32 = 1024.0;
 const FP_INV: f32 = 1.0 / 1024.0;
-const ACCUM_STRIDE: u32 = 24u; // floats per tile in accumulator
+const ACCUM_STRIDE: u32 = 20u; // i32s per tile: count(1) + mag(4) + var(4) + cross(3) + mag²(4) + color(3) + pad(1)
 
 // ─── Bindings ───
 
@@ -196,13 +194,7 @@ fn accumulate(
     atomicAddFP(base + 14u, ab2 * ab2);
     atomicAddFP(base + 15u, ab3 * ab3);
 
-    // sum band_k^3 (offsets 16-19) — for skewness
-    atomicAddFP(base + 16u, b0 * b0 * b0);
-    atomicAddFP(base + 17u, b1 * b1 * b1);
-    atomicAddFP(base + 18u, b2 * b2 * b2);
-    atomicAddFP(base + 19u, b3 * b3 * b3);
-
-    // Color: sample source texture for Oklab L, a, b (offsets 20-22)
+    // Color: sample source texture for Oklab L, a, b (offsets 16-18)
     let srgb = textureLoad(source_tex, vec2<u32>(x, y), 0);
     let lin = vec3<f32>(
         srgb_to_linear(srgb.r),
@@ -210,11 +202,11 @@ fn accumulate(
         srgb_to_linear(srgb.b),
     );
     let lab = linear_to_oklab(lin);
-    atomicAddFP(base + 20u, lab.x);
-    atomicAddFP(base + 21u, lab.y);
-    atomicAddFP(base + 22u, lab.z);
+    atomicAddFP(base + 16u, lab.x);
+    atomicAddFP(base + 17u, lab.y);
+    atomicAddFP(base + 18u, lab.z);
 
-    // offset 23 reserved (padding)
+    // offset 19 reserved (padding)
 }
 
 // ─── Entry point 2: Finalize — compute stats from accumulated sums ───
@@ -244,7 +236,6 @@ fn finalize(
             0.0, 0.0, 0.0, 0.0,
             0.0, 0.0, 0.0,
             0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.0,
         );
         return;
     }
@@ -297,36 +288,15 @@ fn finalize(
     corr12 = clamp(corr12, -1.0, 1.0);
     corr23 = clamp(corr23, -1.0, 1.0);
 
-    // Marginal skewness: E[x^3] / std^3
-    let m3_0 = readFP(base + 16u) * inv_n;
-    let m3_1 = readFP(base + 17u) * inv_n;
-    let m3_2 = readFP(base + 18u) * inv_n;
-    let m3_3 = readFP(base + 19u) * inv_n;
-
-    let std_v0 = sqrt(max(var0, 0.0));
-    let std_v1 = sqrt(max(var1, 0.0));
-    let std_v2 = sqrt(max(var2, 0.0));
-    let std_v3 = sqrt(max(var3, 0.0));
-
-    var skew0: f32 = 0.0;
-    var skew1: f32 = 0.0;
-    var skew2: f32 = 0.0;
-    var skew3: f32 = 0.0;
-    if (std_v0 > eps) { skew0 = m3_0 / (std_v0 * std_v0 * std_v0); }
-    if (std_v1 > eps) { skew1 = m3_1 / (std_v1 * std_v1 * std_v1); }
-    if (std_v2 > eps) { skew2 = m3_2 / (std_v2 * std_v2 * std_v2); }
-    if (std_v3 > eps) { skew3 = m3_3 / (std_v3 * std_v3 * std_v3); }
-
-    // Mean color
-    let mean_L = readFP(base + 20u) * inv_n;
-    let mean_a = readFP(base + 21u) * inv_n;
-    let mean_b = readFP(base + 22u) * inv_n;
+    // Mean color (offsets shifted after skewness removal)
+    let mean_L = readFP(base + 16u) * inv_n;
+    let mean_a = readFP(base + 17u) * inv_n;
+    let mean_b = readFP(base + 18u) * inv_n;
 
     tile_stats[tile_idx] = TileStatsTier3(
         mag0, mag1, mag2, mag3,
         var0, var1, var2, var3,
         corr01, corr12, corr23,
         mean_L, mean_a, mean_b,
-        skew0, skew1, skew2, skew3,
     );
 }

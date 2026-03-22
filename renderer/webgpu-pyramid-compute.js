@@ -29,8 +29,8 @@ const PYRAMID_LEVELS = 4;
 const CONFIG_SIZE = 16; // 4 u32s = 16 bytes (decompose config)
 const STATS_CONFIG_SIZE = 64; // 16 u32s = 64 bytes (stats config)
 const TILE_SIZE = 8;
-const ACCUM_STRIDE = 24; // floats per tile in accumulator
-const STATS_STRIDE = 18; // floats per tile in TileStatsTier3
+const ACCUM_STRIDE = 20; // i32s per tile in accumulator (no skewness)
+const STATS_STRIDE = 14; // floats per tile in TileStatsTier3 (no skewness)
 const FRAME_INTERVAL = 2; // compute every Nth frame (matches Tier 2.5)
 
 class WebGPUPyramidCompute {
@@ -702,7 +702,6 @@ class WebGPUPyramidCompute {
                 variance: [raw[o+4], raw[o+5], raw[o+6], raw[o+7]],
                 crossCorr: [raw[o+8], raw[o+9], raw[o+10]],
                 color: { L: raw[o+11], a: raw[o+12], b: raw[o+13] },
-                skewness: [raw[o+14], raw[o+15], raw[o+16], raw[o+17]],
             });
         }
         return tiles;
