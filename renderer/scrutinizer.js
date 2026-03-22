@@ -664,6 +664,7 @@
                     });
                 }
             }
+            if (this.frameTimer) this.frameTimer.mark('compute');
 
             // 8. Render (single call to WebGL with all composed state)
             const debugMode = this.contentAnalysis.getDebugMode();
