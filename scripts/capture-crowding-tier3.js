@@ -28,7 +28,9 @@ const { run } = require('./lib/capture-runner');
 
 const ROOT = path.join(__dirname, '..');
 const OUTPUT_DIR = path.join(ROOT, 'tests', 'crowding-captures', 'tier3');
-const CROWDING_PAGE = 'file://' + path.join(ROOT, 'tests', 'reference-pages', 'crowding-stimulus.html');
+// Crowding stimulus page lives in scrutinizer-www, not in this repo's test dir
+const WWW_ROOT = path.join(ROOT, '..', 'scrutinizer-www', 'src', 'reference-pages');
+const CROWDING_PAGE = 'file://' + path.join(WWW_ROOT, 'crowding-stimulus.html');
 
 // Eccentricity target: 8° at 45 px/deg = 360px from fixation
 // Fixation at center (960, 540 at 1920x1080)

@@ -171,8 +171,8 @@ fn match_stats(
     // Step 1: Scale magnitudes to match target variance
     // target_var ≈ E[x^2] for zero-mean bandpass signals
     // Scale noise so its variance matches: noise *= sqrt(target_var / current_var)
-    // For initial noise (uniform [-1,1]), variance ≈ 1/3
-    let noise_var = 0.333;
+    // Sine grating noise: sin(x)*cos(y) has variance ≈ 0.125 (product of two sinusoids)
+    let noise_var = 0.125;
     let scale0 = select(0.0, sqrt(max(target_var0, 0.0) / noise_var), target_var0 > eps);
     let scale1 = select(0.0, sqrt(max(target_var1, 0.0) / noise_var), target_var1 > eps);
     let scale2 = select(0.0, sqrt(max(target_var2, 0.0) / noise_var), target_var2 > eps);
@@ -191,7 +191,7 @@ fn match_stats(
     //
     // Method: v_child += target_corr * (|v_parent| - mean_parent_mag) * sign(v_child)
     // This shifts child magnitude toward parent magnitude, scaled by correlation.
-    let corr_strength = 0.5; // damping factor to prevent oscillation
+    let corr_strength = 0.8; // stronger correlation injection for visible structure
 
     // corr01: band0 (parent) → band1 (child)
     let parent_dev0 = abs(v0) - target_mag0;
@@ -327,10 +327,22 @@ fn reconstruct(
     let L11 = rc_stats[i11 * STATS_STRIDE + 11u];
     let tile_mean_L = mix(mix(L00, L10, fx_frac), mix(L01, L11, fx_frac), fy_frac);
 
-    // Reconstruct Oklab color: tile-mean L modulated by synthesized band detail
-    // synth_luma is bandpass detail (zero-mean), scaled by tile variance
-    // Stronger modulation in high-variance tiles (text, edges), weaker in flat tiles
-    let L = clamp(tile_mean_L + synth_luma * 0.3, 0.0, 1.0);
+    // Eccentricity-graded content replacement (the crowding mechanism):
+    //
+    // Near fovea (alpha → 0): tile_mean_L + detail — preserves structure,
+    //   letter identity survives because mean carries it.
+    //
+    // Far periphery (alpha → 1): tile_mean_L + STRONGER detail — synthesis
+    //   dominates, tile mean is just the DC offset, bandpass noise is the content.
+    //   Isolated letter: low-variance tile → weak noise → mean (letter shape) visible.
+    //   Flanked letter: high-variance tile → strong noise → mean is average of
+    //   multiple letters → identity destroyed. THIS IS CROWDING.
+    //
+    // The key: detail_strength scales with alpha AND tile variance.
+    // High eccentricity + high variance = full replacement (crowding).
+    // High eccentricity + low variance = mean dominates (isolated letter preserved).
+    let detail_strength = mix(0.15, 0.8, alpha);
+    let L = clamp(tile_mean_L + synth_luma * detail_strength, 0.0, 1.0);
     let lab = vec3<f32>(L, tile_mean_a, tile_mean_b);
     let lin = oklab_to_linear(lab);
 
