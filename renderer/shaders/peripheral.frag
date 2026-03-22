@@ -956,6 +956,13 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     }
 
     if (config.v1_distortion_type == 2) {
+        // For compute tiers that handle their own peripheral degradation,
+        // preserve eccentricity-based strength for downstream blend/color pipeline
+        // even though we skip displacement. Without this, strength=0 from
+        // v1_strength_mult=0 kills the entire peripheral rendering chain.
+        if (u_compute_tier >= 2.5) {
+            signal.distortionStrength = lgn.suppressionFactor * eccentricityScale;
+        }
         return signal;
     }
     
