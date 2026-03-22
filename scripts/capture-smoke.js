@@ -49,6 +49,14 @@ const SMOKE_SPECS = [
         radius: '45', width: '1920', height: '1080', mobile: 'false',
     },
     {
+        filename: 'smoke_dashboard_mode14.png',
+        url: `${REF_PAGES}/dashboard.html`,
+        mode: '14',
+        fixationX: 0.5, fixationY: 0.5,
+        selector: '', overlay: false,
+        radius: '45', width: '1920', height: '1080', mobile: 'false',
+    },
+    {
         filename: 'smoke_dashboard_mode12.png',
         url: `${REF_PAGES}/dashboard.html`,
         mode: '12',

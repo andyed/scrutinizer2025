@@ -48,6 +48,7 @@ const FIXATION_COORDS = {
 // Debug variants for standard pages
 const DEBUG_VARIANTS = [
     { id: 'standard', mode: '0', overlay: false },
+    { id: 'mode14_pyramid', mode: '14', overlay: false },
     { id: 'mode12_isotropic', mode: '12', overlay: false },
     { id: 'saliency', mode: 'saliency' },
     { id: 'structure', mode: 'structure' },
