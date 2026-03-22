@@ -22,9 +22,13 @@
 // atomicAdd as u32, then divide by 2^16 * count in finalize.
 //
 // References:
-//   Portilla & Simoncelli (2000) — joint wavelet statistics
-//   Walton et al. (2021) — real-time subset: magnitudes + cross-scale correlations
-//   Rosenholtz et al. (2012) — TTM summary statistics
+//   Burt & Adelson (1983) — Laplacian pyramid (our decomposition basis)
+//   Portilla & Simoncelli (2000) — full texture model (710+ stats on complex wavelets;
+//       we compute ~18 stats on isotropic Laplacian bands — a strict subset)
+//   Walton et al. (2021) — real-time oriented synthesis (we approximate with
+//       variance scaling, not their histogram matching)
+//   Rosenholtz et al. (2012) — TTM (requires oriented filters; our isotropic
+//       approximation captures scale but not orientation)
 
 // ─── Structures ───
 

@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.7.0] - 2026-03-22
+
+### Added
+- **Tier 2.75 WebGPU Compute Pipeline (Mode 14, Default)**: Laplacian pyramid decomposition (4 bands + DC residual) with per-tile cross-scale magnitude correlation extraction and spectrum-matching synthesis. 15 dispatches per frame via `webgpu-pyramid-compute.js`. Three WGSL shaders: `pyramid-decompose.wgsl` (luminance, blur/downsample, band subtraction), `pyramid-stats.wgsl` (atomic accumulate + finalize → 18 floats/tile), `pyramid-synth.wgsl` (sine-grating noise + variance matching + bilinear interpolation + multi-band reconstruction). Produces spatially coherent peripheral texture instead of Tier 2.5's colored noise.
+- **Bilinear Tile Interpolation**: Variance, magnitude, and cross-scale correlation bilinearly interpolated between 4 nearest tile centers before scaling noise. Eliminates crosshatch artifact at tile boundaries where adjacent tiles had different content characteristics.
+- **Isotropic 4-Orientation Noise**: Sum of 4 rotated sine gratings (0/45/90/135 degrees) per band with per-pixel phase jitter. Replaces axis-aligned `sin(x)*cos(y)` which produced diagonal fringing. Noise variance recalibrated to 0.5 for the 4-grating sum.
+- **Eccentricity-Graded Content Replacement**: Synthesis alpha scales with eccentricity — near-fovea (0.15) preserves structure, far periphery (0.8) replaces content. High-variance tiles get more noise disruption than low-variance tiles, producing the crowding mechanism.
+- **Gaze-Based Stable Seed**: Noise seed derived from gaze position instead of pixel coordinates. Eliminates shimmer during fixation.
+- **Subband Tiling Visualization**: 3x2 grid rendering of Laplacian pyramid bands (4 frequency bands + residual + original) with contrast-stretched bandpass for blog use.
+- **Python Reference Generator**: `scripts/generate-pyramid-reference.py` generates ground-truth pyramid decomposition data via pyrtools for unit test validation.
+- **Pyramid Decomposition Tests**: 30 unit tests validating decomposition against pyrtools reference data.
+- **Wave 7 Validation Scaffolding**: Specs and scripts for 7a (pyramid fidelity), 7b (stats accuracy), 7c (crowding asymmetry). Crowding capture and analysis scripts for Tier 2.5 vs 2.75 comparison.
+- **Tier 3 TTM Synthesis Plan**: Architecture spec (`docs/specs/tier3_ttm_synthesis_plan.md`) for content replacement within pooling regions.
+- **Compute Phase in FrameTimer**: Timer mark for WebGPU compute dispatch duration.
+
+### Changed
+- **Default Mode**: 12 (FOVI Cortical Grid) → 14 (Pyramid Mongrel). Multi-scale pyramid synthesis replaces single-scale oriented noise for peripheral rendering. Previous default accessible via menu.
+- **Mode-Switch Pipeline Recreation**: Switching between Tier 2.5 and Tier 2.75 modes now destroys and recreates the WebGPU compute pipeline with the correct buffer layout. Fixes crash when switching between mode 10/14.
+- **Cross-Scale Correlation Strength**: 0.5 → 0.8 for stronger parent-child band coupling.
+
+### Fixed
+- **Bilinear Stats Interpolation**: `match_stats` shader now interpolates all tile statistics (variance, magnitude, correlation) between nearest tile centers. Eliminates crosshatch artifact at content boundaries.
+- **Diagonal Fringing**: Axis-aligned noise replaced with 4-orientation isotropic sum. Diagonal artifacts at band edges eliminated.
+- **Eccentricity Blend**: Synthesis was applying uniform noise strength regardless of distance from fovea. Now graded from 0.15 (foveal) to 0.8 (far peripheral).
+
 ## [2.6.1] - 2026-03-22
 
 ### Fixed

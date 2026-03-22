@@ -104,7 +104,7 @@ Replace oriented sine gratings with multi-scale noise matching:
 
 1. **Initialize**: Seeded white noise per band (hash-based, deterministic per tile for temporal stability)
 2. **Magnitude matching**: Scale noise band_k so mean|noise_k| = target mean|band_k|, variance matches target
-3. **Cross-scale correlation injection**: For each parent-child pair (k, k+1), adjust child magnitudes conditioned on parent magnitude. If target correlation is high and parent has strong energy → boost child. If low → leave independent. This is Walton's "histogram matching in the magnitude domain."
+3. **Cross-scale correlation injection**: For each parent-child pair (k, k+1), adjust child magnitudes conditioned on parent magnitude. If target correlation is high and parent has strong energy → boost child. If low → leave independent. This is a linear approximation inspired by Walton et al. (2021); their full approach uses histogram matching on steerable pyramid subbands, which is a Tier 3 target.
 4. **Marginal adjustment**: Shift distribution to match target skewness (power-law transform)
 5. **Reconstruct**: Sum adjusted noise bands + original lowpass residual → output image
 

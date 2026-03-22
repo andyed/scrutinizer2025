@@ -17,9 +17,11 @@
 //   Low correlation → leave independent (noise stays noise).
 //
 // References:
-//   Walton et al. (2021) — histogram matching in magnitude domain
-//   Portilla & Simoncelli (2000) — cross-scale statistics
-//   Rosenholtz et al. (2012) — TTM: summary statistics → crowding
+//   Burt & Adelson (1983) — Laplacian pyramid (our decomposition basis)
+//   Walton et al. (2021) — real-time ventral metamers (we approximate with
+//       variance scaling, not their full histogram matching on steerable pyramids)
+//   Rosenholtz et al. (2012) — TTM theory motivates the approach; our isotropic
+//       subset captures cross-scale structure but not orientation selectivity
 
 // ─── Config ───
 
