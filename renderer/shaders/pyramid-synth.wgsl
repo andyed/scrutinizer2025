@@ -166,25 +166,43 @@ fn match_stats(
     let y = gid.y;
     if (x >= ms_config.width || y >= ms_config.height) { return; }
 
-    // Tile lookup
-    let tx = min(x / ms_config.tile_size, ms_config.tile_count_x - 1u);
-    let ty = min(y / ms_config.tile_size, ms_config.tile_count_y - 1u);
-    let tile_idx = ty * ms_config.tile_count_x + tx;
+    // Bilinear interpolation of tile statistics — eliminates crosshatch
+    // at tile boundaries by smoothly blending variance/magnitude/correlation
+    // between neighboring tiles.
+    let ts = f32(ms_config.tile_size);
+    let tcx = ms_config.tile_count_x;
+    let tcy = ms_config.tile_count_y;
 
-    // Target statistics
-    let target_mag0 = get_tile_stat(tile_idx, 0u);
-    let target_mag1 = get_tile_stat(tile_idx, 1u);
-    let target_mag2 = get_tile_stat(tile_idx, 2u);
-    let target_mag3 = get_tile_stat(tile_idx, 3u);
+    let ftx = (f32(x) + 0.5) / ts - 0.5;
+    let fty = (f32(y) + 0.5) / ts - 0.5;
 
-    let target_var0 = get_tile_stat(tile_idx, 4u);
-    let target_var1 = get_tile_stat(tile_idx, 5u);
-    let target_var2 = get_tile_stat(tile_idx, 6u);
-    let target_var3 = get_tile_stat(tile_idx, 7u);
+    let tx0 = u32(clamp(i32(floor(ftx)), 0, i32(tcx) - 1));
+    let ty0 = u32(clamp(i32(floor(fty)), 0, i32(tcy) - 1));
+    let tx1 = min(tx0 + 1u, tcx - 1u);
+    let ty1 = min(ty0 + 1u, tcy - 1u);
 
-    let target_corr01 = get_tile_stat(tile_idx, 8u);
-    let target_corr12 = get_tile_stat(tile_idx, 9u);
-    let target_corr23 = get_tile_stat(tile_idx, 10u);
+    let fx_f = clamp(ftx - floor(ftx), 0.0, 1.0);
+    let fy_f = clamp(fty - floor(fty), 0.0, 1.0);
+
+    let i00 = ty0 * tcx + tx0;
+    let i10 = ty0 * tcx + tx1;
+    let i01 = ty1 * tcx + tx0;
+    let i11 = ty1 * tcx + tx1;
+
+    // Interpolate all 11 statistics
+    let target_mag0 = mix(mix(get_tile_stat(i00, 0u), get_tile_stat(i10, 0u), fx_f), mix(get_tile_stat(i01, 0u), get_tile_stat(i11, 0u), fx_f), fy_f);
+    let target_mag1 = mix(mix(get_tile_stat(i00, 1u), get_tile_stat(i10, 1u), fx_f), mix(get_tile_stat(i01, 1u), get_tile_stat(i11, 1u), fx_f), fy_f);
+    let target_mag2 = mix(mix(get_tile_stat(i00, 2u), get_tile_stat(i10, 2u), fx_f), mix(get_tile_stat(i01, 2u), get_tile_stat(i11, 2u), fx_f), fy_f);
+    let target_mag3 = mix(mix(get_tile_stat(i00, 3u), get_tile_stat(i10, 3u), fx_f), mix(get_tile_stat(i01, 3u), get_tile_stat(i11, 3u), fx_f), fy_f);
+
+    let target_var0 = mix(mix(get_tile_stat(i00, 4u), get_tile_stat(i10, 4u), fx_f), mix(get_tile_stat(i01, 4u), get_tile_stat(i11, 4u), fx_f), fy_f);
+    let target_var1 = mix(mix(get_tile_stat(i00, 5u), get_tile_stat(i10, 5u), fx_f), mix(get_tile_stat(i01, 5u), get_tile_stat(i11, 5u), fx_f), fy_f);
+    let target_var2 = mix(mix(get_tile_stat(i00, 6u), get_tile_stat(i10, 6u), fx_f), mix(get_tile_stat(i01, 6u), get_tile_stat(i11, 6u), fx_f), fy_f);
+    let target_var3 = mix(mix(get_tile_stat(i00, 7u), get_tile_stat(i10, 7u), fx_f), mix(get_tile_stat(i01, 7u), get_tile_stat(i11, 7u), fx_f), fy_f);
+
+    let target_corr01 = mix(mix(get_tile_stat(i00, 8u), get_tile_stat(i10, 8u), fx_f), mix(get_tile_stat(i01, 8u), get_tile_stat(i11, 8u), fx_f), fy_f);
+    let target_corr12 = mix(mix(get_tile_stat(i00, 9u), get_tile_stat(i10, 9u), fx_f), mix(get_tile_stat(i01, 9u), get_tile_stat(i11, 9u), fx_f), fy_f);
+    let target_corr23 = mix(mix(get_tile_stat(i00, 10u), get_tile_stat(i10, 10u), fx_f), mix(get_tile_stat(i01, 10u), get_tile_stat(i11, 10u), fx_f), fy_f);
 
     let idx = y * ms_config.width + x;
 
