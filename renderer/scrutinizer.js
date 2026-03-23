@@ -563,14 +563,13 @@
                             this.webgpuCompute = new WebGPUPyramidCompute(this.webgpuDevice, halfW, halfH);
                             this.webgpuTier = 2.75;
                             this.renderer.setComputeTier(2.75);
-                            console.log('[Scrutinizer] Pyramid compute initialized — Tier 2.75 active (%dx%d)', halfW, halfH);
                         } else {
                             this.webgpuCompute = new WebGPUCrowdingCompute(this.webgpuDevice, halfW, halfH);
                             this.webgpuTier = 2.5;
                             this.renderer.setComputeTier(2.5);
                         }
                     } catch (e) {
-                        console.warn('[Scrutinizer] WebGPU compute init FAILED — falling back:', e.message);
+                        console.warn('[Scrutinizer] WebGPU compute init failed:', e.message);
                         this._fallbackToTier16();
                     }
                 } else if (halfW !== this.webgpuCompute.width || halfH !== this.webgpuCompute.height) {
@@ -657,16 +656,10 @@
                     readbackFn.then((data) => {
                         if (data && this.renderer) {
                             this.renderer.uploadComputeTexture(data, halfW, halfH, cw, ch);
-                            if (!this._pyramidUploadLogged) {
-                                console.log('[Scrutinizer] Pyramid texture uploaded: %dx%d (%d bytes)', halfW, halfH, data.length);
-                                this._pyramidUploadLogged = true;
-                            }
                             // Always invalidate after upload so next content change triggers resynth.
                             // Without this, hover effects / CSS animations / dynamic content
                             // show stale tiles until the next saccade or drift threshold.
                             this._metamerInitialized = false;
-                        } else if (!data && usePyramid) {
-                            console.warn('[Scrutinizer] Pyramid readback returned null — synthesis may have failed');
                         }
                     });
                 }
