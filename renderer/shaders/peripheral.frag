@@ -2073,5 +2073,18 @@ void main() {
         }
     }
 
+    // Debug: compute tier indicator — top-left corner dot
+    // Green = Tier 2.75 (pyramid synthesis active), Red = DoG fallback
+    // Remove before release.
+    if (v_texCoord.x < 0.015 && v_texCoord.y < 0.02) {
+        if (u_compute_tier > 2.0) {
+            color = vec4(0.0, 1.0, 0.0, 1.0); // green = Tier 2.75
+        } else if (u_dog_enabled > 0.5) {
+            color = vec4(1.0, 0.0, 0.0, 1.0); // red = DoG fallback
+        } else {
+            color = vec4(0.0, 0.0, 1.0, 1.0); // blue = MIP only
+        }
+    }
+
     fragColor = color;
 }
