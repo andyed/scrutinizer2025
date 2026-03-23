@@ -404,11 +404,5 @@ fn reconstruct(
         linear_to_srgb(clamp(lin.b, 0.0, 1.0)),
     );
 
-    // Alpha controls how much the compute texture overrides the fragment shader's
-    // displacement+MIP output. Too high → undoes displacement (compute RGB is close
-    // to undistorted source). Too low → invisible. 0.3 max lets the pyramid synthesis
-    // add texture quality (cross-scale correlations, tile-mean color) without
-    // overwhelming the displacement that drives readability destruction.
-    let blend_alpha = alpha * 0.3;
-    output[idx] = pack_rgba8(srgb.r, srgb.g, srgb.b, blend_alpha);
+    output[idx] = pack_rgba8(srgb.r, srgb.g, srgb.b, alpha);
 }
