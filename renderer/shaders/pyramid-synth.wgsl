@@ -389,7 +389,12 @@ fn reconstruct(
     // The key: detail_strength scales with alpha AND tile variance.
     // High eccentricity + high variance = full replacement (crowding).
     // High eccentricity + low variance = mean dominates (isolated letter preserved).
-    let detail_strength = mix(0.15, 0.8, alpha);
+    // Detail strength scales with eccentricity. synth_luma values are small
+    // (Oklab L bands ~0.005-0.01) so amplification needs to be aggressive.
+    // At alpha=1 (far periphery), 40x amplification brings ±0.01 band values
+    // to ±0.4 visible luminance variation — enough to destroy text legibility
+    // while preserving the tile-mean spatial structure (blobs, not letters).
+    let detail_strength = mix(1.0, 40.0, alpha);
     let L = clamp(tile_mean_L + synth_luma * detail_strength, 0.0, 1.0);
     let lab = vec3<f32>(L, tile_mean_a, tile_mean_b);
     let lin = oklab_to_linear(lab);
