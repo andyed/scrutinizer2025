@@ -1217,21 +1217,26 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         vec4 computeSample = texture(u_computeStatTexture, computeUV);
         float computeAlpha = computeSample.a;
 
-        if (computeAlpha > 0.99) {
-            // Full metamer coverage — skip MIP fallback
-            pooledCol = computeSample.rgb;
+        // Always compute MIP/DoG blur — it provides spatial pooling (readability
+        // destruction). The compute texture adds texture quality on top.
+        vec3 mipResult;
+        if (u_dog_enabled > 0.5) {
+            mipResult = sampleDoGReconstructed(
+                v1.distortedUV, coupledEccentricity, fovea_radius,
+                u_dog_e2, u_dog_sharpness, eccentricity, uv
+            ).rgb;
         } else {
-            // Partial blend — compute MIP fallback for uncovered portion
-            vec3 mipFallback;
-            if (u_dog_enabled > 0.5) {
-                mipFallback = sampleDoGReconstructed(
-                    v1.distortedUV, coupledEccentricity, fovea_radius,
-                    u_dog_e2, u_dog_sharpness, eccentricity, uv
-                ).rgb;
-            } else {
-                mipFallback = sampleMIPPooled(v1.distortedUV, coupledEccentricity, fovea_radius).rgb;
-            }
-            pooledCol = mix(mipFallback, computeSample.rgb, computeAlpha);
+            mipResult = sampleMIPPooled(v1.distortedUV, coupledEccentricity, fovea_radius).rgb;
+        }
+
+        if (computeAlpha > 0.01) {
+            // Blend MIP blur with compute texture: MIP destroys readability,
+            // compute adds texture structure (cross-scale correlations).
+            // 50/50 blend preserves blur while adding synthesis quality.
+            vec3 combined = mix(mipResult, computeSample.rgb, 0.5);
+            pooledCol = mix(mipResult, combined, computeAlpha);
+        } else {
+            pooledCol = mipResult;
         }
     } else if (u_gaussian_blur_mode > 0.5) {
         // Eccentricity-scaled Gaussian blur via MIP chain (no band decomposition).
