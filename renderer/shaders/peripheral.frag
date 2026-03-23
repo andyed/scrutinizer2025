@@ -956,13 +956,6 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     }
 
     if (config.v1_distortion_type == 2) {
-        // For compute tiers that handle their own peripheral degradation,
-        // preserve eccentricity-based strength for downstream blend/color pipeline
-        // even though we skip displacement. Without this, strength=0 from
-        // v1_strength_mult=0 kills the entire peripheral rendering chain.
-        if (u_compute_tier >= 2.5) {
-            signal.distortionStrength = lgn.suppressionFactor * eccentricityScale;
-        }
         return signal;
     }
     
@@ -1217,26 +1210,21 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         vec4 computeSample = texture(u_computeStatTexture, computeUV);
         float computeAlpha = computeSample.a;
 
-        // Always compute MIP/DoG blur — it provides spatial pooling (readability
-        // destruction). The compute texture adds texture quality on top.
-        vec3 mipResult;
-        if (u_dog_enabled > 0.5) {
-            mipResult = sampleDoGReconstructed(
-                v1.distortedUV, coupledEccentricity, fovea_radius,
-                u_dog_e2, u_dog_sharpness, eccentricity, uv
-            ).rgb;
+        if (computeAlpha > 0.99) {
+            // Full metamer coverage — skip MIP fallback
+            pooledCol = computeSample.rgb;
         } else {
-            mipResult = sampleMIPPooled(v1.distortedUV, coupledEccentricity, fovea_radius).rgb;
-        }
-
-        if (computeAlpha > 0.01) {
-            // Blend MIP blur with compute texture: MIP destroys readability,
-            // compute adds texture structure (cross-scale correlations).
-            // 50/50 blend preserves blur while adding synthesis quality.
-            vec3 combined = mix(mipResult, computeSample.rgb, 0.5);
-            pooledCol = mix(mipResult, combined, computeAlpha);
-        } else {
-            pooledCol = mipResult;
+            // Partial blend — compute MIP fallback for uncovered portion
+            vec3 mipFallback;
+            if (u_dog_enabled > 0.5) {
+                mipFallback = sampleDoGReconstructed(
+                    v1.distortedUV, coupledEccentricity, fovea_radius,
+                    u_dog_e2, u_dog_sharpness, eccentricity, uv
+                ).rgb;
+            } else {
+                mipFallback = sampleMIPPooled(v1.distortedUV, coupledEccentricity, fovea_radius).rgb;
+            }
+            pooledCol = mix(mipFallback, computeSample.rgb, computeAlpha);
         }
     } else if (u_gaussian_blur_mode > 0.5) {
         // Eccentricity-scaled Gaussian blur via MIP chain (no band decomposition).
@@ -1259,14 +1247,9 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     // have nothing to amplify into Mach bands. On structured content (text, edges),
     // colorDelta is large and this is a no-op.
     //
-    // Skip for Tier 2.75+ compute: pyramid synthesis produces intentionally subtle
-    // differences from foveaCol that this detector would kill. The synthesis
-    // output IS the peripheral representation — don't snap it away.
-    if (u_compute_tier < 2.5) {
-        float colorDelta = length(pooledCol - foveaCol);
-        float smoothContent = 1.0 - smoothstep(0.01, 0.05, colorDelta);
-        pooledCol = mix(pooledCol, foveaCol, smoothContent);
-    }
+    float colorDelta = length(pooledCol - foveaCol);
+    float smoothContent = 1.0 - smoothstep(0.01, 0.05, colorDelta);
+    pooledCol = mix(pooledCol, foveaCol, smoothContent);
 
     // Blur blend: pixel-space transition from fovea edge outward.
     // Tight range keeps Mach bands at the fovea boundary where content masks them.
