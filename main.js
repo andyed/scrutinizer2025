@@ -25,7 +25,7 @@ let currentStartPage;
 
 let currentVisualMemory;
 let currentMobileEmulation;
-let currentAestheticMode = 0;
+let currentAestheticMode = 14;
 
 // Tier 1 keyboard shortcut state (cycling modes)
 let currentCongestionMode = 0;   // 0=Off, 1=Stats, 2=Heatmap, 3=Saliency vs Congestion
