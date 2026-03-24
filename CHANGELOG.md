@@ -42,6 +42,8 @@
 
 ## [2.6.0] - 2026-03-19
 
+**Blog post:** [Isotropic Cortical Sampling](https://andyed.github.io/scrutinizer-www/blog/2026-03-21-v2.6.html) | [Release notes](docs/release_notes_v2.6.0.md)
+
 ### Added
 - **FOVI Cortical Grid (Mode 12, Default)**: Isotropic cortical sampling from Blauch, Alvarez & Konkle (2026, arxiv:2602.03766) is now the default mode. Sector geometry derived from `w = log(r + a)` parameterizes the displacement pipeline — noise frequency scales inversely with sector extent, scramble cell size tracks sector extent (capped at 16px, floor 8px). Sector geometry drives *transition rate*, not rendering mechanism. 19-test geometry suite validates math against Blauch's Python to 3 decimal places.
 - **Bender/Cutter Extraction**: V1 displacement components extracted as parameterized GLSL structs (`BenderConfig`, `CutterConfig`) with `applyBender()` and `applyCutter()` functions. Researchers can swap implementations by constructing different configs. Type 1 (Shredder) refactored to use extracted functions — behavior-identical.
@@ -58,7 +60,7 @@
 
 ### Fixed
 - **Isotropic Mode Was Inert (Ship-Blocking)**: `v1_distortion_type: 5` (cortical_isotropic) was silently overwritten to type 1 (shatter) every frame by a legacy `mongrelMode` override on `peripheral.frag` line 1806. The guard condition exempted types 2, 3, and 4 but not type 5 — so mode 12's sector geometry was computed but never reached the shader's isotropic code path. All captures, demos, and validation prior to this fix were running shatter distortion with isotropic uniforms ignored. Fixed by adding `config.v1_distortion_type != 5` to the exemption list.
-- **Arxiv Citation Accuracy**: Corrected FOVI paper title to "A biologically-inspired foveated interface for deep vision models" across 6 files. Fixed author order (Alvarez before Konkle) where reversed. AI-confabulated title variants ("Foveation of inputs...", "Foveated vision in neural networks") replaced with actual paper title.
+- **Arxiv Citation Accuracy (Science Agent)**: Corrected FOVI paper title to "A biologically-inspired foveated interface for deep vision models" across 6 files using the [science agent](.claude/agents/science-agent.md) for CrossRef/BibTeX validation. Fixed author order (Alvarez before Konkle) where reversed. AI-confabulated title variants ("Foveation of inputs...", "Foveated vision in neural networks") replaced with actual paper title.
 - **Missing Uniform Declaration**: `u_num_cortical_rings` was passed from JS but not declared in the shader.
 - **OCR Baseline Stale**: Re-frozen OCR baseline at 1x DPR (1920×944) after mode 12 graduation changed capture geometry. Previous baseline was frozen at 2x DPR (3840×1888), causing foveal radius mismatch.
 
