@@ -1216,6 +1216,16 @@ ipcMain.on('log:renderer', (event, message) => {
     }
 });
 
+// Debug: Compute Texture Dump — receives raw RGBA8 data from renderer
+// Used by capture-compute-texture.js for Tier 2.5 vs 2.75 comparison.
+let _pendingComputeTextureResolve = null;
+ipcMain.on('debug:compute-texture-data', (event, payload) => {
+    if (_pendingComputeTextureResolve) {
+        _pendingComputeTextureResolve(payload);
+        _pendingComputeTextureResolve = null;
+    }
+});
+
 // Citation-Ready Export Handler
 // Captures the current HUD view and embeds metadata for academic reproducibility
 ipcMain.on('export:citation-screenshot', async (event, options = {}) => {
@@ -2040,6 +2050,49 @@ function runBatchCapture() {
                     const filePath = p.join(screenshotsDir, shot.filename);
                     fs.writeFileSync(filePath, buffer);
                     console.log(`[Batch] ✓ ${shot.filename}`);
+
+                    // Optional: dump raw compute texture alongside screenshot
+                    if (shot.captureCompute) {
+                        try {
+                            const computePromise = new Promise((resolve) => {
+                                _pendingComputeTextureResolve = resolve;
+                                setTimeout(() => {
+                                    if (_pendingComputeTextureResolve === resolve) {
+                                        _pendingComputeTextureResolve = null;
+                                        resolve({ error: 'timeout' });
+                                    }
+                                }, 5000);
+                            });
+                            // Wait for compute pipeline to stabilize before requesting readback
+                            await new Promise(r => setTimeout(r, 1000));
+                            mainWindow.scrutinizerHud.webContents.send('debug:dump-compute-texture');
+                            let result = await computePromise;
+                            // Retry once if readback returned null (pipeline may not have dispatched yet)
+                            if (result.error === 'readback returned null') {
+                                await new Promise(r => setTimeout(r, 2000));
+                                const retryPromise = new Promise((resolve) => {
+                                    _pendingComputeTextureResolve = resolve;
+                                    setTimeout(() => { _pendingComputeTextureResolve = null; resolve({ error: 'timeout' }); }, 5000);
+                                });
+                                mainWindow.scrutinizerHud.webContents.send('debug:dump-compute-texture');
+                                result = await retryPromise;
+                            }
+                            if (result.error) {
+                                console.warn(`[Batch] Compute texture: ${result.error}`);
+                            } else {
+                                const computeFile = p.join(screenshotsDir,
+                                    shot.filename.replace('.png', '_compute.raw'));
+                                // Write raw RGBA8 + dimensions header (8 bytes: u32 width, u32 height)
+                                const header = Buffer.alloc(8);
+                                header.writeUInt32LE(result.width, 0);
+                                header.writeUInt32LE(result.height, 4);
+                                fs.writeFileSync(computeFile, Buffer.concat([header, Buffer.from(result.data)]));
+                                console.log(`[Batch] ✓ ${shot.filename.replace('.png', '_compute.raw')} (${result.width}x${result.height}, tier=${result.tier})`);
+                            }
+                        } catch (computeErr) {
+                            console.warn(`[Batch] Compute texture failed: ${computeErr.message}`);
+                        }
+                    }
                 } catch (err) {
                     console.error(`[Batch] ✗ ${shot.filename}: ${err.message}`);
                 }

@@ -223,6 +223,7 @@
 
         setupEventListeners() {
             window.addEventListener('resize', this.handleResize);
+            this._setupComputeTextureDump();
 
             // Structure updates from DOM analysis (via IPC)
             // Fires on scroll, resize, and DOM mutations.
@@ -369,6 +370,40 @@
             if (this.enabled) await this.enable();
             else this.disable();
             return this.enabled;
+        }
+
+        // ── Debug: Compute Texture Dump ──────────────────────────────
+        // Requested by batch capture scripts to extract raw compute texture.
+        // Responds with RGBA8 Uint8Array + dimensions via IPC.
+        _setupComputeTextureDump() {
+            ipcRenderer.on('debug:dump-compute-texture', async () => {
+                if (!this.webgpuCompute) {
+                    ipcRenderer.send('debug:compute-texture-data', { error: 'no compute pipeline' });
+                    return;
+                }
+                try {
+                    // Detect pipeline type by checking which readback method exists
+                    const isPyramid = typeof this.webgpuCompute.readbackOutput === 'function';
+                    const data = isPyramid
+                        ? await this.webgpuCompute.readbackOutput()
+                        : await this.webgpuCompute.readback();
+                    if (!data) {
+                        ipcRenderer.send('debug:compute-texture-data', { error: 'readback returned null' });
+                        return;
+                    }
+                    const w = this.webgpuCompute.width;
+                    const h = this.webgpuCompute.height;
+                    const tier = this.renderer?.config.compute_tier || 0;
+                    ipcRenderer.send('debug:compute-texture-data', {
+                        data: Buffer.from(data.buffer),
+                        width: w,
+                        height: h,
+                        tier,
+                    });
+                } catch (e) {
+                    ipcRenderer.send('debug:compute-texture-data', { error: e.message });
+                }
+            });
         }
 
         // ── Resize ───────────────────────────────────────────────────
@@ -615,7 +650,7 @@
                             halfFovea,
                             2  // synthesis iterations
                         );
-                    } else {
+                    } else if (typeof this.webgpuCompute.uploadAndConfigure === 'function') {
                         // Tier 2.5: Original crowding compute
                         const foveaDeg = 1.0;
                         const halfDiag = Math.sqrt(halfW * halfW + halfH * halfH) / 2;
@@ -648,9 +683,11 @@
                     this._lastSynthGazeY = gazeFrameY / 2;
                     this._metamerInitialized = true;
 
-                    // Async readback — non-blocking, result arrives next frame
+                    // Async readback — non-blocking, result arrives next frame.
+                    // Detect pipeline type dynamically to handle mode-switch races.
                     const cw = this.canvas.width, ch = this.canvas.height;
-                    const readbackFn = usePyramid
+                    const isPyramidCompute = typeof this.webgpuCompute.readbackOutput === 'function';
+                    const readbackFn = isPyramidCompute
                         ? this.webgpuCompute.readbackOutput()
                         : this.webgpuCompute.readback();
                     readbackFn.then((data) => {
