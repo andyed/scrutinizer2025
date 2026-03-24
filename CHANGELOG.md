@@ -2,6 +2,8 @@
 
 ## [2.6.0] - 2026-03-19
 
+**Blog post:** [Isotropic Cortical Sampling](https://andyed.github.io/scrutinizer-www/blog/2026-03-21-v2.6.html) | [Release notes](docs/release_notes_v2.6.0.md)
+
 ### Added
 - **FOVI Cortical Grid (Mode 12, Default)**: Isotropic cortical sampling from Blauch, Alvarez & Konkle (2026, arxiv:2602.03766) is now the default mode. Sector geometry derived from `w = log(r + a)` parameterizes the displacement pipeline — noise frequency scales inversely with sector extent, scramble cell size tracks sector extent (capped at 16px, floor 8px). Sector geometry drives *transition rate*, not rendering mechanism. 19-test geometry suite validates math against Blauch's Python to 3 decimal places.
 - **Bender/Cutter Extraction**: V1 displacement components extracted as parameterized GLSL structs (`BenderConfig`, `CutterConfig`) with `applyBender()` and `applyCutter()` functions. Researchers can swap implementations by constructing different configs. Type 1 (Shredder) refactored to use extracted functions — behavior-identical.
