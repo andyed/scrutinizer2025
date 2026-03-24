@@ -1,6 +1,7 @@
 # Scrutinizer v2.6.0 — Isotropic Cortical Sampling
 
 **Date:** 2026-03-19
+**Previous:** [v2.5.0 release notes](release_notes_v2.5.0.md)
 **Blog post:** [Isotropic Cortical Sampling](https://andyed.github.io/scrutinizer-www/blog/2026-03-21-v2.6.html)
 
 Scrutinizer's default mode now derives its peripheral distortion profile from the FOVI cortical magnification model (Blauch, Alvarez & Konkle 2026). Seven rendering approaches failed before the eighth succeeded: sector geometry drives *where and how fast* degradation changes — not how pixels change.
@@ -24,9 +25,9 @@ V1 displacement components extracted as parameterized GLSL structs (`BenderConfi
 
 DoG band reconstruction artifacts on smooth gradients ("the halo") eliminated via smooth-content detection. When `pooledCol ≈ foveaCol`, the pipeline snaps to the source color — no Mach bands to amplify. V4 transitions restored to pixel-space.
 
-### Citation Audit
+### Citation Audit (Science Agent)
 
-AI-confabulated paper titles, authors, and article numbers corrected across 8 files. Findings: 12% of BibTeX entries had issues, 1 complete fabrication, 5 partial confabulations. [citation-guardian](https://github.com/andyed/citation-guardian) tool built to detect this class of error.
+AI-confabulated paper titles, authors, and article numbers corrected across 8 files using the [science agent](./../.claude/agents/science-agent.md) — a specialized Claude Code subagent that validates citations against CrossRef and BibTeX, detects confabulated titles/authors/DOIs, and flags cross-file inconsistencies. Findings: 12% of BibTeX entries had issues, 1 complete fabrication, 5 partial confabulations. [citation-guardian](https://github.com/andyed/citation-guardian) tool built to detect this class of error.
 
 ## New Files
 
