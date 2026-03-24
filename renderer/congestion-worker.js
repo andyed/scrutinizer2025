@@ -176,11 +176,78 @@ self.onmessage = function (e) {
     const congestionStats = computeStats(norm_congestion, width, height);
     const edgeDensityStats = computeStats(norm_edgeDensity, width, height);
 
-    // ── Pack into ImageData: R=congestion, G=edgeDensity, B=0, A=255 ─
+    // ── Peripheral congestion (128px, σ=5.0) ─────────────────────────
+    // Eccentricity-weighted: coarser spatial scale matching how the visual
+    // system pools features at increasing eccentricity. Packed into B channel.
+    const PERIPH_MAX_DIM = 128;
+    const periphScale = Math.min(1.0, PERIPH_MAX_DIM / Math.max(width, height));
+    const pW = Math.max(1, Math.floor(width * periphScale));
+    const pH = Math.max(1, Math.floor(height * periphScale));
+    const pLen = pW * pH;
+
+    // Downscale Oklab channels to peripheral resolution via box filter
+    const pI = new Float32Array(pLen);
+    const pRG = new Float32Array(pLen);
+    const pBY = new Float32Array(pLen);
+
+    for (let py = 0; py < pH; py++) {
+        for (let px = 0; px < pW; px++) {
+            // Map peripheral pixel to source region
+            const sx0 = Math.floor(px / periphScale);
+            const sy0 = Math.floor(py / periphScale);
+            const sx1 = Math.min(width - 1, Math.floor((px + 1) / periphScale));
+            const sy1 = Math.min(height - 1, Math.floor((py + 1) / periphScale));
+            let sumI = 0, sumRG = 0, sumBY = 0, count = 0;
+            for (let sy = sy0; sy <= sy1; sy++) {
+                for (let sx = sx0; sx <= sx1; sx++) {
+                    const si = sy * width + sx;
+                    sumI += I[si]; sumRG += RG[si]; sumBY += BY[si];
+                    count++;
+                }
+            }
+            const pi = py * pW + px;
+            pI[pi] = sumI / count;
+            pRG[pi] = sumRG / count;
+            pBY[pi] = sumBY / count;
+        }
+    }
+
+    // Compute local variance at wider σ=5.0 (peripheral pooling scale)
+    const pTmp1 = new Float32Array(pLen);
+    const pTmp2 = new Float32Array(pLen);
+    const pVar_I = computeLocalVariance(pI, pW, pH, 5.0, pTmp1, pTmp2);
+    const pVar_RG = computeLocalVariance(pRG, pW, pH, 5.0, pTmp1, pTmp2);
+    const pVar_BY = computeLocalVariance(pBY, pW, pH, 5.0, pTmp1, pTmp2);
+
+    const periphCong = new Float32Array(pLen);
+    for (let i = 0; i < pLen; i++) {
+        periphCong[i] = pVar_I[i] + pVar_RG[i] + pVar_BY[i];
+    }
+    const norm_periphCong = normalizeFeature(periphCong);
+
+    // Upscale peripheral congestion back to full output resolution (bilinear)
+    const periphUpscaled = new Float32Array(len);
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const sx = (x / width) * pW;
+            const sy = (y / height) * pH;
+            const x0 = Math.floor(sx), y0 = Math.floor(sy);
+            const x1 = Math.min(x0 + 1, pW - 1);
+            const y1 = Math.min(y0 + 1, pH - 1);
+            const fx = sx - x0, fy = sy - y0;
+            periphUpscaled[y * width + x] =
+                norm_periphCong[y0 * pW + x0] * (1 - fx) * (1 - fy) +
+                norm_periphCong[y0 * pW + x1] * fx * (1 - fy) +
+                norm_periphCong[y1 * pW + x0] * (1 - fx) * fy +
+                norm_periphCong[y1 * pW + x1] * fx * fy;
+        }
+    }
+
+    // ── Pack into ImageData: R=congestion, G=edgeDensity, B=periphCong, A=255
     for (let i = 0; i < len; i++) {
         pixels[i * 4]     = Math.floor(Math.max(0, Math.min(1, norm_congestion[i])) * 255);
         pixels[i * 4 + 1] = Math.floor(Math.max(0, Math.min(1, norm_edgeDensity[i])) * 255);
-        pixels[i * 4 + 2] = 0;
+        pixels[i * 4 + 2] = Math.floor(Math.max(0, Math.min(1, periphUpscaled[i])) * 255);
         pixels[i * 4 + 3] = 255;
     }
 

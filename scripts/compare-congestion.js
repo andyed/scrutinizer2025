@@ -220,20 +220,25 @@ function main() {
         const sc = scByName[name];
 
         pyScalars.push(py.scalar);
-        scMeans.push(sc.mean);
+        // Scrutinizer results may nest congestion stats under .congestion or at top level
+        const scMean = sc.mean ?? sc.congestion?.mean;
+        const scP90 = sc.p90 ?? sc.congestion?.p90;
+        scMeans.push(scMean);
 
         const entry = {
             name,
             source: py.source,
             python: { scalar: py.scalar, mean: py.mean, p90: py.p90 },
-            scrutinizer: { mean: sc.mean, p90: sc.p90 },
+            scrutinizer: { mean: scMean, p90: scP90 },
         };
 
         // Try heatmap SSIM
-        const pyMapPath = path.join(PYTHON_MAPS, py.mapFile);
-        const scMapPath = path.join(SCRUTINIZER_MAPS, sc.mapFile);
+        const pyMapFile = py.mapFile || py.congestionMapFile;
+        const scMapFile = sc.mapFile || sc.congestionMapFile;
+        const pyMapPath = pyMapFile ? path.join(PYTHON_MAPS, pyMapFile) : null;
+        const scMapPath = scMapFile ? path.join(SCRUTINIZER_MAPS, scMapFile) : null;
 
-        if (fs.existsSync(pyMapPath) && fs.existsSync(scMapPath)) {
+        if (pyMapPath && scMapPath && fs.existsSync(pyMapPath) && fs.existsSync(scMapPath)) {
             try {
                 const pyMap = loadGrayscalePng(pyMapPath);
                 const scMap = loadGrayscalePng(scMapPath);

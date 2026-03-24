@@ -14,6 +14,7 @@ Scrutinizer's rendering pipeline implements three decades of visual psychophysic
 | [3](#wave-3-crowding-geometry) | Crowding Geometry | Bouma 1970, Toet & Levi 1992, Pelli & Tillman 2008 | 5/7 + Bouma step | [spec](../docs/specs/wave3_crowding_validation.md) |
 | [4](#wave-4-saliency-validation) | Saliency & Protection | Itti & Koch 2001, Rosenholtz 2007 (Feature Congestion) | 4A: 6+1 INFO · 4B: 5/5 | [stimulus](https://andyed.github.io/scrutinizer-www/reference-pages/saliency-popout.html) |
 | [6](#wave-6-coco-periph-peripheral-encoding) | System-Level Encoding | Harrington et al. 2024 (COCO-Periph), Rosenholtz et al. 2012 (TTM) | Pending | [spec](../docs/specs/wave6_coco_periph_validation.md) |
+| [7](#wave-7-pyramid-decomposition--crowding) | Pyramid Decomposition & Crowding | Portilla & Simoncelli 2000, Walton 2021, Bouma 1970 | Scaffolded | [spec](../docs/specs/wave7_pyramid_validation.md) |
 
 ### Tier Structure
 

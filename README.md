@@ -7,7 +7,7 @@
 
 Live site: **[scrutinizer.app](https://andyed.github.io/scrutinizer-www/)** | [Blog](https://andyed.github.io/scrutinizer-www/blog/) | [YouTube](https://www.youtube.com/@scrutinizer-app/playlists)
 
-macOS Installer: **[Download v2.6.0](https://github.com/andyed/scrutinizer2025/releases/tag/v2.6.0)** | [Changelog](CHANGELOG.md)
+macOS Installer: **[Download v2.7.0](https://github.com/andyed/scrutinizer2025/releases/tag/v2.7.0)** | [Changelog](CHANGELOG.md)
 
 ---
 
@@ -59,13 +59,15 @@ Resolution falloff across all stages follows a [cortical magnification function]
 
 ## Features
 
-### Rendering Pipeline (v2.1)
+### Rendering Pipeline (v2.7)
 - **12 half-octave DoG bands** — Difference-of-Gaussians peripheral reconstruction at √2 frequency spacing (5.66–0.088 cpd), validated against Rovamo & Virsu 1979
 - **Foveal/peripheral simulation** — eccentricity-dependent spatial pooling and chromatic filtering bound to cursor position
-- **[Analytical cortical magnification](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html)** — eccentricity falloff using the Schwartz (1980) log-mapping parameterization (mode 6), alongside legacy (mode 7) for comparison
+- **[Isotropic cortical magnification](https://andyed.github.io/scrutinizer-www/blog/2026-03-21-v2.6.html)** — FOVI-derived cortical sectors (Blauch, Alvarez & Konkle 2026) parameterize displacement noise frequency and scramble cell size
 - **[Feature Congestion](https://andyed.github.io/scrutinizer-www/blog/congestion-score.html) pipeline** — real-time visual clutter scoring with ComplexityHUD overlay (Score / Stats / Spatial tabs)
-- **WebGPU peripheral texture synthesis** (Tier 2.5, default) — two-pass tile statistics extraction and oriented noise synthesis via WGSL compute shaders, with auto-fallback safety harness and temporal smoothing. Falls back to MIP blur on hardware without WebGPU.
-- **Congestion-gated pooling** (mode 9) — peripheral attenuation weighted by local visual complexity
+- **Eccentricity-weighted congestion** — two-scale Feature Congestion: foveal (1024px, σ=2.5) and peripheral (128px, σ=5.0), blended by eccentricity. Peripheral clutter is measured at the resolution the visual system can actually resolve there.
+- **Resolution-gated saliency** — acuity decay (Strasburger et al. 2011) scales saliency protection with eccentricity. Features must be proportionally more conspicuous to survive at higher eccentricities. Saliency-aware scramble zone preserves high-saliency content (product images, faces) from aggressive displacement.
+- **WebGPU pyramid synthesis** (Tier 2.75) — 4-scale Laplacian pyramid decomposition with cross-scale magnitude correlation matching via WGSL compute shaders. Falls back to Tier 2.5 (oriented noise) or MIP blur on hardware without WebGPU.
+- **Congestion-gated pooling** — peripheral attenuation weighted by local visual complexity, blending Bouma-scaled edge density with eccentricity-weighted congestion
 - **Saliency modulation** — allocates more peripheral bandwidth to salient regions (edges, contrast, high-importance areas)
 - **Structure map analysis** — reads the live DOM to detect text rhythm, element density, font weight, and semantic type (ARIA roles), feeding the crowding and saliency stages
 - **Visual memory simulation** — iconic memory decay across 5 modes (Off, Limited, Extended, Infinite, Fixation Buffer)
@@ -158,11 +160,11 @@ Full gap analysis: [simulation-limitations.md](docs/simulation-limitations.md).
 
 ## Installation
 
-### Download (v2.3.0)
+### Download (v2.7.0)
 
 > Scrutinizer for macOS is **Signed & Notarized** — no security warnings.
 
-*   **macOS (Apple Silicon):** [**Download Scrutinizer-2.3.0.dmg**](https://github.com/andyed/scrutinizer2025/releases/tag/v2.3.0)
+*   **macOS (Apple Silicon):** [**Download Scrutinizer-2.7.0.dmg**](https://github.com/andyed/scrutinizer2025/releases/tag/v2.7.0)
 *   **Windows:** Manual build required (see [Releases Page](https://github.com/andyed/scrutinizer2025/releases))
 
 [**View All Releases & Changelogs**](https://github.com/andyed/scrutinizer2025/releases)

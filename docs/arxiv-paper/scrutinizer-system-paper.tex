@@ -262,7 +262,7 @@ The pipeline matches published data where mechanisms map cleanly to GPU operatio
 
 \textbf{Design audit.} The \texttt{scrutinizer-audit} CLI tool and MCP server provide batch Feature Congestion scoring without launching the Electron renderer, enabling CI integration. Designers see which elements survive peripheral vision before deployment. \citet{queen2006} showed that desktop icons with distinct low-spatial-frequency silhouettes are identified ${\sim}$0.5\,s faster in a match-to-sample task ($N{=}10$, 20 trial images), but this analysis requires spatial-frequency filtering that most designers lack access to.
 
-\textbf{Research platform.} The five branch points and declarative mode registry make Scrutinizer a platform for perceptual experiments. Researchers can compare frequency-selective filtering against Gaussian blur on reading speed, swap in eye tracker SDKs or scanpath replay, or test how saliency models interact with crowding---all without modifying the core shader.
+\textbf{Research platform.} The five branch points and declarative mode registry make Scrutinizer a platform for perceptual experiments. Researchers can compare frequency-selective filtering against Gaussian blur on reading speed, swap in eye tracker SDKs or scanpath replay, or test how saliency models interact with crowding---all without modifying the core shader. The WebGL pipeline can serve as a jsPsych~\citep{deleeuw2015} extension or complement PsychoPy~\citep{peirce2019} gaze-contingent paradigms, providing the biologically grounded foveation model---cortical magnification, chromatic degradation, crowding---that these frameworks do not include.
 
 \textbf{Education.} Side-by-side comparison modes let users manipulate parameters and see results on their own content.
 
@@ -275,7 +275,7 @@ The pipeline matches published data where mechanisms map cleanly to GPU operatio
 
 \textbf{Gaze-cursor coordination as cognitive signal.} \citet{stone2023} and~\citet{zhu2023} show that the \emph{relationship} between gaze and cursor carries richer signal than either alone---coordination breakdown indicates friction~\citep{stone2023}, and cross-modal attention learns when to trust which input~\citep{zhu2023}. Integrating eye tracking via the gaze-input branch point would let Scrutinizer capture this coordination signal alongside the peripheral rendering, potentially connecting to information foraging models~\citep{pirolli1999} where gaze-cursor divergence may reflect scent evaluation.
 
-\textbf{Experiment framework integration.} mouseview.js~\citep{anwylirvine2021} demonstrated that cursor-directed apertures integrate with jsPsych, PsychoJS, and Gorilla for web-based experiments. Scrutinizer can replace these Gaussian-blur tools with biologically-grounded filtering within the same experiment frameworks, enabling direct comparison of peripheral models on identical stimuli.
+\textbf{Experiment framework integration.} The jsPsych extension described in Section~4 requires packaging the WebGL pipeline as a reusable plugin with calibrated viewing-distance input~\citep{remotecalibrator} and per-frame gaze logging compatible with standard experiment data formats.
 
 % ============================================================
 \section{Conclusion}

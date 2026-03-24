@@ -6,7 +6,7 @@ Known gaps between Scrutinizer's peripheral rendering and biological peripheral 
 
 ## 1. Crowding Is Not Density-Dependent
 
-**Status**: Addressed (v1.9.1) — density-gated crowding sigmoid shipped. Isolated elements now receive reduced V1 distortion (floor 0.3×) while dense content gets full crowding.
+**Status**: Partially addressed (v1.9.1 density gate, v2.7 eccentricity-weighted congestion + saliency-aware scramble). Isolated elements receive reduced V1 distortion (floor 0.3×). Congestion-gated pooling now uses eccentricity-weighted clutter (foveal σ=2.5 vs peripheral σ=5.0) blended with Bouma-scaled edge density. Saliency-aware scramble zone preserves high-saliency content. **Remaining gap**: crowding asymmetry (isolated vs flanked letters) requires summary-statistic pooling (Tier 3), not displacement. Wave 7c validation will test this.
 **Exposed by**: `reference-pages/crowding.html`
 **Severity**: High — crowding is arguably the dominant bottleneck in peripheral object recognition (Pelli & Tillman 2008), more limiting than acuity loss.
 

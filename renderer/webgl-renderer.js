@@ -165,6 +165,7 @@
                     supra_exponent: 0.5, // Threshold→appearance compression (Jiang et al. 2022)
                     show_congestion: 0,  // 0=off, 1=congestion heatmap, 2=saliency vs congestion
                     congestion_pooling: true,
+                    saliency_acuity_e2: 8.0, // Half-sensitivity eccentricity (deg) for saliency gating
                     saccadic_blindness: true,
                     reading_span: true,
                     reading_span_strength: 1.0,
@@ -292,6 +293,9 @@
 
                 // Congestion-gated pooling uniform lookup
                 this.congestionPoolingLocation = gl.getUniformLocation(this.program, "u_congestion_pooling");
+
+                // Resolution-gated saliency: acuity decay (Strasburger et al. 2011)
+                this.saliencyAcuityE2Location = gl.getUniformLocation(this.program, "u_saliency_acuity_e2");
 
                 // Density-gated crowding uniform lookups
                 this.crowdingDensityThresholdLocation = gl.getUniformLocation(this.program, "u_crowding_density_threshold");
@@ -761,7 +765,13 @@
                 gl.activeTexture(gl.TEXTURE5);
                 gl.bindTexture(gl.TEXTURE_2D, this.computeTexture);
                 gl.uniform1i(this.computeTextureLocation, 5);
-                gl.uniform1f(this.computeTierLocation, this._hasComputeData ? this._computeTier : 0.0);
+                // For Tier 3+, always pass the config compute_tier so the shader can
+                // bypass V1 displacement even when compute texture isn't ready yet.
+                // For Tier 2.x, gate on _hasComputeData to avoid sampling empty texture.
+                const effectiveTier = (this.config.compute_tier >= 3.0)
+                    ? this.config.compute_tier
+                    : (this._hasComputeData ? this._computeTier : 0.0);
+                gl.uniform1f(this.computeTierLocation, effectiveTier);
                 gl.uniform2f(this.computeFrameScaleLocation, this._computeFrameScale[0], this._computeFrameScale[1]);
 
                 gl.uniform2f(this.resolutionLocation, width, height);
@@ -844,6 +854,7 @@
                 gl.uniform1f(this.readingSpanLocation, this.config.reading_span ? 1.0 : 0.0);
                 gl.uniform1f(this.readingSpanStrengthLocation, this.config.reading_span_strength);
                 gl.uniform1f(this.congestionPoolingLocation, this.config.congestion_pooling ? 1.0 : 0.0);
+                gl.uniform1f(this.saliencyAcuityE2Location, this.config.saliency_acuity_e2 ?? 8.0);
                 gl.uniform1f(this.crowdingDensityThresholdLocation, this.config.crowding_density_threshold ?? 0.3);
                 gl.uniform1f(this.crowdingDensitySteepnessLocation, this.config.crowding_density_steepness ?? 20.0);
 

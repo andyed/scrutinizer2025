@@ -1,6 +1,6 @@
 # Scrutinizer Roadmap
 
-Last updated: 2026-03-21 (v2.6)
+Last updated: 2026-03-22 (v2.7)
 
 ## What's implemented
 
@@ -19,6 +19,9 @@ Scrutinizer is a Restricted Focus Viewer that replaces Gaussian blur with a biol
 | CMF geometry | Isotropic cortical sectors (FOVI) | Blauch, Alvarez & Konkle 2026 | v2.6 |
 | Reading span | Asymmetric foveal envelope | Rayner 1998 | v2.4 |
 | Saliency | Oklab DoG + face detection + DOM structure | Itti et al. 2001 | v1.7 |
+| Acuity-gated saliency | Resolution-dependent protection decay | Strasburger et al. 2011 | v2.7 |
+| Eccentricity congestion | Two-scale Feature Congestion (foveal + peripheral) | Rosenholtz 2007, Pelli & Tillman 2008 | v2.7 |
+| Pyramid synthesis | Laplacian pyramid + cross-scale correlations (Tier 2.75) | Portilla & Simoncelli 2000, Walton 2021 | v2.7 |
 
 ### What the pipeline preserves vs Gaussian blur
 

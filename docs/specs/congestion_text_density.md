@@ -1,10 +1,11 @@
 # Congestion Gate: Text Density Enhancement
 
-> **Last updated:** 2026-03-08
+> **Last updated:** 2026-03-22
 
-**Status:** Spec (v2.2 target)
+**Status:** Shipped (v2.7) — eccentricity-weighted congestion + Bouma-scaled edge density
 **Depends on:** Wave 5 Halverson findings (v2.1)
-**Goal:** Graduate Mode 9 (Congestion-Gated Pooling) from experimental to default
+**Original goal:** Graduate Mode 9 (Congestion-Gated Pooling) from experimental to default
+**Resolution:** Implemented via Option C (hybrid precomputed texture) with eccentricity weighting. See [eccentricity_weighted_congestion.md](eccentricity_weighted_congestion.md) for the v2.7 implementation.
 
 ## Problem
 
@@ -30,7 +31,19 @@ Halverson's TEE model defines density by **nearest-neighbor distance** between t
 
 This is not visual complexity (Feature Congestion). It's spatial packing of discrete readable elements. The biological basis: crowding in peripheral vision scales with the number of items competing for the same pooling region, not with the visual richness of those items.
 
-## Proposed approaches
+## v2.7 Implementation
+
+The shipped solution combines Option C (precomputed edge density texture) with eccentricity weighting:
+
+1. **Two-scale Feature Congestion**: Foveal (1024px, σ=2.5) in R channel, peripheral (128px, σ=5.0) in B channel of congestion map texture.
+2. **Bouma-scaled edge density**: Existing G channel sampled at MIP level matching Bouma's critical spacing (0.5× eccentricity).
+3. **Shader blend**: `sampleEccentricityCongestion()` interpolates between foveal and peripheral congestion via `smoothstep(3°, 8°, ecc)`.
+4. **Congestion pooling gate**: 50/50 blend of Bouma edge density + eccentricity congestion modulates `coupledEccentricity`.
+5. **Resolution-gated saliency**: Acuity decay (`1/(1+ecc/E2)`, E2=8.0°) prevents over-protection of far-peripheral content.
+
+Validation: Spearman ρ=0.72 against Rosenholtz MIT reference (R channel unchanged).
+
+## Historical: Proposed approaches
 
 ### Option A: Pixel-level edge density in shader (preferred)
 

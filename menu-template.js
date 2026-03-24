@@ -599,6 +599,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             type: 'radio',
                             checked: currentAestheticMode === 14,
                             click: () => { sendToOverlays('menu:set-aesthetic-mode', 14); app.emit('aesthetic-mode-changed', 14); }
+                        },
+                        {
+                            label: 'TTM Synthesis (Tier 3)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 15,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 15); app.emit('aesthetic-mode-changed', 15); }
                         }
                     ]
                 },

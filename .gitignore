@@ -35,6 +35,12 @@ tests/validation/results-*/
 tests/golden-captures/
 tests/smoke-captures/
 
+# Compute texture captures — raw RGBA dumps, regenerate with capture-compute-texture.js
+tests/compute-captures/
+
+# Pyramid validation reference data — regenerate with generate-pyramid-reference.py
+tests/validation/pyramid-reference/
+
 # Isotropic comparison captures — bulk PNGs, regenerate with capture-isotropic-comparison.js
 docs/golden/isotropic-comparison/
 
@@ -57,6 +63,9 @@ docs/arxiv-paper/*.aux
 docs/arxiv-paper/*.bbl
 docs/arxiv-paper/*.blg
 docs/arxiv-paper/*.out
+
+# Claude Code session data
+.claude/
 
 build/certs/
 build_error.txt
