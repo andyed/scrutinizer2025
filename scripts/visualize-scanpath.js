@@ -37,11 +37,12 @@ const ROOT = path.join(__dirname, '..');
 const dir = path.resolve(getArg('dir', path.join(ROOT, 'output', 'scanpath-replay')));
 const doDiagram = hasFlag('diagram') || hasFlag('both');
 const doAnimate = hasFlag('animate') || hasFlag('both');
+const doGazeplot = hasFlag('gazeplot-diagram');
 const animFormat = getArg('format', 'gif');
 const animScale = parseInt(getArg('scale', '2'));
 
-if (!doDiagram && !doAnimate) {
-    console.error('Usage: node scripts/visualize-scanpath.js --diagram|--animate|--both');
+if (!doDiagram && !doAnimate && !doGazeplot) {
+    console.error('Usage: node scripts/visualize-scanpath.js --diagram|--animate|--both|--gazeplot-diagram');
     process.exit(1);
 }
 
@@ -64,22 +65,9 @@ console.log(`  Task:       ${meta.task || 'n/a'}`);
 console.log(`  Subject:    ${meta.subject || 'n/a'}`);
 console.log();
 
-// ── Diagram ─────────────────────────────────────────────────────
+// ── Scanpath overlay (shared by diagram and gazeplot) ───────────
 
-function generateDiagram() {
-    // Load background image
-    const baselinePath = path.join(dir, 'frame_baseline.png');
-    const firstFramePath = path.join(dir, fixations[0].frame);
-    const bgPath = fs.existsSync(baselinePath) ? baselinePath : firstFramePath;
-
-    if (!fs.existsSync(bgPath)) {
-        console.error('  No baseline or frame image found for diagram background.');
-        return false;
-    }
-
-    console.log('  Generating scanpath diagram...');
-    const png = loadPNG(bgPath);
-
+function drawScanpathOverlay(png) {
     // Compute scale factor: fixation coordinates are in display space (e.g. 1680×1050)
     // but the captured PNG may be at a higher resolution (Retina DPR)
     const displayW = meta.display ? meta.display.width : 1680;
@@ -99,14 +87,12 @@ function generateDiagram() {
         const dashLen = Math.round(12 * avgScale);
         const gap = Math.round(8 * avgScale);
         const thick = Math.max(2, Math.round(2 * avgScale));
-        // Top and bottom edges
         for (let x = sbx; x < sbx + sbw; x++) {
             if (Math.floor((x - sbx) / (dashLen + gap)) % 2 === 0) {
                 fillRect(png, x, sby, 1, thick, 0, 200, 100, 180);
                 fillRect(png, x, sby + sbh - thick, 1, thick, 0, 200, 100, 180);
             }
         }
-        // Left and right edges
         for (let y = sby; y < sby + sbh; y++) {
             if (Math.floor((y - sby) / (dashLen + gap)) % 2 === 0) {
                 fillRect(png, sbx, y, thick, 1, 0, 200, 100, 180);
@@ -135,33 +121,61 @@ function generateDiagram() {
         const cy = Math.round(fix.y * scaleY);
         const duration = fix.duration;
 
-        // Radius scales with duration, adjusted for DPR
         const baseRadius = Math.max(14, Math.min(30, 10 + duration / 30));
         const radius = Math.round(baseRadius * avgScale);
 
-        // Color: HSL ramp from red (hue 0) to blue (hue 240) across fixations
-        // Standard temporal coding in eye-tracking literature
-        const hue = fixations.length > 1
-            ? (i / (fixations.length - 1)) * 240
-            : 120;
+        // HSL ramp red→blue (standard temporal coding in eye-tracking literature)
+        const hue = fixations.length > 1 ? (i / (fixations.length - 1)) * 240 : 120;
         const [cr, cg, cb] = hslToRgb(hue, 0.8, 0.45);
 
-        // Filled circle (semi-transparent)
         fillCircle(png, cx, cy, Math.round(radius), cr, cg, cb, 180);
-
-        // White outline
         drawCircle(png, cx, cy, Math.round(radius), 255, 255, 255, 220, Math.max(2, Math.round(2 * avgScale)));
 
-        // Fixation number (1-indexed, centered)
         const label = String(i + 1);
         const tw = textWidth(label, fontScale);
         const th = textHeight(fontScale);
-        const tx = cx - Math.round(tw / 2);
-        const ty = cy - Math.round(th / 2);
-        drawText(png, label, tx, ty, fontScale, 255, 255, 255);
+        drawText(png, label, cx - Math.round(tw / 2), cy - Math.round(th / 2), fontScale, 255, 255, 255);
+    }
+}
+
+// ── Diagram ─────────────────────────────────────────────────────
+
+function generateDiagram() {
+    const baselinePath = path.join(dir, 'frame_baseline.png');
+    const firstFramePath = path.join(dir, fixations[0].frame);
+    const bgPath = fs.existsSync(baselinePath) ? baselinePath : firstFramePath;
+
+    if (!fs.existsSync(bgPath)) {
+        console.error('  No baseline or frame image found for diagram background.');
+        return false;
     }
 
+    console.log('  Generating scanpath diagram...');
+    const png = loadPNG(bgPath);
+    drawScanpathOverlay(png);
+
     const outPath = path.join(dir, 'scanpath-diagram.png');
+    savePNG(outPath, png);
+    console.log(`  → ${outPath}`);
+    return true;
+}
+
+// ── Animation ───────────────────────────────────────────────────
+
+// ── Gazeplot diagram ────────────────────────────────────────────
+
+function generateGazeplotDiagram() {
+    const gazeplotPath = path.join(dir, 'gazeplot.png');
+    if (!fs.existsSync(gazeplotPath)) {
+        console.error('  No gazeplot.png found. Run replay-scanpath.js --demo --gazeplot first.');
+        return false;
+    }
+
+    console.log('  Generating gazeplot diagram (visual memory + scanpath overlay)...');
+    const png = loadPNG(gazeplotPath);
+    drawScanpathOverlay(png);
+
+    const outPath = path.join(dir, 'gazeplot-diagram.png');
     savePNG(outPath, png);
     console.log(`  → ${outPath}`);
     return true;
@@ -257,6 +271,7 @@ function generateAnimation() {
 
 async function main() {
     if (doDiagram) generateDiagram();
+    if (doGazeplot) generateGazeplotDiagram();
     if (doAnimate) await generateAnimation();
     console.log('\n  Done.');
 }
