@@ -1252,15 +1252,28 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     float smoothContent = 1.0 - smoothstep(0.01, 0.05, colorDelta);
     pooledCol = mix(pooledCol, foveaCol, smoothContent);
 
-    // Blur blend: ramp from fovea edge across parafovea.
-    // Gradual blend lets per-band castleCSF chromatic decay produce a visible
-    // color gradient on large surfaces (red wall → progressive desaturation).
-    // Previous tight range (0 to 0.5× fovea) snapped to full pooled in ~0.5°,
-    // making all peripheral content uniformly desaturated.
+    // Luminance/chrominance split blend.
+    // Chromatic sensitivity decays faster than spatial resolution with eccentricity
+    // (Mullen 1991; Hansen et al. 2009). Uniform foveal bleed-through compresses
+    // the castleCSF per-band gradient (red wall reads as flat purple instead of
+    // progressive desaturation). Splitting the blend in Oklab lets chrominance
+    // reach full pooled strength earlier while luminance retains gentle bleed
+    // that masks MIP box-filter artifacts at the fovea boundary.
     float baseBlend = smoothstep(0.0, fovea_radius * 2.0, eccentricity);
-    float blendFactor = baseBlend * u_intensity;
+    float lumaBlend = baseBlend * u_intensity;
+    // pow(0.5) reshapes the intensity slider: at 0.6 → 0.77 chroma blend,
+    // reducing foveal chrominance bleed from 40% to 23%. At 1.0, both converge.
+    // Balances gradient visibility against over-blue-shift from YV persistence.
+    float chromaBlend = baseBlend * pow(max(u_intensity, 0.001), 0.5);
 
-    vec3 col = mix(foveaCol, pooledCol, blendFactor);
+    vec3 foveaLab = rgbToOklab(foveaCol);
+    vec3 pooledLab = rgbToOklab(pooledCol);
+    vec3 blendedLab = vec3(
+        mix(foveaLab.x, pooledLab.x, lumaBlend),   // L: gentle transition
+        mix(foveaLab.y, pooledLab.y, chromaBlend),  // a (RG): follows chromatic curve
+        mix(foveaLab.z, pooledLab.z, chromaBlend)   // b (YV): follows chromatic curve
+    );
+    vec3 col = oklabToRgb(blendedLab);
     
     // === MAGNOCELLULAR PATHWAY: Luminance Contrast Preservation ===
     if (eccentricity > 0.001) {
