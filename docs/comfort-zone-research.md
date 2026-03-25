@@ -28,20 +28,22 @@ The anatomical fovea is ~1° radius. But nobody perceives a 1° clear zone — f
 | **Comfort** | 2-3° (~90-135px) | Design review, collaborative assessment | None or very mild |
 | **Periphery** | 3°+ | Full simulation | Progressive degradation |
 
-## Implementation
+## Implementation (v2.7.1)
 
-New parameter: `comfortRadius` (or expose via "Design Review" mode preset)
+Comfort Mode is a checkbox toggle in **Simulation > Behavior**, right after Visual Memory.
 
+**Approach: shader distance offset.** A new uniform `u_comfort_radius` subtracts a dead zone from the pixel-to-gaze distance before it enters the LGN/V1/V4 pipeline. Pixels within the comfort radius see `dist=0` (eccentricity zero, no degradation). Beyond it, normal eccentricity-based calculations resume.
+
+```glsl
+dist = max(0.0, dist - u_comfort_radius);
+dist_stable = max(0.0, dist_stable - u_comfort_radius);
 ```
-comfortRadius = fovealRadius * comfortMultiplier
-```
 
-Where `comfortMultiplier`:
-- **Research mode**: 1.0 (degradation starts at fovea edge — strict biological accuracy)
-- **Design review mode**: 2.5-3.0 (comfortable assessment of layout relationships)
-- **Reading mode**: asymmetric — 1.3° left, 5° right (matches perceptual span)
+This preserves `fovealRadius` as the pixels-per-degree converter (used by CMF, DoG bands, Bouma crowding, reading span). The dead zone is purely spatial suppression — which is what microsaccades provide biologically.
 
-The existing `blend_start` parameter in the pyramid synthesis already controls where degradation begins. Setting `blend_start = comfortRadius` implements this without shader changes.
+**Visual indicator:** A subtle dashed SVG ring (#66ddaa, opacity 0.3) at the original 1° fovea boundary, visible when Comfort Mode is on. Marks the microsaccade sweet spot within the enlarged clear zone.
+
+**Comfort radius = fovealRadius / canvas.height** (normalized screen units = +1° dead zone at default calibration).
 
 ## Scientific basis
 
