@@ -16,7 +16,7 @@ macOS Installer: **[Download v2.7.0](https://github.com/andyed/scrutinizer2025/r
 Your eyes only see fine detail right where you're looking — everything else is blurry, color-shifted, and crowded. Scrutinizer simulates this, rendering any web page through a model of how human vision actually works, bound to your mouse cursor. Move the cursor and watch the rest of the page degrade the way your peripheral vision does. The question it answers: what can a user actually see at a glance, before their eyes move?
 
 > [!TIP]
-> **For usability practitioners:** Scrutinizer works as a [Restricted Focus Viewer](https://pubmed.ncbi.nlm.nih.gov/12723780/) — evaluate peripheral discoverability, color reliance, and layout hierarchy without eye tracking hardware. See the [Getting Started guide](docs/tutorials/getting-started-rfv.md) for setup, calibration, and running design review sessions.
+> **For usability practitioners:** Scrutinizer works as a [Restricted Focus Viewer](https://pubmed.ncbi.nlm.nih.gov/12723780/) (Jansen et al. 2003) — evaluate peripheral discoverability, color reliance, and layout hierarchy without eye tracking hardware. See the [Getting Started guide](docs/tutorials/getting-started-rfv.md) for setup, calibration, and running design review sessions.
 
 ![Dashboard with foveated rendering](screenshots/v25_dashboard_overlay.png)
 
