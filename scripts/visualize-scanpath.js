@@ -80,48 +80,64 @@ function generateDiagram() {
     console.log('  Generating scanpath diagram...');
     const png = loadPNG(bgPath);
 
+    // Compute scale factor: fixation coordinates are in display space (e.g. 1680×1050)
+    // but the captured PNG may be at a higher resolution (Retina DPR)
+    const displayW = meta.display ? meta.display.width : 1680;
+    const displayH = meta.display ? meta.display.height : 1050;
+    const scaleX = png.width / displayW;
+    const scaleY = png.height / displayH;
+    const avgScale = (scaleX + scaleY) / 2;
+    console.log(`  Display: ${displayW}×${displayH}, Capture: ${png.width}×${png.height}, Scale: ${scaleX.toFixed(2)}×${scaleY.toFixed(2)}`);
+
     // Draw target bbox if present (dashed green rectangle)
     if (meta.bbox) {
         const [bx, by, bw, bh] = meta.bbox;
-        const dashLen = 8;
-        const gap = 6;
+        const sbx = Math.round(bx * scaleX);
+        const sby = Math.round(by * scaleY);
+        const sbw = Math.round(bw * scaleX);
+        const sbh = Math.round(bh * scaleY);
+        const dashLen = Math.round(12 * avgScale);
+        const gap = Math.round(8 * avgScale);
+        const thick = Math.max(2, Math.round(2 * avgScale));
         // Top and bottom edges
-        for (let x = bx; x < bx + bw; x++) {
-            if (Math.floor((x - bx) / (dashLen + gap)) % 2 === 0) {
-                fillRect(png, x, by, 1, 2, 0, 200, 100, 180);
-                fillRect(png, x, by + bh - 2, 1, 2, 0, 200, 100, 180);
+        for (let x = sbx; x < sbx + sbw; x++) {
+            if (Math.floor((x - sbx) / (dashLen + gap)) % 2 === 0) {
+                fillRect(png, x, sby, 1, thick, 0, 200, 100, 180);
+                fillRect(png, x, sby + sbh - thick, 1, thick, 0, 200, 100, 180);
             }
         }
         // Left and right edges
-        for (let y = by; y < by + bh; y++) {
-            if (Math.floor((y - by) / (dashLen + gap)) % 2 === 0) {
-                fillRect(png, bx, y, 2, 1, 0, 200, 100, 180);
-                fillRect(png, bx + bw - 2, y, 2, 1, 0, 200, 100, 180);
+        for (let y = sby; y < sby + sbh; y++) {
+            if (Math.floor((y - sby) / (dashLen + gap)) % 2 === 0) {
+                fillRect(png, sbx, y, thick, 1, 0, 200, 100, 180);
+                fillRect(png, sbx + sbw - thick, y, thick, 1, 0, 200, 100, 180);
             }
         }
     }
 
     // Draw saccade lines (behind circles)
+    const lineThick = Math.max(2, Math.round(3 * avgScale));
     for (let i = 0; i < fixations.length - 1; i++) {
         const f0 = fixations[i];
         const f1 = fixations[i + 1];
         drawLine(png,
-            Math.round(f0.x), Math.round(f0.y),
-            Math.round(f1.x), Math.round(f1.y),
-            255, 255, 255, 160, 2
+            Math.round(f0.x * scaleX), Math.round(f0.y * scaleY),
+            Math.round(f1.x * scaleX), Math.round(f1.y * scaleY),
+            255, 255, 255, 160, lineThick
         );
     }
 
     // Draw fixation circles
-    const fontScale = 2;
+    const fontScale = Math.max(2, Math.round(3 * avgScale));
     for (let i = 0; i < fixations.length; i++) {
         const fix = fixations[i];
-        const cx = Math.round(fix.x);
-        const cy = Math.round(fix.y);
+        const cx = Math.round(fix.x * scaleX);
+        const cy = Math.round(fix.y * scaleY);
         const duration = fix.duration;
 
-        // Radius scales with duration (14-30px range)
-        const radius = Math.max(14, Math.min(30, 10 + duration / 30));
+        // Radius scales with duration, adjusted for DPR
+        const baseRadius = Math.max(14, Math.min(30, 10 + duration / 30));
+        const radius = Math.round(baseRadius * avgScale);
 
         // Color: HSL ramp from red (hue 0) to blue (hue 240) across fixations
         // Standard temporal coding in eye-tracking literature
@@ -134,7 +150,7 @@ function generateDiagram() {
         fillCircle(png, cx, cy, Math.round(radius), cr, cg, cb, 180);
 
         // White outline
-        drawCircle(png, cx, cy, Math.round(radius), 255, 255, 255, 220, 2);
+        drawCircle(png, cx, cy, Math.round(radius), 255, 255, 255, 220, Math.max(2, Math.round(2 * avgScale)));
 
         // Fixation number (1-indexed, centered)
         const label = String(i + 1);

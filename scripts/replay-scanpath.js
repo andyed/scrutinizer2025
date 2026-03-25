@@ -138,8 +138,9 @@ function generateStimulusPage(imagePath) {
     overflow: hidden;
   }
   img {
-    max-width: ${captureWidth}px;
-    max-height: ${captureHeight}px;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
     image-rendering: auto;
   }
 </style>
