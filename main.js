@@ -1800,19 +1800,51 @@ function runIntegrationTest() {
                                         const screenY = wb.y + normY * th;
                                         const duration = fix.tEnd - fix.tStart;
 
-                                        mainWindow.scrutinizerHud.webContents.send('browser:mousemove', screenX, screenY, 1.0);
+                                        // Rapidly send position to converge GazeModel smoothing.
+                                        // GazeModel uses exponential lerp (maskSmoothness=0.4), so multiple
+                                        // sends at the same position accelerate convergence and drop velocity.
+                                        for (let pulse = 0; pulse < 10; pulse++) {
+                                            mainWindow.scrutinizerHud.webContents.send('browser:mousemove', screenX, screenY, 1.0);
+                                            await new Promise(resolve => setTimeout(resolve, 16)); // ~60fps
+                                        }
 
-                                        // Dwell at fixation for its recorded duration (min 100ms for render)
-                                        const dwellMs = Math.max(100, duration);
+                                        // Now dwell — velocity should be near zero, visual memory can register.
+                                        // Need dwellTimeThreshold (150ms) of low velocity to record fixation.
+                                        const dwellMs = Math.max(500, duration);
                                         await new Promise(resolve => setTimeout(resolve, dwellMs));
 
-                                        if (fi === 0 || fi === fixations.length - 1) {
-                                            console.log(`[Test]   Fix ${fi + 1}/${fixations.length}: (${normX.toFixed(3)}, ${normY.toFixed(3)}) ${duration}ms`);
-                                        }
+                                        // Query visual memory buffer size for debugging
+                                        let vmSize = '?';
+                                        try {
+                                            vmSize = await mainWindow.scrutinizerHud.webContents.executeJavaScript(
+                                                `window._scrutinizer && window._scrutinizer.visualMemory ? window._scrutinizer.visualMemory.buffer.length : -1`
+                                            );
+                                        } catch (e) {}
+                                        console.log(`[Test]   Fix ${fi + 1}/${fixations.length}: (${normX.toFixed(3)}, ${normY.toFixed(3)}) ${duration}ms dwell=${dwellMs}ms vm_buf=${vmSize}`);
                                     }
 
-                                    // Extra settle time for final visual memory accumulation
-                                    await new Promise(resolve => setTimeout(resolve, 500));
+                                    // Extra settle time for final visual memory render
+                                    await new Promise(resolve => setTimeout(resolve, 300));
+
+                                    // Debug: dump visual memory state at capture time
+                                    try {
+                                        const vmDebug = await mainWindow.scrutinizerHud.webContents.executeJavaScript(`
+                                            (() => {
+                                                const s = window._scrutinizer;
+                                                const vm = s && s.visualMemory;
+                                                if (!vm) return 'no visual memory';
+                                                return JSON.stringify({
+                                                    limit: vm.limit,
+                                                    isActive: vm.isActive(),
+                                                    bufferLen: vm.buffer.length,
+                                                    maskSize: vm.maskCanvas ? vm.maskCanvas.width + 'x' + vm.maskCanvas.height : 'none',
+                                                    enabled: s.enabled,
+                                                    points: vm.buffer.map(p => ({x: Math.round(p.x), y: Math.round(p.y), r: Math.round(p.radius)}))
+                                                });
+                                            })()
+                                        `);
+                                        console.log(`[Test] VM state at capture: ${vmDebug}`);
+                                    } catch (e) { console.log(`[Test] VM debug error: ${e.message}`); }
                                     console.log(`[Test] Scanpath replay complete — capturing accumulated state`);
                                 }
                             }

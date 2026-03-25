@@ -178,11 +178,14 @@
                 this.buffer[existingIndex].y = mouseY;
                 this.buffer[existingIndex].timestamp = now;
             } else {
-                // Add new fixation point
+                // Add new fixation point.
+                // Memory radius extends to parafovea (~2.5× foveal radius) because
+                // fixations retain information from the full useful field, not just
+                // the foveal peak. This matches the perceptual span during scene viewing.
                 this.buffer.push({
                     x: mouseX,
                     y: mouseY,
-                    radius: fovealRadius,
+                    radius: fovealRadius * 2.5,
                     timestamp: now
                 });
 
