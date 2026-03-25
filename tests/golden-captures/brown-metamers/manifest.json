@@ -12,8 +12,8 @@
       "gaze": [0.5, 0.5],
       "raw": "../raw/dashboard_center_raw.png",
       "brown": "dashboard_center_brown.png",
-      "scrutinizer_mode0": "v2.3/dashboard_center.png",
-      "scrutinizer_mode10": null
+      "scrutinizer_mode0": "v2.7/dashboard_center.png",
+      "scrutinizer_mode10": "v2.7/dashboard_center_mode10_texture_synth.png"
     },
     {
       "page": "article",
@@ -21,8 +21,8 @@
       "gaze": [0.5, 0.5],
       "raw": "../raw/article_center_raw.png",
       "brown": "article_center_brown.png",
-      "scrutinizer_mode0": "v2.3/article_center.png",
-      "scrutinizer_mode10": null
+      "scrutinizer_mode0": "v2.7/article_center.png",
+      "scrutinizer_mode10": "v2.7/article_center_mode10_texture_synth.png"
     },
     {
       "page": "ecommerce",
@@ -30,7 +30,7 @@
       "gaze": [0.5, 0.5],
       "raw": "../raw/ecommerce_center_raw.png",
       "brown": "ecommerce_center_brown.png",
-      "scrutinizer_mode0": null,
+      "scrutinizer_mode0": "v2.7/ecommerce_product_image.png",
       "scrutinizer_mode10": null
     },
     {
@@ -39,7 +39,7 @@
       "gaze": [0.5, 0.5],
       "raw": "../raw/techmeme_center_raw.png",
       "brown": "techmeme_center_brown.png",
-      "scrutinizer_mode0": "v2.3/techmeme_center.png",
+      "scrutinizer_mode0": "v2.7/techmeme_center.png",
       "scrutinizer_mode10": null
     },
     {
@@ -48,8 +48,8 @@
       "gaze": [0.5, 0.5],
       "raw": "../raw/crowding_center_raw.png",
       "brown": "crowding_center_brown.png",
-      "scrutinizer_mode0": "v2.3/crowding_center.png",
-      "scrutinizer_mode10": "v2.3/crowding_center_mode10_mongrel.png"
+      "scrutinizer_mode0": "v2.7/crowding_center.png",
+      "scrutinizer_mode10": "v2.7/crowding_center_mode10_mongrel.png"
     },
     {
       "page": "color-spectrum",
@@ -57,7 +57,7 @@
       "gaze": [0.5, 0.5],
       "raw": "../raw/color-spectrum_center_raw.png",
       "brown": "color-spectrum_center_brown.png",
-      "scrutinizer_mode0": "v2.3/color-spectrum_center_mode0_smoothstep.png",
+      "scrutinizer_mode0": null,
       "scrutinizer_mode10": null
     }
   ]

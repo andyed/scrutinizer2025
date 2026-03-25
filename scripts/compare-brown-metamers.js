@@ -57,9 +57,34 @@ function toLuma(png) {
  * Compute SSIM, PSNR, MSE for pixels within a given annular band.
  * gazeX, gazeY are in pixel coordinates.
  */
+// Nearest-neighbor downsample to target dimensions
+function downsample(png, targetW, targetH) {
+  if (png.width === targetW && png.height === targetH) return png;
+  const out = new PNG({ width: targetW, height: targetH });
+  const sx = png.width / targetW;
+  const sy = png.height / targetH;
+  for (let y = 0; y < targetH; y++) {
+    for (let x = 0; x < targetW; x++) {
+      const srcX = Math.min(Math.floor(x * sx), png.width - 1);
+      const srcY = Math.min(Math.floor(y * sy), png.height - 1);
+      const si = (srcY * png.width + srcX) * 4;
+      const di = (y * targetW + x) * 4;
+      out.data[di] = png.data[si];
+      out.data[di+1] = png.data[si+1];
+      out.data[di+2] = png.data[si+2];
+      out.data[di+3] = png.data[si+3];
+    }
+  }
+  return out;
+}
+
 function bandMetrics(aPng, bPng, gazeX, gazeY, rMin, rMax) {
+  // Downsample larger image to match smaller (handles 2x retina captures)
   if (aPng.width !== bPng.width || aPng.height !== bPng.height) {
-    throw new Error(`Dimension mismatch: ${aPng.width}x${aPng.height} vs ${bPng.width}x${bPng.height}`);
+    const targetW = Math.min(aPng.width, bPng.width);
+    const targetH = Math.min(aPng.height, bPng.height);
+    aPng = downsample(aPng, targetW, targetH);
+    bPng = downsample(bPng, targetW, targetH);
   }
 
   const w = aPng.width;
