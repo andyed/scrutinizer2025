@@ -1286,9 +1286,11 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     // Without this, chromatic decay and rod desaturation create colored blobs
     // instead of clear image at recalled fixation locations.
     effectFactor *= (1.0 - memoryStrength);
-    // Color effects onset: tight pixel-space transition at fovea edge.
-    // Wide corticalStrength transitions create visible Mach bands on gradients.
-    float bypassTransition = smoothstep(fovea_radius * 0.5, fovea_radius * 0.7, dist);
+    // Color effects onset: ramp across the parafovea so chromatic decay is progressive.
+    // Previous tight transition (0.5–0.7× fovea) created a binary cliff where all
+    // color vanished at once. Now ramps from fovea edge to parafovea boundary (~2.5×),
+    // letting castleCSF per-band decay show its eccentricity gradient on large surfaces.
+    float bypassTransition = smoothstep(fovea_radius * 0.8, fovea_radius * 2.5, dist);
 
     if (config.v4_style_id <= 1) { // Research Modes: 0=Usability, 1=Biological(Purkinje)
     
@@ -1337,14 +1339,19 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
 
         // Apply Base Desaturation (Chrominance only)
         // When per-band chromatic pooling is active (castleCSF + Bowers 2025),
-        // sampleDoGReconstructed() already applies differential RG/YV decay.
-        // Stacking full base desat on top over-desaturates — periphery goes gray
-        // when it should retain blue tint (YV persists biologically).
-        // Reduce base desat to 40% strength when per-band is handling the work.
+        // sampleDoGReconstructed() already applies differential RG/YV decay
+        // progressively with eccentricity. Base desaturation should only add
+        // rod-dominance desaturation at far periphery (>10°), not override
+        // the parafoveal gradient where cones still provide good color.
         // Without per-band (legacy path), base desat is the only color reduction.
         float baseFade = fade;
         if (u_chromatic_pooling > 0.5 && u_dog_enabled > 0.5) {
-            baseFade *= 0.4;  // per-band does frequency-selective; base adds gentle rod ramp
+            // Rod desaturation onset: defer to far periphery where castleCSF
+            // per-band decay has already removed most RG signal. In the parafovea
+            // (2-5°), per-band handles the work — base desat would flatten the
+            // gradient that shows progressive red loss before blue loss.
+            float rodOnset = smoothstep(fovea_radius * 3.0, fovea_radius * 8.0, dist);
+            baseFade *= 0.3 * rodOnset;
         }
         lab.y *= (1.0 - baseFade);
         lab.z *= (1.0 - baseFade);
