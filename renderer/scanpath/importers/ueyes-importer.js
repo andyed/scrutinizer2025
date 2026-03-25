@@ -3,7 +3,7 @@
  *
  * UEyes uses Gazepoint eye trackers exporting CSV with columns:
  *   FPOGX, FPOGY — normalized 0-1 fixation coordinates
- *   FPOGD — fixation duration in ms
+ *   FPOGD — fixation duration in seconds (Gazepoint API v2.0)
  *
  * The dataset contains web/UI stimuli, making it the closest match
  * to Scrutinizer's target domain.
@@ -64,7 +64,10 @@ function parse(csvContent, options = {}) {
         const cols = line.split(',');
         const nx = parseFloat(cols[colX]);
         const ny = parseFloat(cols[colY]);
-        const duration = parseFloat(cols[colD]);
+        const durationRaw = parseFloat(cols[colD]);
+
+        // FPOGD is in seconds (Gazepoint API v2.0) — convert to ms
+        const duration = durationRaw * 1000;
 
         // Skip invalid rows
         if (!isFinite(nx) || !isFinite(ny) || !isFinite(duration) || duration <= 0) continue;
