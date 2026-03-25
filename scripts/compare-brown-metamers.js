@@ -57,8 +57,53 @@ function toLuma(png) {
  * Compute SSIM, PSNR, MSE for pixels within a given annular band.
  * gazeX, gazeY are in pixel coordinates.
  */
-// Nearest-neighbor downsample to target dimensions
-function downsample(png, targetW, targetH) {
+// Align two images to the same dimensions.
+// Scrutinizer captures are 2x retina frame-only (3840x2024 = 1920x1012 @ 2x).
+// Raw/Brown captures are 1x full viewport (1920x1080).
+// Strategy: crop the taller image to match the shorter's aspect, then downsample.
+function alignImages(aPng, bPng) {
+  if (aPng.width === bPng.width && aPng.height === bPng.height) return [aPng, bPng];
+
+  // Determine which is the Scrutinizer capture (2x, smaller height ratio)
+  const aRatio = aPng.width / aPng.height;
+  const bRatio = bPng.width / bPng.height;
+
+  // If one is exactly 2x width of the other, it's the retina capture
+  let hiRes, loRes, hiIsA;
+  if (Math.abs(aPng.width - bPng.width * 2) < 10) {
+    hiRes = aPng; loRes = bPng; hiIsA = true;
+  } else if (Math.abs(bPng.width - aPng.width * 2) < 10) {
+    hiRes = bPng; loRes = aPng; hiIsA = false;
+  } else {
+    // Not a 2x relationship — naive resize to smaller
+    const tw = Math.min(aPng.width, bPng.width);
+    const th = Math.min(aPng.height, bPng.height);
+    return [resizePng(aPng, tw, th), resizePng(bPng, tw, th)];
+  }
+
+  // Crop the 1x image to match the 2x frame area.
+  // 2x frame height / 2 = 1x frame height (e.g. 2024/2 = 1012).
+  // Crop 1x image from top to that height (toolbar area is at the top in Scrutinizer,
+  // but the raw capture has no toolbar — content starts at y=0 in both).
+  const frameH1x = Math.round(hiRes.height / 2);
+  const croppedLo = cropPng(loRes, 0, 0, loRes.width, frameH1x);
+  const downHi = resizePng(hiRes, loRes.width, frameH1x);
+
+  return hiIsA ? [downHi, croppedLo] : [croppedLo, downHi];
+}
+
+function cropPng(png, x, y, w, h) {
+  if (x === 0 && y === 0 && w === png.width && h === png.height) return png;
+  const out = new PNG({ width: w, height: h });
+  for (let row = 0; row < h; row++) {
+    const srcOff = ((y + row) * png.width + x) * 4;
+    const dstOff = row * w * 4;
+    png.data.copy(out.data, dstOff, srcOff, srcOff + w * 4);
+  }
+  return out;
+}
+
+function resizePng(png, targetW, targetH) {
   if (png.width === targetW && png.height === targetH) return png;
   const out = new PNG({ width: targetW, height: targetH });
   const sx = png.width / targetW;
@@ -79,13 +124,8 @@ function downsample(png, targetW, targetH) {
 }
 
 function bandMetrics(aPng, bPng, gazeX, gazeY, rMin, rMax) {
-  // Downsample larger image to match smaller (handles 2x retina captures)
-  if (aPng.width !== bPng.width || aPng.height !== bPng.height) {
-    const targetW = Math.min(aPng.width, bPng.width);
-    const targetH = Math.min(aPng.height, bPng.height);
-    aPng = downsample(aPng, targetW, targetH);
-    bPng = downsample(bPng, targetW, targetH);
-  }
+  // Align dimensions: handles 2x retina + toolbar chrome offset
+  [aPng, bPng] = alignImages(aPng, bPng);
 
   const w = aPng.width;
   const h = aPng.height;
@@ -249,9 +289,16 @@ function main() {
     if (!rawPng) { console.log(`  SKIP: raw not found (${rawPath})`); continue; }
     if (!brownPng) { console.log(`  SKIP: Brown metamer not found (${brownPath})`); continue; }
 
-    // Convert normalized gaze to pixel coordinates
+    // Convert normalized gaze to pixel coordinates.
+    // Scrutinizer frames are shorter than raw viewport (toolbar chrome removed).
+    // Use the Scrutinizer frame height (rawH * scrutH/2 / rawH simplifies to
+    // scrutH/2) as the reference, since that's where the fovea was centered.
+    // After alignment both images are at frame height, so gaze uses frame dims.
+    const frameH = scrut0Png
+      ? Math.round(scrut0Png.height / 2)  // 2x retina → 1x frame height
+      : (scrut10Png ? Math.round(scrut10Png.height / 2) : rawPng.height);
     const gazePixelX = gazeX * rawPng.width;
-    const gazePixelY = gazeY * rawPng.height;
+    const gazePixelY = gazeY * frameH;
 
     const pageResult = {
       page: entry.page,
