@@ -71,14 +71,20 @@ When Visual Memory is on, Scrutinizer tracks where you've fixated and keeps thos
 | **Limited (5)** | 5 | Simulates a quick scan — what do you know after ~5 glances? |
 | **Extended (10)** | 10 | Longer exploration — approaching familiarity |
 | **Infinite** | All | Cumulative reveal — shows how much of the page a thorough scan covers |
-| **Inhibition of Return** | 10 (inverted) | Experimental: previously-fixated areas get *more* degradation, simulating the tendency to avoid refixating |
 
 ### When to use each
 
 - **Off** for evaluating first-glance discoverability: "Can a user find this button without searching?"
 - **Limited/Extended** for evaluating scan efficiency: "How many fixations until the user has oriented to the page structure?"
 - **Infinite** for evaluating information coverage: "Even with unlimited viewing, are there regions that peripheral vision simply cannot resolve?"
-- **Inhibition of Return** for evaluating revisitation cost: "How much does the user lose by looking away?"
+
+### Inhibition of Return
+
+There is also an **Inhibition of Return** mode (10 fixations, inverted — previously-fixated areas get *more* degradation). This is separated from the modes above because it serves a different purpose.
+
+In real viewing, inhibition of return is an automatic oculomotor mechanism — the visual system suppresses re-fixation of recently attended locations, biasing the eyes toward novel regions. In an RFV session, visual memory already externalizes this function: the clarity trail shows you where you've been, which naturally discourages revisiting. You can see you've already looked there.
+
+IOR mode makes the cost of revisitation explicit by degrading previously-seen areas. Use it to evaluate how much a layout depends on re-reading — if a user needs to return to a region they already scanned, how much has been lost? Layouts that require frequent re-fixation (dense reference tables, forms with validation feedback far from the input) will feel especially punishing under IOR.
 
 ### Design dialogue prompt
 
@@ -155,6 +161,14 @@ Turn Visual Memory to **Off**. Park the cursor on the primary content area. With
 | Button blends into background at 5 deg | Low figure-ground separation in periphery | Increase contrast ratio, add border or shadow, increase padding |
 | Two elements look identical at 5 deg | Crowding — peripheral vision pools nearby features | Increase spacing between elements, differentiate by color or size |
 | Page structure unclear after 5 fixations | Poor visual hierarchy — no strong landmarks guide the scan | Strengthen heading/section contrast, add whitespace between regions |
+
+### Reading span and text evaluation
+
+When evaluating text-heavy pages, keep in mind that reading uses a different spatial strategy than scene viewing. Rayner (1998) established that the perceptual span during reading extends ~14-15 characters to the right of fixation (~5 degrees) but only 3-4 characters to the left. Within this span, useful letter information comes from about 7-8 characters on each side (~2 degrees) — the *visual span* (Legge et al. 2007).
+
+Forward reading saccades average ~7-9 characters (~2 degrees), meaning readers hop through text in roughly foveal-width steps. This has practical implications for RFV evaluation: if you can't read a navigation label or heading at its eccentricity from a natural fixation point, a real user would need to explicitly saccade to it. That's the signal — the label lacks peripheral discoverability and requires a deliberate eye movement to read.
+
+Scrutinizer has a **Reading Span** overlay (**Simulation > Behavior > Reading Span**) that visualizes this asymmetric perceptual window.
 
 ### What Scrutinizer does NOT simulate
 
