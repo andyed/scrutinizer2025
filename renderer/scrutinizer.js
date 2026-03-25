@@ -100,6 +100,7 @@
             this._lastCongestionGeneration = 0;
             this._lastCongestionResultTime = 0;
             this._heatmapPendingRestore = false;
+            this._comfortMode = false;
 
             // ── WebGPU Compute (Tier 2.5) ──────────────────────────────
             this.webgpuCompute = null;
@@ -541,6 +542,13 @@
                 ? this.config.intensity * 0.6
                 : this.config.intensity;
 
+            // Comfort mode: +1° dead zone in normalized screen units (fovealRadius ≈ 1° in px)
+            if (this.renderer) {
+                this.renderer.config.comfort_radius = this._comfortMode
+                    ? (this.config.fovealRadius / this.canvas.height)
+                    : 0.0;
+            }
+
             // 6. Update SVG overlay (debug visualization)
             if (this.svgOverlay) {
                 const scale = this.gazeModel.getScale();
@@ -846,6 +854,15 @@
                 this.renderer._readingSpanOverride = enabled;
                 ipcRenderer.send('log:renderer', `[Scrutinizer] Reading span: ${enabled}`);
             }
+        }
+
+        toggleComfortMode(enabled) {
+            this._comfortMode = enabled;
+            if (this.svgOverlay) {
+                this.svgOverlay.setComfortMode(enabled);
+            }
+            ipcRenderer.send('settings:comfort-mode-changed', enabled);
+            ipcRenderer.send('log:renderer', `[Scrutinizer] Comfort mode: ${enabled}`);
         }
 
         toggleGaussianBlurMode(enabled) {

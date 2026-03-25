@@ -11,6 +11,7 @@ class SettingsManager {
             blur: 10,
             intensity: 0.6,
             enabled: true, // Default to enabled
+            comfortMode: false, // Comfort mode: +1° clear zone (microsaccade envelope)
             showWelcomePopup: true, // Default to showing popup
             startPage: 'https://github.com/andyed/scrutinizer2025?tab=readme-ov-file#what-is-scrutinizer',
             windowBounds: { width: 1200, height: 900 }

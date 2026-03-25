@@ -537,6 +537,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                                 }
                             ]
                         },
+                        {
+                            label: 'Comfort Mode (+1° clear zone)',
+                            type: 'checkbox',
+                            checked: false,
+                            click: (menuItem) => sendToOverlays('menu:toggle-comfort-mode', menuItem.checked)
+                        },
                         { type: 'separator' },
                         {
                             label: 'Enable Structure Map',

@@ -66,6 +66,7 @@ uniform float u_saccadic_blindness; // 0.0=off, 1.0=suppress fovea during saccad
 uniform vec2  u_velocity_dir;          // Directional velocity (px/ms) for reading span
 uniform float u_reading_span;          // 0=strict circle, 1=asymmetric envelope (Rayner 1998)
 uniform float u_reading_span_strength; // 0.7=comfort, 1.0=full Rayner asymmetry
+uniform float u_comfort_radius;       // Comfort mode dead zone (normalized screen units, 0=off)
 uniform float u_chromatic_pooling;  // 0.0=off (legacy uniform desat), 1.0=on
 uniform float u_rg_decay;           // RG (L-M) eccentricity decay k_e (default 0.072, Bowers et al. 2025 suprathreshold)
 uniform float u_rg_freq_decay;      // RG frequency-dependent decay k_ef (default 0.003)
@@ -1804,6 +1805,11 @@ void main() {
         dist_stable = length(delta_stable);
     }
 
+    // Comfort mode: extend clear zone by suppressing distortion within comfort radius.
+    // Microsaccades (< 0.5°) and tiny saccades (< 1°) give near-free access to this zone.
+    // Subtracting from dist creates a dead zone without altering fovea_radius (ppd converter).
+    dist = max(0.0, dist - u_comfort_radius);
+    dist_stable = max(0.0, dist_stable - u_comfort_radius);
 
     float radius_norm = u_foveaRadius / u_resolution.y;
     float fovea_radius = radius_norm;

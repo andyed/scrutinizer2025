@@ -37,8 +37,15 @@ class SVGOverlay {
                 group: this.createGroup('grid-group'),
                 rings: this.createGroup('grid-rings'),
                 spokes: this.createGroup('grid-spokes')
+            },
+            comfortGuide: {
+                group: this.createGroup('comfort-guide-group', false),
+                circle: this.createCircle('comfort-guide-circle', 'none', '#66ddaa', 1.0, 0.0)
             }
         };
+
+        // Comfort mode state
+        this._comfortMode = false;
 
         // Tick cache
         this.tickPool = []; // reuse lines
@@ -131,6 +138,11 @@ class SVGOverlay {
         this.elements.parafovea.circle.setAttribute('stroke-dasharray', '20, 10'); // Wider dash
         this.elements.parafovea.circle.setAttribute('stroke-linecap', 'butt'); // Cleaner ends
 
+        // Comfort guide: subtle dashed ring at original fovea boundary (microsaccade sweet spot)
+        this.elements.comfortGuide.group.appendChild(this.elements.comfortGuide.circle);
+        this.elements.comfortGuide.circle.setAttribute('stroke-dasharray', '3, 6');
+        this.elements.comfortGuide.circle.setAttribute('stroke-linecap', 'round');
+
         // OPTIMIZATION: Do NOT filter the grid group to improve performance
         // The grid moves every frame, causing constant re-rasterization of the shadow if filtered.
         this.elements.grid.group.removeAttribute('filter');
@@ -140,12 +152,17 @@ class SVGOverlay {
         this.elements.grid.group.appendChild(this.elements.grid.spokes);
     }
 
+    setComfortMode(enabled) {
+        this._comfortMode = enabled;
+    }
+
     update(x, y, foveaRadius, aspectRatio, mode, parafoveaRadius) {
         if (!this.svg) return;
 
         // Hide all initially
         this.elements.fovea.group.style.display = 'none';
         this.elements.parafovea.group.style.display = 'none';
+        this.elements.comfortGuide.group.style.display = 'none';
         this.elements.grid.group.style.display = 'none';
 
         if (mode < 0.5) return; // Off
@@ -203,6 +220,18 @@ class SVGOverlay {
             this.elements.parafovea.circle.setAttribute('cx', 0);
             this.elements.parafovea.circle.setAttribute('cy', 0);
             this.elements.parafovea.circle.setAttribute('r', parafoveaRadius);
+        }
+
+        // --- COMFORT GUIDE: microsaccade boundary ring ---
+        // Shown when comfort mode is on, independent of debug mode.
+        // Ring at the original fovea boundary (1°) within the enlarged clear zone.
+        if (this._comfortMode) {
+            this.elements.comfortGuide.group.style.removeProperty('display');
+            this.elements.comfortGuide.group.setAttribute('transform', `translate(${x}, ${y})`);
+            this.elements.comfortGuide.circle.setAttribute('cx', 0);
+            this.elements.comfortGuide.circle.setAttribute('cy', 0);
+            this.elements.comfortGuide.circle.setAttribute('r', foveaRadius);
+            this.elements.comfortGuide.circle.setAttribute('opacity', 0.3);
         }
 
         // --- MODE 3: RADIAL GRID ---

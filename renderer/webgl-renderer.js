@@ -113,6 +113,9 @@
                 this.readingSpanLocation = null;
                 this.readingSpanStrengthLocation = null;
 
+                // Comfort mode (microsaccade dead zone)
+                this.comfortRadiusLocation = null;
+
                 // Congestion-gated pooling (hypothesis mode)
                 this.congestionPoolingLocation = null;
 
@@ -290,6 +293,9 @@
                 this.velocityDirLocation = gl.getUniformLocation(this.program, "u_velocity_dir");
                 this.readingSpanLocation = gl.getUniformLocation(this.program, "u_reading_span");
                 this.readingSpanStrengthLocation = gl.getUniformLocation(this.program, "u_reading_span_strength");
+
+                // Comfort mode (microsaccade dead zone)
+                this.comfortRadiusLocation = gl.getUniformLocation(this.program, "u_comfort_radius");
 
                 // Congestion-gated pooling uniform lookup
                 this.congestionPoolingLocation = gl.getUniformLocation(this.program, "u_congestion_pooling");
@@ -853,6 +859,7 @@
                 gl.uniform2f(this.velocityDirLocation, velocityDirX, velocityDirY);
                 gl.uniform1f(this.readingSpanLocation, this.config.reading_span ? 1.0 : 0.0);
                 gl.uniform1f(this.readingSpanStrengthLocation, this.config.reading_span_strength);
+                gl.uniform1f(this.comfortRadiusLocation, this.config.comfort_radius || 0.0);
                 gl.uniform1f(this.congestionPoolingLocation, this.config.congestion_pooling ? 1.0 : 0.0);
                 gl.uniform1f(this.saliencyAcuityE2Location, this.config.saliency_acuity_e2 ?? 8.0);
                 gl.uniform1f(this.crowdingDensityThresholdLocation, this.config.crowding_density_threshold ?? 0.3);

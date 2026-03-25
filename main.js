@@ -124,6 +124,10 @@ ipcMain.on('settings:visual-memory-changed', (event, value) => {
     // rebuildMenu(); // If we want to update checked state
 });
 
+ipcMain.on('settings:comfort-mode-changed', (event, enabled) => {
+    settingsManager.set('comfortMode', enabled);
+});
+
 ipcMain.on('settings:page-changed', (event, url) => {
     if (url && url.startsWith('http')) {
         currentStartPage = url;
@@ -1091,6 +1095,7 @@ function createScrutinizerWindow(startUrl) {
                 intensity: currentIntensity !== undefined ? currentIntensity : 1.0,
                 enabled: currentEnabled !== undefined ? currentEnabled : true,
                 visualMemory: currentVisualMemory || 20,
+                comfortMode: settingsManager.get('comfortMode') || false,
                 showWelcome: currentShowWelcome !== undefined ? currentShowWelcome : true,
                 enableSaliencyModulation: enableSaliency
             };

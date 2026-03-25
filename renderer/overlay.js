@@ -187,6 +187,9 @@
             if (state.enableSaliencyModulation !== undefined) {
                 if (scrutinizer) scrutinizer.toggleSaliencyModulation(state.enableSaliencyModulation);
             }
+            if (state.comfortMode) {
+                if (scrutinizer) scrutinizer.toggleComfortMode(true);
+            }
         });
 
         // Menu IPC handlers
@@ -273,6 +276,10 @@
 
         ipcRenderer.on('menu:toggle-reading-span', (e, enabled) => {
             scrutinizer.toggleReadingSpan(enabled);
+        });
+
+        ipcRenderer.on('menu:toggle-comfort-mode', (e, enabled) => {
+            scrutinizer.toggleComfortMode(enabled);
         });
 
         ipcRenderer.on('menu:toggle-gaussian-blur-mode', (e, enabled) => {
