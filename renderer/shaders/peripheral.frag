@@ -1261,10 +1261,10 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     // that masks MIP box-filter artifacts at the fovea boundary.
     float baseBlend = smoothstep(0.0, fovea_radius * 2.0, eccentricity);
     float lumaBlend = baseBlend * u_intensity;
-    // pow(0.5) reshapes the intensity slider: at 0.6 → 0.77 chroma blend,
-    // reducing foveal chrominance bleed from 40% to 23%. At 1.0, both converge.
-    // Balances gradient visibility against over-blue-shift from YV persistence.
-    float chromaBlend = baseBlend * pow(max(u_intensity, 0.001), 0.5);
+    // pow(0.7) reshapes the intensity slider: at 0.6 → 0.68 chroma blend,
+    // reducing foveal chrominance bleed from 40% to 32%. Gentle enough to avoid
+    // dramatic blue shift on red surfaces while still showing progressive decay.
+    float chromaBlend = baseBlend * pow(max(u_intensity, 0.001), 0.7);
 
     vec3 foveaLab = rgbToOklab(foveaCol);
     vec3 pooledLab = rgbToOklab(pooledCol);
