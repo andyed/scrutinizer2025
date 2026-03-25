@@ -30,13 +30,25 @@ const manifestArg = process.argv.find(a => a.startsWith('--manifest='));
 const MANIFEST_PATH = manifestArg ? manifestArg.split('=')[1] : DEFAULT_MANIFEST;
 
 // Eccentricity bands in pixels (from gaze center)
-const BANDS = [
+// Base eccentricity bands at 45 px/deg (1x resolution, fovea radius = 45px).
+// Scaled by image DPR at comparison time — see makeBands().
+const BANDS_1X = [
   { id: 0, label: 'fovea',          rMin: 0,   rMax: 90,   eccRange: '0-2 deg' },
   { id: 1, label: 'parafovea',      rMin: 90,  rMax: 180,  eccRange: '2-4 deg' },
   { id: 2, label: 'near_periphery', rMin: 180, rMax: 360,  eccRange: '4-8 deg' },
   { id: 3, label: 'mid_periphery',  rMin: 360, rMax: 720,  eccRange: '8-16 deg' },
   { id: 4, label: 'far_periphery',  rMin: 720, rMax: Infinity, eccRange: '16+ deg' },
 ];
+
+function makeBands(imageWidth) {
+  // Detect DPR: 3840 wide = 2x, 1920 wide = 1x
+  const dpr = imageWidth > 2000 ? 2 : 1;
+  return BANDS_1X.map(b => ({
+    ...b,
+    rMin: b.rMin * dpr,
+    rMax: b.rMax === Infinity ? Infinity : b.rMax * dpr,
+  }));
+}
 
 function loadPng(filePath) {
   if (!fs.existsSync(filePath)) return null;
@@ -310,6 +322,7 @@ function main() {
       bands: []
     };
 
+    const BANDS = makeBands(rawPng.width);
     for (const band of BANDS) {
       const bandResult = {
         band: band.id,
