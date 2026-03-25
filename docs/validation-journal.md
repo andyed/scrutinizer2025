@@ -15,6 +15,7 @@ Scrutinizer's rendering pipeline implements three decades of visual psychophysic
 | [4](#wave-4-saliency-validation) | Saliency & Protection | Itti & Koch 2001, Rosenholtz 2007 (Feature Congestion) | 4A: 6+1 INFO · 4B: 5/5 | [stimulus](https://andyed.github.io/scrutinizer-www/reference-pages/saliency-popout.html) |
 | [6](#wave-6-coco-periph-peripheral-encoding) | System-Level Encoding | Harrington et al. 2024 (COCO-Periph), Rosenholtz et al. 2012 (TTM) | Pending | [spec](../docs/specs/wave6_coco_periph_validation.md) |
 | [7](#wave-7-pyramid-decomposition--crowding) | Pyramid Decomposition & Crowding | Portilla & Simoncelli 2000, Walton 2021, Bouma 1970 | Scaffolded | [spec](../docs/specs/wave7_pyramid_validation.md) |
+| [7.5](#wave-75-compute-texture-isolation) | Compute Texture Quality | Tier 2.5 vs 2.75 isolation | **Tier 2.75 validated** | [lessons](../docs/specs/tier3_lessons_learned.md) |
 
 ### Tier Structure
 
@@ -279,3 +280,47 @@ Pending — run `npm run wave6` to execute.
 - Ashraf, M., et al. (2024). castleCSF — A contrast sensitivity function of color, area, spatiotemporal frequency, luminance and eccentricity. *bioRxiv*.
 - Blauch, N.M., Alvarez, G.A. & Konkle, T. (2026). FOVI: Foveated vision transformers. *arXiv*.
 - Harrington, C., Pepe, A., Ling, S. & Rosenholtz, R. (2024). COCO-Periph: Bridging the gap between human and machine perception with a peripheral vision benchmark. *ICLR 2024*.
+
+---
+
+## Wave 7.5: Compute Texture Isolation (2026-03-24)
+
+### Question
+Does the Tier 2.75 pyramid synthesis (cross-scale magnitude correlations) produce measurably better peripheral texture than the Tier 2.5 oriented noise synthesis?
+
+### Method
+Extracted raw compute textures (RGBA8 readback, before fragment shader compositing) from both tiers on the same stimulus (dashboard.html, center fixation, radius 45). Compared per-eccentricity-ring luminance variance and mean absolute difference (MAD).
+
+Scripts: `scripts/capture-compute-texture.js`, `scripts/compare-compute-textures.js`
+
+### Results
+
+| Ring | Tier 2.5 variance | Tier 2.75 variance | MAD |
+|------|-------------------|-------------------|-----|
+| fovea | 0.000 | 0.035 | 0.890 |
+| parafovea | 0.000 | 0.030 | 0.918 |
+| near-periph | 0.000 | 0.024 | 0.933 |
+| mid-periph | 0.000 | 0.009 | 0.970 |
+| far-periph | 0.000 | 0.082 | 0.858 |
+
+**Overall MAD: 0.863**
+
+### Interpretation
+
+**Tier 2.5 is broken.** The oriented noise synthesis (`crowding-synth.wgsl`) produces near-zero RGB values everywhere. The alpha channel (blend weight) was the only useful output. Mode 10 has been functioning as a MIP-blur mode — the fragment shader compensated via the MIP fallback path.
+
+**Tier 2.75 produces structured content.** The pyramid synthesis preserves page layout (sidebar, stat cards, table structure), correct colors (Oklab mean per tile), while replacing fine detail with cross-scale-correlated bandpass noise. The compute texture visually resembles the source page at 16px tile resolution.
+
+The cross-scale magnitude correlation injection (`pyramid-synth.wgsl:255-275`) is working: edges spanning multiple frequency bands produce coherent texture rather than independent noise per band.
+
+### Tier 3 attempt (failed, reverted)
+
+Attempted to use Tier 2.75's compute texture as the sole degradation mechanism (mode 15, no V1 displacement). Failed because:
+1. On sparse dashboard content, sector means ≈ original pixels (text is <5% of sector area)
+2. Fragment shader's blend cap (60%), smooth content snap-back, and magnocellular contrast restoration collectively cancelled out the remaining effect
+
+The synthesis quality is validated. The Tier 3 gap is in the fragment shader compositing, not the compute pipeline. Full details in `docs/specs/tier3_lessons_learned.md`.
+
+### Next: Brown metamer comparison (Wave 7c prerequisite)
+
+Quantitative gap analysis against Brown et al. (2023) metamers requires overnight PooledStatisticsMetamers jobs. This is the prerequisite for validating that Tier 2.75 synthesis approaches psychophysically-correct peripheral representations. Deferred to TTM Tier 3 sprint.
