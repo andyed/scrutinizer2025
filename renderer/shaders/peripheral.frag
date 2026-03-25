@@ -1252,10 +1252,12 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     float smoothContent = 1.0 - smoothstep(0.01, 0.05, colorDelta);
     pooledCol = mix(pooledCol, foveaCol, smoothContent);
 
-    // Blur blend: pixel-space transition from fovea edge outward.
-    // Tight range keeps Mach bands at the fovea boundary where content masks them.
-    // (corticalStrength transitions are too wide — visible rings on gradients.)
-    float baseBlend = smoothstep(0.0, fovea_radius * 0.5, eccentricity);
+    // Blur blend: ramp from fovea edge across parafovea.
+    // Gradual blend lets per-band castleCSF chromatic decay produce a visible
+    // color gradient on large surfaces (red wall → progressive desaturation).
+    // Previous tight range (0 to 0.5× fovea) snapped to full pooled in ~0.5°,
+    // making all peripheral content uniformly desaturated.
+    float baseBlend = smoothstep(0.0, fovea_radius * 2.0, eccentricity);
     float blendFactor = baseBlend * u_intensity;
 
     vec3 col = mix(foveaCol, pooledCol, blendFactor);
