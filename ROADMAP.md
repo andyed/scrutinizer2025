@@ -1,6 +1,6 @@
 # Scrutinizer Roadmap
 
-Last updated: 2026-03-22 (v2.7)
+Last updated: 2026-03-25 (v2.7.1)
 
 ## What's implemented
 
@@ -71,6 +71,8 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 
 **Suprathreshold correction across channels.** The power-law exponent (0.5) from Jiang et al. 2022 was measured for luminance. Applied to chromatic channels without evidence the same exponent holds. The parafovea (2–8°) is where most UI interaction happens — over-desaturating it is the highest-cost error the model can make. Eccentricity-dependent exponents or channel-specific fits to Bowers 2025 data are the likely fix.
 
+**Visual memory mask gradient.** The memory mask uses a 3-stop radial gradient (1.0→0.5→0.0) with a hard `memoryStrength > 0.7` bypass threshold in the shader. This creates visible circular splotches at recalled fixation locations — the boundary between "clear original" and "pipeline processed" is too abrupt. Fix: soften the gradient tail and lower the bypass threshold, or replace the binary bypass with a smooth blend across the full memoryStrength range.
+
 **Spacing-dependent crowding.** Current V1 stage modulates distortion *strength* by density, not *spacing* by flanker distance. Bouma's rule predicts critical spacing as ~0.5× eccentricity. Requires a pooling-region pass that the single-pass fragment shader cannot express.
 
 ### Mouse-gaze coordination
@@ -106,6 +108,18 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 ---
 
 ## Release history
+
+### v2.7.1: Chromatic Fidelity & Scanpath Replay (2026-03-25)
+- Unified eccentricity master curve: 6 overlapping smoothsteps → 1 C2-continuous curve + power functions, eliminating Mach bands in parafoveal color transitions
+- Luma/chroma split foveal blend (Mullen 1991): progressive chromatic decay visible on uniform surfaces
+- Rod desaturation deferred to far periphery when castleCSF active (t³ onset)
+- Visual memory: parafoveal radius (2.5× fovea) for recalled fixation footprint
+- Visual memory: V4 color effect suppression in remembered regions (memoryStrength → processV4)
+- Comfort Mode: +1° clear zone via shader distance offset (microsaccade envelope)
+- Scanpath replay: ScanpathPlayer (GazeModel drop-in), COCO-Search18 importer, CLI replay + visualization
+- Gazeplot mode: visual memory accumulation across fixation sequence
+
+### v2.7.0: Pyramid Mongrel + Acuity Saliency (2026-03-24)
 
 ### v2.6: Isotropic Cortical Sampling (2026-03-20)
 - FOVI-derived isotropic sector geometry as default for all modes
