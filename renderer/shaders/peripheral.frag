@@ -1167,7 +1167,7 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
 }
 
 // --- STAGE 3: V4 (Aesthetics) ---
-vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float parafovea_radius, float saccadeFactor) {
+vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float parafovea_radius, float saccadeFactor, float memoryStrength) {
     float eccentricity = max(0.0, dist - fovea_radius);
     
     // Screen-space derivatives of the distorted UV so textureGrad sees the
@@ -1282,6 +1282,10 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     }
 
     float effectFactor = v1.distortionStrength;
+    // Visual memory: suppress V4 color effects in remembered regions.
+    // Without this, chromatic decay and rod desaturation create colored blobs
+    // instead of clear image at recalled fixation locations.
+    effectFactor *= (1.0 - memoryStrength);
     // Color effects onset: tight pixel-space transition at fovea edge.
     // Wide corticalStrength transitions create visible Mach bands on gradients.
     float bypassTransition = smoothstep(fovea_radius * 0.5, fovea_radius * 0.7, dist);
@@ -1864,7 +1868,7 @@ void main() {
 
     V1_Signal v1 = processV1(uv, uv_corrected, lgn, config, dist_stable, radial_dir, fovea_radius, parafovea_radius, isFarPeriphery, isParafovea, memoryStrength);
     
-    vec3 finalRGB = processV4(uv, v1, lgn, config, dist, fovea_radius, parafovea_radius, saccadeFactor);
+    vec3 finalRGB = processV4(uv, v1, lgn, config, dist, fovea_radius, parafovea_radius, saccadeFactor, memoryStrength);
     
     vec4 color = vec4(finalRGB, 1.0);
 
@@ -1881,7 +1885,7 @@ void main() {
     }
 
     if (u_useMask < 1.5 && u_useMask > 0.5 && u_debug_structure < 0.5) {
-        if (memoryStrength > 0.9) {
+        if (memoryStrength > 0.7) {
             vec4 clearColor = sampleSource(uv);
             color.rgb = clearColor.rgb;
         } else if (memoryStrength > 0.0) {
