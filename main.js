@@ -1477,6 +1477,8 @@ function runIntegrationTest() {
     // Coordinates are normalized (0-1). captureAtNorm is optional (default 0.6 = capture at 60% of sweep).
     const testTrajectory = process.env.TEST_GAZE_TRAJECTORY || null;
     const testOverlay = process.env.TEST_OVERLAY === 'true';
+    const testScanpath = process.env.TEST_SCANPATH || null; // Path to scanpath JSON for gazeplot replay
+    const testVisualMemory = process.env.TEST_VISUAL_MEMORY ? parseInt(process.env.TEST_VISUAL_MEMORY) : null; // -1 = infinite
     const screenshotMode = process.env.SCREENSHOT_MODE || 'date';
     const outputFilename = process.env.TEST_OUTPUT_FILENAME || null;
     // Parse mobile emulation: accepts 'true', 'false', or a profile name string like 'iphone_14_pro'
@@ -1751,6 +1753,68 @@ function runIntegrationTest() {
                                 }
 
                                 await new Promise(resolve => setTimeout(resolve, frameMs));
+                            }
+                        }
+
+                        // === Scanpath gazeplot replay (visual memory accumulation) ===
+                        // Walks through fixation sequence with visual memory enabled,
+                        // dwelling at each fixation for its recorded duration.
+                        // Captures screenshot of the FINAL accumulated state.
+                        if (testScanpath && !trajectoryImage) {
+                            const fs = require('fs');
+                            let scanpathData;
+                            try {
+                                scanpathData = JSON.parse(fs.readFileSync(testScanpath, 'utf8'));
+                            } catch (e) {
+                                console.error(`[Test] Failed to load scanpath: ${e.message}`);
+                            }
+
+                            if (scanpathData) {
+                                // Extract fixations from either demo-sample or direct format
+                                const subjectIdx = parseInt(process.env.TEST_SCANPATH_SUBJECT || '0');
+                                let fixations;
+                                if (scanpathData.scanpaths) {
+                                    fixations = scanpathData.scanpaths[subjectIdx].fixations;
+                                } else if (scanpathData.fixations) {
+                                    fixations = scanpathData.fixations;
+                                }
+
+                                if (fixations && fixations.length > 0) {
+                                    const displayW = scanpathData.displaySize ? scanpathData.displaySize.width : 1680;
+                                    const displayH = scanpathData.displaySize ? scanpathData.displaySize.height : 1050;
+
+                                    // Enable infinite visual memory (-1)
+                                    const vmLimit = testVisualMemory !== null ? testVisualMemory : -1;
+                                    console.log(`[Test] Scanpath replay: ${fixations.length} fixations, visual memory=${vmLimit}`);
+                                    mainWindow.scrutinizerHud.webContents.send('menu:set-visual-memory', vmLimit);
+                                    await new Promise(resolve => setTimeout(resolve, 200));
+
+                                    const { width: tw, height: th } = mainWindow.getContentBounds();
+                                    const wb = mainWindow.getBounds();
+
+                                    for (let fi = 0; fi < fixations.length; fi++) {
+                                        const fix = fixations[fi];
+                                        const normX = fix.x / displayW;
+                                        const normY = fix.y / displayH;
+                                        const screenX = wb.x + normX * tw;
+                                        const screenY = wb.y + normY * th;
+                                        const duration = fix.tEnd - fix.tStart;
+
+                                        mainWindow.scrutinizerHud.webContents.send('browser:mousemove', screenX, screenY, 1.0);
+
+                                        // Dwell at fixation for its recorded duration (min 100ms for render)
+                                        const dwellMs = Math.max(100, duration);
+                                        await new Promise(resolve => setTimeout(resolve, dwellMs));
+
+                                        if (fi === 0 || fi === fixations.length - 1) {
+                                            console.log(`[Test]   Fix ${fi + 1}/${fixations.length}: (${normX.toFixed(3)}, ${normY.toFixed(3)}) ${duration}ms`);
+                                        }
+                                    }
+
+                                    // Extra settle time for final visual memory accumulation
+                                    await new Promise(resolve => setTimeout(resolve, 500));
+                                    console.log(`[Test] Scanpath replay complete — capturing accumulated state`);
+                                }
                             }
                         }
 

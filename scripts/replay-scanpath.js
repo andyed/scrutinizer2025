@@ -24,6 +24,8 @@
  *   --height=1050       Viewport height (default: stimulus display height)
  *   --radius=45         Foveal radius in pixels
  *   --composite         Also capture the raw image (no effect) for comparison
+ *   --gazeplot          Single capture with infinite visual memory after walking all fixations
+ *   --visual-memory=-1  Visual memory limit for gazeplot (-1=infinite, 5=limited, 10=extended)
  *   --dry-run           Print what would be captured without running
  */
 
@@ -42,6 +44,8 @@ const ROOT = path.join(__dirname, '..');
 const dryRun = hasFlag('dry-run');
 const isDemo = hasFlag('demo');
 const composite = hasFlag('composite');
+const gazeplot = hasFlag('gazeplot');
+const visualMemoryLimit = getArg('visual-memory', '-1'); // -1 = infinite
 const modeId = getArg('mode', '0');
 const subjectIdx = parseInt(getArg('subject', '0'));
 const radiusPx = getArg('radius', '45');
@@ -215,6 +219,71 @@ function captureFrame(stimulusUrl, fixX, fixY, outputFilename, mode) {
     });
 }
 
+// ── Gazeplot: single session with visual memory accumulation ────
+
+function captureGazeplot(stimulusUrl, outputFilename, mode) {
+    return new Promise((resolve) => {
+        if (dryRun) {
+            console.log(`  [dry-run] ${outputFilename} (gazeplot, ${fixations.length} fixations)`);
+            return resolve(true);
+        }
+
+        // Position at first fixation initially
+        const firstNormX = fixations[0].x / parseInt(captureWidth);
+        const firstNormY = fixations[0].y / parseInt(captureHeight);
+
+        const env = {
+            ...process.env,
+            TEST_MODE: 'true',
+            TEST_URL: stimulusUrl,
+            TEST_MODES: mode,
+            TEST_RADIUS: radiusPx,
+            TEST_WIDTH: captureWidth,
+            TEST_HEIGHT: captureHeight,
+            TEST_FIXATION_X: firstNormX.toFixed(6),
+            TEST_FIXATION_Y: firstNormY.toFixed(6),
+            TEST_OVERLAY: 'false',
+            TEST_OUTPUT_FILENAME: outputFilename,
+            TEST_WAIT_CONGESTION: 'false',
+            TEST_SCANPATH: scanpathFile,
+            TEST_SCANPATH_SUBJECT: String(subjectIdx),
+            TEST_VISUAL_MEMORY: visualMemoryLimit,
+            SCREENSHOT_MODE: 'update',
+            ELECTRON_RUN_AS_NODE: undefined,
+        };
+
+        const child = spawn('npm', ['start'], {
+            cwd: ROOT,
+            env,
+            stdio: 'pipe',
+        });
+
+        let stderr = '';
+        child.stderr.on('data', (d) => { stderr += d.toString(); });
+
+        child.on('close', (code) => {
+            if (code === 0) {
+                const packageVersion = require(path.join(ROOT, 'package.json')).version.replace(/\.\d+$/, '');
+                const src = path.join(ROOT, 'tests', 'golden-captures', `v${packageVersion}`, outputFilename);
+                const dest = path.join(outputDir, outputFilename);
+
+                if (fs.existsSync(src)) {
+                    fs.renameSync(src, dest);
+                    resolve(true);
+                } else {
+                    console.warn(`  Warning: screenshot not found at ${src}`);
+                    resolve(false);
+                }
+            } else {
+                console.error(`  Gazeplot capture failed (exit ${code})`);
+                if (stderr.length > 200) stderr = stderr.slice(-200);
+                if (stderr) console.error(`  stderr: ${stderr}`);
+                resolve(false);
+            }
+        });
+    });
+}
+
 // ── Main ────────────────────────────────────────────────────────
 
 async function main() {
@@ -240,29 +309,44 @@ async function main() {
     const stimulusUrl = `file://${stimulusPage}`;
 
     // Optionally capture baseline (no effect)
-    if (composite) {
+    if (composite || gazeplot) {
         console.log('  Capturing baseline (no effect)...');
         await captureFrame(stimulusUrl, 0.5, 0.5, 'frame_baseline.png', 'disabled');
     }
 
-    // Capture each fixation
-    let success = 0;
-    for (let i = 0; i < fixations.length; i++) {
-        const fix = fixations[i];
-        const duration = fix.tEnd - fix.tStart;
+    if (gazeplot) {
+        // ── Gazeplot mode: single Electron session with visual memory ──
+        // Walks through all fixations sequentially with infinite visual memory,
+        // then captures the final accumulated state — shows everything the viewer
+        // learned across their entire search.
+        console.log(`  Gazeplot mode: visual memory=${visualMemoryLimit}, walking ${fixations.length} fixations...`);
 
-        // Convert pixel coordinates to normalized 0-1
-        const normX = fix.x / parseInt(captureWidth);
-        const normY = fix.y / parseInt(captureHeight);
+        const gazeplotOk = await captureGazeplot(stimulusUrl, 'gazeplot.png', modeId);
+        if (gazeplotOk) {
+            console.log(`\n  Done: gazeplot captured → ${outputDir}/gazeplot.png`);
+        } else {
+            console.log(`\n  Gazeplot capture failed.`);
+        }
+    } else {
+        // ── Per-fixation mode: independent captures ──
+        let success = 0;
+        for (let i = 0; i < fixations.length; i++) {
+            const fix = fixations[i];
+            const duration = fix.tEnd - fix.tStart;
 
-        const filename = `frame_${String(i).padStart(3, '0')}_fix${fix.tStart}ms.png`;
-        console.log(`  [${i + 1}/${fixations.length}] (${fix.x.toFixed(0)}, ${fix.y.toFixed(0)}) ${duration}ms → ${filename}`);
+            // Convert pixel coordinates to normalized 0-1
+            const normX = fix.x / parseInt(captureWidth);
+            const normY = fix.y / parseInt(captureHeight);
 
-        const ok = await captureFrame(stimulusUrl, normX, normY, filename, modeId);
-        if (ok) success++;
+            const filename = `frame_${String(i).padStart(3, '0')}_fix${fix.tStart}ms.png`;
+            console.log(`  [${i + 1}/${fixations.length}] (${fix.x.toFixed(0)}, ${fix.y.toFixed(0)}) ${duration}ms → ${filename}`);
+
+            const ok = await captureFrame(stimulusUrl, normX, normY, filename, modeId);
+            if (ok) success++;
+        }
+
+        console.log(`\n  Done: ${success}/${fixations.length} frames captured → ${outputDir}`);
     }
-
-    console.log(`\n  Done: ${success}/${fixations.length} frames captured → ${outputDir}`);
 
     // Write replay metadata alongside frames
     const replayMeta = {
