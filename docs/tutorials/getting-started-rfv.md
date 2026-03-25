@@ -174,7 +174,7 @@ Turn Visual Memory to **Off**. Park the cursor on the primary content area. With
 
 ### References
 
-- Jansen, Blackwell & Marriott (2017). A Restricted Focus Viewer for usability evaluation. *Behaviour & Information Technology*.
+- Jansen, Blackwell & Marriott (2003). A tool for tracking visual attention: The Restricted Focus Viewer. *Behavior Research Methods, Instruments, & Computers*.
 - Rayner (1998). Eye movements in reading and information processing. *Psychological Bulletin*.
 - Rolfs (2009). Microsaccades: Small steps on a long way. *Vision Research*.
 - Rosenholtz, Li & Nakano (2007). Measuring visual clutter. *Journal of Vision*.
