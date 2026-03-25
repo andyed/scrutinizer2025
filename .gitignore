@@ -50,6 +50,13 @@ docs/golden/isotropic-comparison/
 # OCR test artifacts
 *.traineddata
 tests/validation/ocr-accuracy-curve.json
+# Eye-tracking datasets (large downloads, not for git)
+# Keep demo samples (data/*/demo-*.json) for out-of-box replay
+data/coco-search18/*.zip
+data/coco-search18/coco_search18_*.json
+data/coco-search18/readme.txt
+data/ueyes/
+
 # Research papers (PDFs, too large for git)
 docs/research/
 
