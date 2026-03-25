@@ -271,8 +271,12 @@ function main() {
     const gazeX = entry.gaze[0];
     const gazeY = entry.gaze[1];
 
-    // Load images
-    const rawPath = path.join(brownDir, entry.raw);
+    // Load images — prefer raw-electron (same renderer) over raw-playwright
+    const rawElectronPath = path.join(capturesDir, 'raw-electron', `${entry.page}_center_raw.png`);
+    const rawPlaywrightPath = path.join(brownDir, entry.raw);
+    const rawPath = fs.existsSync(rawElectronPath) ? rawElectronPath : rawPlaywrightPath;
+    const rawSource = rawPath === rawElectronPath ? 'electron' : 'playwright';
+
     const brownPath = path.join(brownDir, entry.brown);
     const scrutinizerMode0Path = entry.scrutinizer_mode0
       ? path.join(capturesDir, entry.scrutinizer_mode0.replace(/^\.\.\//, ''))
@@ -288,17 +292,15 @@ function main() {
 
     if (!rawPng) { console.log(`  SKIP: raw not found (${rawPath})`); continue; }
     if (!brownPng) { console.log(`  SKIP: Brown metamer not found (${brownPath})`); continue; }
+    if (rawSource === 'electron') {
+      console.log(`  Raw source: Electron (pixel-matched to Scrutinizer)`);
+    }
 
-    // Convert normalized gaze to pixel coordinates.
-    // Scrutinizer frames are shorter than raw viewport (toolbar chrome removed).
-    // Use the Scrutinizer frame height (rawH * scrutH/2 / rawH simplifies to
-    // scrutH/2) as the reference, since that's where the fovea was centered.
-    // After alignment both images are at frame height, so gaze uses frame dims.
-    const frameH = scrut0Png
-      ? Math.round(scrut0Png.height / 2)  // 2x retina → 1x frame height
-      : (scrut10Png ? Math.round(scrut10Png.height / 2) : rawPng.height);
+    // Gaze in pixel coordinates. For Electron raw captures (same dimensions as
+    // Scrutinizer golden captures), gaze is simply normalized × image dims.
+    // For Playwright raw (1920x1080 vs Scrutinizer 3840x2024), use frame height.
     const gazePixelX = gazeX * rawPng.width;
-    const gazePixelY = gazeY * frameH;
+    const gazePixelY = gazeY * rawPng.height;
 
     const pageResult = {
       page: entry.page,
