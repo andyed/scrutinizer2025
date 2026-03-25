@@ -333,6 +333,33 @@
             }
         });
 
+        // ── Scanpath Replay IPC ────────────────────────────────────
+        ipcRenderer.on('scanpath:load', (event, data) => {
+            log(`[Overlay] Loading scanpath: ${data.scanpathData.fixations.length} fixations`);
+            if (scrutinizer) scrutinizer.loadScanpath(data.scanpathData);
+        });
+
+        ipcRenderer.on('scanpath:play', (event, data) => {
+            if (data && data.speed && scrutinizer) scrutinizer.scanpathSetSpeed(data.speed);
+            if (scrutinizer) scrutinizer.scanpathPlay();
+        });
+
+        ipcRenderer.on('scanpath:pause', () => {
+            if (scrutinizer) scrutinizer.scanpathPause();
+        });
+
+        ipcRenderer.on('scanpath:seek', (event, data) => {
+            if (scrutinizer && data && data.timeMs !== undefined) scrutinizer.scanpathSeek(data.timeMs);
+        });
+
+        ipcRenderer.on('scanpath:step', (event, data) => {
+            if (scrutinizer && data && data.n !== undefined) scrutinizer.scanpathStep(data.n);
+        });
+
+        ipcRenderer.on('scanpath:reset', () => {
+            if (scrutinizer) scrutinizer.scanpathReset();
+        });
+
         log('[Overlay] Ready (menu-only mode)');
     });
 })();

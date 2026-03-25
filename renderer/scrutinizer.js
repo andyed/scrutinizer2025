@@ -19,6 +19,7 @@
     const Logger = require('./logger');
     const WebGLRenderer = require('./webgl-renderer');
     const GazeModel = require('./gaze-model');
+    const ScanpathPlayer = require('./scanpath-player');
     const VisualMemory = require('./visual-memory');
     const ContentAnalysis = require('./content-analysis');
     const { probeWebGPU } = require('./webgpu-probe');
@@ -75,7 +76,14 @@
 
             // ── Module Initialization ────────────────────────────────
             // GazeModel: Oculomotor system proxy (mouse tracking, velocity, saccade detection)
-            this.gazeModel = new GazeModel(this.config, this.canvas);
+            // ScanpathPlayer: Drop-in replacement for replaying imported eye-tracking data
+            if (config.scanpathReplay && config.scanpathData) {
+                this.gazeModel = new ScanpathPlayer(this.config, this.canvas);
+                this.gazeModel.load(config.scanpathData);
+                Logger.info('ScanpathPlayer loaded:', config.scanpathData.fixations.length, 'fixations');
+            } else {
+                this.gazeModel = new GazeModel(this.config, this.canvas);
+            }
 
             // VisualMemory: Visuospatial working memory (fixation history, mask texture)
             this.visualMemory = new VisualMemory(this.config, this.canvas);
@@ -863,6 +871,53 @@
             }
             ipcRenderer.send('settings:comfort-mode-changed', enabled);
             ipcRenderer.send('log:renderer', `[Scrutinizer] Comfort mode: ${enabled}`);
+        }
+
+        // ── Scanpath Replay ────────────────────────────────────────
+        // Playback control methods — forwarded from IPC handlers in overlay.js
+
+        /**
+         * Load scanpath data and prepare for replay.
+         * @param {ScanpathData} scanpathData
+         */
+        loadScanpath(scanpathData) {
+            if (!(this.gazeModel instanceof ScanpathPlayer)) {
+                // Hot-swap GazeModel for ScanpathPlayer
+                this.gazeModel = new ScanpathPlayer(this.config, this.canvas);
+            }
+            this.gazeModel.load(scanpathData);
+            ipcRenderer.send('log:renderer',
+                `[Scrutinizer] Scanpath loaded: ${scanpathData.fixations.length} fixations, ` +
+                `dataset=${scanpathData.meta.dataset}`);
+        }
+
+        scanpathPlay() {
+            if (this.gazeModel.play) this.gazeModel.play();
+        }
+
+        scanpathPause() {
+            if (this.gazeModel.pause) this.gazeModel.pause();
+        }
+
+        scanpathStep(n) {
+            if (this.gazeModel.step) this.gazeModel.step(n);
+        }
+
+        scanpathSeek(timeMs) {
+            if (this.gazeModel.seek) this.gazeModel.seek(timeMs);
+        }
+
+        scanpathSetSpeed(multiplier) {
+            if (this.gazeModel.setSpeed) this.gazeModel.setSpeed(multiplier);
+        }
+
+        scanpathReset() {
+            if (this.gazeModel.reset) this.gazeModel.reset();
+        }
+
+        getScanpathProgress() {
+            if (this.gazeModel.getProgress) return this.gazeModel.getProgress();
+            return null;
         }
 
         toggleGaussianBlurMode(enabled) {
