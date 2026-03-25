@@ -1252,60 +1252,41 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     float smoothContent = 1.0 - smoothstep(0.01, 0.05, colorDelta);
     pooledCol = mix(pooledCol, foveaCol, smoothContent);
 
-    // Luminance/chrominance split blend.
-    // Chromatic sensitivity decays faster than spatial resolution with eccentricity
-    // (Mullen 1991; Hansen et al. 2009). Uniform foveal bleed-through compresses
-    // the castleCSF per-band gradient (red wall reads as flat purple instead of
-    // progressive desaturation). Splitting the blend in Oklab lets chrominance
-    // reach full pooled strength earlier while luminance retains gentle bleed
-    // that masks MIP box-filter artifacts at the fovea boundary.
-    float baseBlend = smoothstep(0.0, fovea_radius * 2.0, eccentricity);
-    float lumaBlend = baseBlend * u_intensity;
-    // pow(0.7) reshapes the intensity slider: at 0.6 → 0.68 chroma blend,
-    // reducing foveal chrominance bleed from 40% to 32%. Gentle enough to avoid
-    // dramatic blue shift on red surfaces while still showing progressive decay.
-    float chromaBlend = baseBlend * pow(max(u_intensity, 0.001), 0.7);
+    // === UNIFIED ECCENTRICITY MASTER CURVE ===
+    // Single C2-continuous transition replaces 6 overlapping smoothsteps that
+    // created compounding Mach bands. All V4 effects derive from one curve:
+    //   t   = fovea→pooled spatial blend
+    //   t²  = color effect onset (CA, rod desat gating) — gentle near fovea
+    //   t³  = rod desaturation — deferred to far periphery
+    // Each is a composition of smooth functions — no second-derivative
+    // discontinuities, no visible banding on uniform surfaces.
+    float t = smoothstep(0.0, fovea_radius * 4.0, eccentricity);
 
-    vec3 foveaLab = rgbToOklab(foveaCol);
-    vec3 pooledLab = rgbToOklab(pooledCol);
-    vec3 blendedLab = vec3(
-        mix(foveaLab.x, pooledLab.x, lumaBlend),   // L: gentle transition
-        mix(foveaLab.y, pooledLab.y, chromaBlend),  // a (RG): follows chromatic curve
-        mix(foveaLab.z, pooledLab.z, chromaBlend)   // b (YV): follows chromatic curve
-    );
-    vec3 col = oklabToRgb(blendedLab);
-    
+    // Unified blend from master curve. The wide ramp (0→4× fovea) lets the
+    // castleCSF per-band chromatic decay in the pooled output show through
+    // progressively, without the Mach bands from the previous tight transition.
+    float blendFactor = t * u_intensity;
+    vec3 col = mix(foveaCol, pooledCol, blendFactor);
+
     // === MAGNOCELLULAR PATHWAY: Luminance Contrast Preservation ===
     if (eccentricity > 0.001) {
         vec3 cleanSample = sampleSource(uv).rgb;
         float cleanLuma = dot(cleanSample, vec3(0.299, 0.587, 0.114));
         float distortedLuma = dot(col, vec3(0.299, 0.587, 0.114));
-        
         float lumaRatio = cleanLuma / max(distortedLuma, 0.01);
-        
-        float contrastRamp = smoothstep(0.0, fovea_radius * 0.5, eccentricity);
 
-        // Contrast preservation: 60% inner, 10% far periphery
-        float contrastPreservation = mix(0.6, 0.1, smoothstep(0.0, parafovea_radius - fovea_radius, eccentricity));
-        
-        col *= mix(1.0, lumaRatio, contrastPreservation * contrastRamp);
+        // Contrast preservation: 60% inner, 10% far periphery — uses master t
+        float contrastPreservation = mix(0.6, 0.1, t);
+        col *= mix(1.0, lumaRatio, contrastPreservation * t);
     }
-    
-    // === FOVEA PROTECTION ===
-    if (dist < fovea_radius * 0.5) {
-        return col;
-    }
+
+    // V4 effect factors derived from master curve
+    float colorEffects = t * t;     // Quadratic: gentle onset at fovea boundary
+    float rodDesat = t * t * t;     // Cubic: deferred to far periphery
 
     float effectFactor = v1.distortionStrength;
     // Visual memory: suppress V4 color effects in remembered regions.
-    // Without this, chromatic decay and rod desaturation create colored blobs
-    // instead of clear image at recalled fixation locations.
     effectFactor *= (1.0 - memoryStrength);
-    // Color effects onset: ramp across the parafovea so chromatic decay is progressive.
-    // Previous tight transition (0.5–0.7× fovea) created a binary cliff where all
-    // color vanished at once. Now ramps from fovea edge to parafovea boundary (~2.5×),
-    // letting castleCSF per-band decay show its eccentricity gradient on large surfaces.
-    float bypassTransition = smoothstep(fovea_radius * 0.8, fovea_radius * 2.5, dist);
 
     if (config.v4_style_id <= 1) { // Research Modes: 0=Usability, 1=Biological(Purkinje)
     
@@ -1317,10 +1298,8 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         float desatIntensity = smoothstep(0.0, 0.6, u_intensity);
         float strengthMult = desatIntensity * dampener;
         
-        // 1. Chromatic Aberration
-        float periphery_start = fovea_radius * 1.2;
-        float caFactor = smoothstep(periphery_start, periphery_start + 0.25, dist);
-        caFactor *= strengthMult;
+        // 1. Chromatic Aberration — onset from master curve
+        float caFactor = colorEffects * strengthMult;
         float caSuppression = 1.0 - v1.scrambleZone;
         caFactor *= caSuppression;
         
@@ -1332,44 +1311,32 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         // a slightly closer fovea edge, blue a slightly further one. This creates
         // a color fringe at the fovea boundary without overwriting DoG output.
         if (caFactor > 0.01) {
+            // Lateral chromatic aberration: shift the blend boundary per channel.
+            // Uses master curve t with small offsets for R and B channels.
             float offset = 0.005 * caFactor;
             float eccR = max(0.0, eccentricity - offset * fovea_radius * 4.0);
             float eccB = eccentricity + offset * fovea_radius * 4.0;
-            float blendR = smoothstep(0.0, fovea_radius * 0.5, eccR) * u_intensity;
-            float blendG = smoothstep(0.0, fovea_radius * 0.5, eccentricity) * u_intensity;
-            float blendB = smoothstep(0.0, fovea_radius * 0.5, eccB) * u_intensity;
-            col.r = mix(foveaCol.r, pooledCol.r, blendR);
-            col.g = mix(foveaCol.g, pooledCol.g, blendG);
-            col.b = mix(foveaCol.b, pooledCol.b, blendB);
+            float tR = smoothstep(0.0, fovea_radius * 4.0, eccR) * u_intensity;
+            float tG = t * u_intensity;
+            float tB = smoothstep(0.0, fovea_radius * 4.0, eccB) * u_intensity;
+            col.r = mix(foveaCol.r, pooledCol.r, tR);
+            col.g = mix(foveaCol.g, pooledCol.g, tG);
+            col.b = mix(foveaCol.b, pooledCol.b, tB);
         }
 
         // 2. Oklab Conversion
         vec3 lab = rgbToOklab(col);
         
-        // 3. Rod Desaturation Factor
-        float rampEnd = fovea_radius * config.lgn_ramp_end_mult;
-        float desaturationFactor = smoothstep(fovea_radius, rampEnd, dist);
-        desaturationFactor *= strengthMult;
-        float fade = desaturationFactor * bypassTransition;
-
-        // Apply Base Desaturation (Chrominance only)
-        // When per-band chromatic pooling is active (castleCSF + Bowers 2025),
-        // sampleDoGReconstructed() already applies differential RG/YV decay
-        // progressively with eccentricity. Base desaturation should only add
-        // rod-dominance desaturation at far periphery (>10°), not override
-        // the parafoveal gradient where cones still provide good color.
-        // Without per-band (legacy path), base desat is the only color reduction.
-        float baseFade = fade;
+        // 3. Rod Desaturation — uses cubic master curve (rodDesat = t³)
+        // t³ naturally defers rod effects: at t=0.5 (mid-parafovea), t³=0.125.
+        // This replaces the previous smoothstep(fovea, rampEnd) + rodOnset stacking.
+        float desaturationFactor = rodDesat * strengthMult;
         if (u_chromatic_pooling > 0.5 && u_dog_enabled > 0.5) {
-            // Rod desaturation onset: defer to far periphery where castleCSF
-            // per-band decay has already removed most RG signal. In the parafovea
-            // (2-5°), per-band handles the work — base desat would flatten the
-            // gradient that shows progressive red loss before blue loss.
-            float rodOnset = smoothstep(fovea_radius * 3.0, fovea_radius * 8.0, dist);
-            baseFade *= 0.3 * rodOnset;
+            // castleCSF per-band decay handles parafovea; rod just adds far-periphery tint
+            desaturationFactor *= 0.3;
         }
-        lab.y *= (1.0 - baseFade);
-        lab.z *= (1.0 - baseFade);
+        lab.y *= (1.0 - desaturationFactor);
+        lab.z *= (1.0 - desaturationFactor);
         
         // === DIVERGENCE: USABILITY VS BIOLOGY ===
         
@@ -1383,7 +1350,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             if (u_chromatic_pooling < 0.5 || u_dog_enabled < 0.5) {
                 float rednessFactor = max(0.0, lab.y);
                 if (rednessFactor > 0.0) {
-                     float peripheralFade = smoothstep(parafovea_radius, periphery_start + (fovea_radius * 2.0), dist);
+                     float peripheralFade = smoothstep(parafovea_radius, fovea_radius * 1.2 + (fovea_radius * 2.0), dist);
                      float desatStrength = peripheralFade * 0.95;
                      lab.y = mix(lab.y, 0.0, desatStrength); // Kill a (Red)
                      lab.z = mix(lab.z, 0.0, desatStrength); // Kill b (Yellow)
@@ -1399,14 +1366,14 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             rodColor += noiseVal * 0.08;
             rodColor = clamp(rodColor, 0.0, 1.0);
             
-            return mix(finalCol, rodColor, desaturationFactor * bypassTransition * 0.3);
+            return mix(finalCol, rodColor, desaturationFactor * 0.3);
             
         } else {
             // === MODE 1: BIOLOGICAL (Purkinje Darkening) ===
             // Goal: Simulation accuracy. Red objects vanish into shadows.
             
             // Purkinje Shift + Optical Vignette
-            float deepPeriphery = smoothstep(parafovea_radius, periphery_start + (fovea_radius * 0.8), dist);
+            float deepPeriphery = smoothstep(parafovea_radius, fovea_radius * 1.2 + (fovea_radius * 0.8), dist);
             float rednessFactor = max(0.0, lab.y * 2.0); // Boosted sensitivity
              
             if (rednessFactor > 0.0) {
@@ -1426,7 +1393,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         
     } else if (config.v4_style_id == 2) { // Frosted
         vec3 frosted = mix(col, vec3(0.9), 0.3);
-        return mix(col, frosted, effectFactor * 0.7 * bypassTransition);
+        return mix(col, frosted, effectFactor * 0.7 * colorEffects);
         
     } else if (config.v4_style_id == 3) { // Blueprint (ARIA Wireframe)
         vec4 structure = texture(u_structureMap, v1.distortedUV);
@@ -1570,7 +1537,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             float gridLine = 1.0 - 0.06 * (1.0 - smoothstep(0.0, 0.08, edgeDist));
             result *= gridLine;
 
-            return mix(col, result, blockBlend * effectFactor * bypassTransition);
+            return mix(col, result, blockBlend * effectFactor * colorEffects);
             
     } else if (config.v4_style_id == 5) { // Double Vision
         float luma = dot(col, vec3(0.299, 0.587, 0.114));
@@ -1579,11 +1546,11 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         float n = snoise(warpUV + vec2(u_time * 0.1));
         float subtleNoise = n * 0.05 * effectFactor;
         vec3 finalColor = clamp(saturated + subtleNoise, 0.0, 1.0);
-        return mix(col, finalColor, effectFactor * bypassTransition);
+        return mix(col, finalColor, effectFactor * colorEffects);
 
     } else if (config.v4_style_id == 7) { // Pooling Grid — educational polar overlay
         // Compute own eccentricity ramp (not dependent on V1 distortion strength)
-        float gridFade = smoothstep(fovea_radius, fovea_radius * 2.0, dist) * bypassTransition;
+        float gridFade = colorEffects;  // uses master curve t²
 
         // Mild desaturation so content stays readable
         float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
@@ -1736,7 +1703,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
 
         result *= min(ringEdge, spokeEdge);
 
-        return mix(col, result, blockBlend * effectFactor * bypassTransition);
+        return mix(col, result, blockBlend * effectFactor * colorEffects);
 
     } else if (config.v4_style_id == 6) { // FOVI: Gaussian color decay (rod-cone transition)
         if (u_cmf_color_sigma > 0.01) {
