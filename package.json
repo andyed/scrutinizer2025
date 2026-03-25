@@ -1,6 +1,6 @@
 {
   "name": "scrutinizer-electron",
-  "version": "2.7.1-dev",
+  "version": "2.7.0",
   "description": "Foveated vision simulator — peripheral rendering driven by cortical magnification, saliency, and chromatic decay",
   "main": "main.js",
   "scripts": {

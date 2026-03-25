@@ -1,6 +1,7 @@
 # Scrutinizer v2.7.0 — Pyramid Mongrel
 
-**Date:** 2026-03-22
+**Date:** 2026-03-25
+**Previous:** [v2.6.0](release_notes_v2.6.0.md)
 
 Tier 2.75 replaces Tier 2.5's single-scale oriented noise with a Laplacian pyramid decomposition pipeline. Four frequency bands plus a DC residual are extracted per tile, their variances and cross-scale correlations measured, and noise is synthesized to match those statistics at each scale. The result is spatially coherent peripheral texture instead of colored noise. Mode 14 (Pyramid Mongrel) is the new default.
 
@@ -78,9 +79,27 @@ Switching between Tier 2.5 and Tier 2.75 modes now correctly destroys and recrea
 | Wave 7b (stats accuracy) | Scaffolded |
 | Wave 7c (crowding asymmetry) | FAIL — OCR calibration needed, not a synthesis issue |
 
+### Acuity-Gated Saliency
+
+Saliency protection decays with eccentricity per Strasburger et al. (2011). E2 tuned to 8.0° for web content.
+
+### Eccentricity-Weighted Congestion
+
+Feature Congestion runs at two scales: foveal (σ=2.5) and peripheral (σ=5.0), weighted by eccentricity.
+
+### Comfort Mode
+
+Toggle (View → Comfort Mode, ⌘⇧C) adds +1° to the clear zone. Extends foveal protection from 1° to ~2°, matching the microsaccade-maintained visibility envelope.
+
+### Compute Texture Comparison Tooling
+
+New validation scripts: `capture-compute-texture.js` and `compare-compute-textures.js` for isolated compute pipeline comparison. Wave 7.5 validation proved Tier 2.75 produces structured content (MAD = 0.86 vs Tier 2.5's near-black output).
+
 ## Known Limitations
 
-- Synthesis adds bandpass detail to tile-mean luminance rather than replacing content. Crowding asymmetry (flanked targets harder than isolated) requires Tier 3 content replacement within pooling regions. Wave 7c fails for this reason — it is an expected limitation of Tier 2.75, not a bug.
+- **Tier 2.5 (mode 10) near-black bug** — oriented noise synthesis produces near-zero RGB. Not user-facing (mode 14 is default).
+- **Tier 3 (mode 15) not ready** — Pure sector pooling without V1 displacement doesn't degrade sparse content. Fragment shader fixes identified, deferred. See `docs/specs/tier3_lessons_learned.md`.
+- **Brown metamer comparison pending** — Overnight PooledStatisticsMetamers jobs needed for quantitative gap analysis.
 - Cross-scale correlation strength tuned to 0.8 empirically. No psychophysical calibration yet.
 
 ## Breaking Changes

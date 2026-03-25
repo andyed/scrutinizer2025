@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.7.0] - 2026-03-22
+## [2.7.0] - 2026-03-25
 
 ### Added
 - **Tier 2.75 WebGPU Compute Pipeline (Mode 14, Default)**: Laplacian pyramid decomposition (4 bands + DC residual) with per-tile cross-scale magnitude correlation extraction and spectrum-matching synthesis. 15 dispatches per frame via `webgpu-pyramid-compute.js`. Three WGSL shaders: `pyramid-decompose.wgsl` (luminance, blur/downsample, band subtraction), `pyramid-stats.wgsl` (atomic accumulate + finalize → 18 floats/tile), `pyramid-synth.wgsl` (sine-grating noise + variance matching + bilinear interpolation + multi-band reconstruction). Produces spatially coherent peripheral texture instead of Tier 2.5's colored noise.
@@ -14,6 +14,11 @@
 - **Wave 7 Validation Scaffolding**: Specs and scripts for 7a (pyramid fidelity), 7b (stats accuracy), 7c (crowding asymmetry). Crowding capture and analysis scripts for Tier 2.5 vs 2.75 comparison.
 - **Tier 3 TTM Synthesis Plan**: Architecture spec (`docs/specs/tier3_ttm_synthesis_plan.md`) for content replacement within pooling regions.
 - **Compute Phase in FrameTimer**: Timer mark for WebGPU compute dispatch duration.
+- **Acuity-Gated Saliency**: Saliency protection decays with eccentricity (Strasburger et al. 2011, E2=8.0°).
+- **Eccentricity-Weighted Congestion**: Two-scale Feature Congestion — foveal (σ=2.5) + peripheral (σ=5.0).
+- **Comfort Mode**: Toggle (⌘⇧C) adds +1° to clear zone via shader distance offset. Microsaccade-maintained visibility envelope.
+- **Compute Texture Comparison**: `capture-compute-texture.js` + `compare-compute-textures.js` for isolated pipeline validation. Wave 7.5: MAD=0.86 between Tier 2.5 (near-black) and Tier 2.75 (structured content).
+- **Tier 3 Lessons Learned**: `docs/specs/tier3_lessons_learned.md` — failed pure-pooling attempt, fragment shader fixes identified.
 
 ### Changed
 - **Default Mode**: 12 (FOVI Cortical Grid) → 14 (Pyramid Mongrel). Multi-scale pyramid synthesis replaces single-scale oriented noise for peripheral rendering. Previous default accessible via menu.
