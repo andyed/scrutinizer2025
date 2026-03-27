@@ -416,10 +416,11 @@ fn reconstruct(
     let fy = f32(y) - rc_config.fovea_y * f32(rc_config.height);
     let ecc = sqrt(fx * fx + fy * fy);
 
-    // Blend weight: match the fragment shader's master curve (smoothstep 0→4×fovea)
-    // to avoid a visible border at the compute texture's onset.
-    // Old linear ramp with blend_start offset created a hard edge at the parafovea.
-    let alpha = smoothstep(0.0, rc_config.blend_end, ecc);
+    // Blend weight: 0 at fovea, 1 in far periphery
+    let alpha = clamp(
+        (ecc - rc_config.blend_start) / max(rc_config.blend_end - rc_config.blend_start, 1.0),
+        0.0, 1.0
+    );
 
     // If fully foveal, output transparent (original passthrough)
     if (alpha < 0.01) {

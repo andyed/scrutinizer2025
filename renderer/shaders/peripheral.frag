@@ -1248,17 +1248,16 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     // have nothing to amplify into Mach bands. On structured content (text, edges),
     // colorDelta is large and this is a no-op.
     //
-    // Smooth content snap-back: prevents Mach bands from DoG reconstruction errors.
-    // Tier 3: widen the threshold so snap-back only fires on near-identical content,
-    // not on synthesis output that's subtly different from the original.
-    // Tier 2.x: standard tight threshold (0.01-0.05).
-    {
-        float snapLo = (u_compute_tier >= 3.0) ? 0.03 : 0.01;
-        float snapHi = (u_compute_tier >= 3.0) ? 0.12 : 0.05;
-        float colorDelta = length(pooledCol - foveaCol);
-        float smoothContent = 1.0 - smoothstep(snapLo, snapHi, colorDelta);
-        pooledCol = mix(pooledCol, foveaCol, smoothContent);
-    }
+    // Smooth content detection: DoG band decomposition isn't identity on gradients —
+    // hardware MIP uses box filtering, and per-band chromatic attenuation introduces
+    // small color errors that compound across 12 bands. When pooledCol ≈ foveaCol
+    // (smooth content), snap pooledCol to foveaCol so subsequent blend transitions
+    // have nothing to amplify into Mach bands. On structured content (text, edges),
+    // colorDelta is large and this is a no-op.
+    //
+    float colorDelta = length(pooledCol - foveaCol);
+    float smoothContent = 1.0 - smoothstep(0.01, 0.05, colorDelta);
+    pooledCol = mix(pooledCol, foveaCol, smoothContent);
 
     // === UNIFIED ECCENTRICITY MASTER CURVE ===
     // Single C2-continuous transition replaces 6 overlapping smoothsteps that
@@ -1273,27 +1272,21 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     // Unified blend from master curve. The wide ramp (0→4× fovea) lets the
     // castleCSF per-band chromatic decay in the pooled output show through
     // progressively, without the Mach bands from the previous tight transition.
-    // Tier 3: raised blend cap (0.85) — synthesis has more authority but not total.
-    // Full authority (t * 1.0) creates a hard visible band and the synthesis output
-    // isn't strong enough to stand alone yet. 0.85 gives 15% original bleed-through.
-    // Tier 2.x: standard intensity-attenuated blend (u_intensity ≈ 0.6).
-    float blendFactor = (u_compute_tier >= 3.0) ? t * 0.85 : t * u_intensity;
+    // Unified blend from master curve. The wide ramp (0→4× fovea) lets the
+    // castleCSF per-band chromatic decay in the pooled output show through
+    // progressively, without the Mach bands from the previous tight transition.
+    float blendFactor = t * u_intensity;
     vec3 col = mix(foveaCol, pooledCol, blendFactor);
 
     // === MAGNOCELLULAR PATHWAY: Luminance Contrast Preservation ===
-    // Tier 3: reduce (not disable) — fully removing causes dim periphery because
-    // sector means average dark content with white → gray wash. Keep partial
-    // restoration to maintain luminance while still allowing pooling degradation.
     if (eccentricity > 0.001) {
         vec3 cleanSample = sampleSource(uv).rgb;
         float cleanLuma = dot(cleanSample, vec3(0.299, 0.587, 0.114));
         float distortedLuma = dot(col, vec3(0.299, 0.587, 0.114));
         float lumaRatio = cleanLuma / max(distortedLuma, 0.01);
 
-        // Contrast preservation: inner → far periphery.
-        // Tier 3: reduced (30%→5%) — allows more pooling degradation while preventing dim wash.
-        // Tier 2.x: standard (60%→10%).
-        float contrastPreservation = (u_compute_tier >= 3.0) ? mix(0.3, 0.05, t) : mix(0.6, 0.1, t);
+        // Contrast preservation: 60% inner, 10% far periphery — uses master t
+        float contrastPreservation = mix(0.6, 0.1, t);
         col *= mix(1.0, lumaRatio, contrastPreservation * t);
     }
 

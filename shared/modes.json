@@ -460,6 +460,7 @@
                 "crowding_density_threshold": 0.3,
                 "crowding_density_steepness": 20.0,
                 "compute_tier": 2.75,
+                "num_cortical_rings": 50,
                 "reading_span": true,
                 "reading_span_strength": 1.0
             },
@@ -469,7 +470,7 @@
                 "cross_scale_correlation_sign",
                 "fallback_to_mip"
             ],
-            "architectural_purpose": "Tier 2.75: Multi-scale pyramid decomposition + cross-scale correlation matching — bridges Tier 2.5 (single-scale noise) to Tier 3 (full TTM synthesis)",
+            "architectural_purpose": "Tier 2.75+: Hybrid — CMF sector pooling (Tier 3 geometry) with V1 displacement + MIP blur pipeline (Tier 2.75 compositing). Sectors scale pooling regions with eccentricity; displacement provides spatial destruction.",
             "citations": {
                 "technique": "Laplacian pyramid + cross-scale magnitude correlation (Portilla & Simoncelli 2000, Walton 2021)",
                 "biological_basis": "Pooling regions scale with eccentricity via CMF (Schwartz 1980, FOVI 2026)"

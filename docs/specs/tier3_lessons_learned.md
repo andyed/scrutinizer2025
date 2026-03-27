@@ -1,4 +1,4 @@
-# Tier 3 TTM Synthesis — Lessons Learned (2026-03-24)
+# Tier 3 TTM Synthesis — Lessons Learned (updated 2026-03-27)
 
 ## What we tried
 
@@ -62,3 +62,73 @@ Sector pooling alone ≠ visible degradation. The TTM quality comes from the **s
 - `renderer/webgpu-pyramid-compute.js` — useSectors parameter, maxSectors increase
 - `renderer/scrutinizer.js` — isTier3 flag, sector dispatch, debug logging
 - `renderer/shaders/peripheral.frag` — Tier 3 blend/bypass changes
+
+---
+
+## Session 2: Option C + Phase 3a (2026-03-26/27)
+
+### What we built
+
+**Option C: Eccentricity-scaled sectors** (committed ff21eed)
+- CMF-based sector assignment (Blauch et al. 2026) replaces fixed 8x8 tiles
+- ~3,200 sectors (N=50 rings, 15° max) vs ~7,680 tiles — memory decreases
+- `computeSectorId()` in WGSL: 1 sqrt + 1 log + 1 atan2 + 2 buffer reads per pixel
+- Activated via `num_cortical_rings: 50` in mode config
+- 9 new unit tests validate sector layout against Blauch Python reference
+- Both TTM Synthesis and Pyramid Mongrel now use sectors
+
+**Phase 3a: Synthesis improvements** (committed ff21eed)
+- Skewness extraction (ACCUM_STRIDE 20→24, STATS_STRIDE 14→18) + power-law matching
+- Multiplicative cross-scale correlation (conditional parent→child scaling replaces linear additive)
+- Crowding OCR test page (`crowding-ocr-test.html`) — minimal stimulus for Wave 7c
+- Brown comparison extended for TTM Synthesis mode
+- Zoom reset (`setZoomFactor(1.0)`) in batch capture pipeline
+
+### What we measured
+
+**Brown comparison — dashboard near/mid periphery SSIM:**
+
+| Stage | Near periphery | Mid periphery | Target (Brown) |
+|-------|---------------|---------------|-----------------|
+| Pre-sectors (Tier 2.75 tiles) | 0.96-1.00 | 0.96-1.00 | 0.21-0.24 |
+| Option C sectors only | 0.37 | 0.39 | 0.21-0.24 |
+| Phase 3a (graduated frag shader) | 0.71 | 0.73 | 0.21-0.24 |
+
+Sectors produced the biggest single improvement (SSIM 1.0→0.37). The fragment shader changes partially undid it by preserving too much original content (0.37→0.71). Reverting fragment shader changes restores the sector improvement.
+
+### What we tried and reverted
+
+**Fragment shader Tier 3 compositing path** — three changes gated on `u_compute_tier >= 3.0`:
+1. Blend cap raised from 0.6 to 0.85 → **caused hard visible band at parafovea**
+2. Smooth content snap-back disabled → **allowed synthesis to fully replace content, but synthesis output was too weak to stand alone**
+3. Magnocellular contrast preservation disabled → **caused dim/washed-out periphery**
+
+Then graduated (not disabled): 0.85 blend, widened snap-back, reduced magnocellular → **still dim, still large fovea, low peripheral contrast.** Visual regression from utility POV.
+
+Then smoothstep alpha ramp in synthesis to match fragment shader → **fixed parafoveal border but created huge fovea.**
+
+**All reverted.** The synthesis isn't ready for more compositing authority. The standard Tier 2.75 compositing (0.6 blend, standard snap-back, standard magnocellular) works for both modes.
+
+**Residual-based DC** — replaced tile_mean_L with pyramid residual (W/16×H/16) as DC component in synthesis. Destroyed ALL content equally (isolated and flanked) because the 16px blur obliterates letter-scale structure. Reverted to tile_mean_L.
+
+### What we learned
+
+1. **Sector geometry works and produces real degradation.** SSIM dropped from ~1.0 to 0.37 on dense content. The infrastructure (ring assignment, spoke computation, atomic accumulation, sector-aware synthesis) is solid.
+
+2. **The fragment shader compositing is deeply coupled to displacement.** Blend factor, snap-back, magnocellular preservation — all tuned for V1 displacement's spatial jitter. Removing displacement and giving synthesis more authority requires a full decouple (Option A refactor), not per-parameter tweaking.
+
+3. **TTM Synthesis (no displacement) looks better on word boundary destruction** — sectors pool across word boundaries, making spacing imperceptible. But the standard compositing's attenuation makes this hard to see.
+
+4. **The hybrid (Pyramid Mongrel + sectors) is the practical path.** Sectors improve compute texture quality; displacement provides spatial destruction; standard compositing handles visual quality. No fragment shader changes needed.
+
+5. **Crowding asymmetry test blocked by sparse content problem.** Both isolated and flanked letters are equally destroyed because sector mean ≈ white for both. The test needs denser stimuli or lower eccentricity, OR the synthesis needs to be destructive enough that the variance difference between isolated (low) and flanked (high) produces measurably different output.
+
+6. **Zoom consistency in captures is critical.** Text zoom variation between sessions invalidated Brown comparisons. Fixed with `setZoomFactor(1.0)` in batch capture.
+
+### Current state
+
+- **Pyramid Mongrel** = sectors + displacement + standard compositing (default, production-ready)
+- **TTM Synthesis** = sectors + no displacement + standard compositing (research mode, not default-ready)
+- Option A (fragment shader decouple) = future work, prerequisite for Tier 3 compositing
+- Crowding asymmetry (Wave 7c) = blocked on stimulus design or synthesis quality
+- 314 tests pass, 0 regressions
