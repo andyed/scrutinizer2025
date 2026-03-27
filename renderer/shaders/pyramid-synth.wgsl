@@ -39,9 +39,14 @@ struct SynthConfig {
     fovea_radius: f32,    // in pixels
     blend_start: f32,     // eccentricity where synthesis begins blending in
     blend_end: f32,       // eccentricity where synthesis is fully opaque
-    _pad0: f32,
-    _pad1: f32,
-    _pad2: f32,
+    // Sector mode fields (CMF-based eccentricity-scaled pooling)
+    use_sectors: u32,     // 0 = tile grid, 1 = CMF sectors
+    num_rings: u32,
+    total_sectors: u32,
+    fovea_x_px: f32,      // fovea in band_0 pixel coords
+    fovea_y_px: f32,
+    cmf_a: f32,           // cortical magnification constant (2.78)
+    cortical_max: f32,    // log(maxEccDeg / cmfA + 1)
 };
 
 // Must match pyramid-stats.wgsl TileStatsTier3
@@ -53,7 +58,7 @@ struct TileStatsTier3 {
     skew0: f32, skew1: f32, skew2: f32, skew3: f32,
 };
 
-const STATS_STRIDE: u32 = 14u;
+const STATS_STRIDE: u32 = 18u;
 
 // ─── Hash functions for deterministic noise ───
 
@@ -155,6 +160,61 @@ fn seed_noise(
 @group(0) @binding(3) var<storage, read_write> n1: array<f32>;
 @group(0) @binding(4) var<storage, read_write> n2: array<f32>;
 @group(0) @binding(5) var<storage, read_write> n3: array<f32>;
+@group(0) @binding(6) var<storage, read> ms_ring_base_sectors: array<u32>;
+@group(0) @binding(7) var<storage, read> ms_ring_spoke_counts: array<u32>;
+
+// ─── CMF Sector Assignment (Blauch et al. 2026) ───
+// Canonical JS reference: tests/unit/isotropic-sectors.test.js:27-70
+// Duplicated from pyramid-stats.wgsl — WGSL has no includes.
+const MAX_ECC_DEG: f32 = 15.0;
+const TWO_PI: f32 = 6.28318530718;
+const M_PI: f32 = 3.14159265359;
+
+fn computeSectorIdMS(x: u32, y: u32) -> u32 {
+    if (ms_config.use_sectors == 0u) {
+        let tx = x / ms_config.tile_size;
+        let ty = y / ms_config.tile_size;
+        return ty * ms_config.tile_count_x + tx;
+    }
+    let dx = f32(x) - ms_config.fovea_x_px;
+    let dy = f32(y) - ms_config.fovea_y_px;
+    let r_px = sqrt(dx * dx + dy * dy);
+    let r_deg = r_px / max(ms_config.fovea_radius * MAX_ECC_DEG, 1.0) * MAX_ECC_DEG;
+    let a = ms_config.cmf_a;
+    let w_min = log(a);
+    let w_step = ms_config.cortical_max / f32(ms_config.num_rings - 1u);
+    let w = log(r_deg + a);
+    let n_cont = (w - w_min) / w_step;
+    let ring = u32(clamp(i32(round(n_cont)), 0, i32(ms_config.num_rings) - 1));
+    let angle = atan2(dy, dx);
+    let spoke_count = ms_ring_spoke_counts[ring];
+    let spoke_width = TWO_PI / f32(spoke_count);
+    let spoke = u32(floor((angle + M_PI) / spoke_width));
+    return ms_ring_base_sectors[ring] + min(spoke, spoke_count - 1u);
+}
+
+fn computeSectorIdRC(x: u32, y: u32) -> u32 {
+    if (rc_config.use_sectors == 0u) {
+        let tx = x / rc_config.tile_size;
+        let ty = y / rc_config.tile_size;
+        return ty * rc_config.tile_count_x + tx;
+    }
+    let dx = f32(x) - rc_config.fovea_x_px;
+    let dy = f32(y) - rc_config.fovea_y_px;
+    let r_px = sqrt(dx * dx + dy * dy);
+    let r_deg = r_px / max(rc_config.fovea_radius * MAX_ECC_DEG, 1.0) * MAX_ECC_DEG;
+    let a = rc_config.cmf_a;
+    let w_min = log(a);
+    let w_step = rc_config.cortical_max / f32(rc_config.num_rings - 1u);
+    let w = log(r_deg + a);
+    let n_cont = (w - w_min) / w_step;
+    let ring = u32(clamp(i32(round(n_cont)), 0, i32(rc_config.num_rings) - 1));
+    let angle = atan2(dy, dx);
+    let spoke_count = rc_ring_spoke_counts[ring];
+    let spoke_width = TWO_PI / f32(spoke_count);
+    let spoke = u32(floor((angle + M_PI) / spoke_width));
+    return rc_ring_base_sectors[ring] + min(spoke, spoke_count - 1u);
+}
 
 fn get_tile_stat(tile_idx: u32, offset: u32) -> f32 {
     return stats[tile_idx * STATS_STRIDE + offset];
@@ -168,43 +228,74 @@ fn match_stats(
     let y = gid.y;
     if (x >= ms_config.width || y >= ms_config.height) { return; }
 
-    // Bilinear interpolation of tile statistics — eliminates crosshatch
-    // at tile boundaries by smoothly blending variance/magnitude/correlation
-    // between neighboring tiles.
-    let ts = f32(ms_config.tile_size);
-    let tcx = ms_config.tile_count_x;
-    let tcy = ms_config.tile_count_y;
+    // Look up statistics for this pixel's pooling region.
+    // In sector mode: direct sector lookup (sectors are eccentricity-matched, no grid).
+    // In tile mode: bilinear interpolation between 4 neighboring tiles.
+    var target_mag0: f32; var target_mag1: f32; var target_mag2: f32; var target_mag3: f32;
+    var target_var0: f32; var target_var1: f32; var target_var2: f32; var target_var3: f32;
+    var target_corr01: f32; var target_corr12: f32; var target_corr23: f32;
 
-    let ftx = (f32(x) + 0.5) / ts - 0.5;
-    let fty = (f32(y) + 0.5) / ts - 0.5;
+    var target_skew0: f32; var target_skew1: f32; var target_skew2: f32; var target_skew3: f32;
 
-    let tx0 = u32(clamp(i32(floor(ftx)), 0, i32(tcx) - 1));
-    let ty0 = u32(clamp(i32(floor(fty)), 0, i32(tcy) - 1));
-    let tx1 = min(tx0 + 1u, tcx - 1u);
-    let ty1 = min(ty0 + 1u, tcy - 1u);
+    if (ms_config.use_sectors != 0u) {
+        // Direct sector lookup — sectors are pooling regions, no interpolation needed.
+        // Adjacent pixels in the same sector get identical stats (correct TTM behavior).
+        let sid = computeSectorIdMS(x, y);
+        target_mag0 = get_tile_stat(sid, 0u);
+        target_mag1 = get_tile_stat(sid, 1u);
+        target_mag2 = get_tile_stat(sid, 2u);
+        target_mag3 = get_tile_stat(sid, 3u);
+        target_var0 = get_tile_stat(sid, 4u);
+        target_var1 = get_tile_stat(sid, 5u);
+        target_var2 = get_tile_stat(sid, 6u);
+        target_var3 = get_tile_stat(sid, 7u);
+        target_corr01 = get_tile_stat(sid, 8u);
+        target_corr12 = get_tile_stat(sid, 9u);
+        target_corr23 = get_tile_stat(sid, 10u);
+        target_skew0 = get_tile_stat(sid, 14u);
+        target_skew1 = get_tile_stat(sid, 15u);
+        target_skew2 = get_tile_stat(sid, 16u);
+        target_skew3 = get_tile_stat(sid, 17u);
+    } else {
+        // Bilinear interpolation of tile statistics — eliminates crosshatch
+        // at tile boundaries by smoothly blending variance/magnitude/correlation
+        // between neighboring tiles.
+        let ts = f32(ms_config.tile_size);
+        let tcx = ms_config.tile_count_x;
+        let tcy = ms_config.tile_count_y;
 
-    let fx_f = clamp(ftx - floor(ftx), 0.0, 1.0);
-    let fy_f = clamp(fty - floor(fty), 0.0, 1.0);
+        let ftx = (f32(x) + 0.5) / ts - 0.5;
+        let fty = (f32(y) + 0.5) / ts - 0.5;
 
-    let i00 = ty0 * tcx + tx0;
-    let i10 = ty0 * tcx + tx1;
-    let i01 = ty1 * tcx + tx0;
-    let i11 = ty1 * tcx + tx1;
+        let tx0 = u32(clamp(i32(floor(ftx)), 0, i32(tcx) - 1));
+        let ty0 = u32(clamp(i32(floor(fty)), 0, i32(tcy) - 1));
+        let tx1 = min(tx0 + 1u, tcx - 1u);
+        let ty1 = min(ty0 + 1u, tcy - 1u);
 
-    // Interpolate all 11 statistics
-    let target_mag0 = mix(mix(get_tile_stat(i00, 0u), get_tile_stat(i10, 0u), fx_f), mix(get_tile_stat(i01, 0u), get_tile_stat(i11, 0u), fx_f), fy_f);
-    let target_mag1 = mix(mix(get_tile_stat(i00, 1u), get_tile_stat(i10, 1u), fx_f), mix(get_tile_stat(i01, 1u), get_tile_stat(i11, 1u), fx_f), fy_f);
-    let target_mag2 = mix(mix(get_tile_stat(i00, 2u), get_tile_stat(i10, 2u), fx_f), mix(get_tile_stat(i01, 2u), get_tile_stat(i11, 2u), fx_f), fy_f);
-    let target_mag3 = mix(mix(get_tile_stat(i00, 3u), get_tile_stat(i10, 3u), fx_f), mix(get_tile_stat(i01, 3u), get_tile_stat(i11, 3u), fx_f), fy_f);
+        let fx_f = clamp(ftx - floor(ftx), 0.0, 1.0);
+        let fy_f = clamp(fty - floor(fty), 0.0, 1.0);
 
-    let target_var0 = mix(mix(get_tile_stat(i00, 4u), get_tile_stat(i10, 4u), fx_f), mix(get_tile_stat(i01, 4u), get_tile_stat(i11, 4u), fx_f), fy_f);
-    let target_var1 = mix(mix(get_tile_stat(i00, 5u), get_tile_stat(i10, 5u), fx_f), mix(get_tile_stat(i01, 5u), get_tile_stat(i11, 5u), fx_f), fy_f);
-    let target_var2 = mix(mix(get_tile_stat(i00, 6u), get_tile_stat(i10, 6u), fx_f), mix(get_tile_stat(i01, 6u), get_tile_stat(i11, 6u), fx_f), fy_f);
-    let target_var3 = mix(mix(get_tile_stat(i00, 7u), get_tile_stat(i10, 7u), fx_f), mix(get_tile_stat(i01, 7u), get_tile_stat(i11, 7u), fx_f), fy_f);
+        let i00 = ty0 * tcx + tx0;
+        let i10 = ty0 * tcx + tx1;
+        let i01 = ty1 * tcx + tx0;
+        let i11 = ty1 * tcx + tx1;
 
-    let target_corr01 = mix(mix(get_tile_stat(i00, 8u), get_tile_stat(i10, 8u), fx_f), mix(get_tile_stat(i01, 8u), get_tile_stat(i11, 8u), fx_f), fy_f);
-    let target_corr12 = mix(mix(get_tile_stat(i00, 9u), get_tile_stat(i10, 9u), fx_f), mix(get_tile_stat(i01, 9u), get_tile_stat(i11, 9u), fx_f), fy_f);
-    let target_corr23 = mix(mix(get_tile_stat(i00, 10u), get_tile_stat(i10, 10u), fx_f), mix(get_tile_stat(i01, 10u), get_tile_stat(i11, 10u), fx_f), fy_f);
+        target_mag0 = mix(mix(get_tile_stat(i00, 0u), get_tile_stat(i10, 0u), fx_f), mix(get_tile_stat(i01, 0u), get_tile_stat(i11, 0u), fx_f), fy_f);
+        target_mag1 = mix(mix(get_tile_stat(i00, 1u), get_tile_stat(i10, 1u), fx_f), mix(get_tile_stat(i01, 1u), get_tile_stat(i11, 1u), fx_f), fy_f);
+        target_mag2 = mix(mix(get_tile_stat(i00, 2u), get_tile_stat(i10, 2u), fx_f), mix(get_tile_stat(i01, 2u), get_tile_stat(i11, 2u), fx_f), fy_f);
+        target_mag3 = mix(mix(get_tile_stat(i00, 3u), get_tile_stat(i10, 3u), fx_f), mix(get_tile_stat(i01, 3u), get_tile_stat(i11, 3u), fx_f), fy_f);
+        target_var0 = mix(mix(get_tile_stat(i00, 4u), get_tile_stat(i10, 4u), fx_f), mix(get_tile_stat(i01, 4u), get_tile_stat(i11, 4u), fx_f), fy_f);
+        target_var1 = mix(mix(get_tile_stat(i00, 5u), get_tile_stat(i10, 5u), fx_f), mix(get_tile_stat(i01, 5u), get_tile_stat(i11, 5u), fx_f), fy_f);
+        target_var2 = mix(mix(get_tile_stat(i00, 6u), get_tile_stat(i10, 6u), fx_f), mix(get_tile_stat(i01, 6u), get_tile_stat(i11, 6u), fx_f), fy_f);
+        target_var3 = mix(mix(get_tile_stat(i00, 7u), get_tile_stat(i10, 7u), fx_f), mix(get_tile_stat(i01, 7u), get_tile_stat(i11, 7u), fx_f), fy_f);
+        target_corr01 = mix(mix(get_tile_stat(i00, 8u), get_tile_stat(i10, 8u), fx_f), mix(get_tile_stat(i01, 8u), get_tile_stat(i11, 8u), fx_f), fy_f);
+        target_corr12 = mix(mix(get_tile_stat(i00, 9u), get_tile_stat(i10, 9u), fx_f), mix(get_tile_stat(i01, 9u), get_tile_stat(i11, 9u), fx_f), fy_f);
+        target_corr23 = mix(mix(get_tile_stat(i00, 10u), get_tile_stat(i10, 10u), fx_f), mix(get_tile_stat(i01, 10u), get_tile_stat(i11, 10u), fx_f), fy_f);
+        target_skew0 = mix(mix(get_tile_stat(i00, 14u), get_tile_stat(i10, 14u), fx_f), mix(get_tile_stat(i01, 14u), get_tile_stat(i11, 14u), fx_f), fy_f);
+        target_skew1 = mix(mix(get_tile_stat(i00, 15u), get_tile_stat(i10, 15u), fx_f), mix(get_tile_stat(i01, 15u), get_tile_stat(i11, 15u), fx_f), fy_f);
+        target_skew2 = mix(mix(get_tile_stat(i00, 16u), get_tile_stat(i10, 16u), fx_f), mix(get_tile_stat(i01, 16u), get_tile_stat(i11, 16u), fx_f), fy_f);
+        target_skew3 = mix(mix(get_tile_stat(i00, 17u), get_tile_stat(i10, 17u), fx_f), mix(get_tile_stat(i01, 17u), get_tile_stat(i11, 17u), fx_f), fy_f);
+    }
 
     let idx = y * ms_config.width + x;
 
@@ -231,27 +322,35 @@ fn match_stats(
     v2 *= scale2;
     v3 *= scale3;
 
-    // Step 2: Cross-scale correlation injection
-    // For each parent-child pair, adjust child magnitude conditioned on parent.
-    // If target correlation is high and parent has strong magnitude:
-    //   child magnitude should also be strong (edges span scales).
-    // If target correlation is low: leave child independent (noise).
+    // Step 2: Cross-scale correlation injection (multiplicative conditional scaling)
+    // When parent magnitude is high (edge present), boost child proportionally.
+    // When parent magnitude is low (smooth region), attenuate child.
+    // This produces coherent edges spanning scales — the key visual structure
+    // that makes text look like horizontal stripes instead of random noise.
     //
-    // Method: v_child += target_corr * (|v_parent| - mean_parent_mag) * sign(v_child)
-    // This shifts child magnitude toward parent magnitude, scaled by correlation.
-    let corr_strength = 0.8; // stronger correlation injection for visible structure
+    // The mix(0.2, 2.0, ...) range: smooth parent → child at 20% (suppressed),
+    // strong parent → child at 200% (boosted). Modulated by target correlation.
 
     // corr01: band0 (parent) → band1 (child)
-    let parent_dev0 = abs(v0) - target_mag0;
-    v1 += target_corr01 * corr_strength * parent_dev0 * sign(v1);
+    let ps0 = mix(0.2, 2.0, smoothstep(0.0, 2.0 * max(target_mag0, 1e-4), abs(v0)));
+    v1 *= ps0 * (0.5 + 0.5 * abs(target_corr01));
 
     // corr12: band1 → band2
-    let parent_dev1 = abs(v1) - target_mag1;
-    v2 += target_corr12 * corr_strength * parent_dev1 * sign(v2);
+    let ps1 = mix(0.2, 2.0, smoothstep(0.0, 2.0 * max(target_mag1, 1e-4), abs(v1)));
+    v2 *= ps1 * (0.5 + 0.5 * abs(target_corr12));
 
     // corr23: band2 → band3
-    let parent_dev2 = abs(v2) - target_mag2;
-    v3 += target_corr23 * corr_strength * parent_dev2 * sign(v3);
+    let ps2 = mix(0.2, 2.0, smoothstep(0.0, 2.0 * max(target_mag2, 1e-4), abs(v2)));
+    v3 *= ps2 * (0.5 + 0.5 * abs(target_corr23));
+
+    // Step 3: Marginal skewness matching (power-law transform)
+    // Shifts distribution asymmetry: text on white has negative skew (dark strokes),
+    // random texture has near-zero skew. Matching skewness produces more natural texture.
+    let skew_k = 0.15; // tuning constant — small to avoid artifacts
+    v0 = sign(v0) * pow(abs(v0) + 0.001, 1.0 + skew_k * target_skew0);
+    v1 = sign(v1) * pow(abs(v1) + 0.001, 1.0 + skew_k * target_skew1);
+    v2 = sign(v2) * pow(abs(v2) + 0.001, 1.0 + skew_k * target_skew2);
+    v3 = sign(v3) * pow(abs(v3) + 0.001, 1.0 + skew_k * target_skew3);
 
     // Write back
     n0[idx] = v0;
@@ -271,6 +370,8 @@ fn match_stats(
 @group(0) @binding(6) var<storage, read> rc_stats: array<f32>;     // for tile color
 @group(0) @binding(7) var source_tex: texture_2d<f32>;             // original for foveal blend
 @group(0) @binding(8) var<storage, read_write> output: array<u32>; // RGBA8 packed
+@group(0) @binding(9) var<storage, read> rc_ring_base_sectors: array<u32>;
+@group(0) @binding(10) var<storage, read> rc_ring_spoke_counts: array<u32>;
 
 // Oklab → linear RGB
 fn oklab_to_linear(lab: vec3<f32>) -> vec3<f32> {
@@ -315,11 +416,10 @@ fn reconstruct(
     let fy = f32(y) - rc_config.fovea_y * f32(rc_config.height);
     let ecc = sqrt(fx * fx + fy * fy);
 
-    // Blend weight: 0 at fovea, 1 in far periphery
-    let alpha = clamp(
-        (ecc - rc_config.blend_start) / max(rc_config.blend_end - rc_config.blend_start, 1.0),
-        0.0, 1.0
-    );
+    // Blend weight: match the fragment shader's master curve (smoothstep 0→4×fovea)
+    // to avoid a visible border at the compute texture's onset.
+    // Old linear ramp with blend_start offset created a hard edge at the parafovea.
+    let alpha = smoothstep(0.0, rc_config.blend_end, ecc);
 
     // If fully foveal, output transparent (original passthrough)
     if (alpha < 0.01) {
@@ -330,70 +430,62 @@ fn reconstruct(
     // Sum synthesized bands to get bandpass detail (zero-mean modulation)
     let synth_luma = rc_n0[idx] + rc_n1[idx] + rc_n2[idx] + rc_n3[idx];
 
-    // Bilinear interpolation of tile color to eliminate grid artifacts.
-    // Sample the 4 nearest tile centers and blend by sub-tile position.
-    let ts = f32(rc_config.tile_size);
-    let tcx = rc_config.tile_count_x;
-    let tcy = rc_config.tile_count_y;
+    // Look up tile/sector mean color (L, a, b in Oklab).
+    // In sector mode: direct sector lookup.
+    // In tile mode: bilinear interpolation between 4 neighboring tiles.
+    var tile_mean_L: f32;
+    var tile_mean_a: f32;
+    var tile_mean_b: f32;
 
-    // Continuous tile coordinate (pixel center relative to tile grid)
-    let ftx = (f32(x) + 0.5) / ts - 0.5;
-    let fty = (f32(y) + 0.5) / ts - 0.5;
+    if (rc_config.use_sectors != 0u) {
+        // Direct sector lookup — pooling region color
+        let sid = computeSectorIdRC(x, y);
+        tile_mean_L = rc_stats[sid * STATS_STRIDE + 11u];
+        tile_mean_a = rc_stats[sid * STATS_STRIDE + 12u];
+        tile_mean_b = rc_stats[sid * STATS_STRIDE + 13u];
+    } else {
+        // Bilinear interpolation of tile color to eliminate grid artifacts.
+        let ts = f32(rc_config.tile_size);
+        let tcx = rc_config.tile_count_x;
+        let tcy = rc_config.tile_count_y;
+        let ftx = (f32(x) + 0.5) / ts - 0.5;
+        let fty = (f32(y) + 0.5) / ts - 0.5;
+        let tx0 = u32(clamp(i32(floor(ftx)), 0, i32(tcx) - 1));
+        let ty0 = u32(clamp(i32(floor(fty)), 0, i32(tcy) - 1));
+        let tx1 = min(tx0 + 1u, tcx - 1u);
+        let ty1 = min(ty0 + 1u, tcy - 1u);
+        let fx_frac = clamp(ftx - floor(ftx), 0.0, 1.0);
+        let fy_frac = clamp(fty - floor(fty), 0.0, 1.0);
+        let i00 = ty0 * tcx + tx0;
+        let i10 = ty0 * tcx + tx1;
+        let i01 = ty1 * tcx + tx0;
+        let i11 = ty1 * tcx + tx1;
+        tile_mean_a = mix(mix(rc_stats[i00 * STATS_STRIDE + 12u], rc_stats[i10 * STATS_STRIDE + 12u], fx_frac),
+                          mix(rc_stats[i01 * STATS_STRIDE + 12u], rc_stats[i11 * STATS_STRIDE + 12u], fx_frac), fy_frac);
+        tile_mean_b = mix(mix(rc_stats[i00 * STATS_STRIDE + 13u], rc_stats[i10 * STATS_STRIDE + 13u], fx_frac),
+                          mix(rc_stats[i01 * STATS_STRIDE + 13u], rc_stats[i11 * STATS_STRIDE + 13u], fx_frac), fy_frac);
+        tile_mean_L = mix(mix(rc_stats[i00 * STATS_STRIDE + 11u], rc_stats[i10 * STATS_STRIDE + 11u], fx_frac),
+                          mix(rc_stats[i01 * STATS_STRIDE + 11u], rc_stats[i11 * STATS_STRIDE + 11u], fx_frac), fy_frac);
+    }
 
-    // Integer tile indices for the 4 corners
-    let tx0 = u32(clamp(i32(floor(ftx)), 0, i32(tcx) - 1));
-    let ty0 = u32(clamp(i32(floor(fty)), 0, i32(tcy) - 1));
-    let tx1 = min(tx0 + 1u, tcx - 1u);
-    let ty1 = min(ty0 + 1u, tcy - 1u);
-
-    // Fractional position within the tile quad
-    let fx_frac = clamp(ftx - floor(ftx), 0.0, 1.0);
-    let fy_frac = clamp(fty - floor(fty), 0.0, 1.0);
-
-    // Sample Oklab chrominance (a, b) from 4 tiles and bilinear blend
-    let i00 = ty0 * tcx + tx0;
-    let i10 = ty0 * tcx + tx1;
-    let i01 = ty1 * tcx + tx0;
-    let i11 = ty1 * tcx + tx1;
-
-    let a00 = rc_stats[i00 * STATS_STRIDE + 12u];
-    let a10 = rc_stats[i10 * STATS_STRIDE + 12u];
-    let a01 = rc_stats[i01 * STATS_STRIDE + 12u];
-    let a11 = rc_stats[i11 * STATS_STRIDE + 12u];
-    let tile_mean_a = mix(mix(a00, a10, fx_frac), mix(a01, a11, fx_frac), fy_frac);
-
-    let b00 = rc_stats[i00 * STATS_STRIDE + 13u];
-    let b10 = rc_stats[i10 * STATS_STRIDE + 13u];
-    let b01 = rc_stats[i01 * STATS_STRIDE + 13u];
-    let b11 = rc_stats[i11 * STATS_STRIDE + 13u];
-    let tile_mean_b = mix(mix(b00, b10, fx_frac), mix(b01, b11, fx_frac), fy_frac);
-
-    // Also interpolate tile mean L for luminance baseline
-    let L00 = rc_stats[i00 * STATS_STRIDE + 11u];
-    let L10 = rc_stats[i10 * STATS_STRIDE + 11u];
-    let L01 = rc_stats[i01 * STATS_STRIDE + 11u];
-    let L11 = rc_stats[i11 * STATS_STRIDE + 11u];
-    let tile_mean_L = mix(mix(L00, L10, fx_frac), mix(L01, L11, fx_frac), fy_frac);
-
-    // Eccentricity-graded content replacement (the crowding mechanism):
+    // Eccentricity-graded content replacement (the crowding mechanism).
     //
-    // Near fovea (alpha → 0): tile_mean_L + detail — preserves structure,
-    //   letter identity survives because mean carries it.
+    // Two DC modes:
+    //   Sector mode (Tier 3): Use pyramid RESIDUAL as DC base. The residual is at
+    //     W/16 × H/16 — a natural 16px blur that destroys letter identity (~12-20px
+    //     tall) while preserving large-scale luminance structure. This is what makes
+    //     the synthesis a true replacement, not a modulation on the original.
+    //   Tile mode (Tier 2.75): Use tile_mean_L as DC base (original behavior).
     //
-    // Far periphery (alpha → 1): tile_mean_L + STRONGER detail — synthesis
-    //   dominates, tile mean is just the DC offset, bandpass noise is the content.
-    //   Isolated letter: low-variance tile → weak noise → mean (letter shape) visible.
-    //   Flanked letter: high-variance tile → strong noise → mean is average of
-    //   multiple letters → identity destroyed. THIS IS CROWDING.
-    //
-    // The key: detail_strength scales with alpha AND tile variance.
-    // High eccentricity + high variance = full replacement (crowding).
-    // High eccentricity + low variance = mean dominates (isolated letter preserved).
-    // Synthesis modulates around the tile-mean color. The fragment shader's
-    // displacement + MIP blur handles readability destruction; the compute
-    // texture adds texture quality (cross-scale structure) on top.
-    // Keep detail moderate — the displaced content underneath provides contrast.
+    // detail_strength scales with alpha: stronger bandpass noise in far periphery.
     let detail_strength = mix(0.5, 3.0, alpha);
+
+    // DC component: sector/tile mean luminance.
+    // For isolated content (single letter on white), mean ≈ white — letter identity is
+    // carried by the mean, not destroyed. For flanked content (multiple letters), mean =
+    // average of all letters — individual identity destroyed. THIS IS CROWDING.
+    // The fragment shader's full-authority blend (Step 1) ensures this synthesis
+    // completely replaces the original content in the periphery.
     let L = clamp(tile_mean_L + synth_luma * detail_strength, 0.0, 1.0);
     let lab = vec3<f32>(L, tile_mean_a, tile_mean_b);
     let lin = oklab_to_linear(lab);

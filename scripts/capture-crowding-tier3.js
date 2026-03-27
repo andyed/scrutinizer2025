@@ -28,32 +28,31 @@ const { run } = require('./lib/capture-runner');
 
 const ROOT = path.join(__dirname, '..');
 const OUTPUT_DIR = path.join(ROOT, 'tests', 'crowding-captures', 'tier3');
-// Crowding stimulus page lives in scrutinizer-www, not in this repo's test dir
+// Minimal OCR crowding test page (not the research grid — that's crowding-stimulus.html)
 const WWW_ROOT = path.join(ROOT, '..', 'scrutinizer-www', 'src', 'reference-pages');
-const CROWDING_PAGE = 'file://' + path.join(WWW_ROOT, 'crowding-stimulus.html');
+const CROWDING_PAGE = 'file://' + path.join(WWW_ROOT, 'crowding-ocr-test.html');
 
 // Eccentricity target: 8° at 45 px/deg = 360px from fixation
-// Fixation at center (960, 540 at 1920x1080)
-// Letter placement: 360px to the right of fixation → x = 1320/1920 ≈ 0.6875
-const LETTER_X_NORM = 0.6875;
+// Fixation at center (960, 506 at 1920x1012 frame)
 const FIX_X = 0.5;
 const FIX_Y = 0.5;
 
 const force = process.argv.includes('--force');
 
 // Stimulus conditions:
-//   isolated=true  → single letter at 8°
-//   isolated=false → letter flanked by 2 letters at Bouma spacing
+//   isolated → single letter at 8° (flankers=0)
+//   flanked  → letter with 2 flankers at Bouma spacing
+// seed=42 for reproducible letter selection across captures
 const CONDITIONS = [
-    { name: 'isolated', queryParam: 'flankers=0' },
-    { name: 'flanked',  queryParam: 'flankers=2&spacing=bouma' },
+    { name: 'isolated', queryParam: 'flankers=0&ecc=8&seed=42&letter=H' },
+    { name: 'flanked',  queryParam: 'flankers=2&ecc=8&spacing=bouma&seed=42&letter=H' },
 ];
 
-// Modes to capture
+// Modes to capture — displacement, tiles, sectors
 const MODES = [
-    { name: 'mode10', mode: 10, desc: 'Tier 2.5 (baseline)' },
-    { name: 'mode14', mode: 14, desc: 'Tier 2.75 (pyramid synthesis)' },
-    { name: 'mode12', mode: 12, desc: 'Tier 1.7 (displacement, default)' },
+    { name: 'mode12', mode: 12, desc: 'Displacement only (control — no pooling)' },
+    { name: 'mode14', mode: 14, desc: 'Pyramid Mongrel (tiles, Tier 2.75)' },
+    { name: 'mode15', mode: 15, desc: 'TTM Synthesis (sectors, Tier 3)' },
 ];
 
 async function main() {

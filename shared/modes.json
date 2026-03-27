@@ -508,6 +508,7 @@
                 "crowding_density_threshold": 0.3,
                 "crowding_density_steepness": 20,
                 "compute_tier": 3.0,
+                "num_cortical_rings": 50,
                 "reading_span": true,
                 "reading_span_strength": 1
             },

@@ -44,11 +44,20 @@ struct StatsConfig {
     band1_w: u32, band1_h: u32,
     band2_w: u32, band2_h: u32,
     band3_w: u32, band3_h: u32,
-    _pad0: u32,
-    _pad1: u32,
+    // Sector mode fields (CMF-based eccentricity-scaled pooling)
+    use_sectors: u32,    // 0 = tile grid, 1 = CMF sectors
+    num_rings: u32,
+    total_sectors: u32,
+    fovea_x_px: f32,     // fovea in band_0 pixel coords
+    fovea_y_px: f32,
+    cmf_a: f32,          // cortical magnification constant (2.78)
+    cortical_max: f32,   // log(maxEccDeg / cmfA + 1)
+    max_ecc_px: f32,     // max eccentricity in pixels at band_0 res
+    _reserved0: u32,
+    _reserved1: u32,
 };
 
-// Output: 14 floats per tile
+// Output: 18 floats per tile
 struct TileStatsTier3 {
     // Per-band mean absolute magnitude (4)
     mag0: f32, mag1: f32, mag2: f32, mag3: f32,
@@ -58,6 +67,8 @@ struct TileStatsTier3 {
     corr01: f32, corr12: f32, corr23: f32,
     // Mean color in Oklab (3)
     mean_L: f32, mean_a: f32, mean_b: f32,
+    // Per-band marginal skewness (4) — asymmetry of band value distribution
+    skew0: f32, skew1: f32, skew2: f32, skew3: f32,
 };
 
 // ─── Accumulator structure (raw sums for finalize) ───
@@ -72,7 +83,7 @@ struct TileStatsTier3 {
 
 const FP_SCALE: f32 = 1024.0;
 const FP_INV: f32 = 1.0 / 1024.0;
-const ACCUM_STRIDE: u32 = 20u; // i32s per tile: count(1) + mag(4) + var(4) + cross(3) + mag²(4) + color(3) + pad(1)
+const ACCUM_STRIDE: u32 = 24u; // i32s per tile: count(1) + mag(4) + var(4) + cross(3) + mag²(4) + color(3) + skew_x³(4) + pad(1)
 
 // ─── Bindings ───
 
@@ -84,6 +95,8 @@ const ACCUM_STRIDE: u32 = 20u; // i32s per tile: count(1) + mag(4) + var(4) + cr
 @group(0) @binding(4) var<storage, read> band3: array<f32>;
 @group(0) @binding(5) var source_tex: texture_2d<f32>;  // for color
 @group(0) @binding(6) var<storage, read_write> accum: array<atomic<i32>>;
+@group(0) @binding(7) var<storage, read> ring_base_sectors: array<u32>;
+@group(0) @binding(8) var<storage, read> ring_spoke_counts: array<u32>;
 
 // ─── Helper: sample band at a given pixel, handling resolution differences ───
 // Bands 1-3 are at lower resolution than band 0.
@@ -135,6 +148,48 @@ fn linear_to_oklab(rgb: vec3<f32>) -> vec3<f32> {
     );
 }
 
+// ─── CMF Sector Assignment (Blauch et al. 2026) ───
+// Maps pixel (x, y) to a pooling slot index.
+// When use_sectors == 0, falls back to fixed 8x8 tile grid.
+// When use_sectors == 1, computes CMF ring + spoke → sector_id.
+// Canonical JS reference: tests/unit/isotropic-sectors.test.js:27-70
+const MAX_ECC_DEG: f32 = 15.0;
+const TWO_PI: f32 = 6.28318530718;
+const PI: f32 = 3.14159265359;
+
+fn computeSectorId(x: u32, y: u32) -> u32 {
+    if (config.use_sectors == 0u) {
+        let tx = x / config.tile_size;
+        let ty = y / config.tile_size;
+        return ty * config.tile_count_x + tx;
+    }
+
+    // Pixel distance from fovea (in band_0 pixel space)
+    let dx = f32(x) - config.fovea_x_px;
+    let dy = f32(y) - config.fovea_y_px;
+    let r_px = sqrt(dx * dx + dy * dy);
+
+    // Convert pixel distance to degrees
+    let r_deg = r_px / max(config.max_ecc_px, 1.0) * MAX_ECC_DEG;
+
+    // CMF ring assignment: w = log(r + a), quantize to ring index
+    let a = config.cmf_a;
+    let w_min = log(a);
+    let w_step = config.cortical_max / f32(config.num_rings - 1u);
+    let w = log(r_deg + a);
+    let n_cont = (w - w_min) / w_step;
+    let ring = u32(clamp(i32(round(n_cont)), 0, i32(config.num_rings) - 1));
+
+    // Spoke assignment: angle → spoke index
+    let angle = atan2(dy, dx); // [-PI, PI]
+    let spoke_count = ring_spoke_counts[ring];
+    let spoke_width = TWO_PI / f32(spoke_count);
+    let spoke = u32(floor((angle + PI) / spoke_width));
+    let spoke_clamped = min(spoke, spoke_count - 1u);
+
+    return ring_base_sectors[ring] + spoke_clamped;
+}
+
 fn atomicAddFP(idx: u32, val: f32) {
     let ival = i32(val * FP_SCALE);
     atomicAdd(&accum[idx], ival);
@@ -150,11 +205,8 @@ fn accumulate(
     let y = gid.y;
     if (x >= config.width || y >= config.height) { return; }
 
-    // Which tile does this pixel belong to?
-    let tx = x / config.tile_size;
-    let ty = y / config.tile_size;
-    if (tx >= config.tile_count_x || ty >= config.tile_count_y) { return; }
-    let tile_idx = ty * config.tile_count_x + tx;
+    // Which pooling slot (tile or sector) does this pixel belong to?
+    let tile_idx = computeSectorId(x, y);
     let base = tile_idx * ACCUM_STRIDE;
 
     // Sample all 4 bands at this pixel location
@@ -206,7 +258,13 @@ fn accumulate(
     atomicAddFP(base + 17u, lab.y);
     atomicAddFP(base + 18u, lab.z);
 
-    // offset 19 reserved (padding)
+    // sum band_k^3 (offsets 19-22) — for skewness
+    atomicAddFP(base + 19u, b0 * b0 * b0);
+    atomicAddFP(base + 20u, b1 * b1 * b1);
+    atomicAddFP(base + 21u, b2 * b2 * b2);
+    atomicAddFP(base + 22u, b3 * b3 * b3);
+
+    // offset 23 reserved (padding)
 }
 
 // ─── Entry point 2: Finalize — compute stats from accumulated sums ───
@@ -224,7 +282,11 @@ fn finalize(
     @builtin(global_invocation_id) gid: vec3<u32>,
 ) {
     let tile_idx = gid.x;
-    let total_tiles = fin_config.tile_count_x * fin_config.tile_count_y;
+    let total_tiles = select(
+        fin_config.tile_count_x * fin_config.tile_count_y,
+        fin_config.total_sectors,
+        fin_config.use_sectors != 0u
+    );
     if (tile_idx >= total_tiles) { return; }
 
     let base = tile_idx * ACCUM_STRIDE;
@@ -236,6 +298,7 @@ fn finalize(
             0.0, 0.0, 0.0, 0.0,
             0.0, 0.0, 0.0,
             0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
         );
         return;
     }
@@ -288,15 +351,33 @@ fn finalize(
     corr12 = clamp(corr12, -1.0, 1.0);
     corr23 = clamp(corr23, -1.0, 1.0);
 
-    // Mean color (offsets shifted after skewness removal)
+    // Mean color
     let mean_L = readFP(base + 16u) * inv_n;
     let mean_a = readFP(base + 17u) * inv_n;
     let mean_b = readFP(base + 18u) * inv_n;
+
+    // Marginal skewness: E[x³] / var^(3/2) (zero-mean bandpass simplification)
+    // Captures distribution asymmetry — text on white has negative skew (dark strokes).
+    let cube0 = readFP(base + 19u) * inv_n;
+    let cube1 = readFP(base + 20u) * inv_n;
+    let cube2 = readFP(base + 21u) * inv_n;
+    let cube3 = readFP(base + 22u) * inv_n;
+
+    let var32_0 = max(var0 * sqrt(max(var0, 0.0)), 1e-8);
+    let var32_1 = max(var1 * sqrt(max(var1, 0.0)), 1e-8);
+    let var32_2 = max(var2 * sqrt(max(var2, 0.0)), 1e-8);
+    let var32_3 = max(var3 * sqrt(max(var3, 0.0)), 1e-8);
+
+    let skew0 = clamp(cube0 / var32_0, -3.0, 3.0);
+    let skew1 = clamp(cube1 / var32_1, -3.0, 3.0);
+    let skew2 = clamp(cube2 / var32_2, -3.0, 3.0);
+    let skew3 = clamp(cube3 / var32_3, -3.0, 3.0);
 
     tile_stats[tile_idx] = TileStatsTier3(
         mag0, mag1, mag2, mag3,
         var0, var1, var2, var3,
         corr01, corr12, corr23,
         mean_L, mean_a, mean_b,
+        skew0, skew1, skew2, skew3,
     );
 }

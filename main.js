@@ -2044,6 +2044,12 @@ function runBatchCapture() {
             loadResolved = true;
             console.log('[Batch] Page loaded. Starting shot sequence...');
 
+            // Reset zoom to 100% — captures must be at consistent zoom regardless
+            // of the user's interactive zoom level. Without this, text density varies
+            // between capture sessions, invalidating Brown metamer comparisons.
+            mainWindow.scrutinizerView.webContents.setZoomFactor(1.0);
+            console.log('[Batch] Zoom reset to 1.0');
+
             // Handle scroll if specified
             const scrollY = firstShot.scrollY || 0;
             if (scrollY > 0) {

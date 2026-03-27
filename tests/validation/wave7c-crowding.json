@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-22T17:23:08.297Z",
+  "timestamp": "2026-03-27T02:20:00.364Z",
   "checks": [
     {
       "name": "mode14_isolated_recognized",
@@ -10,42 +10,60 @@
     {
       "name": "mode14_flanked_crowded",
       "tier": 1,
+      "pass": false,
+      "detail": "confidence 1.00 < 0.5"
+    },
+    {
+      "name": "mode14_asymmetry_ratio",
+      "tier": 2,
+      "pass": false,
+      "detail": "ratio 0.00 > 2.0"
+    },
+    {
+      "name": "mode15_isolated_recognized",
+      "tier": 1,
+      "pass": false,
+      "detail": "confidence 0.00 >= 0.5"
+    },
+    {
+      "name": "mode15_flanked_crowded",
+      "tier": 1,
       "pass": true,
       "detail": "confidence 0.00 < 0.5"
     },
     {
-      "name": "mode14_asymmetry_ratio",
+      "name": "mode15_asymmetry_ratio",
       "tier": 2,
       "pass": false,
       "detail": "ratio 1.00 > 2.0"
     }
   ],
   "modeResults": {
-    "mode10": {
-      "isolated": {
-        "text": "",
-        "confidence": 0,
-        "method": "tesseract"
-      },
-      "flanked": {
-        "text": "",
-        "confidence": 0,
-        "method": "tesseract"
-      }
-    },
     "mode12": {
       "isolated": {
-        "text": "",
-        "confidence": 0,
+        "text": "S",
+        "confidence": 1,
         "method": "tesseract"
       },
       "flanked": {
-        "text": "",
-        "confidence": 0,
+        "text": "S",
+        "confidence": 1,
         "method": "tesseract"
       }
     },
     "mode14": {
+      "isolated": {
+        "text": "",
+        "confidence": 0,
+        "method": "tesseract"
+      },
+      "flanked": {
+        "text": "B",
+        "confidence": 1,
+        "method": "tesseract"
+      }
+    },
+    "mode15": {
       "isolated": {
         "text": "",
         "confidence": 0,
@@ -61,11 +79,11 @@
   "summary": {
     "tier1": {
       "pass": 1,
-      "fail": 1
+      "fail": 3
     },
     "tier2": {
       "pass": 0,
-      "fail": 1
+      "fail": 2
     },
     "tier3": {
       "pass": 0,

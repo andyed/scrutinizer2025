@@ -37,13 +37,22 @@ const ROOT = path.join(__dirname, '..');
 const CAPTURE_DIR = path.join(ROOT, 'tests', 'crowding-captures', 'tier3');
 const RESULTS_FILE = path.join(ROOT, 'tests', 'validation', 'wave7c-crowding.json');
 
-// Letter region — where the target letter sits in the capture
-// At 8° eccentricity, 360px right of center, letter is ~40px tall
-const LETTER_REGION = {
-    x: 1280, y: 520, width: 80, height: 80, // generous crop around target
-};
+// Letter region — where the target letter sits in the capture.
+// crowding-ocr-test.html places target at 8° = 360px right of center.
+// At 1920x1012 frame: center=(960,506), target center=(1320,506).
+// Letter is ~36px tall (0.8 * 45ppd). Crop generously around it.
+// Retina captures would be 2x — detect and scale below.
+function getLetterRegion(imageWidth) {
+    const dpr = imageWidth > 2000 ? 2 : 1;
+    return {
+        x: (1320 - 40) * dpr,  // 40px left of letter center
+        y: (506 - 40) * dpr,   // 40px above letter center
+        width: 80 * dpr,
+        height: 80 * dpr,
+    };
+}
 
-const MODES = ['mode10', 'mode12', 'mode14'];
+const MODES = ['mode12', 'mode14', 'mode15'];
 const CONDITIONS = ['isolated', 'flanked'];
 
 // ── OCR ──
@@ -199,15 +208,17 @@ function main() {
                 continue;
             }
 
-            const ocr = ocrRegion(filepath, LETTER_REGION);
+            const png = loadPng(filepath);
+            const region = getLetterRegion(png ? png.width : 1920);
+            const ocr = ocrRegion(filepath, region);
             results[cond] = ocr;
             console.log(`  ${cond}: confidence=${ocr.confidence.toFixed(2)} method=${ocr.method} text="${ocr.text}"`);
         }
 
         modeResults[mode] = results;
 
-        // Only validate mode14 (Tier 2.75) — the target pipeline
-        if (mode === 'mode14') {
+        // Validate mode14 (tiles) and mode15 (sectors) — both pooling pipelines
+        if (mode === 'mode14' || mode === 'mode15') {
             const isoConf = results.isolated?.confidence ?? 0;
             const flkConf = results.flanked?.confidence ?? 0;
 

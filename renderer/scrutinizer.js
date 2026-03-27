@@ -611,7 +611,13 @@
                 if (!this.webgpuCompute) {
                     try {
                         if (usePyramid) {
-                            this.webgpuCompute = new WebGPUPyramidCompute(this.webgpuDevice, halfW, halfH);
+                            const numRings = this.renderer.config.num_cortical_rings || 0;
+                            const sectorConfig = numRings > 0 ? {
+                                numRings,
+                                cmfA: this.renderer.config.cmf_a || 2.78,
+                                maxEccDeg: 15,
+                            } : null;
+                            this.webgpuCompute = new WebGPUPyramidCompute(this.webgpuDevice, halfW, halfH, sectorConfig);
                             this.webgpuTier = 2.75;
                             this.renderer.setComputeTier(2.75);
                         } else {

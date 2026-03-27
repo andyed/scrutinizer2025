@@ -296,11 +296,15 @@ function main() {
     const scrutinizerMode10Path = entry.scrutinizer_mode10
       ? path.join(capturesDir, entry.scrutinizer_mode10.replace(/^\.\.\//, ''))
       : null;
+    const scrutinizerMode15Path = entry.scrutinizer_mode15
+      ? path.join(capturesDir, entry.scrutinizer_mode15.replace(/^\.\.\//, ''))
+      : null;
 
     const rawPng = loadPng(rawPath);
     const brownPng = loadPng(brownPath);
     const scrut0Png = scrutinizerMode0Path ? loadPng(scrutinizerMode0Path) : null;
     const scrut10Png = scrutinizerMode10Path ? loadPng(scrutinizerMode10Path) : null;
+    const scrut15Png = scrutinizerMode15Path ? loadPng(scrutinizerMode15Path) : null;
 
     if (!rawPng) { console.log(`  SKIP: raw not found (${rawPath})`); continue; }
     if (!brownPng) { console.log(`  SKIP: Brown metamer not found (${brownPath})`); continue; }
@@ -377,14 +381,37 @@ function main() {
         }
       }
 
+      // Raw vs Scrutinizer Mode 15 (TTM sectors — the Tier 3 candidate)
+      if (scrut15Png) {
+        try {
+          const rawVsScrut15 = bandMetrics(rawPng, scrut15Png, gazePixelX, gazePixelY, band.rMin, band.rMax);
+          if (rawVsScrut15) bandResult.comparisons.raw_vs_scrutinizer_mode15 = rawVsScrut15;
+        } catch (e) {
+          bandResult.comparisons.raw_vs_scrutinizer_mode15 = { error: e.message };
+        }
+      }
+
+      // Brown vs Scrutinizer Mode 15 (the Tier 3 gap measurement)
+      if (scrut15Png) {
+        try {
+          const brownVsScrut15 = bandMetrics(brownPng, scrut15Png, gazePixelX, gazePixelY, band.rMin, band.rMax);
+          if (brownVsScrut15) bandResult.comparisons.brown_vs_scrutinizer_mode15 = brownVsScrut15;
+        } catch (e) {
+          bandResult.comparisons.brown_vs_scrutinizer_mode15 = { error: e.message };
+        }
+      }
+
       // Print summary for this band
       if (rawVsBrown) {
         let line = `  Band ${band.id} (${band.label}): Raw->Brown SSIM=${rawVsBrown.ssim.toFixed(4)}`;
         if (bandResult.comparisons.raw_vs_scrutinizer_mode0) {
-          line += ` | Raw->Scrut SSIM=${bandResult.comparisons.raw_vs_scrutinizer_mode0.ssim.toFixed(4)}`;
+          line += ` | Raw->M0 SSIM=${bandResult.comparisons.raw_vs_scrutinizer_mode0.ssim.toFixed(4)}`;
         }
-        if (bandResult.comparisons.brown_vs_scrutinizer_mode0) {
-          line += ` | Brown->Scrut SSIM=${bandResult.comparisons.brown_vs_scrutinizer_mode0.ssim.toFixed(4)}`;
+        if (bandResult.comparisons.raw_vs_scrutinizer_mode15) {
+          line += ` | Raw->M15 SSIM=${bandResult.comparisons.raw_vs_scrutinizer_mode15.ssim.toFixed(4)}`;
+        }
+        if (bandResult.comparisons.brown_vs_scrutinizer_mode15) {
+          line += ` | Brown->M15 SSIM=${bandResult.comparisons.brown_vs_scrutinizer_mode15.ssim.toFixed(4)}`;
         }
         console.log(line);
       }
@@ -402,6 +429,7 @@ function main() {
     ];
     if (scrut0Png) compositeImages.push({ label: 'Scrutinizer Mode 0', png: scrut0Png });
     if (scrut10Png) compositeImages.push({ label: 'Scrutinizer Mode 10', png: scrut10Png });
+    if (scrut15Png) compositeImages.push({ label: 'Scrutinizer TTM Sectors', png: scrut15Png });
 
     // Only create composite if dimensions match (they may not if DPR differs)
     const allSameSize = compositeImages.every(img =>
@@ -418,7 +446,7 @@ function main() {
   const summary = {
     generatedAt: new Date().toISOString(),
     parameters: manifest.parameters,
-    bands: BANDS.map(b => ({ ...b, rMax: b.rMax === Infinity ? 'Inf' : b.rMax })),
+    bands: BANDS_1X.map(b => ({ ...b, rMax: b.rMax === Infinity ? 'Inf' : b.rMax })),
     results: allResults
   };
   const summaryPath = path.join(brownDir, 'comparison-summary.json');
