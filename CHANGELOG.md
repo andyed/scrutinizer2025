@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.7.2] - 2026-03-29
+
+### Fixed
+- **Far-periphery chromatic decay**: RG (L-M) channel now decays to 97% attenuation (was 70%) and YV S-(L+M) to 90% (was 35%) at maximum eccentricity. Additive second smoothstep ramp extends decay beyond mid-periphery plateau while preserving existing Shooner/Hansen-tuned curves. Content at 60°+ eccentricity now approaches biological near-achromacy. Applied to Minecraft (style 4) and Polar Quantize (style 8).
+- **Spatial pooling saturation**: Neighbor-averaging blend ramp now spans full MIP range (divisor 4.0→6.0, matching maxMipLevel). Far-periphery spatial pooling was previously identical to mid-periphery because the blend ramp saturated at mipLevel 4.0.
+
 ## [2.7.0] - 2026-03-25
 
 ### Added

@@ -1342,8 +1342,12 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         // This replaces the previous smoothstep(fovea, rampEnd) + rodOnset stacking.
         float desaturationFactor = rodDesat * strengthMult;
         if (u_chromatic_pooling > 0.5 && u_dog_enabled > 0.5) {
-            // castleCSF per-band decay handles parafovea; rod just adds far-periphery tint
-            desaturationFactor *= 0.3;
+            // castleCSF per-band decay handles parafovea; rod ramps up in far periphery
+            // where castleCSF coverage thins out. 0.3 at mid-periphery → 0.8 at 50°+.
+            float normEcc_rod = max(0.0, dist - fovea_radius) / max(fovea_radius, 0.001);
+            float ecc_deg_rod = normEcc_rod * 2.0;
+            float rodScale = 0.3 + smoothstep(15.0, 50.0, ecc_deg_rod) * 0.5;
+            desaturationFactor *= rodScale;
         }
         lab.y *= (1.0 - desaturationFactor);
         lab.z *= (1.0 - desaturationFactor);
@@ -1515,7 +1519,8 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             vec3 neighborAvg = (labN + labS + labE + labW) * 0.25;
 
             // Per-channel blend: 0 at parafovea → max at far periphery
-            float t = clamp(mipLevel / 4.0, 0.0, 1.0);
+            // Divisor 6.0 matches maxMipLevel so blend spans full MIP range
+            float t = clamp(mipLevel / 6.0, 0.0, 1.0);
             float blendL  = t * 0.4;  // luminance: moderate spatial pooling
             float blendA  = t * 0.6;  // RG: strongest — foveal specialization collapses
             float blendB  = t * 0.25; // YV: weakest — persists into periphery
@@ -1528,14 +1533,18 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             // Per-channel chromatic decay directly in Oklab — a and b channels
             // ARE the L-M and S-(L+M) opponent axes. No RGB decomposition needed.
             // Suprathreshold ramps (Shooner, Jiang & Mullen 2022; Hansen et al. 2009):
-            //   RG (a): foveal specialization, steep early onset, caps at 70%
-            //   YV (b): NOT foveal-specific, slow onset, caps at 35%
-            // Per-channel caps make the differential visible: red-green boundaries
-            // dissolve while blue-yellow persists at the same eccentricity.
+            //   RG (a): foveal specialization, steep early onset → 97% in far periphery
+            //   YV (b): NOT foveal-specific, slow onset → 90% in far periphery
+            // Per-channel differential: red-green boundaries dissolve while
+            // blue-yellow persists at the same eccentricity.
             float normEcc = max(0.0, dist - fovea_radius) / max(fovea_radius, 0.001);
             float ecc_deg = normEcc * 2.0;
-            float rgFade = smoothstep(1.0, 12.0, ecc_deg) * 0.7;  // a: 70% max
-            float yvFade = smoothstep(3.0, 20.0, ecc_deg) * 0.35; // b: 35% max
+            // Phase 1: mid-periphery decay (Shooner/Hansen data)
+            // Phase 2: far-periphery extension — additive, C2-continuous at junction
+            float rgFade = smoothstep(1.0, 12.0, ecc_deg) * 0.7
+                         + smoothstep(12.0, 50.0, ecc_deg) * 0.27;  // a: 97% max
+            float yvFade = smoothstep(3.0, 20.0, ecc_deg) * 0.35
+                         + smoothstep(20.0, 60.0, ecc_deg) * 0.55;  // b: 90% max
             blended.y *= (1.0 - rgFade); // a channel (red-green) fades first
             blended.z *= (1.0 - yvFade); // b channel (blue-yellow) persists
 
@@ -1684,21 +1693,25 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
                           + rgbToOklab(sampleSourceLod(uvTR, sectorMip).rgb)) * 0.25;
 
         // Per-channel blend (same rates as Minecraft style 4)
+        // Divisor 6.0 matches maxMipLevel so blend spans full MIP range
         float mipLevel = computeMipLevel(max(0.0, dist - fovea_radius), fovea_radius);
-        float t = clamp(mipLevel / 4.0, 0.0, 1.0);
+        float t = clamp(mipLevel / 6.0, 0.0, 1.0);
         vec3 blended;
         blended.x = mix(labCenter.x, neighborAvg.x, t * 0.4);   // L
         blended.y = mix(labCenter.y, neighborAvg.y, t * 0.6);   // a (RG)
         blended.z = mix(labCenter.z, neighborAvg.z, t * 0.25);  // b (YV)
 
         // Per-channel chromatic decay.
-        // The smoothstep ranges (1→28°, 5→45°) from Minecraft style 4 were designed
-        // for wide visual fields but barely engage on a desktop screen (~15° max ecc).
-        // Tighten to match the actual ecc_deg range so desaturation is visible.
+        // Phase 1: mid-periphery (Shooner/Hansen data, tightened for desktop ecc range)
+        // Phase 2: far-periphery extension — additive, C2-continuous at junction
         float normEcc = max(0.0, dist - fovea_radius) / max(fovea_radius, 0.001);
         float ecc_deg = normEcc * 2.0;
-        blended.y *= (1.0 - smoothstep(1.0, 12.0, ecc_deg) * 0.7);
-        blended.z *= (1.0 - smoothstep(3.0, 20.0, ecc_deg) * 0.35);
+        float rgFade = smoothstep(1.0, 12.0, ecc_deg) * 0.7
+                     + smoothstep(12.0, 50.0, ecc_deg) * 0.27;  // a: 97% max
+        float yvFade = smoothstep(3.0, 20.0, ecc_deg) * 0.35
+                     + smoothstep(20.0, 60.0, ecc_deg) * 0.55;  // b: 90% max
+        blended.y *= (1.0 - rgFade);
+        blended.z *= (1.0 - yvFade);
 
         vec3 result = oklabToRgb(blended);
 
