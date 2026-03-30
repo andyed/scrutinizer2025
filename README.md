@@ -7,7 +7,7 @@
 
 Live site: **[scrutinizer.app](https://andyed.github.io/scrutinizer-www/)** | [Blog](https://andyed.github.io/scrutinizer-www/blog/) | [YouTube](https://www.youtube.com/@scrutinizer-app/playlists)
 
-macOS Installer: **[Download v2.7.0](https://github.com/andyed/scrutinizer2025/releases/tag/v2.7.0)** | [Changelog](CHANGELOG.md)
+macOS Installer: **[Download v2.7.1](https://github.com/andyed/scrutinizer2025/releases/tag/v2.7.1)** | [Changelog](CHANGELOG.md)
 
 ---
 
@@ -160,11 +160,11 @@ Full gap analysis: [simulation-limitations.md](docs/simulation-limitations.md).
 
 ## Installation
 
-### Download (v2.7.0)
+### Download (v2.7.1)
 
 > Scrutinizer for macOS is **Signed & Notarized** — no security warnings.
 
-*   **macOS (Apple Silicon):** [**Download Scrutinizer-2.7.0.dmg**](https://github.com/andyed/scrutinizer2025/releases/tag/v2.7.0)
+*   **macOS (Apple Silicon):** [**Download Scrutinizer-2.7.1.dmg**](https://github.com/andyed/scrutinizer2025/releases/tag/v2.7.1)
 *   **Windows:** Manual build required (see [Releases Page](https://github.com/andyed/scrutinizer2025/releases))
 
 [**View All Releases & Changelogs**](https://github.com/andyed/scrutinizer2025/releases)
