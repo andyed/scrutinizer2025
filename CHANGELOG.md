@@ -1,10 +1,17 @@
 # Changelog
 
-## [2.7.2] - 2026-03-29
+## [2.7.1] - 2026-03-30
+
+### Added
+- **Scanpath replay**: ScanpathPlayer (GazeModel drop-in) replays recorded eye movement sequences. COCO-Search18 importer, UEyes duration fix, CLI per-fixation frame capture.
+- **Gazeplot mode**: Visual memory accumulation across fixation sequences with `--gazeplot-diagram` scanpath overlay on captures.
+- **Figma plugin v1.5.0**: Model fidelity brought to parity with desktop v2.7 — 12-band DoG spatial frequency decomposition, per-band chromatic attenuation (castleCSF), far-periphery decay ramps, rod desaturation. 9 new shader uniforms with biological defaults.
 
 ### Fixed
-- **Far-periphery chromatic decay**: RG (L-M) channel now decays to 97% attenuation (was 70%) and YV S-(L+M) to 90% (was 35%) at maximum eccentricity. Additive second smoothstep ramp extends decay beyond mid-periphery plateau while preserving existing Shooner/Hansen-tuned curves. Content at 60°+ eccentricity now approaches biological near-achromacy. Applied to Minecraft (style 4) and Polar Quantize (style 8).
-- **Spatial pooling saturation**: Neighbor-averaging blend ramp now spans full MIP range (divisor 4.0→6.0, matching maxMipLevel). Far-periphery spatial pooling was previously identical to mid-periphery because the blend ramp saturated at mipLevel 4.0.
+- **Unified eccentricity master curve**: 6 overlapping smoothsteps → 1 C2-continuous curve + power functions, eliminating Mach bands in parafoveal color transitions.
+- **Luma/chroma split foveal blend** (Mullen 1991): Progressive chromatic decay on uniform surfaces, not a cliff.
+- **Visual memory mask**: Suppresses V4 color effects in remembered regions; parafoveal radius (2.5× fovea) for recalled fixation footprint.
+- **Scanpath coordinate mapping**: Correct DPR and image scaling for retina displays.
 
 ## [2.7.0] - 2026-03-25
 
