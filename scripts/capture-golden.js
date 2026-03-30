@@ -10,6 +10,7 @@
  *   npm run capture-golden                    # Capture current version (incremental)
  *   npm run capture-golden -- --version=1.4.3 # Capture specific version
  *   npm run capture-golden -- --force         # Recapture all shots
+ *   npm run capture-golden -- --all-modes     # Include all 14 rendering modes (regression baselines)
  */
 
 const path = require('path');
@@ -45,7 +46,7 @@ const FIXATION_COORDS = {
     'sidebar': { x: 0.15, y: 0.5 }
 };
 
-// Debug variants for standard pages
+// Debug variants for standard pages — research + active modes
 const DEBUG_VARIANTS = [
     { id: 'standard', mode: '0', overlay: false },
     { id: 'mode14_pyramid', mode: '14', overlay: false },
@@ -56,6 +57,27 @@ const DEBUG_VARIANTS = [
     { id: 'congestion_overlay', mode: 'congestion_overlay' },
     { id: 'congestion_solo', mode: 'congestion_solo' }
 ];
+
+// All rendering modes — used for regression baselines (Option A, etc.)
+const ALL_MODE_VARIANTS = [
+    { id: 'mode0_highkey', mode: '0', overlay: false },
+    { id: 'mode1_biological', mode: '1', overlay: false },
+    { id: 'mode2_frosted', mode: '2', overlay: false },
+    { id: 'mode3_blueprint', mode: '3', overlay: false },
+    { id: 'mode4_minecraft', mode: '4', overlay: false },
+    { id: 'mode5_drunken', mode: '5', overlay: false },
+    { id: 'mode6_logpolar', mode: '6', overlay: false },
+    { id: 'mode7_legacy', mode: '7', overlay: false },
+    { id: 'mode8_mc_eyeball', mode: '8', overlay: false },
+    { id: 'mode9_congestion', mode: '9', overlay: false },
+    { id: 'mode10_mongrel', mode: '10', overlay: false },
+    { id: 'mode12_isotropic', mode: '12', overlay: false },
+    { id: 'mode14_pyramid', mode: '14', overlay: false },
+    { id: 'mode15_ttm', mode: '15', overlay: false }
+];
+
+// Flag: --all-modes captures every mode on dashboard + article
+const allModes = process.argv.includes('--all-modes');
 
 // Mobile/tablet variants appended to desktop captures (never replacing them)
 const MOBILE_VARIANTS = [
@@ -70,6 +92,7 @@ const CAPTURE_TASKS = [
         fixations: ['center'],
         variants: [
             ...DEBUG_VARIANTS,
+            ...(allModes ? ALL_MODE_VARIANTS : []),
             ...MOBILE_VARIANTS
         ]
     },
@@ -80,6 +103,7 @@ const CAPTURE_TASKS = [
         fixations: ['center'],
         variants: [
             ...DEBUG_VARIANTS,
+            ...(allModes ? ALL_MODE_VARIANTS : []),
             ...MOBILE_VARIANTS
         ]
     },

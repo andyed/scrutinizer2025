@@ -14,8 +14,15 @@ const version = getArg('--version') || getArg('v') || pkgVersion;
 const skipBrowserCapture = process.argv.includes('--skip-browser-capture');
 const browserOnly = process.argv.includes('--browser-only');
 const figmaOnly = process.argv.includes('--figma-only');
-const thresholdSSIM = parseFloat(getArg('--threshold-ssim')) || 0.98;
-const thresholdPSNR = parseFloat(getArg('--threshold-psnr')) || 35;
+const regressionMode = process.argv.includes('--regression');
+const regressionBase = getArg('--base');      // e.g., --base=pre-optionA
+const regressionTarget = getArg('--target');  // e.g., --target=post-optionA
+const pixelIdentical = process.argv.includes('--pixel-identical');
+
+// --pixel-identical sets tight thresholds for structural refactors
+const thresholdSSIM = pixelIdentical ? 0.9999 : (parseFloat(getArg('--threshold-ssim')) || 0.98);
+const thresholdPSNR = pixelIdentical ? 55 : (parseFloat(getArg('--threshold-psnr')) || 35);
+const thresholdMaxPixelDiff = pixelIdentical ? 1 : (parseInt(getArg('--threshold-max-diff')) || 255);
 
 const ROOT = path.join(__dirname, '..');
 const TEST_CAPTURE_DIR = path.join(ROOT, 'tests', 'golden-captures', `v${version}`);
@@ -103,7 +110,23 @@ function metrics(aPng, bPng) {
   const c1 = (0.01 * 255) ** 2;
   const c2 = (0.03 * 255) ** 2;
   const ssim = ((2 * muA * muB + c1) * (2 * cov + c2)) / ((muA * muA + muB * muB + c1) * (varA + varB + c2));
-  return { mse, psnr, ssim };
+
+  // Per-channel pixel diff metrics
+  let maxPixelDiff = 0;
+  let diffCountAbove1 = 0;
+  let diffCountAbove5 = 0;
+  const totalPixels = aPng.width * aPng.height;
+  for (let i = 0; i < totalPixels; i++) {
+    const idx = i * 4;
+    for (let c = 0; c < 3; c++) { // R, G, B (skip alpha)
+      const d = Math.abs(aPng.data[idx + c] - bPng.data[idx + c]);
+      if (d > maxPixelDiff) maxPixelDiff = d;
+      if (d > 1) diffCountAbove1++;
+      if (d > 5) diffCountAbove5++;
+    }
+  }
+
+  return { mse, psnr, ssim, maxPixelDiff, diffCountAbove1, diffCountAbove5 };
 }
 
 function comparePairs(browserFiles) {
@@ -118,7 +141,7 @@ function comparePairs(browserFiles) {
     }
     try {
       const m = metrics(loadPng(browserPath), loadPng(figmaPath));
-      const pass = m.ssim >= thresholdSSIM && m.psnr >= thresholdPSNR;
+      const pass = m.ssim >= thresholdSSIM && m.psnr >= thresholdPSNR && m.maxPixelDiff <= thresholdMaxPixelDiff;
       results.push({ file, browserPath, figmaPath, ...m, pass, status: pass ? 'pass' : 'fail' });
     } catch (err) {
       results.push({ file, browserPath, figmaPath, status: 'error', error: err.message });
@@ -130,27 +153,126 @@ function comparePairs(browserFiles) {
 function summarize(results) {
   const pass = results.filter((r) => r.status === 'pass').length;
   const fail = results.filter((r) => r.status === 'fail').length;
-  const missing = results.filter((r) => r.status === 'missing-figma').length;
+  const missing = results.filter((r) => r.status.startsWith('missing')).length;
   const errors = results.filter((r) => r.status === 'error').length;
   console.log('\nSummary');
   console.log(`  Pass:    ${pass}`);
   console.log(`  Fail:    ${fail}`);
   console.log(`  Missing: ${missing}`);
   console.log(`  Errors:  ${errors}`);
+
+  if (pixelIdentical) {
+    console.log(`\n  Thresholds (--pixel-identical):`);
+    console.log(`    SSIM ≥ ${thresholdSSIM}, PSNR ≥ ${thresholdPSNR}, maxPixelDiff ≤ ${thresholdMaxPixelDiff}`);
+  }
+
+  // Show failures with detail
+  const failures = results.filter((r) => r.status === 'fail');
+  if (failures.length > 0) {
+    console.log('\n  Failures:');
+    failures.forEach((r) => {
+      console.log(`    ${r.file}`);
+      console.log(`      SSIM=${r.ssim.toFixed(6)} PSNR=${r.psnr.toFixed(1)} maxDiff=${r.maxPixelDiff} diffPx>1=${r.diffCountAbove1} diffPx>5=${r.diffCountAbove5}`);
+    });
+  }
+
+  // Per-mode grouping (extract mode from filename pattern: *_modeN_*)
+  const byMode = {};
+  results.forEach((r) => {
+    const modeMatch = r.file.match(/mode(\d+)/);
+    const mode = modeMatch ? `mode ${modeMatch[1]}` : 'default';
+    if (!byMode[mode]) byMode[mode] = { pass: 0, fail: 0 };
+    byMode[mode][r.status === 'pass' ? 'pass' : 'fail']++;
+  });
+  if (Object.keys(byMode).length > 1) {
+    console.log('\n  By mode:');
+    Object.entries(byMode).sort().forEach(([mode, counts]) => {
+      const status = counts.fail > 0 ? 'FAIL' : 'PASS';
+      console.log(`    ${mode}: ${counts.pass} pass, ${counts.fail} fail — ${status}`);
+    });
+  }
 }
 
-function writeSummary(results) {
+function writeSummary(results, summaryPath) {
   const payload = {
     version,
-    thresholds: { ssim: thresholdSSIM, psnr: thresholdPSNR },
+    thresholds: { ssim: thresholdSSIM, psnr: thresholdPSNR, maxPixelDiff: thresholdMaxPixelDiff },
     generatedAt: new Date().toISOString(),
     results,
   };
-  fs.writeFileSync(SUMMARY_PATH, JSON.stringify(payload, null, 2));
-  console.log(`\nSummary written: ${SUMMARY_PATH}`);
+  const outPath = summaryPath || SUMMARY_PATH;
+  fs.writeFileSync(outPath, JSON.stringify(payload, null, 2));
+  console.log(`\nSummary written: ${outPath}`);
+}
+
+/**
+ * Regression comparison: compare two capture directories (base vs target).
+ * Usage: node golden-compare.js --regression --base=pre-optionA --target=post-optionA [--pixel-identical]
+ */
+function runRegression() {
+  const captureRoot = path.join(ROOT, 'tests', 'golden-captures');
+  const baseDir = path.join(captureRoot, regressionBase);
+  const targetDir = path.join(captureRoot, regressionTarget);
+
+  if (!fs.existsSync(baseDir)) {
+    console.error(`Base directory not found: ${baseDir}`);
+    process.exit(1);
+  }
+  if (!fs.existsSync(targetDir)) {
+    console.error(`Target directory not found: ${targetDir}`);
+    process.exit(1);
+  }
+
+  console.log(`\nRegression comparison: ${regressionBase} → ${regressionTarget}`);
+  if (pixelIdentical) console.log('  Mode: --pixel-identical');
+
+  const baseFiles = fs.readdirSync(baseDir).filter((f) => f.endsWith('.png'));
+  const results = [];
+
+  baseFiles.forEach((file) => {
+    const basePath = path.join(baseDir, file);
+    const targetPath = path.join(targetDir, file);
+    if (!fs.existsSync(targetPath)) {
+      results.push({ file, status: 'missing-target' });
+      return;
+    }
+    try {
+      const m = metrics(loadPng(basePath), loadPng(targetPath));
+      const pass = m.ssim >= thresholdSSIM && m.psnr >= thresholdPSNR && m.maxPixelDiff <= thresholdMaxPixelDiff;
+      results.push({ file, ...m, pass, status: pass ? 'pass' : 'fail' });
+    } catch (err) {
+      results.push({ file, status: 'error', error: err.message });
+    }
+  });
+
+  // Check for new files in target not in base
+  const targetFiles = fs.readdirSync(targetDir).filter((f) => f.endsWith('.png'));
+  const newFiles = targetFiles.filter((f) => !baseFiles.includes(f));
+  if (newFiles.length > 0) {
+    console.log(`\n  New files in target (not in base): ${newFiles.length}`);
+    newFiles.forEach((f) => console.log(`    + ${f}`));
+  }
+
+  summarize(results);
+  const summaryPath = path.join(captureRoot, `regression-${regressionBase}-vs-${regressionTarget}.json`);
+  writeSummary(results, summaryPath);
+
+  const failures = results.filter((r) => r.status === 'fail');
+  if (failures.length > 0) process.exit(1);
 }
 
 (async () => {
+  // Regression mode: compare two capture directories
+  if (regressionMode) {
+    if (!regressionBase || !regressionTarget) {
+      console.error('Usage: --regression --base=<dir> --target=<dir> [--pixel-identical]');
+      process.exit(1);
+    }
+    runRegression();
+    return;
+  }
+
+  // Default: browser vs Figma comparison
   if (!figmaOnly && !skipBrowserCapture) {
     runBrowserCapture();
   }
