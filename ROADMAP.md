@@ -1,6 +1,6 @@
 # Scrutinizer Roadmap
 
-Last updated: 2026-03-25 (v2.7.1)
+Last updated: 2026-03-30 (v2.7.1 + Option A)
 
 ## What's implemented
 
@@ -22,6 +22,7 @@ Scrutinizer is a Restricted Focus Viewer that replaces Gaussian blur with a biol
 | Acuity-gated saliency | Resolution-dependent protection decay | Strasburger et al. 2011 | v2.7 |
 | Eccentricity congestion | Two-scale Feature Congestion (foveal + peripheral) | Rosenholtz 2007, Pelli & Tillman 2008 | v2.7 |
 | Pyramid synthesis | Laplacian pyramid + cross-scale correlations (Tier 2.75) | Portilla & Simoncelli 2000, Walton 2021 | v2.7 |
+| V4 decouple | Eccentricity-direct V4 effects, independent of V1 displacement | Mullen 1991, Curcio 1990 | v2.7.1 |
 
 ### What the pipeline preserves vs Gaussian blur
 
@@ -36,7 +37,8 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 | [isotropic_cortical_sampling.md](docs/specs/isotropic_cortical_sampling.md) | **Shipped** (v2.6) |
 | [oriented_dog_bands.md](docs/specs/oriented_dog_bands.md) | **Shipped** (v2.2) |
 | [ratio_reconstruction.md](docs/specs/ratio_reconstruction.md) | **Shipped** (v2.3) |
-| [mongrel_textures.md](docs/specs/mongrel_textures.md) | **Tier 2.5 shipped** (v2.3); Tier 3 planned |
+| [option_a_decouple_spec.md](docs/specs/option_a_decouple_spec.md) | **Shipped** (v2.7.1) — V4 decoupled from V1 |
+| [mongrel_textures.md](docs/specs/mongrel_textures.md) | **Tier 2.5 shipped** (v2.3); Tier 3 unblocked by Option A |
 | [oblique_effect_validation.md](docs/specs/oblique_effect_validation.md) | Validation in progress |
 | [gaussian_blur_comparison.md](docs/specs/gaussian_blur_comparison.md) | **Shipped** (v2.1) |
 | [wave6_coco_periph_validation.md](docs/specs/wave6_coco_periph_validation.md) | Scaffolding (v2.4) |

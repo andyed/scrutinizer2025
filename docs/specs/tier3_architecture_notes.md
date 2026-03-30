@@ -94,21 +94,19 @@ accumulation (can't use fixed workgroup = fixed tile).
 
 ## Recommendation
 
-**Option C first, then Option A.**
+**Option C first, then Option A.** ✅ Both shipped.
 
-Option C (eccentricity-scaled tiles) is the path of least resistance:
-- The sector geometry already exists and is validated
-- The stats extraction can use atomic accumulation (already implemented)
-  with variable tile IDs instead of fixed grid
-- The fragment shader doesn't need changes — the compute texture
-  naturally contains degraded content when tiles are large enough
-- Connects to the v2.6 isotropic sampling work
+Option C (eccentricity-scaled sectors) shipped v2.7.1:
+- CMF-based sector assignment (Blauch et al. 2026), ~3,200 sectors
+- Activated via `num_cortical_rings: 50` in mode config
+- SSIM dropped from ~1.0 to 0.37 on dense content
 
-Option A (fragment shader refactor) is the long-term architecture:
-- Clean separation between degradation mechanism and visual effects
-- Enables pure-synthesis rendering without displacement
-- Required for crowding asymmetry (the Tier 3 scientific milestone)
-- But it's a significant refactor of the most complex shader
+Option A (fragment shader decouple) shipped 2026-03-30:
+- V1_Signal extended with v4PoolingStrength / v4EffectStrength
+- EccentricityProfile struct centralizes master curve (t, t², t³)
+- `u_v4_eccentricity_source` uniform: 0.0=v1_coupled, 1.0=eccentricity
+- Mode 15 uses eccentricity-direct path with v1_strength_mult: 0.0
+- See `option_a_decouple_spec.md` for full spec and incremental plan
 
 ## Performance notes
 

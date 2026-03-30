@@ -125,10 +125,14 @@ Then smoothstep alpha ramp in synthesis to match fragment shader → **fixed par
 
 6. **Zoom consistency in captures is critical.** Text zoom variation between sessions invalidated Brown comparisons. Fixed with `setZoomFactor(1.0)` in batch capture.
 
-### Current state
+### Current state (updated 2026-03-30)
 
 - **Pyramid Mongrel** = sectors + displacement + standard compositing (default, production-ready)
-- **TTM Synthesis** = sectors + no displacement + standard compositing (research mode, not default-ready)
-- Option A (fragment shader decouple) = future work, prerequisite for Tier 3 compositing
-- Crowding asymmetry (Wave 7c) = blocked on stimulus design or synthesis quality
+- **TTM Synthesis** = sectors + no displacement + eccentricity-driven V4 (research mode)
+- **Option A (fragment shader decouple) = SHIPPED** (v2.7.1+, commits 539d367..9880645)
+  - V1_Signal extended with v4PoolingStrength / v4EffectStrength
+  - EccentricityProfile struct centralizes master curve computation
+  - Mode 15 uses `v4_eccentricity_source: 1` — V4 effects work with zero displacement
+  - Modes 0-14 use legacy identity path (zero behavioral change)
+- Crowding asymmetry (Wave 7c) = unblocked by Option A, pending synthesis quality
 - 314 tests pass, 0 regressions

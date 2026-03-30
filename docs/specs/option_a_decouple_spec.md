@@ -1,6 +1,7 @@
 # Option A: Decouple V4 Effects from V1 Displacement
 
-> Spec version: 2.0 — 2026-03-30
+> Spec version: 2.1 — 2026-03-30
+> Status: **SHIPPED** — Steps 1-4 landed (commits 539d367..9880645)
 > Prereqs: Option C (eccentricity-scaled sectors) ✅ shipped v2.7.1
 > Unlocks: Wave 7c crowding asymmetry, Tier 3 pure-synthesis rendering, researcher-independent parameter variation
 > Reviewed by: vision science agent, validation agent, codebase exploration agent
