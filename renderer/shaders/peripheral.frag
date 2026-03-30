@@ -831,6 +831,19 @@ struct V1_Signal {
     float v4EffectStrength;     // drives V4 aesthetic effects (line 1297)
 };
 
+// Eccentricity profile — computed once per fragment, consumed by all V4 stages.
+// Centralizes the eccentricity-to-effect mappings that were previously scattered
+// as local variables in processV4. Each field maps eccentricity to a specific
+// visual effect via a published psychophysical transfer function.
+struct EccentricityProfile {
+    float eccentricity;     // raw pixel distance from gaze
+    float ecc_deg;          // degrees of visual angle (eccentricity / fovea_ppd)
+    float masterT;          // smoothstep(0, fovea_radius*4, eccentricity) — unified blend
+    float colorOnset;       // t² — quadratic chromatic effect onset (Mullen 1991)
+    float rodOnset;         // t³ — cubic rod desaturation onset (Curcio 1990)
+    float blendFactor;      // masterT * u_intensity — fovea→pooled spatial blend
+};
+
 // --- STAGE 1: LGN (Gating & Analysis) ---
 LGN_Signal processLGN(vec2 uv, ModeConfig config, float dist, float fovea_radius) {
     LGN_Signal signal;
@@ -1184,7 +1197,16 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
 // --- STAGE 3: V4 (Aesthetics) ---
 vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float dist, float fovea_radius, float parafovea_radius, float saccadeFactor, float memoryStrength) {
     float eccentricity = max(0.0, dist - fovea_radius);
-    
+
+    // Build eccentricity profile — all downstream V4 effects read from this
+    EccentricityProfile ecc;
+    ecc.eccentricity = eccentricity;
+    ecc.ecc_deg = eccentricity / max(fovea_radius, 1.0); // approximate ppd conversion
+    ecc.masterT = smoothstep(0.0, fovea_radius * 4.0, eccentricity);
+    ecc.colorOnset = ecc.masterT * ecc.masterT;           // t²
+    ecc.rodOnset = ecc.masterT * ecc.masterT * ecc.masterT; // t³
+    ecc.blendFactor = ecc.masterT * u_intensity;
+
     // Screen-space derivatives of the distorted UV so textureGrad sees the
     // actual Jacobian of the V1 warp.  dFdx/dFdy on the undistorted uv would
     // ignore crowding-induced UV stretching, causing incorrect hardware LOD at
@@ -1274,24 +1296,14 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     float smoothContent = 1.0 - smoothstep(0.01, 0.05, colorDelta);
     pooledCol = mix(pooledCol, foveaCol, smoothContent);
 
-    // === UNIFIED ECCENTRICITY MASTER CURVE ===
-    // Single C2-continuous transition replaces 6 overlapping smoothsteps that
-    // created compounding Mach bands. All V4 effects derive from one curve:
-    //   t   = fovea→pooled spatial blend
-    //   t²  = color effect onset (CA, rod desat gating) — gentle near fovea
-    //   t³  = rod desaturation — deferred to far periphery
-    // Each is a composition of smooth functions — no second-derivative
-    // discontinuities, no visible banding on uniform surfaces.
-    float t = smoothstep(0.0, fovea_radius * 4.0, eccentricity);
-
-    // Unified blend from master curve. The wide ramp (0→4× fovea) lets the
-    // castleCSF per-band chromatic decay in the pooled output show through
-    // progressively, without the Mach bands from the previous tight transition.
-    // Unified blend from master curve. The wide ramp (0→4× fovea) lets the
-    // castleCSF per-band chromatic decay in the pooled output show through
-    // progressively, without the Mach bands from the previous tight transition.
-    float blendFactor = t * u_intensity;
-    vec3 col = mix(foveaCol, pooledCol, blendFactor);
+    // === UNIFIED ECCENTRICITY MASTER CURVE (from EccentricityProfile) ===
+    // All V4 effects derive from ecc.masterT (computed once at top of processV4):
+    //   ecc.masterT     = fovea→pooled spatial blend
+    //   ecc.colorOnset  = t² — color effect onset (CA, rod desat gating)
+    //   ecc.rodOnset    = t³ — rod desaturation, deferred to far periphery
+    //   ecc.blendFactor = t × intensity — spatial blend weight
+    float t = ecc.masterT; // local alias for downstream code that references t directly
+    vec3 col = mix(foveaCol, pooledCol, ecc.blendFactor);
 
     // === MAGNOCELLULAR PATHWAY: Luminance Contrast Preservation ===
     if (eccentricity > 0.001) {
@@ -1305,9 +1317,9 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         col *= mix(1.0, lumaRatio, contrastPreservation * t);
     }
 
-    // V4 effect factors derived from master curve
-    float colorEffects = t * t;     // Quadratic: gentle onset at fovea boundary
-    float rodDesat = t * t * t;     // Cubic: deferred to far periphery
+    // V4 effect factors from eccentricity profile
+    float colorEffects = ecc.colorOnset;  // t² — quadratic onset
+    float rodDesat = ecc.rodOnset;        // t³ — cubic onset
 
     float effectFactor = v1.v4EffectStrength;
     // Visual memory: suppress V4 color effects in remembered regions.
