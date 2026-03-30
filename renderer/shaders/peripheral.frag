@@ -100,6 +100,7 @@ uniform vec2 u_congestionMapSize; // Width/height of congestion map texture (for
 // RGBA: RGB = oriented noise metamer, A = blend weight (0=foveal passthrough, 1=full metamer)
 uniform sampler2D u_computeStatTexture;
 uniform float u_compute_tier; // 0.0=disabled, 2.5=active
+uniform float u_v4_eccentricity_source; // 0.0=v1_coupled (legacy), 1.0=eccentricity (Tier 3)
 uniform vec2 u_compute_frame_scale; // frame/canvas ratio for UV correction (1.0 if same)
 
 in vec2 v_texCoord;
@@ -823,6 +824,11 @@ struct V1_Signal {
     float distortionStrength;
     vec2 displacement;
     float scrambleZone;
+    // Option A: independent V4 drivers (decoupled from V1 displacement)
+    // Legacy (u_v4_eccentricity_source == 0): identity-assigned from distortionStrength
+    // Tier 3 (u_v4_eccentricity_source == 1): eccentricity-driven, V1 can be zero
+    float v4PoolingStrength;    // drives MIP blur depth (line 1183)
+    float v4EffectStrength;     // drives V4 aesthetic effects (line 1297)
 };
 
 // --- STAGE 1: LGN (Gating & Analysis) ---
@@ -902,6 +908,8 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     signal.distortionStrength = 0.0;
     signal.displacement = vec2(0.0);
     signal.scrambleZone = 0.0;
+    signal.v4PoolingStrength = 0.0;
+    signal.v4EffectStrength = 0.0;
 
     // === CORTICAL STRENGTH: continuous eccentricity function ===
     // Replaces zone-based smoothstep boundaries (fovea_radius, parafovea_radius).
@@ -953,10 +961,14 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         signal.displacement = waveOffset;
         signal.distortedUV = uv + signal.displacement;
         signal.distortionStrength = strength;
+        signal.v4PoolingStrength = signal.distortionStrength;
+        signal.v4EffectStrength = signal.distortionStrength;
         return signal;
     }
 
     if (config.v1_distortion_type == 2) {
+        signal.v4PoolingStrength = signal.distortionStrength;
+        signal.v4EffectStrength = signal.distortionStrength;
         return signal;
     }
     
@@ -1163,6 +1175,9 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         }
     }
 
+    // Option A: identity-assign V4 drivers from distortionStrength (legacy path)
+    signal.v4PoolingStrength = signal.distortionStrength;
+    signal.v4EffectStrength = signal.distortionStrength;
     return signal;
 }
 
@@ -1180,7 +1195,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     
     // TIER 1.8: COUPLED POOLING
     float blurMult = 1.0 + (u_blurRadius * 0.3);
-    float coupledEccentricity = v1.distortionStrength * u_intensity * fovea_radius * blurMult;
+    float coupledEccentricity = v1.v4PoolingStrength * u_intensity * fovea_radius * blurMult;
 
     // Congestion-gated pooling: Bouma-scaled edge density + eccentricity-weighted
     // congestion modulate MIP blur. Dense flankers within critical spacing →
@@ -1294,7 +1309,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     float colorEffects = t * t;     // Quadratic: gentle onset at fovea boundary
     float rodDesat = t * t * t;     // Cubic: deferred to far periphery
 
-    float effectFactor = v1.distortionStrength;
+    float effectFactor = v1.v4EffectStrength;
     // Visual memory: suppress V4 color effects in remembered regions.
     effectFactor *= (1.0 - memoryStrength);
 
