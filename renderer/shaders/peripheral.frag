@@ -974,14 +974,28 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         signal.displacement = waveOffset;
         signal.distortedUV = uv + signal.displacement;
         signal.distortionStrength = strength;
-        signal.v4PoolingStrength = signal.distortionStrength;
-        signal.v4EffectStrength = signal.distortionStrength;
+        if (u_v4_eccentricity_source > 0.5) {
+            float eccStrength = lgn.suppressionFactor * eccentricityScale;
+            if (u_useMask < 1.5) eccStrength *= (1.0 - memoryStrength);
+            signal.v4PoolingStrength = eccStrength;
+            signal.v4EffectStrength = eccStrength;
+        } else {
+            signal.v4PoolingStrength = signal.distortionStrength;
+            signal.v4EffectStrength = signal.distortionStrength;
+        }
         return signal;
     }
 
     if (config.v1_distortion_type == 2) {
-        signal.v4PoolingStrength = signal.distortionStrength;
-        signal.v4EffectStrength = signal.distortionStrength;
+        if (u_v4_eccentricity_source > 0.5) {
+            float eccStrength = lgn.suppressionFactor * eccentricityScale;
+            if (u_useMask < 1.5) eccStrength *= (1.0 - memoryStrength);
+            signal.v4PoolingStrength = eccStrength;
+            signal.v4EffectStrength = eccStrength;
+        } else {
+            signal.v4PoolingStrength = signal.distortionStrength;
+            signal.v4EffectStrength = signal.distortionStrength;
+        }
         return signal;
     }
     
@@ -1188,9 +1202,22 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
         }
     }
 
-    // Option A: identity-assign V4 drivers from distortionStrength (legacy path)
-    signal.v4PoolingStrength = signal.distortionStrength;
-    signal.v4EffectStrength = signal.distortionStrength;
+    // Option A: V4 eccentricity source policy
+    if (u_v4_eccentricity_source > 0.5) {
+        // Eccentricity-direct: V4 effects driven by eccentricity, independent of V1 displacement.
+        // No v1_strength_mult, no density crowding — chromatic decay and pooling are retinal,
+        // not scene-dependent (Mullen 1991, Curcio 1990).
+        float eccStrength = lgn.suppressionFactor * eccentricityScale;
+        if (u_useMask < 1.5) {
+            eccStrength *= (1.0 - memoryStrength);
+        }
+        signal.v4PoolingStrength = eccStrength;
+        signal.v4EffectStrength = eccStrength;
+    } else {
+        // Legacy (v1_coupled): identity-assign from distortionStrength
+        signal.v4PoolingStrength = signal.distortionStrength;
+        signal.v4EffectStrength = signal.distortionStrength;
+    }
     return signal;
 }
 
