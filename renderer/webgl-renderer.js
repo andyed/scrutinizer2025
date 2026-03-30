@@ -135,6 +135,7 @@
                 this.computeTextureLocation = null;
                 this.computeTierLocation = null;
                 this.computeFrameScaleLocation = null;
+                this.v4EccentricitySourceLocation = null;
                 this._hasComputeData = false;
                 this._computeTier = 0;
                 this._computeFrameScale = [1.0, 1.0];
@@ -316,6 +317,8 @@
                 this.computeTextureLocation = gl.getUniformLocation(this.program, "u_computeStatTexture");
                 this.computeTierLocation = gl.getUniformLocation(this.program, "u_compute_tier");
                 this.computeFrameScaleLocation = gl.getUniformLocation(this.program, "u_compute_frame_scale");
+                // Option A: V4 eccentricity source (0.0=v1_coupled, 1.0=eccentricity)
+                this.v4EccentricitySourceLocation = gl.getUniformLocation(this.program, "u_v4_eccentricity_source");
 
                 // Create buffers
                 this.positionBuffer = gl.createBuffer();
@@ -634,6 +637,7 @@
                         this.config.yv_freq_decay = p.yv_freq_decay ?? defaults.yv_freq_decay;
                         this.config.supra_exponent = p.supra_exponent ?? defaults.supra_exponent;
                         this.config.compute_tier = p.compute_tier ?? defaults.compute_tier;
+                        this.config.v4_eccentricity_source = p.v4_eccentricity_source ?? 0;
                         this.config.reading_span = p.reading_span ?? defaults.reading_span;
                         this.config.reading_span_strength = p.reading_span_strength ?? defaults.reading_span_strength;
 
@@ -779,6 +783,7 @@
                     : (this._hasComputeData ? this._computeTier : 0.0);
                 gl.uniform1f(this.computeTierLocation, effectiveTier);
                 gl.uniform2f(this.computeFrameScaleLocation, this._computeFrameScale[0], this._computeFrameScale[1]);
+                gl.uniform1f(this.v4EccentricitySourceLocation, this.config.v4_eccentricity_source || 0.0);
 
                 gl.uniform2f(this.resolutionLocation, width, height);
                 gl.uniform2f(this.mouseLocation, mouseX, mouseY);
