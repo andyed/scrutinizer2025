@@ -516,6 +516,10 @@
         render() {
             if (!this.renderer) return;
             const now = performance.now();
+            // In test mode, pin shader time to 0 for deterministic captures
+            // (gaze model still uses real time for position settling)
+            const shaderTime = (typeof process !== 'undefined' && process.env?.TEST_MODE === 'true')
+                ? 0.0 : now;
             if (this.frameTimer) this.frameTimer.beginFrame();
 
             // 1. Update gaze model (smoothing + velocity)
@@ -754,7 +758,7 @@
                 gaze.y, // stableMouseY
                 (contentState.hasStructure && contentState.enableStructureMap) ? 1.0 : 0.0,
                 contentState.enableSaliencyModulation ? 1.0 : 0.0,
-                now / 1000.0, // time (seconds)
+                shaderTime / 1000.0, // time (seconds) — pinned to 0 in TEST_MODE
                 this.config.scrollbarWidth,
                 vel.vx,
                 vel.vy

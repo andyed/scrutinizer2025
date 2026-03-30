@@ -107,9 +107,15 @@
             }
 
             // Smooth mouse position (exponential lerp toward target)
+            // In test mode, snap instantly for deterministic captures
             if (this.targetMouseX !== 0 || this.targetMouseY !== 0) {
-                this.mouseX += (this.targetMouseX - this.mouseX) * this.config.maskSmoothness;
-                this.mouseY += (this.targetMouseY - this.mouseY) * this.config.maskSmoothness;
+                if (typeof process !== 'undefined' && process.env?.TEST_MODE === 'true') {
+                    this.mouseX = this.targetMouseX;
+                    this.mouseY = this.targetMouseY;
+                } else {
+                    this.mouseX += (this.targetMouseX - this.mouseX) * this.config.maskSmoothness;
+                    this.mouseY += (this.targetMouseY - this.mouseY) * this.config.maskSmoothness;
+                }
             }
 
             // Calculate velocity (pixels per ms)
