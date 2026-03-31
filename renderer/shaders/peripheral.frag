@@ -1265,6 +1265,10 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
 
     vec3 pooledCol;
 
+    // Compute alpha — declared before tier check so snap-back can reference it
+    float computeAlpha = 0.0;
+    float rawComputeAlpha = 0.0; // pre-foveal-gate alpha for Tier 3 snap-back scaling
+
     // Tier 2.5: WebGPU compute metamer — oriented noise matching pooling statistics.
     // Alpha encodes blend weight: 0 at fovea, 1 in far periphery.
     // Falls through to MIP/DoG for uncovered regions (alpha < 1).
@@ -1273,7 +1277,14 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         // which may be smaller than the canvas (e.g. toolbar chrome).
         vec2 computeUV = uv * u_compute_frame_scale;
         vec4 computeSample = texture(u_computeStatTexture, computeUV);
-        float computeAlpha = computeSample.a;
+        computeAlpha = computeSample.a;
+
+        // Foveal protection: the compute texture is half-res and bilinear
+        // interpolation bleeds synthesis into the foveal boundary. The fragment
+        // shader has full-res eccentricity and must independently gate compute.
+        float fovealGate = smoothstep(0.0, fovea_radius * 0.5, eccentricity);
+        float rawComputeAlpha = computeAlpha; // pre-gate alpha for snap-back scaling
+        computeAlpha *= fovealGate;
 
         if (computeAlpha > 0.99) {
             // Full metamer coverage — skip MIP fallback
@@ -1320,8 +1331,21 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     // colorDelta is large and this is a no-op.
     //
     float colorDelta = length(pooledCol - foveaCol);
-    float smoothContent = 1.0 - smoothstep(0.01, 0.05, colorDelta);
-    pooledCol = mix(pooledCol, foveaCol, smoothContent);
+    // Smooth content snap-back: prevents Mach bands on smooth gradients where
+    // DoG/MIP pooling introduces small color errors. When pooledCol ≈ foveaCol,
+    // snap pooledCol to foveaCol so blend transitions have nothing to amplify.
+    //
+    // Tier 3: scale snap-back by inverse of compute authority. Where synthesis
+    // has full authority (computeAlpha ≈ 1), no snap-back — synthesis replaces
+    // content. Where synthesis has low authority (fovea, computeAlpha ≈ 0),
+    // full snap-back — foveal protection.
+    // Tier 3: skip snap-back. The compute texture IS the peripheral representation.
+    // Foveal protection is handled by the fovealGate on computeAlpha above.
+    // Snap-back would undo synthesis on sparse content where colorDelta is small.
+    if (u_compute_tier < 3.0) {
+        float smoothContent = 1.0 - smoothstep(0.01, 0.05, colorDelta);
+        pooledCol = mix(pooledCol, foveaCol, smoothContent);
+    }
 
     // === UNIFIED ECCENTRICITY MASTER CURVE (from EccentricityProfile) ===
     // All V4 effects derive from ecc.masterT (computed once at top of processV4):
@@ -1339,8 +1363,10 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         float distortedLuma = dot(col, vec3(0.299, 0.587, 0.114));
         float lumaRatio = cleanLuma / max(distortedLuma, 0.01);
 
-        // Contrast preservation: 60% inner, 10% far periphery — uses master t
-        float contrastPreservation = mix(0.6, 0.1, t);
+        // Contrast preservation: inner→far periphery — uses master t
+        // Tier 3: reduce inner preservation to let synthesis contrast dominate
+        float cp_inner = (u_compute_tier >= 3.0) ? 0.3 : 0.6;
+        float contrastPreservation = mix(cp_inner, 0.1, t);
         col *= mix(1.0, lumaRatio, contrastPreservation * t);
     }
 
