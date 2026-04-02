@@ -1481,6 +1481,8 @@ function runIntegrationTest() {
     const testVisualMemory = process.env.TEST_VISUAL_MEMORY ? parseInt(process.env.TEST_VISUAL_MEMORY) : null; // -1 = infinite
     const testAdserp = process.env.TEST_ADSERP_MODE === 'true'; // AdSERP live replay mode
     const testAdSerpSpeed = process.env.TEST_ADSERP_SPEED ? parseFloat(process.env.TEST_ADSERP_SPEED) : 1.0;
+    const testBatchGazeplot = process.env.TEST_BATCH_GAZEPLOT === 'true'; // Fast batch: bulk-load VM, skip per-fixation walk
+    const testBatchDocHeight = process.env.TEST_BATCH_GAZEPLOT_DOC_HEIGHT ? parseInt(process.env.TEST_BATCH_GAZEPLOT_DOC_HEIGHT) : 0;
     const screenshotMode = process.env.SCREENSHOT_MODE || 'date';
     const outputFilename = process.env.TEST_OUTPUT_FILENAME || null;
     // Parse mobile emulation: accepts 'true', 'false', or a profile name string like 'iphone_14_pro'
@@ -1758,11 +1760,154 @@ function runIntegrationTest() {
                             }
                         }
 
+                        // === Batch gazeplot: bulk-load ALL fixations into VM at once ===
+                        // Skips the per-fixation walk entirely. Loads fixation list into
+                        // the visual memory buffer in one shot, triggers a single render,
+                        // then falls through to tile capture + screenshot.
+                        if (testBatchGazeplot && testScanpath && !trajectoryImage) {
+                            const fs = require('fs');
+                            let scanpathData;
+                            try {
+                                scanpathData = JSON.parse(fs.readFileSync(testScanpath, 'utf8'));
+                            } catch (e) {
+                                console.error(`[Test] Failed to load scanpath: ${e.message}`);
+                            }
+
+                            if (scanpathData) {
+                                const fixations = scanpathData.fixations || [];
+                                if (fixations.length > 0) {
+                                  try {
+                                    // Hide scrollbar so content width matches viewport exactly
+                                    await mainWindow.scrutinizerView.webContents.executeJavaScript(`
+                                        (() => {
+                                            const s = document.createElement('style');
+                                            s.textContent = 'html { overflow-y: scroll; scrollbar-width: none; } ::-webkit-scrollbar { display: none; }';
+                                            document.head.appendChild(s);
+                                            return 'ok';
+                                        })()
+                                    `);
+                                    await new Promise(resolve => setTimeout(resolve, 200));
+
+                                    // Enable infinite visual memory
+                                    const vmLimit = testVisualMemory !== null ? testVisualMemory : -1;
+                                    console.log(`[Test] Batch gazeplot: ${fixations.length} fixations, visual memory=${vmLimit}`);
+                                    mainWindow.scrutinizerHud.webContents.send('menu:set-visual-memory', vmLimit);
+                                    await new Promise(resolve => setTimeout(resolve, 200));
+
+                                    // Get physical capture size for coordinate scaling
+                                    const testCapture = await mainWindow.scrutinizerHud.capturePage();
+                                    const physSize = testCapture.getSize();
+                                    const stimW = (scanpathData.meta && scanpathData.meta.stimulusWidth) || 1280;
+                                    const stimH = (scanpathData.meta && scanpathData.meta.stimulusHeight) || 1024;
+                                    const scaleX = physSize.width / stimW;
+                                    const scaleY = physSize.height / stimH;
+
+                                    // Build full VM buffer in physical canvas pixels (viewport tile 0)
+                                    // For the initial render, map all fixations to viewport-space at scrollY=0
+                                    const vmPoints = fixations
+                                        .filter(f => f.pageY !== undefined || f.y !== undefined)
+                                        .map(f => ({
+                                            x: f.x * scaleX,
+                                            y: ((f.pageY !== undefined ? f.pageY : f.y)) * scaleY,
+                                            radius: (f.radius || 45) * scaleX
+                                        }));
+
+                                    // Bulk-load into VM buffer and trigger one render pass
+                                    await mainWindow.scrutinizerHud.webContents.executeJavaScript(`
+                                        (() => {
+                                            const vm = window._scrutinizer && window._scrutinizer.visualMemory;
+                                            if (!vm) return 'no visual memory';
+                                            vm.buffer = ${JSON.stringify(vmPoints)};
+                                            vm.maskDirty = true;
+                                            return 'loaded ' + vm.buffer.length + ' points';
+                                        })()
+                                    `);
+
+                                    // Wait for render to settle (2 frames)
+                                    await new Promise(resolve => setTimeout(resolve, 100));
+                                    console.log(`[Test] Batch gazeplot: bulk-loaded ${vmPoints.length} points, physSize=${physSize.width}x${physSize.height}, scale=${scaleX.toFixed(2)}x${scaleY.toFixed(2)}`);
+
+                                    // ── Tile capture (reuses existing tile logic) ──
+                                    const fullpageTiles = process.env.TEST_FULLPAGE_TILES ? parseInt(process.env.TEST_FULLPAGE_TILES) : 0;
+                                    if (fullpageTiles > 0) {
+                                        const cssViewportH = await mainWindow.scrutinizerView.webContents.executeJavaScript(
+                                            'window.innerHeight'
+                                        );
+                                        console.log(`[Test] Batch tile capture: ${fullpageTiles} tiles, cssViewportH=${cssViewportH}px`);
+
+                                        // Disable sticky/fixed headers
+                                        await mainWindow.scrutinizerView.webContents.executeJavaScript(`
+                                            (() => {
+                                                document.querySelectorAll('*').forEach(el => {
+                                                    const cs = getComputedStyle(el);
+                                                    if (cs.position === 'fixed' || cs.position === 'sticky') {
+                                                        el.style.position = 'absolute';
+                                                    }
+                                                });
+                                                return 'ok';
+                                            })()
+                                        `);
+                                        await new Promise(r => setTimeout(r, 200));
+
+                                        const fs2 = require('fs');
+                                        const p = require('path');
+                                        const packageVersion = require('./package.json').version.replace(/\.\d+$/, '');
+                                        const capDir = p.join(__dirname, 'tests', 'golden-captures', `v${packageVersion}`);
+                                        if (!fs2.existsSync(capDir)) fs2.mkdirSync(capDir, { recursive: true });
+
+                                        for (let tile = 0; tile < fullpageTiles; tile++) {
+                                            const scrollY = tile * cssViewportH;
+
+                                            // Scroll the content view
+                                            await mainWindow.scrutinizerView.webContents.executeJavaScript(
+                                                `window.scrollTo(0, ${scrollY})`
+                                            );
+                                            await new Promise(r => setTimeout(r, 300));
+
+                                            // Remap VM buffer for this tile's scroll offset
+                                            const shiftedPoints = fixations
+                                                .filter(f => f.pageY !== undefined)
+                                                .map(f => ({
+                                                    x: f.x * scaleX,
+                                                    y: (f.pageY - scrollY) * scaleY,
+                                                    radius: (f.radius || 45) * scaleX
+                                                }))
+                                                .filter(p => p.y > -100 && p.y < physSize.height + 100);
+
+                                            await mainWindow.scrutinizerHud.webContents.executeJavaScript(`
+                                                (() => {
+                                                    const vm = window._scrutinizer && window._scrutinizer.visualMemory;
+                                                    if (!vm) return;
+                                                    vm.buffer = ${JSON.stringify(shiftedPoints)};
+                                                    vm.maskDirty = true;
+                                                })()
+                                            `);
+
+                                            await new Promise(r => setTimeout(r, 500)); // let render settle
+
+                                            // Capture tile
+                                            const tileImage = await mainWindow.scrutinizerHud.capturePage();
+                                            const tileBuffer = tileImage.toPNG();
+                                            const tileFile = outputFilename.replace('.png', `_tile${tile}.png`);
+                                            fs2.writeFileSync(p.join(capDir, tileFile), tileBuffer);
+                                            console.log(`[Test] Batch tile ${tile}/${fullpageTiles}: scroll=${scrollY} points=${shiftedPoints.length} → ${tileFile}`);
+                                        }
+                                    }
+
+                                    console.log(`[Test] Batch gazeplot complete`);
+                                  } catch (batchErr) {
+                                    console.error(`[Test] Batch gazeplot error: ${batchErr.message}`);
+                                    console.error(batchErr.stack);
+                                  }
+                                }
+                            }
+                        }
+
                         // === Scanpath gazeplot replay (visual memory accumulation) ===
                         // Walks through fixation sequence with visual memory enabled,
                         // dwelling at each fixation for its recorded duration.
                         // Captures screenshot of the FINAL accumulated state.
-                        if (testScanpath && !trajectoryImage && !testAdserp) {
+                        if (testScanpath && !trajectoryImage && !testAdserp && !testBatchGazeplot) {
                             const fs = require('fs');
                             let scanpathData;
                             try {
@@ -1787,22 +1932,43 @@ function runIntegrationTest() {
                                     const displayH = scanpathData.displaySize ? scanpathData.displaySize.height
                                         : (scanpathData.meta && scanpathData.meta.stimulusHeight) || 1050;
 
+                                    // Hide scrollbar in content view so content width matches viewport exactly.
+                                    // Without this, the scrollbar shifts content right by ~14px, misaligning
+                                    // the foveated render with fixation coordinates.
+                                    await mainWindow.scrutinizerView.webContents.executeJavaScript(`
+                                        const s = document.createElement('style');
+                                        s.textContent = 'html { overflow-y: scroll; scrollbar-width: none; } ::-webkit-scrollbar { display: none; }';
+                                        document.head.appendChild(s);
+                                    `);
+                                    await new Promise(resolve => setTimeout(resolve, 200));
+
                                     // Enable infinite visual memory (-1)
                                     const vmLimit = testVisualMemory !== null ? testVisualMemory : -1;
                                     console.log(`[Test] Scanpath replay: ${fixations.length} fixations, visual memory=${vmLimit}`);
                                     mainWindow.scrutinizerHud.webContents.send('menu:set-visual-memory', vmLimit);
                                     await new Promise(resolve => setTimeout(resolve, 200));
 
-                                    const { width: tw, height: th } = mainWindow.getContentBounds();
-                                    const wb = mainWindow.getBounds();
-                                    console.log(`[Test] Gazeplot walk: displayW=${displayW} displayH=${displayH} contentBounds=${tw}x${th} windowBounds=${wb.x},${wb.y},${wb.width}x${wb.height}`);
+                                    // Use content bounds (not window outer bounds) to match HUD positioning.
+                                    // The HUD is offset by TOOLBAR_HEIGHT (40px) from content top.
+                                    // screenX/Y must land in HUD coordinates after overlay.js subtracts window.screenX/Y.
+                                    const cb = mainWindow.getContentBounds();
+                                    const TOOLBAR_HEIGHT = 40;
+                                    // HUD position: x = cb.x, y = cb.y + TOOLBAR_HEIGHT
+                                    // HUD size: cb.width x (cb.height - TOOLBAR_HEIGHT)
+                                    const hudW = cb.width;
+                                    const hudH = cb.height - TOOLBAR_HEIGHT;
+                                    console.log(`[Test] Gazeplot walk: displayW=${displayW} displayH=${displayH} contentBounds=${cb.x},${cb.y},${cb.width}x${cb.height} hudOffset=${TOOLBAR_HEIGHT} hudSize=${hudW}x${hudH}`);
 
                                     for (let fi = 0; fi < fixations.length; fi++) {
                                         const fix = fixations[fi];
                                         const normX = fix.x / displayW;
                                         const normY = fix.y / displayH;
-                                        const screenX = wb.x + normX * tw;
-                                        const screenY = wb.y + normY * th;
+                                        // Target HUD local position: (normX * hudW, normY * hudH)
+                                        // overlay.js computes: localX = screenX - window.screenX
+                                        // where window.screenX = cb.x (HUD x position)
+                                        // So: screenX = cb.x + normX * hudW
+                                        const screenX = cb.x + normX * hudW;
+                                        const screenY = (cb.y + TOOLBAR_HEIGHT) + normY * hudH;
                                         const duration = fix.tEnd - fix.tStart;
 
                                         // Rapidly send position to converge GazeModel smoothing.
@@ -1860,7 +2026,7 @@ function runIntegrationTest() {
                         // then captures viewport-sized PNGs that can be stitched later.
                         const fullpageTiles = process.env.TEST_FULLPAGE_TILES ? parseInt(process.env.TEST_FULLPAGE_TILES) : 0;
                         const fullpageDocH = process.env.TEST_FULLPAGE_DOC_HEIGHT ? parseInt(process.env.TEST_FULLPAGE_DOC_HEIGHT) : 0;
-                        if (fullpageTiles > 0 && testScanpath) {
+                        if (fullpageTiles > 0 && testScanpath && !testBatchGazeplot) {
                             const { width: tw, height: th } = mainWindow.getContentBounds();
                             console.log(`[Test] Full-page tile capture: ${fullpageTiles} tiles, viewport=${tw}x${th}`);
 
@@ -1893,18 +2059,20 @@ function runIntegrationTest() {
                                 `);
                                 await new Promise(r => setTimeout(r, 200));
 
-                                // Determine actual tile height from first capture.
-                                // getContentBounds().height may include chrome that capturePage() excludes.
-                                let actualTileH = th;
-                                {
-                                    const testCapture = await mainWindow.scrutinizerHud.capturePage();
-                                    const testSize = testCapture.getSize();
-                                    actualTileH = testSize.height;
-                                    console.log(`[Test] Content bounds: ${tw}x${th}, capture size: ${testSize.width}x${testSize.height}, using ${actualTileH}px tile height`);
-                                }
+                                // Determine tile height for scrolling.
+                                // CRITICAL: scroll uses CSS pixels, but capturePage() returns physical pixels (DPR-scaled).
+                                // We need CSS pixels for window.scrollTo(). Get the actual viewport height
+                                // from the content view, not from the capture dimensions.
+                                const cssViewportH = await mainWindow.scrutinizerView.webContents.executeJavaScript(
+                                    'window.innerHeight'
+                                );
+                                // Also get physical capture size for logging
+                                const testCapture = await mainWindow.scrutinizerHud.capturePage();
+                                const physSize = testCapture.getSize();
+                                console.log(`[Test] Content bounds: ${tw}x${th}, CSS viewport: ${cssViewportH}px, capture: ${physSize.width}x${physSize.height}px (DPR=${(physSize.height/cssViewportH).toFixed(1)})`);
 
                                 for (let tile = 0; tile < fullpageTiles; tile++) {
-                                    const scrollY = tile * actualTileH;
+                                    const scrollY = tile * cssViewportH;
 
                                     // Scroll the content view
                                     await mainWindow.scrutinizerView.webContents.executeJavaScript(
@@ -1918,16 +2086,18 @@ function runIntegrationTest() {
                                     //   viewportY = (pageY - scrollY) scaled to canvas
                                     const stimW = spData.meta.stimulusWidth || 1280;
                                     const stimH = spData.meta.stimulusHeight || 1024;
-                                    const scaleX = tw / stimW;
-                                    const scaleY = actualTileH / stimH;
+                                    // VM buffer operates in physical canvas pixels.
+                                    // Scale from stimulus-space to physical capture space.
+                                    const scaleX = physSize.width / stimW;
+                                    const scaleY = physSize.height / stimH;
                                     const shiftedPoints = fixations
-                                        .filter(f => f.pageY !== undefined) // only AdSERP fixations have pageY
+                                        .filter(f => f.pageY !== undefined)
                                         .map(f => ({
                                             x: f.x * scaleX,
                                             y: (f.pageY - scrollY) * scaleY,
                                             radius: 45 * scaleX
                                         }))
-                                        .filter(p => p.y > -100 && p.y < actualTileH + 100);
+                                        .filter(p => p.y > -100 && p.y < physSize.height + 100);
 
                                     await mainWindow.scrutinizerHud.webContents.executeJavaScript(`
                                         (() => {
