@@ -1782,8 +1782,10 @@ function runIntegrationTest() {
                                 }
 
                                 if (fixations && fixations.length > 0) {
-                                    const displayW = scanpathData.displaySize ? scanpathData.displaySize.width : 1680;
-                                    const displayH = scanpathData.displaySize ? scanpathData.displaySize.height : 1050;
+                                    const displayW = scanpathData.displaySize ? scanpathData.displaySize.width
+                                        : (scanpathData.meta && scanpathData.meta.stimulusWidth) || 1680;
+                                    const displayH = scanpathData.displaySize ? scanpathData.displaySize.height
+                                        : (scanpathData.meta && scanpathData.meta.stimulusHeight) || 1050;
 
                                     // Enable infinite visual memory (-1)
                                     const vmLimit = testVisualMemory !== null ? testVisualMemory : -1;
@@ -1793,6 +1795,7 @@ function runIntegrationTest() {
 
                                     const { width: tw, height: th } = mainWindow.getContentBounds();
                                     const wb = mainWindow.getBounds();
+                                    console.log(`[Test] Gazeplot walk: displayW=${displayW} displayH=${displayH} contentBounds=${tw}x${th} windowBounds=${wb.x},${wb.y},${wb.width}x${wb.height}`);
 
                                     for (let fi = 0; fi < fixations.length; fi++) {
                                         const fix = fixations[fi];
@@ -1890,8 +1893,18 @@ function runIntegrationTest() {
                                 `);
                                 await new Promise(r => setTimeout(r, 200));
 
+                                // Determine actual tile height from first capture.
+                                // getContentBounds().height may include chrome that capturePage() excludes.
+                                let actualTileH = th;
+                                {
+                                    const testCapture = await mainWindow.scrutinizerHud.capturePage();
+                                    const testSize = testCapture.getSize();
+                                    actualTileH = testSize.height;
+                                    console.log(`[Test] Content bounds: ${tw}x${th}, capture size: ${testSize.width}x${testSize.height}, using ${actualTileH}px tile height`);
+                                }
+
                                 for (let tile = 0; tile < fullpageTiles; tile++) {
-                                    const scrollY = tile * th;
+                                    const scrollY = tile * actualTileH;
 
                                     // Scroll the content view
                                     await mainWindow.scrutinizerView.webContents.executeJavaScript(
@@ -1906,7 +1919,7 @@ function runIntegrationTest() {
                                     const stimW = spData.meta.stimulusWidth || 1280;
                                     const stimH = spData.meta.stimulusHeight || 1024;
                                     const scaleX = tw / stimW;
-                                    const scaleY = th / stimH;
+                                    const scaleY = actualTileH / stimH;
                                     const shiftedPoints = fixations
                                         .filter(f => f.pageY !== undefined) // only AdSERP fixations have pageY
                                         .map(f => ({
@@ -1914,7 +1927,7 @@ function runIntegrationTest() {
                                             y: (f.pageY - scrollY) * scaleY,
                                             radius: 45 * scaleX
                                         }))
-                                        .filter(p => p.y > -100 && p.y < th + 100);
+                                        .filter(p => p.y > -100 && p.y < actualTileH + 100);
 
                                     await mainWindow.scrutinizerHud.webContents.executeJavaScript(`
                                         (() => {

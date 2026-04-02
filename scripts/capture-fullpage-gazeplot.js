@@ -54,7 +54,9 @@ const vpH = meta.screenHeight || 1024;
 
 // Document height for tile count
 const docH = meta.documentHeight || 2642;
-const tileCount = Math.ceil(docH / vpH);
+// Add 1 extra tile to account for capture height < viewport height
+// (title bar/chrome reduces actual capture area by ~40px)
+const tileCount = Math.ceil(docH / vpH) + 1;
 
 console.log(`═══ Full-Page Gazeplot: ${trialId} ═══\n`);
 console.log(`  Fixations: ${scanpathData.fixations.length}`);
@@ -129,6 +131,7 @@ child.on('close', async (code) => {
 
     const tilesB64 = tilePaths.map(t => fs.readFileSync(t).toString('base64'));
 
+    // Stitch at 1x resolution (halve 2x DPR captures) to keep file sizes reasonable
     const stitchedB64 = await page.evaluate(async (data) => {
         const imgs = [];
         for (const b64 of data) {
@@ -137,12 +140,14 @@ child.on('close', async (code) => {
             await new Promise(r => img.onload = r);
             imgs.push(img);
         }
-        const w = imgs[0].width, h = imgs[0].height;
+        const srcW = imgs[0].width, srcH = imgs[0].height;
+        const outW = Math.round(srcW / 2); // 1x from 2x DPR
+        const outH = Math.round(srcH / 2);
         const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h * imgs.length;
+        canvas.width = outW;
+        canvas.height = outH * imgs.length;
         const ctx = canvas.getContext('2d');
-        imgs.forEach((img, i) => ctx.drawImage(img, 0, i * h));
+        imgs.forEach((img, i) => ctx.drawImage(img, 0, i * outH, outW, outH));
         return canvas.toDataURL('image/png').split(',')[1];
     }, tilesB64);
 
