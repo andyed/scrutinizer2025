@@ -1479,6 +1479,8 @@ function runIntegrationTest() {
     const testOverlay = process.env.TEST_OVERLAY === 'true';
     const testScanpath = process.env.TEST_SCANPATH || null; // Path to scanpath JSON for gazeplot replay
     const testVisualMemory = process.env.TEST_VISUAL_MEMORY ? parseInt(process.env.TEST_VISUAL_MEMORY) : null; // -1 = infinite
+    const testAdserp = process.env.TEST_ADSERP_MODE === 'true'; // AdSERP live replay mode
+    const testAdSerpSpeed = process.env.TEST_ADSERP_SPEED ? parseFloat(process.env.TEST_ADSERP_SPEED) : 1.0;
     const screenshotMode = process.env.SCREENSHOT_MODE || 'date';
     const outputFilename = process.env.TEST_OUTPUT_FILENAME || null;
     // Parse mobile emulation: accepts 'true', 'false', or a profile name string like 'iphone_14_pro'
@@ -1760,7 +1762,7 @@ function runIntegrationTest() {
                         // Walks through fixation sequence with visual memory enabled,
                         // dwelling at each fixation for its recorded duration.
                         // Captures screenshot of the FINAL accumulated state.
-                        if (testScanpath && !trajectoryImage) {
+                        if (testScanpath && !trajectoryImage && !testAdserp) {
                             const fs = require('fs');
                             let scanpathData;
                             try {
@@ -1847,6 +1849,207 @@ function runIntegrationTest() {
                                     } catch (e) { console.log(`[Test] VM debug error: ${e.message}`); }
                                     console.log(`[Test] Scanpath replay complete — capturing accumulated state`);
                                 }
+                            }
+                        }
+
+                        // ── Full-page tile capture (after gazeplot walk) ──
+                        // Scrolls through the page, shifting the VM buffer for each tile,
+                        // then captures viewport-sized PNGs that can be stitched later.
+                        const fullpageTiles = process.env.TEST_FULLPAGE_TILES ? parseInt(process.env.TEST_FULLPAGE_TILES) : 0;
+                        const fullpageDocH = process.env.TEST_FULLPAGE_DOC_HEIGHT ? parseInt(process.env.TEST_FULLPAGE_DOC_HEIGHT) : 0;
+                        if (fullpageTiles > 0 && testScanpath) {
+                            const { width: tw, height: th } = mainWindow.getContentBounds();
+                            console.log(`[Test] Full-page tile capture: ${fullpageTiles} tiles, viewport=${tw}x${th}`);
+
+                            // Save original VM buffer positions (page-space, stored as screen-space during walk)
+                            const origBuffer = await mainWindow.scrutinizerHud.webContents.executeJavaScript(`
+                                (() => {
+                                    const vm = window._scrutinizer && window._scrutinizer.visualMemory;
+                                    if (!vm) return null;
+                                    return vm.buffer.map(p => ({ x: p.x, y: p.y, radius: p.radius }));
+                                })()
+                            `);
+
+                            if (origBuffer && origBuffer.length > 0) {
+                                console.log(`[Test] VM buffer: ${origBuffer.length} points`);
+
+                                // Load fixation data once (includes pageY for tile mapping)
+                                const fs2 = require('fs');
+                                const spData = JSON.parse(fs2.readFileSync(testScanpath, 'utf8'));
+                                const fixations = spData.fixations || [];
+
+                                // Disable sticky/fixed headers in the SERP so they don't
+                                // repeat at the top of every tile when stitched
+                                await mainWindow.scrutinizerView.webContents.executeJavaScript(`
+                                    document.querySelectorAll('*').forEach(el => {
+                                        const cs = getComputedStyle(el);
+                                        if (cs.position === 'fixed' || cs.position === 'sticky') {
+                                            el.style.position = 'absolute';
+                                        }
+                                    });
+                                `);
+                                await new Promise(r => setTimeout(r, 200));
+
+                                for (let tile = 0; tile < fullpageTiles; tile++) {
+                                    const scrollY = tile * th;
+
+                                    // Scroll the content view
+                                    await mainWindow.scrutinizerView.webContents.executeJavaScript(
+                                        `window.scrollTo(0, ${scrollY})`
+                                    );
+                                    await new Promise(r => setTimeout(r, 300));
+
+                                    // Rebuild VM buffer using page-space Y coordinates.
+                                    // f.pageY is the original page-space position (before scroll correction).
+                                    // For this tile at scrollY, convert to viewport position:
+                                    //   viewportY = (pageY - scrollY) scaled to canvas
+                                    const stimW = spData.meta.stimulusWidth || 1280;
+                                    const stimH = spData.meta.stimulusHeight || 1024;
+                                    const scaleX = tw / stimW;
+                                    const scaleY = th / stimH;
+                                    const shiftedPoints = fixations
+                                        .filter(f => f.pageY !== undefined) // only AdSERP fixations have pageY
+                                        .map(f => ({
+                                            x: f.x * scaleX,
+                                            y: (f.pageY - scrollY) * scaleY,
+                                            radius: 45 * scaleX
+                                        }))
+                                        .filter(p => p.y > -100 && p.y < th + 100);
+
+                                    await mainWindow.scrutinizerHud.webContents.executeJavaScript(`
+                                        (() => {
+                                            const vm = window._scrutinizer && window._scrutinizer.visualMemory;
+                                            if (!vm) return;
+                                            vm.buffer = ${JSON.stringify(shiftedPoints)};
+                                            vm.maskDirty = true;
+                                        })()
+                                    `);
+
+                                    await new Promise(r => setTimeout(r, 500)); // let render settle
+
+                                    // Capture tile
+                                    const tileImage = await mainWindow.scrutinizerHud.capturePage();
+                                    const tileBuffer = tileImage.toPNG();
+                                    const p = require('path');
+                                    const packageVersion = require('./package.json').version.replace(/\.\d+$/, '');
+                                    const capDir = p.join(__dirname, 'tests', 'golden-captures', `v${packageVersion}`);
+                                    if (!fs2.existsSync(capDir)) fs2.mkdirSync(capDir, { recursive: true });
+                                    const tileFile = outputFilename.replace('.png', `_tile${tile}.png`);
+                                    fs2.writeFileSync(p.join(capDir, tileFile), tileBuffer);
+                                    console.log(`[Test] Tile ${tile}/${fullpageTiles}: scroll=${scrollY} points=${shiftedPoints.length} → ${tileFile}`);
+                                }
+
+                                // Restore original VM buffer
+                                await mainWindow.scrutinizerHud.webContents.executeJavaScript(`
+                                    (() => {
+                                        const vm = window._scrutinizer && window._scrutinizer.visualMemory;
+                                        if (!vm) return;
+                                        vm.buffer = ${JSON.stringify(origBuffer)};
+                                        vm.maskDirty = true;
+                                    })()
+                                `);
+                            }
+                        }
+
+                        // ── AdSERP live replay: load scanpath into renderer, start playback ──
+                        if (testAdserp && testScanpath) {
+                            const fs = require('fs');
+                            let adSerpData;
+                            try {
+                                adSerpData = JSON.parse(fs.readFileSync(testScanpath, 'utf8'));
+                            } catch (e) {
+                                console.error(`[Test] Failed to load AdSERP scanpath: ${e.message}`);
+                            }
+
+                            if (adSerpData && adSerpData.fixations) {
+                                console.log(`[Test] AdSERP replay: ${adSerpData.fixations.length} fixations, ` +
+                                    `${(adSerpData.mouseTimeline || []).length} mouse events, ` +
+                                    `${(adSerpData.scrollTimeline || []).length} scroll events, ` +
+                                    `speed=${testAdSerpSpeed}x`);
+
+                                // Load scanpath data into renderer's ScanpathPlayer
+                                await mainWindow.scrutinizerHud.webContents.executeJavaScript(`
+                                    (() => {
+                                        const s = window._scrutinizer;
+                                        if (!s) return 'no scrutinizer';
+                                        s.loadScanpath(${JSON.stringify(adSerpData)});
+
+                                        // Wire scroll callback to scroll the content view
+                                        if (s.gazeModel.scrollTimeline) {
+                                            s.gazeModel.onScroll = (scrollY) => {
+                                                window._adSerpScrollY = scrollY;
+                                            };
+                                        }
+
+                                        s.gazeModel.setSpeed(${testAdSerpSpeed});
+                                        s.gazeModel.play();
+                                        return 'playing';
+                                    })()
+                                `);
+
+                                // Poll scroll position and sync content view
+                                const scrollTimeline = adSerpData.scrollTimeline || [];
+                                const totalDuration = adSerpData.fixations.length > 0
+                                    ? adSerpData.fixations[adSerpData.fixations.length - 1].tEnd
+                                    : 0;
+                                const replayDuration = totalDuration / testAdSerpSpeed;
+
+                                console.log(`[Test] AdSERP replay duration: ${(replayDuration / 1000).toFixed(1)}s`);
+
+                                // Scroll sync loop — polls renderer for current scroll target
+                                const scrollSyncInterval = setInterval(async () => {
+                                    try {
+                                        const scrollY = await mainWindow.scrutinizerHud.webContents.executeJavaScript(
+                                            `window._adSerpScrollY || 0`
+                                        );
+                                        if (isFinite(scrollY)) {
+                                            await mainWindow.scrutinizerView.webContents.executeJavaScript(
+                                                `window.scrollTo(0, ${Math.round(scrollY)})`
+                                            );
+                                        }
+                                    } catch (e) { /* window may have closed */ }
+                                }, 50); // 20Hz scroll sync
+
+                                // Wait for replay to complete
+                                await new Promise((resolve) => {
+                                    let pollCount = 0;
+                                    const checkComplete = setInterval(async () => {
+                                        try {
+                                            const info = await mainWindow.scrutinizerHud.webContents.executeJavaScript(`
+                                                (() => {
+                                                    const s = window._scrutinizer;
+                                                    if (!s || !s.gazeModel) return 'no-scrutinizer';
+                                                    const gm = s.gazeModel;
+                                                    return gm.state + '|t=' + Math.round(gm.playbackTime || 0)
+                                                        + '|mouse=' + (gm.mousePlayer ? 'yes' : 'no');
+                                                })()
+                                            `);
+                                            pollCount++;
+                                            if (pollCount <= 5 || pollCount % 10 === 0) {
+                                                console.log(`[Test] AdSERP poll #${pollCount}: ${info}`);
+                                            }
+                                            if (typeof info === 'string' && info.startsWith('complete')) {
+                                                clearInterval(checkComplete);
+                                                clearInterval(scrollSyncInterval);
+                                                resolve();
+                                            }
+                                        } catch (e) {
+                                            clearInterval(checkComplete);
+                                            clearInterval(scrollSyncInterval);
+                                            resolve();
+                                        }
+                                    }, 200);
+
+                                    // Safety timeout: 2x expected duration + 10s buffer
+                                    setTimeout(() => {
+                                        clearInterval(checkComplete);
+                                        clearInterval(scrollSyncInterval);
+                                        console.log('[Test] AdSERP replay timeout — capturing current state');
+                                        resolve();
+                                    }, replayDuration + 10000);
+                                });
+
+                                console.log('[Test] AdSERP replay complete');
                             }
                         }
 

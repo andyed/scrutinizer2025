@@ -41,11 +41,20 @@ class SVGOverlay {
             comfortGuide: {
                 group: this.createGroup('comfort-guide-group', false),
                 circle: this.createCircle('comfort-guide-circle', 'none', '#66ddaa', 1.0, 0.0)
+            },
+            mouseCursor: {
+                group: this.createGroup('mouse-cursor-group', true),
+                arrow: null,     // Created lazily in initMouseCursor()
+                clickRing: null  // Radial pulse for click events
             }
         };
 
         // Comfort mode state
         this._comfortMode = false;
+
+        // Mouse cursor state
+        this._mouseCursorVisible = false;
+        this._clickPulseStart = 0;
 
         // Tick cache
         this.tickPool = []; // reuse lines
@@ -249,6 +258,94 @@ class SVGOverlay {
             // No need to iterate 50+ elements every frame.
             this.elements.grid.group.setAttribute('transform', `translate(${x}, ${y})`);
         }
+    }
+
+    // ── Mouse Cursor Overlay ─────────────────────────────────────
+
+    /**
+     * Initialize fake mouse cursor SVG elements.
+     * Called lazily on first updateMouseCursor() call.
+     */
+    initMouseCursor() {
+        if (this.elements.mouseCursor.arrow) return; // Already initialized
+
+        const ns = "http://www.w3.org/2000/svg";
+        const group = this.elements.mouseCursor.group;
+
+        // Standard pointer arrow shape (scaled to ~20px)
+        const arrow = document.createElementNS(ns, "path");
+        arrow.setAttribute("d",
+            "M 0,0 L 0,18 L 4.5,14 L 8,21 L 11,19.5 L 7.5,13 L 13,13 Z"
+        );
+        arrow.setAttribute("fill", "#ff9933");
+        arrow.setAttribute("stroke", "#000000");
+        arrow.setAttribute("stroke-width", "1.2");
+        arrow.setAttribute("opacity", "0.85");
+        arrow.setAttribute("stroke-linejoin", "round");
+        group.appendChild(arrow);
+        this.elements.mouseCursor.arrow = arrow;
+
+        // Click pulse ring — expands and fades on click events
+        const clickRing = document.createElementNS(ns, "circle");
+        clickRing.setAttribute("cx", "0");
+        clickRing.setAttribute("cy", "0");
+        clickRing.setAttribute("r", "0");
+        clickRing.setAttribute("fill", "none");
+        clickRing.setAttribute("stroke", "#ff9933");
+        clickRing.setAttribute("stroke-width", "2");
+        clickRing.setAttribute("opacity", "0");
+        group.appendChild(clickRing);
+        this.elements.mouseCursor.clickRing = clickRing;
+
+        // Start hidden
+        group.style.display = 'none';
+    }
+
+    /**
+     * Update fake mouse cursor position and click state.
+     *
+     * @param {number} x - CSS pixel x position
+     * @param {number} y - CSS pixel y position
+     * @param {string} eventType - Current event type from MouseCursorPlayer
+     * @param {number} eventAge - ms since the event occurred
+     */
+    updateMouseCursor(x, y, eventType, eventAge) {
+        if (!this.svg) return;
+
+        // Lazy init
+        if (!this.elements.mouseCursor.arrow) {
+            this.initMouseCursor();
+        }
+
+        const group = this.elements.mouseCursor.group;
+        group.style.removeProperty('display');
+        group.setAttribute('transform', `translate(${x}, ${y})`);
+        this._mouseCursorVisible = true;
+
+        // Click pulse animation
+        const clickRing = this.elements.mouseCursor.clickRing;
+        const isClick = (eventType === 'click' || eventType === 'mousedown');
+        const PULSE_DURATION = 400; // ms
+
+        if (isClick && eventAge < PULSE_DURATION) {
+            const t = eventAge / PULSE_DURATION;
+            const radius = 5 + 25 * t; // Expand from 5 to 30px
+            const opacity = 0.8 * (1 - t); // Fade out
+            clickRing.setAttribute('r', radius);
+            clickRing.setAttribute('opacity', opacity);
+        } else {
+            clickRing.setAttribute('opacity', '0');
+        }
+    }
+
+    /**
+     * Hide the mouse cursor overlay.
+     */
+    hideMouseCursor() {
+        if (this.elements.mouseCursor.group) {
+            this.elements.mouseCursor.group.style.display = 'none';
+        }
+        this._mouseCursorVisible = false;
     }
 
     buildGrid(startRadius, stepSize) {

@@ -14,6 +14,7 @@
  */
 
 const { saccadeDurationFromPixels } = require('./scanpath/coordinate-utils');
+const MouseCursorPlayer = require('./mouse-cursor-player');
 
 class ScanpathPlayer {
     constructor(config, canvas) {
@@ -47,6 +48,15 @@ class ScanpathPlayer {
 
         // Pixels per degree — for saccade duration estimation
         this.ppd = config.fovealRadius || 45;
+
+        // Optional mouse cursor replay (loaded when scanpath has mouseTimeline)
+        this.mousePlayer = null;
+
+        // Optional scroll timeline (for page scroll sync)
+        this.scrollTimeline = null;
+
+        // Callback for scroll sync — set by the host to scroll the content view
+        this.onScroll = null;
     }
 
     // ── GazeModel interface (stubs for compatibility) ──────────────
@@ -88,6 +98,8 @@ class ScanpathPlayer {
             this.currentVelocityX = 0;
             this.currentVelocityY = 0;
             this.isSaccading = false;
+            // Final update for mouse + scroll at end of timeline
+            this._updateAuxiliary(totalDuration);
             return { isSaccading: false };
         }
 
@@ -128,7 +140,24 @@ class ScanpathPlayer {
             this.currentVelocity = Math.sqrt(dx * dx + dy * dy);
         }
 
+        this._updateAuxiliary(this.playbackTime);
+
         return { isSaccading: this.isSaccading };
+    }
+
+    /**
+     * Update mouse cursor and scroll position for a given playback time.
+     * Extracted so both mid-playback and completion paths can call it.
+     * @param {number} timeMs
+     */
+    _updateAuxiliary(timeMs) {
+        if (this.mousePlayer) {
+            this.mousePlayer.update(timeMs);
+        }
+        if (this.scrollTimeline && this.onScroll) {
+            const scrollY = this._interpolateScroll(timeMs);
+            this.onScroll(scrollY);
+        }
     }
 
     /**
@@ -170,14 +199,54 @@ class ScanpathPlayer {
      */
     load(scanpathData) {
         this.scanpath = scanpathData;
-        this.timeline = this._buildTimeline(scanpathData.fixations);
+
+        // Compute scale from stimulus-space to physical canvas pixels.
+        // The canvas may be 2x larger than CSS dimensions on HiDPI/Retina displays.
+        // Fixation coordinates from importers are in stimulus-space pixels (the
+        // experiment's display resolution), not physical canvas pixels.
+        const stimW = scanpathData.meta.stimulusWidth;
+        const stimH = scanpathData.meta.stimulusHeight;
+        const canvasW = this.canvas ? this.canvas.width : stimW;
+        const canvasH = this.canvas ? this.canvas.height : stimH;
+        this._coordScaleX = (stimW && stimW > 0) ? canvasW / stimW : 1;
+        this._coordScaleY = (stimH && stimH > 0) ? canvasH / stimH : 1;
+
+        // Scale fixation coordinates before building timeline
+        const scaledFixations = scanpathData.fixations.map(f => ({
+            x: f.x * this._coordScaleX,
+            y: f.y * this._coordScaleY,
+            tStart: f.tStart,
+            tEnd: f.tEnd
+        }));
+
+        this.timeline = this._buildTimeline(scaledFixations);
         this.state = 'idle';
         this.playbackTime = 0;
 
         // Set initial position to first fixation
-        if (scanpathData.fixations.length > 0) {
-            this.x = scanpathData.fixations[0].x;
-            this.y = scanpathData.fixations[0].y;
+        if (scaledFixations.length > 0) {
+            this.x = scaledFixations[0].x;
+            this.y = scaledFixations[0].y;
+        }
+
+        // Load mouse replay if timeline present — scale mouse coordinates too
+        if (scanpathData.mouseTimeline && scanpathData.mouseTimeline.length > 0) {
+            this.mousePlayer = new MouseCursorPlayer();
+            const scaledMouse = scanpathData.mouseTimeline.map(evt => ({
+                ...evt,
+                x: evt.x * this._coordScaleX,
+                y: evt.y * this._coordScaleY
+            }));
+            this.mousePlayer.load(scaledMouse);
+        } else {
+            this.mousePlayer = null;
+        }
+
+        // Load scroll timeline if present
+        if (scanpathData.scrollTimeline && scanpathData.scrollTimeline.length > 0) {
+            this.scrollTimeline = scanpathData.scrollTimeline;
+        } else {
+            this.scrollTimeline = null;
         }
     }
 
@@ -279,6 +348,9 @@ class ScanpathPlayer {
             this.x = this.scanpath.fixations[0].x;
             this.y = this.scanpath.fixations[0].y;
         }
+
+        if (this.mousePlayer) this.mousePlayer.reset();
+        if (this.scrollTimeline && this.onScroll) this.onScroll(0);
     }
 
     /**
@@ -315,6 +387,28 @@ class ScanpathPlayer {
     }
 
     // ── Internal ──────────────────────────────────────────────────
+
+    /**
+     * Interpolate scroll offset at a given playback time.
+     * @param {number} timeMs - Playback time in ms
+     * @returns {number} Scroll Y offset in pixels
+     */
+    _interpolateScroll(timeMs) {
+        const st = this.scrollTimeline;
+        if (!st || st.length === 0) return 0;
+
+        if (timeMs <= st[0].t) return 0;
+        if (timeMs >= st[st.length - 1].t) return st[st.length - 1].scrollY;
+
+        // Linear scan — scroll events are sparse enough that binary search isn't needed
+        for (let i = 0; i < st.length - 1; i++) {
+            if (timeMs >= st[i].t && timeMs < st[i + 1].t) {
+                const t = (timeMs - st[i].t) / (st[i + 1].t - st[i].t);
+                return st[i].scrollY + (st[i + 1].scrollY - st[i].scrollY) * t;
+            }
+        }
+        return st[st.length - 1].scrollY;
+    }
 
     /**
      * Build a flat timeline of alternating fixation and saccade segments.

@@ -575,6 +575,19 @@
                 );
             }
 
+            // 6b. Update mouse cursor overlay (replay only)
+            if (this.svgOverlay && this.gazeModel.mousePlayer) {
+                const scale = this.gazeModel.getScale();
+                const mousePos = this.gazeModel.mousePlayer.getPosition();
+                const mouseEvt = this.gazeModel.mousePlayer.getCurrentEvent();
+                this.svgOverlay.updateMouseCursor(
+                    mousePos.x / scale.scaleX,
+                    mousePos.y / scale.scaleY,
+                    mouseEvt.event,
+                    mouseEvt.age
+                );
+            }
+
             // 7. Content analysis state for shader uniforms
             const contentState = this.contentAnalysis.getState();
 
@@ -737,7 +750,9 @@
             this._rsDebugCount++;
             if (this._rsDebugCount % 30 === 0) {
                 const scalarV = this.gazeModel.getVelocity();
-                ipcRenderer.send('log:renderer', `[ReadingSpan] frame=${this._rsDebugCount} vx=${vel.vx.toFixed(4)} vy=${vel.vy.toFixed(4)} scalar=${scalarV.toFixed(4)} gaze=(${gaze.x.toFixed(0)},${gaze.y.toFixed(0)}) target=(${this.gazeModel.targetMouseX.toFixed(0)},${this.gazeModel.targetMouseY.toFixed(0)}) reading_span=${this.renderer.config.reading_span}`);
+                const targetX = this.gazeModel.targetMouseX;
+                const targetY = this.gazeModel.targetMouseY;
+                ipcRenderer.send('log:renderer', `[ReadingSpan] frame=${this._rsDebugCount} vx=${vel.vx.toFixed(4)} vy=${vel.vy.toFixed(4)} scalar=${scalarV.toFixed(4)} gaze=(${gaze.x.toFixed(0)},${gaze.y.toFixed(0)}) target=(${targetX !== undefined ? targetX.toFixed(0) : '-'},${targetY !== undefined ? targetY.toFixed(0) : '-'}) reading_span=${this.renderer.config.reading_span}`);
             }
             this.renderer.render(
                 this.canvas.width,

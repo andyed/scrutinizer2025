@@ -21,8 +21,23 @@
  */
 
 /**
+ * @typedef {Object} MouseTimelineEvent
+ * @property {number} t - ms from recording start
+ * @property {number} x - Screen-space pixel x
+ * @property {number} y - Screen-space pixel y
+ * @property {string} event - Event type (mousemove, click, mousedown, mouseup, etc.)
+ * @property {string} [xpath] - XPath to DOM element
+ */
+
+/**
+ * @typedef {Object} ScrollTimelineEvent
+ * @property {number} t - ms from recording start
+ * @property {number} scrollY - Cumulative vertical scroll offset in pixels
+ */
+
+/**
  * @typedef {Object} ScanpathMeta
- * @property {string} dataset - "ueyes"|"recgaze"|"mit1003"|"fixatons"|"onestop"
+ * @property {string} dataset - "ueyes"|"recgaze"|"mit1003"|"fixatons"|"onestop"|"coco-search18"|"adserp"
  * @property {string} participantId
  * @property {string} stimulusId
  * @property {number} stimulusWidth - Original stimulus pixels
@@ -36,6 +51,8 @@
  * @property {ScanpathMeta} meta
  * @property {Fixation[]} fixations
  * @property {ScanpathEvent[]} [events]
+ * @property {MouseTimelineEvent[]} [mouseTimeline] - Dense mouse position + event stream
+ * @property {ScrollTimelineEvent[]} [scrollTimeline] - Scroll offset keyframes
  */
 
 module.exports = {};
