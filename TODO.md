@@ -29,6 +29,7 @@ Migrated from master backlog on 2026-03-25. Detailed tasks for the Scrutinizer f
 - [x] **Mouse Position Replay** -- MouseCursorPlayer renders cursor independently from gaze. Orange arrow cursor + click pulse in SVG overlay. Shipped v2.7.1.
 - [ ] **Gaze Replay Blog Post** -- `scrutinizer-www/src/blog/drafts/2026-04-02-gaze-replay.html`. Needs: hero image (raw vs gazeplot side-by-side), 4-up gazeplot grid crops, task model SVG, interactive explorer screenshot. Fix image paths once assets are finalized.
 - [ ] **Fix scanpath overlay coordinate alignment** -- Fixation coords are 1280px screenshot-space but SERP HTML reflows at different viewport widths. Plan: pre-render SERP screenshots at 1280px with Playwright. See plan in `~/.claude/plans/immutable-conjuring-knuth.md`.
+- [ ] **Gazeplot reflow drift fix** -- Render SERPs at original 1422px window width (matching AdSERP recording session), scale output image to 1280px without reflowing. Fixes progressive vertical drift where element positions shift due to text reflow at narrower width. Affects batch and standard gazeplot modes.
 - [ ] **Full-page gazeplot scroll offset** -- Tile capture scrolls by physical pixels (DPR-scaled) instead of CSS pixels. Tiles overlap or gap on some trials. Need `th` from CSS content bounds, not physical.
 - [ ] **Suppress mouse during TEST_MODE captures** -- Physical mouse movement contaminates gazeplot renders. TEST_MODE should ignore real cursor events.
 - [ ] **Golden Captures** -- Retroactive v1.8.0 captures, optimize capture suite performance.

@@ -1794,22 +1794,34 @@ function runIntegrationTest() {
                                     mainWindow.scrutinizerHud.webContents.send('menu:set-visual-memory', vmLimit);
                                     await new Promise(resolve => setTimeout(resolve, 200));
 
-                                    // Get physical capture size for coordinate scaling
+                                    // Get physical capture size for coordinate scaling.
+                                    // Viewport is now windowWidth×windowHeight (original recording layout),
+                                    // NOT screenWidth×screenHeight. Fixation x/y are screen-space (1280×1024);
+                                    // pageY is page-space at window width (1422px layout).
                                     const testCapture = await mainWindow.scrutinizerHud.capturePage();
                                     const physSize = testCapture.getSize();
-                                    const stimW = (scanpathData.meta && scanpathData.meta.stimulusWidth) || 1280;
-                                    const stimH = (scanpathData.meta && scanpathData.meta.stimulusHeight) || 1024;
-                                    const scaleX = physSize.width / stimW;
-                                    const scaleY = physSize.height / stimH;
+                                    const meta = scanpathData.meta || {};
+                                    const screenW = meta.screenWidth || meta.stimulusWidth || 1280;
+                                    const screenH = meta.screenHeight || meta.stimulusHeight || 1024;
+                                    const windowW = meta.windowWidth || screenW;
+                                    const windowH = meta.windowHeight || screenH;
+                                    // Physical pixels per CSS pixel at window dimensions
+                                    const scaleX = physSize.width / windowW;
+                                    const scaleY = physSize.height / windowH;
+                                    // Screen-space → window-space ratio (for fixation x/y)
+                                    const screenToWindowX = windowW / screenW;
+                                    const screenToWindowY = windowH / screenH;
+                                    console.log(`[Test] Batch coord mapping: screen=${screenW}x${screenH} window=${windowW}x${windowH} phys=${physSize.width}x${physSize.height} scale=${scaleX.toFixed(2)}x${scaleY.toFixed(2)}`);
 
-                                    // Build full VM buffer in physical canvas pixels (viewport tile 0)
-                                    // For the initial render, map all fixations to viewport-space at scrollY=0
+                                    // Build full VM buffer in physical canvas pixels (viewport tile 0).
+                                    // f.x/f.y are screen-space → scale to window-space → scale to physical.
+                                    // f.pageY is already in window-space (page-space at 1422px layout) → scale to physical.
                                     const vmPoints = fixations
                                         .filter(f => f.pageY !== undefined || f.y !== undefined)
                                         .map(f => ({
-                                            x: f.x * scaleX,
-                                            y: ((f.pageY !== undefined ? f.pageY : f.y)) * scaleY,
-                                            radius: (f.radius || 45) * scaleX
+                                            x: f.x * screenToWindowX * scaleX,
+                                            y: ((f.pageY !== undefined ? f.pageY : f.y * screenToWindowY)) * scaleY,
+                                            radius: (f.radius || 45) * screenToWindowX * scaleX
                                         }));
 
                                     // Bulk-load into VM buffer and trigger one render pass
@@ -1825,7 +1837,7 @@ function runIntegrationTest() {
 
                                     // Wait for render to settle (2 frames)
                                     await new Promise(resolve => setTimeout(resolve, 100));
-                                    console.log(`[Test] Batch gazeplot: bulk-loaded ${vmPoints.length} points, physSize=${physSize.width}x${physSize.height}, scale=${scaleX.toFixed(2)}x${scaleY.toFixed(2)}`);
+                                    console.log(`[Test] Batch gazeplot: bulk-loaded ${vmPoints.length} points`);
 
                                     // ── Tile capture (reuses existing tile logic) ──
                                     const fullpageTiles = process.env.TEST_FULLPAGE_TILES ? parseInt(process.env.TEST_FULLPAGE_TILES) : 0;
@@ -1864,13 +1876,16 @@ function runIntegrationTest() {
                                             );
                                             await new Promise(r => setTimeout(r, 300));
 
-                                            // Remap VM buffer for this tile's scroll offset
+                                            // Remap VM buffer for this tile's scroll offset.
+                                            // f.x is screen-space → window-space → physical.
+                                            // f.pageY is window-space (page coords at 1422px layout).
+                                            // scrollY is CSS pixels (window-space). Subtraction stays in window-space.
                                             const shiftedPoints = fixations
                                                 .filter(f => f.pageY !== undefined)
                                                 .map(f => ({
-                                                    x: f.x * scaleX,
+                                                    x: f.x * screenToWindowX * scaleX,
                                                     y: (f.pageY - scrollY) * scaleY,
-                                                    radius: (f.radius || 45) * scaleX
+                                                    radius: (f.radius || 45) * screenToWindowX * scaleX
                                                 }))
                                                 .filter(p => p.y > -100 && p.y < physSize.height + 100);
 

@@ -56,7 +56,7 @@ Internal representation shared by all importers.
  */
 // ScanpathData: {
 //   meta: {
-//     dataset: string,           // "ueyes"|"recgaze"|"mit1003"|"fixatons"|"onestop"
+//     dataset: string,           // "ueyes"|"adserp"|"recgaze"|"mit1003"|"fixatons"|"onestop"|"coco-search18"
 //     participantId: string,
 //     stimulusId: string,
 //     stimulusWidth: number,     // original stimulus pixels
@@ -86,6 +86,7 @@ Each importer lives in `renderer/scanpath/importers/`, exports `parse(fileConten
 | Dataset | Format | Coord System | Time | Parser Approach |
 |---------|--------|-------------|------|----------------|
 | **UEyes** | Gazepoint CSV | Normalized 0-1 | ms | JS CSV parse, multiply by stimulus dims |
+| **AdSERP** | Gazepoint CSV + mouse CSV + XML + JSON | Page-space px (gaze), Screen-space px (mouse) | ms | JS CSV parse, scroll-offset reconciliation |
 | **RecGaze** | Tobii CSV | Pixels | mixed (ms fixations, s clicks) | JS CSV, extract scroll/click as events |
 | **MIT1003** | MATLAB .mat | Pixels (1024×768) | ms | Python converter → JSON, JS reads JSON |
 | **FixaTons** | NumPy .npy | Pixels, Y-inverted | s→ms | Python converter using `fixatons` API → JSON |
@@ -100,9 +101,142 @@ Each importer lives in `renderer/scanpath/importers/`, exports `parse(fileConten
 - Coordinate conversion: multiply by `stimulusWidth`/`stimulusHeight` from metadata
 - Fixation timing: `tStart` accumulated from durations, `tEnd = tStart + FPOGD`
 
-### 2.2 RecGaze (Priority 2)
+### 2.2 AdSERP (Implemented)
 
-**Why second:** Interactive stimuli with scroll/click events — enables testing interaction-aware rendering.
+**Why:** First dataset with real scrollable HTML stimuli, simultaneous mouse tracking, and dense scroll data. Enables replaying actual SERP browsing sessions through the foveated pipeline — gaze drives the fovea, mouse drives a fake cursor, page scrolls in sync.
+
+**Dataset:** 2,776 trials, 47 participants, Gazepoint GP3 HD (150 Hz). Each trial is a unique Google Shopping SERP. See `~/Documents/dev/attentional-foraging/AdSERP/data/`.
+
+**Data files per trial** (keyed by ID like `p004-b1-t1`):
+
+| File | Format | Coordinate System | Contents |
+|------|--------|-------------------|----------|
+| `fixation-data/{id}.csv` | CSV: `timestamp,FPOGX,FPOGY,FPOGD` | **Page-space** pixels | Gaze fixations with absolute timestamps, duration in ms |
+| `mouse-movement-data/{id}.csv` | CSV: `timestamp,xpos,ypos,event,xpath` | **Screen-space** pixels | Mouse events (~60Hz), scroll events (cumulative offset), clicks |
+| `trial-metadata/{id}.xml` | XML | — | Viewport dimensions, document size, query, task |
+| `ad-boundary-data/{id}.json` | JSON | Page-space pixels | Ad bounding boxes by type (native_ad, dd_top, dd_right) |
+| `serps/{id}.html` | HTML | — | Complete Google SERP snapshot (self-contained) |
+
+**Coordinate systems:**
+
+The Gazepoint GP3 HD reports gaze in **screen-space** (where the eye looks on the physical monitor), not page-space. This means fixation coordinates and mouse coordinates are in the same coordinate system — no scroll correction needed for gaze-mouse comparison. The importer passes fixation coordinates through directly.
+
+Scroll events in the mouse CSV (`event=scroll`, `ypos` = cumulative offset) are used to sync the page position during replay, not to transform gaze coordinates. The scroll timeline is interpolated with binary search + linear lerp for O(log n) lookup.
+
+**Importer:** `importers/adserp-importer.js`
+
+```js
+// Node.js convenience function — loads all files for a trial
+const { loadTrial } = require('./importers/adserp-importer');
+const scanpathData = loadTrial('/path/to/AdSERP/data', 'p004-b1-t1');
+
+// Returns ScanpathData with extended fields:
+// scanpathData.fixations       — screen-space, relative timestamps
+// scanpathData.mouseTimeline   — [{t, x, y, event, xpath}]
+// scanpathData.scrollTimeline  — [{t, scrollY}]
+// scanpathData.meta.serpHtmlPath — path to SERP HTML file
+```
+
+**Extended ScanpathData fields** (AdSERP-specific, defined in `scanpath-types.js`):
+
+- `mouseTimeline: MouseTimelineEvent[]` — dense mouse position + event stream (screen-space)
+- `scrollTimeline: ScrollTimelineEvent[]` — scroll offset keyframes
+
+**Mouse cursor replay:** `MouseCursorPlayer` (`renderer/mouse-cursor-player.js`) interpolates mouse positions independently of gaze. Loaded automatically by `ScanpathPlayer` when `scanpathData.mouseTimeline` is present. Renders as an arrow cursor in the SVG overlay, visually distinct from the foveal circle. Click events trigger a brief radial pulse animation.
+
+**Scroll sync:** `ScanpathPlayer` maintains a `scrollTimeline` and fires an `onScroll(scrollY)` callback during playback. In the Electron main process, this drives `window.scrollTo()` on the content view, keeping the page position in sync with the recording.
+
+**CLI replay:**
+
+```bash
+# Replay a specific trial
+node scripts/replay-adserp.js --trial=p004-b1-t1 \
+    --data=../attentional-foraging/AdSERP/data \
+    --mode=0 --speed=1.0
+
+# Options
+--trial=<id>        Trial ID (required)
+--data=<path>       Path to AdSERP/data/ directory (required)
+--mode=0            Rendering mode (default: 0 = MIP+DoG)
+--speed=1.0         Playback speed multiplier
+--radius=45         Foveal radius in pixels
+--width=1422        Viewport width (default: from trial metadata)
+--height=1137       Viewport height (default: from trial metadata)
+--overlay=true      Show debug overlay
+--screenshot        Capture screenshot at end of replay
+--dry-run           Print trial info without launching
+--list              List available trial IDs
+```
+
+**Interesting trials catalog:** `attentional-foraging/AdSERP/data/interesting-trials.json` — 2,341 tagged trials with behavioral annotations. Generated by `attentional-foraging/scripts/find_interesting_trials.py`. Tags include:
+
+| Tag | Count | Defining metric |
+|-----|-------|-----------------|
+| `regressive_scroller` | 1,465 | Scroll offset decreases (scrolls back up) |
+| `mouse_independent` | 1,434 | Mean gaze-mouse divergence > 500px |
+| `ad_focused` | 495 | > 50% of fixations on ad regions |
+| `heavy_scroller` | 486 | > 200 scroll events |
+| `ad_ignorer` | 242 | Zero ad fixations despite ads present |
+| `deep_explorer` | 153 | Viewed > 80% of page height |
+| `scanner` | 73 | > 200 fixations |
+| `scroll_without_reading` | 67 | > 100 scroll events but < 50 fixations |
+| `satisficer` | 12 | ≤ 10 fixations in ≤ 5s |
+| `mouse_follower` | 1 | Mean divergence < 100px |
+
+**Recommended first replays:**
+
+| Trial | Tags | Why interesting |
+|-------|------|-----------------|
+| `p045-b2-t6` | scanner | 312 fixations, 75s, thorough viewer |
+| `p029-b6-t10` | satisficer, instant_decision | 2 fixations, 0.2s, immediate click |
+| `p009-b1-t3` | scroll_without_reading | 506 scroll events but only 40 fixations |
+| `p021-b2-t10` | mouse_independent | 1,606px gaze-mouse divergence |
+| `p029-b2-t10` | ad_focused | 100% of fixations on ads |
+| `p037-b5-t10` | heavy_scroller, deep_explorer | 529 scroll events, full page explored |
+
+**Aggregate visualization note:** No SERPs are shared across participants (2,776 unique queries). Aggregate approaches: within-participant overlay (60 trials per person), structural grouping by ad layout, or brand-as-proxy (Denso: 113 trials/43 participants). Backlogged in `~/Documents/dev/backlog.md`.
+
+#### Full-Page Foveated Gazeplots
+
+**Script:** `scripts/capture-fullpage-gazeplot.js`
+
+Generates a full-page PNG showing accumulated visual memory — where the viewer looked across the entire SERP, rendered through the foveated pipeline. Foveated regions appear clear; unviewed regions are degraded.
+
+```bash
+# Batch mode (recommended — seconds, not minutes)
+node scripts/capture-fullpage-gazeplot.js --data=/path/to/AdSERP/data --trial=p004-b1-t1 --batch
+
+# Standard mode (per-fixation walk through render loop)
+node scripts/capture-fullpage-gazeplot.js --data=/path/to/AdSERP/data --trial=p004-b1-t1
+```
+
+**Two capture strategies:**
+
+| Mode | How fixations enter VM | Speed | When to use |
+|------|----------------------|-------|-------------|
+| Standard | Per-fixation: 10 velocity-convergence pulses + dwell per fixation | ~30s for 50 fixations | Verifying velocity-based fixation detection, debugging dwell timing |
+| Batch (`--batch`) | Bulk-load: writes all fixation coords directly into `vm.buffer`, sets `maskDirty` | ~5s for 50 fixations | Production gazeplot generation, parameter sweeps |
+
+**Tile capture pipeline:**
+
+1. Load SERP HTML at trial viewport (1280×1024)
+2. Enable infinite visual memory (`vm.limit = -1`)
+3. Load fixations (standard: walk them; batch: bulk-load buffer)
+4. Disable sticky/fixed positioned elements (prevents header repeating in tiles)
+5. For each tile at `scrollY = tile × cssViewportH`:
+   - Scroll the content view
+   - Remap VM buffer: `viewportY = (pageY - scrollY) × scaleY`
+   - Wait for render (500ms)
+   - Capture tile PNG at 2× DPR
+6. On exit: Playwright stitches tiles at 1× resolution, crops canvas to exact `documentHeight`
+
+**Known limitation — reflow drift:** AdSERP fixation data was recorded at the original window width (1422px). SERPs are rendered at 1280px for the gazeplot, causing text to reflow — vertical positions drift progressively down the page. Early fixations (search bar, top results) align well; later fixations may be offset by 10–40px. The correct fix is to render at the original 1422px width and scale the output image, preserving element positions. (Backlogged.)
+
+**Output:** `output/adserp-fullpage-gazeplots/{trialId}_fullpage_gazeplot.png`
+
+### 2.3 RecGaze (Priority 2)
+
+**Why third:** Interactive stimuli with scroll/click events — enables testing interaction-aware rendering.
 
 - Source: Tobii CSV with fixation coordinates in pixels, timestamps in ms
 - Click events in separate column with timestamps in seconds (convert × 1000)
@@ -110,9 +244,9 @@ Each importer lives in `renderer/scanpath/importers/`, exports `parse(fileConten
 - Importer: `importers/recgaze-importer.js`
 - Events extracted into `ScanpathData.events[]`
 
-### 2.3 MIT1003 (Priority 3)
+### 2.4 MIT1003 (Priority 3)
 
-**Why third:** Most widely benchmarked for saliency validation (Experiment D). Natural images at 1024×768.
+**Why:** Most widely benchmarked for saliency validation (Experiment D). Natural images at 1024×768.
 
 - Source: MATLAB `.mat` files with fixation arrays
 - **Python converter:** `scripts/convert-scanpath-mat.py`
@@ -121,7 +255,7 @@ Each importer lives in `renderer/scanpath/importers/`, exports `parse(fileConten
   - Usage: `python scripts/convert-scanpath-mat.py --input fixations/ --output scanpaths/mit1003/`
 - JS importer reads converted JSON: `importers/mit1003-importer.js`
 
-### 2.4 FixaTons
+### 2.5 FixaTons
 
 - Source: NumPy `.npy` arrays via the `fixatons` Python package
 - Y-axis inverted (flip: `y = stimulusHeight - y`)
@@ -131,14 +265,14 @@ Each importer lives in `renderer/scanpath/importers/`, exports `parse(fileConten
   - Outputs JSON per stimulus
 - JS importer reads converted JSON: `importers/fixatons-importer.js`
 
-### 2.5 OneStop
+### 2.6 OneStop
 
 - Source: EyeLink ASCII CSV with fixation reports
 - Coordinates in pixels, durations in ms
 - Timing reconstructed by accumulating fixation durations + estimated saccade durations
 - Importer: `importers/onestop-importer.js`
 
-### 2.6 Coordinate Normalization Utility
+### 2.7 Coordinate Normalization Utility
 
 **File:** `renderer/scanpath/coordinate-utils.js`
 
@@ -262,6 +396,42 @@ if (config.scanpathReplay) {
 ```
 
 No other changes to the render loop — `update(now)`, `getPosition()`, `getVelocity()` work identically.
+
+### Auxiliary Streams (AdSERP)
+
+When `scanpathData.mouseTimeline` is present, `ScanpathPlayer.load()` instantiates a `MouseCursorPlayer` (`renderer/mouse-cursor-player.js`) and stores it as `this.mousePlayer`. When `scanpathData.scrollTimeline` is present, it stores the timeline and accepts an `onScroll(scrollY)` callback.
+
+Both auxiliary streams advance in `_updateAuxiliary(timeMs)`, called from `update()` after the main gaze interpolation:
+
+```js
+_updateAuxiliary(timeMs) {
+    if (this.mousePlayer) this.mousePlayer.update(timeMs);
+    if (this.scrollTimeline && this.onScroll) {
+        const scrollY = interpolateScrollY(timeMs, this.scrollTimeline);
+        this.onScroll(scrollY);
+    }
+}
+```
+
+The render loop in `scrutinizer.js` queries `gazeModel.mousePlayer.getPosition()` to update the SVG overlay's fake mouse cursor (arrow path + click pulse ring). The scroll callback is wired in the Electron main process to drive `window.scrollTo()` on the content view.
+
+### MouseCursorPlayer
+
+**File:** `renderer/mouse-cursor-player.js`
+
+Lightweight interpolator for dense mouse event data. Separate class from ScanpathPlayer — different concern (input device replay vs. oculomotor simulation), different update rate (60Hz mouse vs. sparse fixations).
+
+```js
+class MouseCursorPlayer {
+    load(mouseTimeline)          // [{t, x, y, event, xpath}]
+    update(playbackTimeMs)       // linear interpolation, sequential scan cache
+    getPosition() → { x, y }    // screen-space pixels
+    getCurrentEvent() → { event, age }  // for click flash (age in ms)
+    reset()
+}
+```
+
+Uses sequential scan with cached index for O(1) forward playback. Falls back to linear scan on seek (backward jump).
 
 ---
 

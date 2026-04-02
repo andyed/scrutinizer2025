@@ -61,9 +61,11 @@ fs.writeFileSync(scanpathFile, JSON.stringify(scanpathData));
 const outputDir = path.join(ROOT, 'output', 'adserp-fullpage-gazeplots');
 fs.mkdirSync(outputDir, { recursive: true });
 
-// Viewport matches screen dims (fixation coordinate space)
-const vpW = meta.screenWidth || 1280;
-const vpH = meta.screenHeight || 1024;
+// Viewport matches WINDOW dims (original recording layout), not screen dims.
+// AdSERP fixation pageY was measured in the 1422px-wide layout. Rendering at
+// windowWidth preserves element positions — no reflow drift.
+const vpW = meta.windowWidth || meta.screenWidth || 1280;
+const vpH = meta.windowHeight || meta.screenHeight || 1024;
 
 // Document height for tile count
 const docH = meta.documentHeight || 2642;
@@ -73,7 +75,8 @@ const tileCount = singleMode ? 0 : Math.ceil(docH / vpH) + 1;
 
 console.log(`═══ Full-Page Gazeplot: ${trialId} ═══\n`);
 console.log(`  Fixations: ${scanpathData.fixations.length}`);
-console.log(`  Viewport:  ${vpW}x${vpH}`);
+console.log(`  Window:    ${vpW}x${vpH} (layout viewport)`);
+console.log(`  Screen:    ${meta.screenWidth}x${meta.screenHeight} (fixation coord space)`);
 console.log(`  Document:  ${meta.documentWidth}x${docH}`);
 console.log(`  Mode:      ${batchMode ? 'BATCH (bulk-load VM)' : singleMode ? 'single (full-height)' : `tiled (${tileCount} × ${vpH}px)`}`);
 console.log(`  Render:    ${modeId}`);
@@ -189,8 +192,9 @@ child.on('close', async (code) => {
 
         const tilesB64 = tilePaths.map(t => fs.readFileSync(t).toString('base64'));
 
-        // Stitch at 1x resolution (halve 2x DPR captures), crop to exact docH
-        const stitchedB64 = await page.evaluate(async ({ tiles, targetH }) => {
+        // Stitch tiles and crop to exact docH.
+        // Detect DPR: if tile width > vpW, tiles are 2x DPR and need halving.
+        const stitchedB64 = await page.evaluate(async ({ tiles, targetH, expectedW }) => {
             const imgs = [];
             for (const b64 of tiles) {
                 const img = new Image();
@@ -199,16 +203,16 @@ child.on('close', async (code) => {
                 imgs.push(img);
             }
             const srcW = imgs[0].width, srcH = imgs[0].height;
-            const outW = Math.round(srcW / 2); // 1x from 2x DPR
-            const tileH = Math.round(srcH / 2);
+            const dpr = srcW > expectedW ? Math.round(srcW / expectedW) : 1;
+            const outW = Math.round(srcW / dpr);
+            const tileH = Math.round(srcH / dpr);
             const canvas = document.createElement('canvas');
             canvas.width = outW;
-            // Crop to exact document height instead of tileCount × tileH
             canvas.height = targetH;
             const ctx = canvas.getContext('2d');
             imgs.forEach((img, i) => ctx.drawImage(img, 0, i * tileH, outW, tileH));
             return canvas.toDataURL('image/png').split(',')[1];
-        }, { tiles: tilesB64, targetH: docH });
+        }, { tiles: tilesB64, targetH: docH, expectedW: vpW });
 
         await browser.close();
 

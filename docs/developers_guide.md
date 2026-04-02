@@ -682,6 +682,60 @@ The `disabled` mode captures from `mainWindow.scrutinizerView` (the content WebC
 
 Analysis scripts in `scripts/analyze-*.js` and `scripts/validate-*.js` compare captured pixels against published psychophysical data. Results land in `tests/validation/results*/`.
 
+### Full-Page Foveated Gazeplots (AdSERP)
+
+Generate full-page foveated gazeplots from eye-tracking trial data. Loads a SERP HTML in Scrutinizer, replays fixations through the visual memory pipeline, then tile-captures and stitches the full scrollable page into a single PNG.
+
+```bash
+# Standard mode: walks each fixation through the render loop (accurate, slow)
+node scripts/capture-fullpage-gazeplot.js --data=/path/to/AdSERP/data --trial=p004-b1-t1
+
+# Batch mode: bulk-loads ALL fixations into VM at once (fast, seconds not minutes)
+node scripts/capture-fullpage-gazeplot.js --data=/path/to/AdSERP/data --trial=p004-b1-t1 --batch
+
+# Single-shot mode: full-height window, no tiling (simplest, limited by max window size)
+node scripts/capture-fullpage-gazeplot.js --data=/path/to/AdSERP/data --trial=p004-b1-t1 --single
+```
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--data=<path>` | Path to `AdSERP/data/` directory (required) |
+| `--trial=<id>` | Trial ID, e.g. `p004-b1-t1` (required) |
+| `--mode=<id>` | Rendering mode (default: `0`) |
+| `--batch` | Bulk-load fixations into visual memory buffer at once. Skips per-fixation walk. |
+| `--single` | Capture full page in one tall window instead of tiling |
+
+**How it works (tiled mode):**
+
+1. Loads the SERP HTML at the trial's viewport size (typically 1280×1024)
+2. Walks fixations or bulk-loads them (batch mode) into `VisualMemory.buffer`
+3. For each tile: scrolls the page, remaps VM buffer Y coordinates for the scroll offset, captures the viewport
+4. After Electron exits, Playwright stitches tiles at 1× resolution (halving 2× DPR), crops canvas height to exact `documentHeight`
+
+**Output:** `output/adserp-fullpage-gazeplots/{trialId}_fullpage_gazeplot.png`
+
+**Batch vs standard mode:** Standard mode dwells at each fixation long enough for the velocity-based fixation detector to register it (~500ms+ per fixation). Batch mode bypasses the detector entirely — it writes fixation coordinates directly into `vm.buffer` and sets `vm.maskDirty = true`, triggering a single render pass. For a trial with 50 fixations, standard takes ~30s; batch takes ~5s.
+
+**Coordinate pipeline:**
+
+```
+fixation (stimulus-space px) → scale by physSize/stimSize → VM buffer (physical canvas px)
+per-tile: (pageY - scrollY) × scaleY → viewport-relative physical px
+stitching: 2× DPR tiles → 1× canvas, crop to documentHeight
+```
+
+**Env vars (used internally by the launcher):**
+
+| Var | Purpose |
+|-----|---------|
+| `TEST_BATCH_GAZEPLOT=true` | Activates batch path in main.js |
+| `TEST_BATCH_GAZEPLOT_DOC_HEIGHT` | Crop target height for stitching |
+| `TEST_FULLPAGE_TILES` | Number of tiles to capture |
+| `TEST_FULLPAGE_DOC_HEIGHT` | Document height (passed to tile logic) |
+| `TEST_SCANPATH` | Path to scanpath JSON |
+
 ### Smoke Test (Quick Pipeline Sanity Check)
 
 Run before any shader or renderer changes to verify the capture pipeline works end-to-end:
@@ -791,13 +845,42 @@ The test suite performs the following checks:
 2.  **Distortion Application**: Verifies that changing the `intensity` parameter significantly alters the rendered image (ensures effects are being applied).
 3.  **Motion Responsiveness**: Verifies that moving the mouse position significantly alters the rendered image (ensures the fovea is tracking).
 
-### Adding New Tests
+### Adding New Visual Tests
 
 To add new visual tests:
 1.  Open `tests/visual-test.html`.
 2.  Add a new test block following the existing pattern.
 3.  Use the `captureFrame()` and `compareFrames()` helpers to analyze the output.
 4.  Report success/failure via `ipcRenderer.send('test-result', ...)` or throw an error.
+
+### Unit Tests (Jest)
+
+```bash
+npm run test:unit          # Run all unit tests
+npx jest tests/unit/visual-memory.test.js  # Run a specific suite
+```
+
+15 test suites covering core renderer logic. Tests run in Node (`testEnvironment: "node"`) with minimal DOM mocks — no jsdom dependency.
+
+| Suite | Module | Tests | What it covers |
+|-------|--------|-------|----------------|
+| `visual-memory.test.js` | `renderer/visual-memory.js` | 25 | Fixation detection, FIFO eviction, infinite mode, bulk-load (batch gazeplot), merge-on-proximity, mask rendering, inhibition-of-return, resize |
+| `config.test.js` | `renderer/config.js` | — | Default settings, calibration URL |
+| `cortical-strength.test.js` | `renderer/cortical-strength.js` | — | Eccentricity-to-strength mapping |
+| `oriented-dog.test.js` | `renderer/oriented-dog.js` | — | Oriented DoG filter coefficients |
+| `isotropic-sectors.test.js` | `renderer/isotropic-sectors.js` | — | V1 sector assignment |
+| `pyramid-decompose.test.js` | `renderer/pyramid-decompose.js` | — | Laplacian pyramid math |
+| `oklab-utils.test.js` | `renderer/oklab-utils.js` | — | sRGB↔Oklab color conversion |
+| `stimulus-domain.test.js` | `renderer/stimulus-domain.js` | — | Stimulus domain detection |
+| `color-saliency-map.test.js` | `renderer/color-saliency-map.js` | — | Chromatic saliency computation |
+| `mip-fidelity.test.js` | `renderer/mip-fidelity.js` | — | MIP chain fidelity metrics |
+| `cmf-lod.test.js` | `renderer/cmf-lod.js` | — | Color matching function LOD |
+| `gestalt-processor.test.js` | `renderer/gestalt-processor.js` | — | Gestalt grouping |
+| `pyramid-sector-assignment.test.js` | `renderer/pyramid-sector-assignment.js` | — | Pyramid↔sector mapping |
+| `validation-regression.test.js` | Various | — | Cross-module regression checks |
+| `logger.test.js` | `renderer/logger.js` | — | Logging utilities |
+
+**Adding unit tests:** Place new test files in `tests/unit/` matching `*.test.js`. Jest config: `jest.config.js`. Setup file: `tests/setup.js` (mocks `localStorage`). For renderer modules that reference `window`/`document`, mock the minimal API surface — see `visual-memory.test.js` for the pattern.
 
 ---
 
