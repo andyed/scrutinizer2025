@@ -768,6 +768,7 @@ function createScrutinizerWindow(startUrl) {
     console.log('[Main] Creating new Scrutinizer window (dual-window architecture)', startUrl ? 'with URL: ' + startUrl : '(default URL)');
 
     const TOOLBAR_HEIGHT = 40;
+    const isTestMode = process.env.TEST_MODE === 'true';
 
     // Determine initial bounds based on emulation state
     let initialWidth, initialHeight, initialResizable;
@@ -805,6 +806,7 @@ function createScrutinizerWindow(startUrl) {
     const win = new BrowserWindow({
         width: initialWidth,
         height: initialHeight,
+        useContentSize: false,
         x: savedBounds.x, // Always use saved position
         y: savedBounds.y,
         resizable: initialResizable,
@@ -879,10 +881,17 @@ function createScrutinizerWindow(startUrl) {
     // bounds are relative to the content area (excludes title bar on macOS)
     const updateViewBounds = () => {
         const [width, height] = win.getContentSize();
-        // Toolbar at top
-        toolbarView.setBounds({ x: 0, y: 0, width: width, height: TOOLBAR_HEIGHT });
-        // Content below toolbar
-        contentView.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width: width, height: height - TOOLBAR_HEIGHT });
+        if (isTestMode) {
+            // TEST_MODE: hide toolbar, content gets full window height.
+            // Eliminates 40px toolbar offset from captures.
+            toolbarView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+            contentView.setBounds({ x: 0, y: 0, width: width, height: height });
+        } else {
+            // Toolbar at top
+            toolbarView.setBounds({ x: 0, y: 0, width: width, height: TOOLBAR_HEIGHT });
+            // Content below toolbar
+            contentView.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width: width, height: height - TOOLBAR_HEIGHT });
+        }
     };
     updateViewBounds();
     win.on('resize', updateViewBounds);
@@ -891,9 +900,13 @@ function createScrutinizerWindow(startUrl) {
     // Separate transparent window for toolbar + canvas
     // Position it to match the content area of main window (not including title bar AND toolbar)
     const contentBounds = win.getContentBounds();
-    // Adjust for toolbar
-    const hudY = contentBounds.y + TOOLBAR_HEIGHT;
-    const hudHeight = contentBounds.height - TOOLBAR_HEIGHT;
+    // In TEST_MODE, no toolbar offset — HUD matches full content area
+    const toolbarOffset = isTestMode ? 0 : TOOLBAR_HEIGHT;
+    const hudY = contentBounds.y + toolbarOffset;
+    const hudHeight = contentBounds.height - toolbarOffset;
+    if (isTestMode) {
+        console.log(`[Main] TEST_MODE HUD: contentBounds=${JSON.stringify(contentBounds)} toolbarOffset=${toolbarOffset} hudY=${hudY} hudHeight=${hudHeight}`);
+    }
 
     const hudWindow = new BrowserWindow({
         parent: win, // Attach to main window so it stays on top of it
@@ -1795,33 +1808,26 @@ function runIntegrationTest() {
                                     await new Promise(resolve => setTimeout(resolve, 200));
 
                                     // Get physical capture size for coordinate scaling.
-                                    // Viewport is now windowWidth×windowHeight (original recording layout),
-                                    // NOT screenWidth×screenHeight. Fixation x/y are screen-space (1280×1024);
-                                    // pageY is page-space at window width (1422px layout).
+                                    // FPOGX/FPOGY are "relative to the top-left corner of the screenshot"
+                                    // (AdSERP docs). Screenshot is at screenWidth (1280px). Viewport
+                                    // matches screenWidth, so scale is simply physical/screen.
                                     const testCapture = await mainWindow.scrutinizerHud.capturePage();
                                     const physSize = testCapture.getSize();
                                     const meta = scanpathData.meta || {};
-                                    const screenW = meta.screenWidth || meta.stimulusWidth || 1280;
-                                    const screenH = meta.screenHeight || meta.stimulusHeight || 1024;
-                                    const windowW = meta.windowWidth || screenW;
-                                    const windowH = meta.windowHeight || screenH;
-                                    // Physical pixels per CSS pixel at window dimensions
-                                    const scaleX = physSize.width / windowW;
-                                    const scaleY = physSize.height / windowH;
-                                    // Screen-space → window-space ratio (for fixation x/y)
-                                    const screenToWindowX = windowW / screenW;
-                                    const screenToWindowY = windowH / screenH;
-                                    console.log(`[Test] Batch coord mapping: screen=${screenW}x${screenH} window=${windowW}x${windowH} phys=${physSize.width}x${physSize.height} scale=${scaleX.toFixed(2)}x${scaleY.toFixed(2)}`);
+                                    const stimW = meta.stimulusWidth || meta.screenWidth || 1280;
+                                    const stimH = meta.stimulusHeight || meta.screenHeight || 1024;
+                                    const scaleX = physSize.width / stimW;
+                                    const scaleY = physSize.height / stimH;
+                                    console.log(`[Test] Batch coord mapping: stim=${stimW}x${stimH} phys=${physSize.width}x${physSize.height} scale=${scaleX.toFixed(2)}x${scaleY.toFixed(2)}`);
 
-                                    // Build full VM buffer in physical canvas pixels (viewport tile 0).
-                                    // f.x/f.y are screen-space → scale to window-space → scale to physical.
-                                    // f.pageY is already in window-space (page-space at 1422px layout) → scale to physical.
+                                    // Build full VM buffer in physical canvas pixels.
+                                    // Coordinates map directly from screenshot-space to physical canvas.
                                     const vmPoints = fixations
                                         .filter(f => f.pageY !== undefined || f.y !== undefined)
                                         .map(f => ({
-                                            x: f.x * screenToWindowX * scaleX,
-                                            y: ((f.pageY !== undefined ? f.pageY : f.y * screenToWindowY)) * scaleY,
-                                            radius: (f.radius || 45) * screenToWindowX * scaleX
+                                            x: f.x * scaleX,
+                                            y: ((f.pageY !== undefined ? f.pageY : f.y)) * scaleY,
+                                            radius: (f.radius || 45) * scaleX
                                         }));
 
                                     // Bulk-load into VM buffer and trigger one render pass
@@ -1877,15 +1883,14 @@ function runIntegrationTest() {
                                             await new Promise(r => setTimeout(r, 300));
 
                                             // Remap VM buffer for this tile's scroll offset.
-                                            // f.x is screen-space → window-space → physical.
-                                            // f.pageY is window-space (page coords at 1422px layout).
-                                            // scrollY is CSS pixels (window-space). Subtraction stays in window-space.
+                                            // Remap VM buffer for this tile's scroll offset.
+                                            // Coordinates are screenshot-space → physical canvas.
                                             const shiftedPoints = fixations
                                                 .filter(f => f.pageY !== undefined)
                                                 .map(f => ({
-                                                    x: f.x * screenToWindowX * scaleX,
+                                                    x: f.x * scaleX,
                                                     y: (f.pageY - scrollY) * scaleY,
-                                                    radius: (f.radius || 45) * screenToWindowX * scaleX
+                                                    radius: (f.radius || 45) * scaleX
                                                 }))
                                                 .filter(p => p.y > -100 && p.y < physSize.height + 100);
 
@@ -1909,6 +1914,22 @@ function runIntegrationTest() {
                                         }
                                     }
 
+                                    // Write capture metadata so the build script can
+                                    // compute the correct Y scaling (physH ≠ windowH
+                                    // due to macOS title bar eating viewport height).
+                                    const metaJson = {
+                                        physWidth: physSize.width,
+                                        physHeight: physSize.height,
+                                        stimWidth: stimW,
+                                        stimHeight: stimH,
+                                    };
+                                    const _fs = require('fs');
+                                    const _p = require('path');
+                                    const _ver = require('./package.json').version.replace(/\.\d+$/, '');
+                                    const _capDir = _p.join(__dirname, 'tests', 'golden-captures', `v${_ver}`);
+                                    const metaFile = outputFilename.replace('.png', '_meta.json');
+                                    _fs.writeFileSync(_p.join(_capDir, metaFile), JSON.stringify(metaJson));
+                                    console.log(`[Test] Wrote capture metadata: ${metaFile}`);
                                     console.log(`[Test] Batch gazeplot complete`);
                                   } catch (batchErr) {
                                     console.error(`[Test] Batch gazeplot error: ${batchErr.message}`);

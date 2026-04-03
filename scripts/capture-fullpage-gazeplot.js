@@ -61,11 +61,11 @@ fs.writeFileSync(scanpathFile, JSON.stringify(scanpathData));
 const outputDir = path.join(ROOT, 'output', 'adserp-fullpage-gazeplots');
 fs.mkdirSync(outputDir, { recursive: true });
 
-// Viewport matches WINDOW dims (original recording layout), not screen dims.
-// AdSERP fixation pageY was measured in the 1422px-wide layout. Rendering at
-// windowWidth preserves element positions — no reflow drift.
-const vpW = meta.windowWidth || meta.screenWidth || 1280;
-const vpH = meta.windowHeight || meta.screenHeight || 1024;
+// Viewport matches SCREEN dims (screenshot coordinate space).
+// FPOGX/FPOGY are "relative to the top-left corner of the screenshot in pixels"
+// (AdSERP docs). The screenshot is at screenWidth (1280px).
+const vpW = meta.screenWidth || 1280;
+const vpH = meta.screenHeight || 1024;
 
 // Document height for tile count
 const docH = meta.documentHeight || 2642;
@@ -90,7 +90,9 @@ const env = {
     TEST_MODES: modeId,
     TEST_RADIUS: '45',
     TEST_WIDTH: String(vpW),
-    TEST_HEIGHT: singleMode ? String(docH) : String(vpH),
+    // Add 68px to compensate for macOS title bar (28px) + Electron toolbar offset (40px).
+    // The HUD capture area ends up exactly vpH pixels tall.
+    TEST_HEIGHT: singleMode ? String(docH) : String(vpH + 68),
     TEST_OVERLAY: 'false',
     TEST_SCANPATH: scanpathFile,
     TEST_VISUAL_MEMORY: '-1',
@@ -222,5 +224,14 @@ child.on('close', async (code) => {
 
         // Clean up individual tiles
         tilePaths.forEach(t => { try { fs.unlinkSync(t); } catch (e) {} });
+    }
+
+    // Copy capture metadata JSON if it exists (written by batch mode in main.js)
+    const metaName = `${trialId}_fullpage_gazeplot_meta.json`;
+    const metaSrc = path.join(capDir, metaName);
+    if (fs.existsSync(metaSrc)) {
+        const metaDst = path.join(outputDir, metaName);
+        fs.copyFileSync(metaSrc, metaDst);
+        console.log(`  Meta: ${metaDst}`);
     }
 });
