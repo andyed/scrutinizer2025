@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Synthetic SERP for coordinate alignment test</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1280px; font: 16px/1.5 Arial, sans-serif; background: white; }
+.marker { position: absolute; width: 20px; height: 20px; background: red; border-radius: 50%; }
+.label { position: absolute; font: bold 12px monospace; color: red; }
+.content { padding: 20px; }
+.block { height: 200px; border: 1px solid #ccc; margin: 10px 0; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #666; }
+</style></head><body>
+<div class="content">
+<!-- Markers at known absolute positions for alignment verification -->
+<!-- Each red dot is centered at (x, y) in page coordinates -->
+<div class="marker" style="left:100px;top:100px;"></div><div class="label" style="left:125px;top:95px;">A (100,100)</div>
+<div class="marker" style="left:640px;top:100px;"></div><div class="label" style="left:665px;top:95px;">B (640,100)</div>
+<div class="marker" style="left:100px;top:500px;"></div><div class="label" style="left:125px;top:495px;">C (100,500)</div>
+<div class="marker" style="left:640px;top:500px;"></div><div class="label" style="left:665px;top:495px;">D (640,500)</div>
+<div class="marker" style="left:100px;top:1000px;"></div><div class="label" style="left:125px;top:995px;">E (100,1000)</div>
+<div class="marker" style="left:640px;top:1000px;"></div><div class="label" style="left:665px;top:995px;">F (640,1000)</div>
+<div class="marker" style="left:100px;top:1500px;"></div><div class="label" style="left:125px;top:1495px;">G (100,1500)</div>
+<div class="marker" style="left:640px;top:1500px;"></div><div class="label" style="left:665px;top:1495px;">H (640,1500)</div>
+<div class="marker" style="left:100px;top:2000px;"></div><div class="label" style="left:125px;top:1995px;">I (100,2000)</div>
+<div class="marker" style="left:640px;top:2000px;"></div><div class="label" style="left:665px;top:1995px;">J (640,2000)</div>
+
+<!-- Filler content to make page tall enough -->
+<div class="block" style="margin-top:50px;">Block 1 (Y ~70-270)</div>
+<div class="block">Block 2 (Y ~280-480)</div>
+<div class="block">Block 3 (Y ~490-690)</div>
+<div class="block">Block 4 (Y ~700-900)</div>
+<div class="block">Block 5 (Y ~910-1110)</div>
+<div class="block">Block 6 (Y ~1120-1320)</div>
+<div class="block">Block 7 (Y ~1330-1530)</div>
+<div class="block">Block 8 (Y ~1540-1740)</div>
+<div class="block">Block 9 (Y ~1750-1950)</div>
+<div class="block">Block 10 (Y ~1960-2160)</div>
+</div>
+</body></html>

@@ -1,0 +1,22 @@
+{
+  "meta": {
+    "dataset": "synthetic",
+    "stimulusWidth": 1280,
+    "stimulusHeight": 1024,
+    "screenWidth": 1280,
+    "screenHeight": 1024,
+    "documentHeight": 2200
+  },
+  "fixations": [
+    { "x": 110, "y": 100, "pageY": 110, "tStart": 0, "tEnd": 300 },
+    { "x": 650, "y": 100, "pageY": 110, "tStart": 500, "tEnd": 800 },
+    { "x": 110, "y": 500, "pageY": 510, "tStart": 1000, "tEnd": 1300 },
+    { "x": 650, "y": 500, "pageY": 510, "tStart": 1500, "tEnd": 1800 },
+    { "x": 110, "y": 976, "pageY": 1010, "tStart": 2000, "tEnd": 2300 },
+    { "x": 650, "y": 976, "pageY": 1010, "tStart": 2500, "tEnd": 2800 },
+    { "x": 110, "y": 476, "pageY": 1510, "tStart": 3000, "tEnd": 3300 },
+    { "x": 650, "y": 476, "pageY": 1510, "tStart": 3500, "tEnd": 3800 },
+    { "x": 110, "y": 976, "pageY": 2010, "tStart": 4000, "tEnd": 4300 },
+    { "x": 650, "y": 976, "pageY": 2010, "tStart": 4500, "tEnd": 4800 }
+  ]
+}
