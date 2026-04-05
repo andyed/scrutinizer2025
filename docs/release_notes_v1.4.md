@@ -49,7 +49,7 @@ vec4 pooled = textureLod(u_texture, uv, mipLevel);
 📚 *Learn more:*
 - *[MIP-Based Pooling (v1.4)](foveated-vision-model.md#mip-based-pooling-v14) — Technical implementation details*
 - *[Rosenholtz et al. — Mongrel Theory](scientific_literature_review.md#vision-science--cognitive-psychology) — Scientific foundation*
-- *[Mongrel Textures Spec](specs/mongrel_textures.md) — Tiered implementation strategy*
+- *[Mongrel Textures Spec](specs/implemented/mongrel_textures.md) — Tiered implementation strategy*
 
 **Visual Evolution: v1.3 → v1.4**
 
@@ -103,4 +103,4 @@ We've completed the v2 specification for **Semantic Guidance & Linguistic Primin
 ## Further Reading
 - [Foveated Vision Model](foveated-vision-model.md) — Complete technical documentation of spatial zones, strength curves, and pipeline stages
 - [Scientific Literature Review](scientific_literature_review.md) — Academic foundations including Rosenholtz's Mongrel Theory
-- [Mongrel Textures Spec](specs/mongrel_textures.md) — Roadmap for Tier 2 (contrast-preserving) and Tier 3 (WebGPU) pooling
+- [Mongrel Textures Spec](specs/implemented/mongrel_textures.md) — Roadmap for Tier 2 (contrast-preserving) and Tier 3 (WebGPU) pooling

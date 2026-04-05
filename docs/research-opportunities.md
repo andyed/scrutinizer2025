@@ -23,9 +23,9 @@ The modular pipeline (GazeModel, VisualMemory, ContentAnalysis, pipeline orchest
 
 ### 1.1 Oriented DoG Bands (Oblique Effect)
 
-**Spec**: `docs/specs/oriented_dog_bands.md`
+**Spec**: `docs/specs/implemented/oriented_dog_bands.md`
 **Depends on**: 1.3 (Calibrated Visual Angles) for publishable results
-**Baseline**: Isotropic 12-band DoG validated in Wave 2 (`docs/specs/wave2_spatial_acuity_validation.md`).
+**Baseline**: Isotropic 12-band DoG validated in Wave 2 (`docs/specs/implemented/wave2_spatial_acuity_validation.md`).
 
 The current DoG band decomposition is isotropic — all edge orientations attenuate equally with eccentricity. Real V1 cells are orientation-selective, and humans show ~30–50% better acuity for cardinal (horizontal/vertical) edges than oblique ones (Appelle, 1972). This project adds a 4-tap gradient analysis to modulate per-band M-scaling cutoffs by local edge orientation. Horizontal text strokes would persist ~50% further into the periphery than diagonal noise.
 
@@ -42,8 +42,8 @@ The current DoG band decomposition is isotropic — all edge orientations attenu
 
 ### 1.2 Mongrel Texture Synthesis for Peripheral Crowding
 
-**Spec**: `docs/specs/mongrel_textures.md` (Tier 1-3 roadmap)
-**Current state**: Density-gated crowding (`docs/specs/density_gated_crowding.md`) validates against Halverson & Hornof 2011. Mongrel synthesis replaces this proxy with actual statistical texture replacement.
+**Spec**: `docs/specs/implemented/mongrel_textures.md` (Tier 1-3 roadmap)
+**Current state**: Density-gated crowding (`docs/specs/implemented/density_gated_crowding.md`) validates against Halverson & Hornof 2011. Mongrel synthesis replaces this proxy with actual statistical texture replacement.
 
 Replace blur-based peripheral rendering with texture synthesis that preserves summary statistics (mean color, orientation distribution, spatial frequency content) while destroying feature identity. This is the "gold standard" for simulating crowding (Rosenholtz et al., 2012) but has never been done in real-time for arbitrary web content.
 

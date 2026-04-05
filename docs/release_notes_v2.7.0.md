@@ -58,8 +58,8 @@ Switching between Tier 2.5 and Tier 2.75 modes now correctly destroys and recrea
 | `scripts/analyze-tier25-gap.js` | Gap analysis: Tier 2.5 vs 2.75 quality metrics |
 | `scripts/capture-pyramid-subbands.js` | Subband capture for per-band visualization |
 | `scripts/generate-subband-tiling.js` | Blog asset: 3x2 grid of decomposed frequency bands |
-| `docs/specs/wave7_pyramid_validation.md` | Wave 7 validation spec (7a fidelity, 7b stats, 7c crowding) |
-| `docs/specs/tier3_ttm_synthesis_plan.md` | Tier 3 TTM synthesis architecture plan |
+| `docs/specs/implemented/wave7_pyramid_validation.md` | Wave 7 validation spec (7a fidelity, 7b stats, 7c crowding) |
+| `docs/specs/implemented/tier3_ttm_synthesis_plan.md` | Tier 3 TTM synthesis architecture plan |
 | `tests/unit/pyramid-decompose.test.js` | 30 unit tests: decomposition validated against pyrtools |
 | `tests/unit/pyramid-reference/pyramid-reference.json` | Golden reference data from Python generator |
 | `tests/validation/wave7c-crowding.json` | Wave 7c crowding asymmetry validation data |
@@ -98,7 +98,7 @@ New validation scripts: `capture-compute-texture.js` and `compare-compute-textur
 ## Known Limitations
 
 - **Tier 2.5 (mode 10) near-black bug** — oriented noise synthesis produces near-zero RGB. Not user-facing (mode 14 is default).
-- **Tier 3 (mode 15) not ready** — Pure sector pooling without V1 displacement doesn't degrade sparse content. Fragment shader fixes identified, deferred. See `docs/specs/tier3_lessons_learned.md`.
+- **Tier 3 (mode 15) not ready** — Pure sector pooling without V1 displacement doesn't degrade sparse content. Fragment shader fixes identified, deferred. See `docs/specs/implemented/tier3_lessons_learned.md`.
 - **Brown metamer comparison pending** — Overnight PooledStatisticsMetamers jobs needed for quantitative gap analysis.
 - Cross-scale correlation strength tuned to 0.8 empirically. No psychophysical calibration yet.
 

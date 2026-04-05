@@ -28,5 +28,5 @@ Updated the calibration logic to support "Real-World" fixation behaviors:
 
 ## Developer Notes
 *   **New Doc**: `docs/test_suite_reference.md` details all standard test cases and what to look for in regressions.
-*   **Spec Update**: `docs/specs/mongrel_textures.md` now documents the Tier 1.8.1 implementation.
+*   **Spec Update**: `docs/specs/implemented/mongrel_textures.md` now documents the Tier 1.8.1 implementation.
 *   **Shader**: The core logic is in `peripheral.frag` under the `config.v1_distortion_type == 0` block.

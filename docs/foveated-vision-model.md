@@ -107,7 +107,7 @@ The biological architecture produces several emergent properties that Scrutinize
 |----------------------|-------|---------------------------|
 | **Resolution loss** | Receptor pooling (100:1) | Approximate DoG band decomposition (MIP-derived, box/bilinear not Gaussian) with M-scaling rolloff; legacy: simple MIP pooling |
 | **Chromatic pooling** | Reduced chromatic spatial resolution; mean chromaticity preserved over large regions (Rosenholtz TTM) | Per-channel RG/YV attenuation in DoG bands (castleCSF). Spec: `docs/specs/implemented/chromatic_pooling.md`. Validated: Wave 1 (Hansen 2009, Mullen 2002). |
-| **Crowding** | Receptive field overlap | Density-gated V1 distortion (sigmoid on structure density). Spec: `docs/specs/density_gated_crowding.md`. Validated: Wave 3 (Bouma 1970), Wave 5 (Halverson 2011). Future: mongrel texture synthesis (`docs/specs/mongrel_textures.md`). |
+| **Crowding** | Receptive field overlap | Density-gated V1 distortion (sigmoid on structure density). Spec: `docs/specs/implemented/density_gated_crowding.md`. Validated: Wave 3 (Bouma 1970), Wave 5 (Halverson 2011). Future: mongrel texture synthesis (`docs/specs/implemented/mongrel_textures.md`). |
 | **Motion sensitivity** | Magnocellular pathway | Preserved contrast in periphery |
 | **Positional uncertainty** | Large receptive fields | Simplex noise displacement |
 
@@ -308,7 +308,7 @@ The V1 Lateral Smash (domain warping) and MIP pooling are both purely eccentrici
 The structure map carries a density channel (`structure.g`) through the LGN signal, but it's currently used only for the whitespace gate (`density < 0.1 → suppressionFactor = 0`), not for scaling V1 distortion strength. A sigmoid gate now modulates V1 strength with a sigmoid transfer on density — dense content gets full Lateral Smash, isolated elements get reduced distortion (floor at 0.3 for residual acuity loss). Shipped in v1.9.1 with threshold=0.6, steepness=20.0.
 
 - **Diagnostic pages:** `reference-pages/crowding.html` (crowded-vs-isolated letters), `reference-pages/crowding-stimulus.html` (orientation, color grouping, complexity)
-- **Spec:** [`docs/specs/density_gated_crowding.md`](specs/density_gated_crowding.md)
+- **Spec:** [`docs/specs/implemented/density_gated_crowding.md`](specs/implemented/density_gated_crowding.md)
 - **Full gap analysis:** [`docs/simulation-limitations.md`](simulation-limitations.md)
 
 ---

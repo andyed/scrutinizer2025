@@ -86,7 +86,7 @@ Integrating all three simultaneously created cascading issues that blocked relea
 | `docs/release_notes_v2.5.0.md` | Unreleased — stays on branch |
 | `docs/specs/pre_pool_chromatic_attenuation.md` | 238 lines — chromatic spec |
 | `docs/specs/control_panel.md` | 335 lines — general (could cherry-pick) |
-| `docs/specs/isotropic_cortical_sampling.md` | expanded |
+| `docs/specs/implemented/isotropic_cortical_sampling.md` | expanded |
 | `docs/fidelity-gaps.md` | 111 lines — gap tracker |
 | `docs/developers_guide.md` | +153 lines |
 | `docs/arxiv-paper/` | minor sync |

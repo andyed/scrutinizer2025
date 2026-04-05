@@ -127,7 +127,7 @@ Two new reference pages published to GitHub Pages for testing crowding behavior:
 
 ### Density-Gated Crowding Spec
 
-`docs/specs/density_gated_crowding.md` proposes feeding the structure map's density channel into V1 strength via a sigmoid transfer function. Dense content (text clusters) gets full Lateral Smash distortion; isolated elements get reduced distortion (floor at 0.3 for residual acuity loss). Includes three options for density signal strength for team review. Status: shipped (v1.9.1). Threshold=0.6, steepness=20.0, calibrated against structure map density values from crowding.html reference page.
+`docs/specs/implemented/density_gated_crowding.md` proposes feeding the structure map's density channel into V1 strength via a sigmoid transfer function. Dense content (text clusters) gets full Lateral Smash distortion; isolated elements get reduced distortion (floor at 0.3 for residual acuity loss). Includes three options for density signal strength for team review. Status: shipped (v1.9.1). Threshold=0.6, steepness=20.0, calibrated against structure map density values from crowding.html reference page.
 
 ---
 
@@ -179,15 +179,15 @@ Two major gaps exposed and documented this cycle, both with specs and reference 
 
 1. **Size-dependent color preservation.** Chromatic pooling (this release) models per-channel, per-band decay rates — both RG and YV channels now have frequency-dependent attenuation, so large colored regions preserve hue further than small ones for both channels (Abramov et al. 1991). The DoG bands provide discrete spatial frequency buckets, not continuous perceptive-field scaling. Full perceptive-field integration (Bouma-scaled pooling regions) remains future work.
 
-2. **Density-independent crowding.** The V1 Lateral Smash displaces pixels based on eccentricity alone — an isolated letter and a densely flanked letter at the same eccentricity receive identical distortion. In biological vision, the isolated letter remains identifiable (Bouma 1970). The structure map carries a density channel that could gate V1 strength, but it's unused. Spec: [`docs/specs/density_gated_crowding.md`](specs/density_gated_crowding.md). Reference pages: `crowding.html`, `crowding-stimulus.html`. See also: `docs/simulation-limitations.md`.
+2. **Density-independent crowding.** The V1 Lateral Smash displaces pixels based on eccentricity alone — an isolated letter and a densely flanked letter at the same eccentricity receive identical distortion. In biological vision, the isolated letter remains identifiable (Bouma 1970). The structure map carries a density channel that could gate V1 strength, but it's unused. Spec: [`docs/specs/implemented/density_gated_crowding.md`](specs/implemented/density_gated_crowding.md). Reference pages: `crowding.html`, `crowding-stimulus.html`. See also: `docs/simulation-limitations.md`.
 
 ---
 
 ## What's Next
 
 ### Rendering Pipeline
-- **Density-gated crowding** — Sigmoid density gate on V1 strength so dense content gets full Lateral Smash while isolated elements are spared. Spec written, pending team review on density signal approach. Spec: [`docs/specs/density_gated_crowding.md`](specs/density_gated_crowding.md)
-- **Oriented DoG bands (Oblique Effect)** — Cardinal edges persist ~50% further than oblique ones. Spec: [`docs/specs/oriented_dog_bands.md`](specs/oriented_dog_bands.md)
+- **Density-gated crowding** — Sigmoid density gate on V1 strength so dense content gets full Lateral Smash while isolated elements are spared. Spec written, pending team review on density signal approach. Spec: [`docs/specs/implemented/density_gated_crowding.md`](specs/implemented/density_gated_crowding.md)
+- **Oriented DoG bands (Oblique Effect)** — Cardinal edges persist ~50% further than oblique ones. Spec: [`docs/specs/implemented/oriented_dog_bands.md`](specs/implemented/oriented_dog_bands.md)
 
 ### scrutinizer-audit
 - **HTML report template** — Lighthouse-style visual report with per-page score cards
@@ -302,7 +302,7 @@ No new dependencies in the main Electron app.
 - **Congestion Brief** (`scrutinizer-www/src/blog/congestion-score.html`): Added "Scores in the Wild" table with live results, CLI & MCP section, and saliency vs congestion split-view description.
 - **Chromatic Pooling Spec** (`docs/specs/implemented/chromatic_pooling.md`): Full spec with castleCSF parameters, per-band attenuation derivation, suprathreshold correction, and validation plan.
 - **Simulation Limitations** (`docs/simulation-limitations.md`): Five known gaps between the renderer and biological peripheral vision, with reference pages and fix paths.
-- **Density-Gated Crowding Spec** (`docs/specs/density_gated_crowding.md`): Sigmoid density gate proposal for V1 strength, with three options for density signal approach.
+- **Density-Gated Crowding Spec** (`docs/specs/implemented/density_gated_crowding.md`): Sigmoid density gate proposal for V1 strength, with three options for density signal approach.
 
 ### Files Changed
 
@@ -314,7 +314,7 @@ No new dependencies in the main Electron app.
 | **Split View** | `renderer/shaders/peripheral.frag`, `renderer/scrutinizer.js`, `renderer/webgl-renderer.js`, `menu-template.js` |
 | **Chromatic Pooling** | `renderer/shaders/peripheral.frag` (+`chromaticAttenuate`, per-band RG/YV decay, decoupled `visual_ecc` for chromatic eccentricity), `renderer/webgl-renderer.js` (6 uniforms), `shared/modes.json`, `menu-template.js`, `main.js`, `renderer/scrutinizer.js`, `renderer/overlay.js` |
 | **Saccadic Blindness** | `renderer/shaders/peripheral.frag` (+`u_saccadic_blindness`, fovea shrink), `renderer/shaders/peripheral.frag` (same), `renderer/webgl-renderer.js` (uniform), `renderer/scrutinizer.js` (+`toggleSaccadicBlindness`), `renderer/overlay.js` (IPC handler), `menu-template.js` (checkbox) |
-| **Crowding Diagnostics** | `scripts/capture-golden.js` (crowding capture tasks), `menu-template.js` (reference page menu items), `docs/simulation-limitations.md`, `docs/specs/density_gated_crowding.md` |
+| **Crowding Diagnostics** | `scripts/capture-golden.js` (crowding capture tasks), `menu-template.js` (reference page menu items), `docs/simulation-limitations.md`, `docs/specs/implemented/density_gated_crowding.md` |
 | **Reference Pages** | `scrutinizer-www/src/reference-pages/crowding.html`, `scrutinizer-www/src/reference-pages/crowding-stimulus.html` |
 | **Validation** | `scripts/extract-congestion.js` (updated to use shared edge density + composite score), `scripts/capture-golden.js` (chromatic pooling on/off variants) |
 | **Documentation** | `docs/developers_guide.md`, `docs/specs/implemented/chromatic_pooling.md`, `docs/release_notes_v1.9.0.md` |

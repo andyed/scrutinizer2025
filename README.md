@@ -9,6 +9,8 @@ Live site: **[scrutinizer.app](https://andyed.github.io/scrutinizer-www/)** | [B
 
 macOS Installer: **[Download v2.7.1](https://github.com/andyed/scrutinizer2025/releases/tag/v2.7.1)** | [Changelog](CHANGELOG.md)
 
+**AI agents & CLI users:** See [**CLI & Automation**](cli/README.md) — visual complexity scoring, MCP server, saliency export, headless capture pipeline, and 75+ automation scripts with output schemas and env var reference.
+
 ---
 
 ## What Scrutinizer Does
@@ -44,7 +46,7 @@ The rendering pipeline mirrors how the brain's visual pathway actually works —
 | Stage | What it does | How Scrutinizer simulates it |
 |-------|-------------|------------------------------|
 | [**LGN** (relay)](docs/foveated-vision-model.md#stage-1-lgn-gating--masking) | Decides what gets through — suppresses blank areas, boosts important regions | Structure map (DOM analysis), [saliency modulation](docs/foveated-vision-model.md#cognitive-vs-retinal-constraint) |
-| [**V1** (detail)](docs/foveated-vision-model.md#stage-2-v1-geometry--distortion) | Processes edges and spatial detail — resolution drops with distance from fixation, nearby elements crowd each other | 12 half-octave [DoG bands](https://andyed.github.io/scrutinizer-www/blog/mip-chain-explainer.html), [density-gated crowding](docs/specs/density_gated_crowding.md) |
+| [**V1** (detail)](docs/foveated-vision-model.md#stage-2-v1-geometry--distortion) | Processes edges and spatial detail — resolution drops with distance from fixation, nearby elements crowd each other | 12 half-octave [DoG bands](https://andyed.github.io/scrutinizer-www/blog/mip-chain-explainer.html), [density-gated crowding](docs/specs/implemented/density_gated_crowding.md) |
 | [**V4** (color)](docs/foveated-vision-model.md#stage-3-v4-aesthetics--style) | Handles color and object-level grouping — red-green fades before blue-yellow in periphery | Per-channel [chromatic decay](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html), coupled spatial pooling |
 
 Resolution falloff across all stages follows a [cortical magnification function](https://andyed.github.io/scrutinizer-www/blog/2026-02-28-fovi.html) — a log-mapping that describes how the brain allocates disproportionate processing power to the center of gaze.

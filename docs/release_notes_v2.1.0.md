@@ -162,7 +162,7 @@ Halverson, T. & Hornof, A.J. (2011). A Computational Model of "Active Vision" fo
 
 - **Walton 2021 contradiction fixed.** Introduction and Open Problems now acknowledge Walton et al.'s real-time ventral metamers (SIGGRAPH 2021) while noting their compute-shader approach requires CUDA/DirectX, not available in WebGL2.
 - **WebGPU tiered roadmap.** New "Tiered upgrade path via WebGPU" paragraph in Open Problems: Tier 2 (contrast-preserving pooling, WebGL2), Tier 2.5 (Walton smooth moments, WebGPU compute), Tier 3 (full TTM, WebGPU compute).
-- **Mongrel textures spec.** Tier 2.5 section added to `docs/specs/mongrel_textures.md` with mechanism, performance estimates, and Vacher & Briand C++ reference for offline ground truth.
+- **Mongrel textures spec.** Tier 2.5 section added to `docs/specs/implemented/mongrel_textures.md` with mechanism, performance estimates, and Vacher & Briand C++ reference for offline ground truth.
 - **Grad student projects.** Project 1.2 (Mongrel Synthesis) updated: Walton 2021 and Vacher & Briand 2021 added to references, 5-phase approach aligned to tier hierarchy.
 
 ---

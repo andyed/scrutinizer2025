@@ -105,7 +105,7 @@ DoG is enabled by default in research-oriented modes:
 
 Two directions under consideration for v1.7:
 
-- **Oriented DoG Bands (Oblique Effect)** — The current DoG decomposition is isotropic: all edge orientations attenuate equally. Real V1 cells are orientation-selective, and humans have ~30-50% better acuity for cardinal (H/V) edges than oblique ones. This would add a 4-tap gradient analysis to modulate per-band M-scaling cutoffs by local edge orientation — horizontal text strokes would persist ~50% further into the periphery than diagonal noise. Cost: +4 texture lookups, ~0.2ms. Spec: `docs/specs/oriented_dog_bands.md`
+- **Oriented DoG Bands (Oblique Effect)** — The current DoG decomposition is isotropic: all edge orientations attenuate equally. Real V1 cells are orientation-selective, and humans have ~30-50% better acuity for cardinal (H/V) edges than oblique ones. This would add a 4-tap gradient analysis to modulate per-band M-scaling cutoffs by local edge orientation — horizontal text strokes would persist ~50% further into the periphery than diagonal noise. Cost: +4 texture lookups, ~0.2ms. Spec: `docs/specs/implemented/oriented_dog_bands.md`
 
 - **Pre-Attentive Semantic Simulation** — Real-time comparison of user goal embeddings against page content embeddings to model pre-attentive semantic filtering. The idea: peripheral vision doesn't just lose spatial resolution, it also loses semantic access. But goal-relevant content (a "Buy" button when you're shopping) receives more attentional bandwidth than irrelevant content. This would embed page elements and a user-specified goal via a local LLM, then modulate the processing budget by cosine similarity — goal-aligned content receives more of the rendering pipeline even in the periphery.
 

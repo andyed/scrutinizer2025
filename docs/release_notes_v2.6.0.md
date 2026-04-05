@@ -34,7 +34,7 @@ AI-confabulated paper titles, authors, and article numbers corrected across 8 fi
 | File | Purpose |
 |------|---------|
 | `scripts/validate-isotropic-rendering.js` | 12-check rendering validation suite |
-| `docs/specs/mode_graduation.md` | Process spec for promoting modes to default |
+| `docs/specs/implemented/mode_graduation.md` | Process spec for promoting modes to default |
 | `docs/drafts/blauch-update-2026-03-19.md` | Draft correspondence re: FOVI adoption |
 
 ## Test Results

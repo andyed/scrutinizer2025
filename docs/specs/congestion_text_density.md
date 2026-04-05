@@ -5,7 +5,7 @@
 **Status:** Shipped (v2.7) — eccentricity-weighted congestion + Bouma-scaled edge density
 **Depends on:** Wave 5 Halverson findings (v2.1)
 **Original goal:** Graduate Mode 9 (Congestion-Gated Pooling) from experimental to default
-**Resolution:** Implemented via Option C (hybrid precomputed texture) with eccentricity weighting. See [eccentricity_weighted_congestion.md](eccentricity_weighted_congestion.md) for the v2.7 implementation.
+**Resolution:** Implemented via Option C (hybrid precomputed texture) with eccentricity weighting. See [eccentricity_weighted_congestion.md](implemented/eccentricity_weighted_congestion.md) for the v2.7 implementation.
 
 ## Problem
 

@@ -9,13 +9,13 @@ Scrutinizer's rendering pipeline implements three decades of visual psychophysic
 
 | Wave | Mechanism | Published Basis | Result | Links |
 |------|-----------|----------------|--------|-------|
-| [1](#wave-1-chromatic-decay) | Chromatic Decay | Mullen & Kingdom 2002, Hansen et al. 2009, Bowers et al. 2025 | T1: 7/7 · T2: 3/3 · T3: 1/2 | [spec](../docs/specs/wave1_feature_search_validation.md) · [report](https://andyed.github.io/scrutinizer-www/validation-reports/color-search-report.html) |
-| [2](#wave-2-spatial-frequency-attenuation) | Spatial Frequency | Rovamo & Virsu 1979, castleCSF (Ashraf et al. 2024) | T1: 12/16 · T2: 5/5 · T3: 0/4 | [spec](../docs/specs/wave2_spatial_acuity_validation.md) · [report](https://andyed.github.io/scrutinizer-www/validation-reports/spatial-acuity-report.html) |
-| [3](#wave-3-crowding-geometry) | Crowding Geometry | Bouma 1970, Toet & Levi 1992, Pelli & Tillman 2008 | 5/7 + Bouma step | [spec](../docs/specs/wave3_crowding_validation.md) |
+| [1](#wave-1-chromatic-decay) | Chromatic Decay | Mullen & Kingdom 2002, Hansen et al. 2009, Bowers et al. 2025 | T1: 7/7 · T2: 3/3 · T3: 1/2 | [spec](../docs/specs/implemented/wave1_feature_search_validation.md) · [report](https://andyed.github.io/scrutinizer-www/validation-reports/color-search-report.html) |
+| [2](#wave-2-spatial-frequency-attenuation) | Spatial Frequency | Rovamo & Virsu 1979, castleCSF (Ashraf et al. 2024) | T1: 12/16 · T2: 5/5 · T3: 0/4 | [spec](../docs/specs/implemented/wave2_spatial_acuity_validation.md) · [report](https://andyed.github.io/scrutinizer-www/validation-reports/spatial-acuity-report.html) |
+| [3](#wave-3-crowding-geometry) | Crowding Geometry | Bouma 1970, Toet & Levi 1992, Pelli & Tillman 2008 | 5/7 + Bouma step | [spec](../docs/specs/implemented/wave3_crowding_validation.md) |
 | [4](#wave-4-saliency-validation) | Saliency & Protection | Itti & Koch 2001, Rosenholtz 2007 (Feature Congestion) | 4A: 6+1 INFO · 4B: 5/5 | [stimulus](https://andyed.github.io/scrutinizer-www/reference-pages/saliency-popout.html) |
-| [6](#wave-6-coco-periph-peripheral-encoding) | System-Level Encoding | Harrington et al. 2024 (COCO-Periph), Rosenholtz et al. 2012 (TTM) | Pending | [spec](../docs/specs/wave6_coco_periph_validation.md) |
-| [7](#wave-7-pyramid-decomposition--crowding) | Pyramid Decomposition & Crowding | Portilla & Simoncelli 2000, Walton 2021, Bouma 1970 | Scaffolded | [spec](../docs/specs/wave7_pyramid_validation.md) |
-| [7.5](#wave-75-compute-texture-isolation) | Compute Texture Quality | Tier 2.5 vs 2.75 isolation | **Tier 2.75 validated** | [lessons](../docs/specs/tier3_lessons_learned.md) |
+| [6](#wave-6-coco-periph-peripheral-encoding) | System-Level Encoding | Harrington et al. 2024 (COCO-Periph), Rosenholtz et al. 2012 (TTM) | Pending | [spec](../docs/specs/implemented/wave6_coco_periph_validation.md) |
+| [7](#wave-7-pyramid-decomposition--crowding) | Pyramid Decomposition & Crowding | Portilla & Simoncelli 2000, Walton 2021, Bouma 1970 | Scaffolded | [spec](../docs/specs/implemented/wave7_pyramid_validation.md) |
+| [7.5](#wave-75-compute-texture-isolation) | Compute Texture Quality | Tier 2.5 vs 2.75 isolation | **Tier 2.75 validated** | [lessons](../docs/specs/implemented/tier3_lessons_learned.md) |
 
 ### Tier Structure
 
@@ -33,7 +33,7 @@ Stimuli are HTML pages captured through Scrutinizer's full rendering path (shade
 
 **Published basis**: Mullen & Kingdom (2002) measured differential distributions of red-green and blue-yellow cone opponency across the visual field. Hansen et al. (2009) measured color naming accuracy across the intermediate periphery. Bowers et al. (2025) measured chromatic contrast sensitivity in the periphery.
 
-**Spec**: [wave1_feature_search_validation.md](../docs/specs/wave1_feature_search_validation.md)
+**Spec**: [wave1_feature_search_validation.md](../docs/specs/implemented/wave1_feature_search_validation.md)
 **Stimulus**: [color-search.html](../tests/reference-pages/color-search.html) — colored dot arrays (red, green, blue, yellow targets among gray distractors) at 5 eccentricity rings
 **Report**: [color-search-report.html](https://andyed.github.io/scrutinizer-www/validation-reports/color-search-report.html) · [.md](../tests/validation/reports/color-search-report.md)
 **Scripts**: [capture-color-search.js](../scripts/capture-color-search.js) · [analyze-color-search.js](../scripts/analyze-color-search.js) · [validate-color-search.js](../scripts/validate-color-search.js)
@@ -57,7 +57,7 @@ Monotonicity checks required non-strict comparison (`>=`) due to 8-bit RGB quant
 
 **Published basis**: Rovamo & Virsu (1979) established the cortical magnification factor — how spatial resolution scales inversely with eccentricity. Their E2 values define the half-sensitivity eccentricity for each spatial frequency. Ashraf et al. (2024) extended this with castleCSF, a contrast sensitivity function across color, area, spatiotemporal frequency, luminance, and eccentricity.
 
-**Spec**: [wave2_spatial_acuity_validation.md](../docs/specs/wave2_spatial_acuity_validation.md)
+**Spec**: [wave2_spatial_acuity_validation.md](../docs/specs/implemented/wave2_spatial_acuity_validation.md)
 **Stimulus**: [spatial-acuity.html](../tests/reference-pages/spatial-acuity.html) — sine-wave gratings at 0.25–4 cpd in concentric annuli
 **Report**: [spatial-acuity-report.html](https://andyed.github.io/scrutinizer-www/validation-reports/spatial-acuity-report.html) · [.md](../tests/validation/reports/spatial-acuity-report.md)
 **Scripts**: [capture-spatial-acuity.js](../scripts/capture-spatial-acuity.js) · [analyze-spatial-acuity.js](../scripts/analyze-spatial-acuity.js) · [validate-spatial-acuity.js](../scripts/validate-spatial-acuity.js)
@@ -90,7 +90,7 @@ The 5-band architecture is a discrete approximation to continuous cortical magni
 
 **Published basis**: Bouma (1970) established that critical spacing for crowding scales linearly with eccentricity at ~0.5x. Toet & Levi (1992) measured the two-dimensional shape of interaction zones — radially elongated with ~2:1 aspect ratio. Pelli & Tillman (2008) formalized the "uncrowded window" of object recognition. Rosenholtz et al. (2012) proposed that crowding arises from pooling of summary statistics in eccentricity-scaled regions.
 
-**Spec**: [wave3_crowding_validation.md](../docs/specs/wave3_crowding_validation.md)
+**Spec**: [wave3_crowding_validation.md](../docs/specs/implemented/wave3_crowding_validation.md)
 **Analysis**: [analyze-crowding-geometry.js](../scripts/analyze-crowding-geometry.js)
 **Stimulus pages**: [crowding-radial.html](https://andyed.github.io/scrutinizer-www/reference-pages/crowding-radial.html) · [crowding-spacing.html](https://andyed.github.io/scrutinizer-www/reference-pages/crowding-spacing.html)
 **Scripts**: [capture-crowding.js](../scripts/capture-crowding.js) · [analyze-crowding.js](../scripts/analyze-crowding.js)
@@ -241,7 +241,7 @@ At 256px worker resolution, 40px CSS items map to ~5 saliency pixels. The DoG ce
 
 **Published basis**: Harrington et al. (2024) created COCO-Periph — COCO images processed through Rosenholtz's Texture Tiling Model (TTM) at 4 eccentricities (5°, 10°, 15°, 20°), with human psychophysics data for object recognition at each eccentricity. This is the first system-level validation: natural images through Scrutinizer's complete pipeline (MIP + DoG + crowding + chromatic decay), compared against the TTM reference.
 
-**Spec**: [wave6_coco_periph_validation.md](../docs/specs/wave6_coco_periph_validation.md)
+**Spec**: [wave6_coco_periph_validation.md](../docs/specs/implemented/wave6_coco_periph_validation.md)
 **Dataset**: [data.csail.mit.edu/coco_periph/](https://data.csail.mit.edu/coco_periph/) (MIT license)
 **Published data**: [harrington2024_coco_periph.json](../tests/validation/published-data/harrington2024_coco_periph.json)
 **Scripts**: [download-coco-periph.js](../scripts/download-coco-periph.js) · [capture-coco-periph.js](../scripts/capture-coco-periph.js) · [analyze-coco-periph.js](../scripts/analyze-coco-periph.js) · [validate-coco-periph.js](../scripts/validate-coco-periph.js)
@@ -319,7 +319,7 @@ Attempted to use Tier 2.75's compute texture as the sole degradation mechanism (
 1. On sparse dashboard content, sector means ≈ original pixels (text is <5% of sector area)
 2. Fragment shader's blend cap (60%), smooth content snap-back, and magnocellular contrast restoration collectively cancelled out the remaining effect
 
-The synthesis quality is validated. The Tier 3 gap is in the fragment shader compositing, not the compute pipeline. Full details in `docs/specs/tier3_lessons_learned.md`.
+The synthesis quality is validated. The Tier 3 gap is in the fragment shader compositing, not the compute pipeline. Full details in `docs/specs/implemented/tier3_lessons_learned.md`.
 
 ### Next: Brown metamer comparison (Wave 7c prerequisite)
 
