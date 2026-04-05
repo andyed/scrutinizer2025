@@ -1878,6 +1878,8 @@ function runIntegrationTest() {
                                                 x: x * scaleX,
                                                 y: y * scaleY,
                                                 radius: (f.radius || 45) * scaleX,
+                                                vdx: f.vdx || 0,
+                                                vdy: f.vdy || 0,
                                             };
                                         });
 
@@ -1941,7 +1943,9 @@ function runIntegrationTest() {
                                                 .map(f => ({
                                                     x: f.x * scaleX,
                                                     y: (f.pageY - scrollY) * scaleY,
-                                                    radius: (f.radius || 45) * scaleX
+                                                    radius: (f.radius || 45) * scaleX,
+                                                    vdx: f.vdx || 0,
+                                                    vdy: f.vdy || 0,
                                                 }))
                                                 .filter(p => p.y > -100 && p.y < physSize.height + 100);
 

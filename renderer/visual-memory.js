@@ -221,19 +221,50 @@
                 const maskY = point.y * maskScaleY;
                 const maskRadius = point.radius * maskScaleX;
 
-                // Soft gradient: full clarity at center, transparent at edge
-                const gradient = this.maskCtx.createRadialGradient(
-                    maskX, maskY, 0,
-                    maskX, maskY, maskRadius
-                );
-                gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
-                gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.5)');
-                gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+                const hasReadingSpan = point.vdx !== undefined && point.vdy !== undefined
+                    && (point.vdx !== 0 || point.vdy !== 0);
 
-                this.maskCtx.fillStyle = gradient;
-                this.maskCtx.beginPath();
-                this.maskCtx.arc(maskX, maskY, maskRadius, 0, Math.PI * 2);
-                this.maskCtx.fill();
+                if (hasReadingSpan) {
+                    // Rayner reading span: asymmetric elliptical gradient
+                    // Perceptual span ~1.3° left, ~5° right (Rayner 1998).
+                    // Shift center 0.7r in reading direction (matches peripheral.frag line 1895).
+                    // Stretch 1.5x forward, 0.8x backward.
+                    const angle = Math.atan2(point.vdy, point.vdx);
+                    const shiftAmount = maskRadius * 0.7;
+
+                    this.maskCtx.save();
+                    this.maskCtx.translate(maskX, maskY);
+                    this.maskCtx.rotate(angle);
+                    // Shift center in reading direction (forward = +x in rotated space)
+                    this.maskCtx.translate(shiftAmount, 0);
+                    // Asymmetric scale: elongate forward, compress backward
+                    this.maskCtx.scale(1.5, 0.8);
+
+                    const gradient = this.maskCtx.createRadialGradient(0, 0, 0, 0, 0, maskRadius);
+                    gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+                    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.5)');
+                    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+
+                    this.maskCtx.fillStyle = gradient;
+                    this.maskCtx.beginPath();
+                    this.maskCtx.arc(0, 0, maskRadius, 0, Math.PI * 2);
+                    this.maskCtx.fill();
+                    this.maskCtx.restore();
+                } else {
+                    // Standard symmetric circular gradient
+                    const gradient = this.maskCtx.createRadialGradient(
+                        maskX, maskY, 0,
+                        maskX, maskY, maskRadius
+                    );
+                    gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+                    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.5)');
+                    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+
+                    this.maskCtx.fillStyle = gradient;
+                    this.maskCtx.beginPath();
+                    this.maskCtx.arc(maskX, maskY, maskRadius, 0, Math.PI * 2);
+                    this.maskCtx.fill();
+                }
             }
 
             // Upload mask to GPU

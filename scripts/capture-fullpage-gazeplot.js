@@ -42,6 +42,7 @@ const batchMode = hasFlag('batch');
 const layoutFreezePath = getArg('layout-freeze', null);
 const docHeightOverride = getArg('doc-height', null);
 const anchorFilePath = getArg('anchors', null);
+const readingSpan = hasFlag('reading-span');
 
 if (!dataDir || !trialId) {
     console.error('Usage: --data=<path> --trial=<id>');
@@ -54,6 +55,28 @@ const meta = scanpathData.meta;
 const serpPath = meta.serpHtmlPath;
 
 if (!serpPath) { console.error('No SERP HTML'); process.exit(1); }
+
+// Annotate fixations with saccade direction for Rayner reading span
+if (readingSpan && scanpathData.fixations) {
+    const fixations = scanpathData.fixations;
+    let annotated = 0;
+    for (let i = 1; i < fixations.length; i++) {
+        const px = fixations[i].pageY !== undefined ? fixations[i].x : fixations[i].x;
+        const py = fixations[i].pageY !== undefined ? fixations[i].pageY : fixations[i].y;
+        const ppx = fixations[i-1].pageY !== undefined ? fixations[i-1].x : fixations[i-1].x;
+        const ppy = fixations[i-1].pageY !== undefined ? fixations[i-1].pageY : fixations[i-1].y;
+        const dx = px - ppx;
+        const dy = py - ppy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        // Gate: predominantly horizontal, > 20px, not a return sweep (massive leftward jump)
+        if (dist > 20 && dist < 500 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+            fixations[i].vdx = dx / dist;  // normalized direction
+            fixations[i].vdy = dy / dist;
+            annotated++;
+        }
+    }
+    console.log(`  Reading span: ${annotated}/${fixations.length} fixations annotated with saccade direction`);
+}
 
 // Write scanpath JSON for the gazeplot walker
 const tmpDir = path.join(ROOT, 'output', 'adserp-tmp');
