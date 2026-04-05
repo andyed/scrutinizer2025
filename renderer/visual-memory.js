@@ -225,31 +225,39 @@
                     && (point.vdx !== 0 || point.vdy !== 0);
 
                 if (hasReadingSpan) {
-                    // Rayner reading span: asymmetric elliptical gradient
-                    // Perceptual span ~1.3° left, ~5° right (Rayner 1998).
-                    // Shift center 0.7r in reading direction (matches peripheral.frag line 1895).
-                    // Stretch 1.5x forward, 0.8x backward.
+                    // Rayner reading span: extend clear zone in reading direction.
+                    // Perceptual span ~3-4 chars left, ~14-15 chars right (Rayner 1998).
+                    // Keep full coverage at fixation center — add an EXTRA lobe forward,
+                    // don't shift the center (which would break left-side coverage).
                     const angle = Math.atan2(point.vdy, point.vdx);
-                    const shiftAmount = maskRadius * 0.7;
+                    const extendAmount = maskRadius * 0.6; // extra reach in reading direction
 
-                    this.maskCtx.save();
-                    this.maskCtx.translate(maskX, maskY);
-                    this.maskCtx.rotate(angle);
-                    // Shift center in reading direction (forward = +x in rotated space)
-                    this.maskCtx.translate(shiftAmount, 0);
-                    // Asymmetric scale: elongate forward, compress backward
-                    this.maskCtx.scale(1.5, 0.8);
-
-                    const gradient = this.maskCtx.createRadialGradient(0, 0, 0, 0, 0, maskRadius);
+                    // First: draw the normal symmetric gradient (full left-side coverage)
+                    const gradient = this.maskCtx.createRadialGradient(
+                        maskX, maskY, 0, maskX, maskY, maskRadius
+                    );
                     gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
                     gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.5)');
                     gradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
-
                     this.maskCtx.fillStyle = gradient;
                     this.maskCtx.beginPath();
-                    this.maskCtx.arc(0, 0, maskRadius, 0, Math.PI * 2);
+                    this.maskCtx.arc(maskX, maskY, maskRadius, 0, Math.PI * 2);
                     this.maskCtx.fill();
-                    this.maskCtx.restore();
+
+                    // Second: add an extended lobe in the reading direction
+                    const lobeCx = maskX + Math.cos(angle) * extendAmount;
+                    const lobeCy = maskY + Math.sin(angle) * extendAmount;
+                    const lobeR = maskRadius * 0.7;
+                    const lobe = this.maskCtx.createRadialGradient(
+                        lobeCx, lobeCy, 0, lobeCx, lobeCy, lobeR
+                    );
+                    lobe.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+                    lobe.addColorStop(0.5, 'rgba(255, 255, 255, 0.4)');
+                    lobe.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+                    this.maskCtx.fillStyle = lobe;
+                    this.maskCtx.beginPath();
+                    this.maskCtx.arc(lobeCx, lobeCy, lobeR, 0, Math.PI * 2);
+                    this.maskCtx.fill();
                 } else {
                     // Standard symmetric circular gradient
                     const gradient = this.maskCtx.createRadialGradient(
