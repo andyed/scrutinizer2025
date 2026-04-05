@@ -736,6 +736,42 @@ stitching: 2× DPR tiles → 1× canvas, crop to documentHeight
 | `TEST_FULLPAGE_DOC_HEIGHT` | Document height (passed to tile logic) |
 | `TEST_SCANPATH` | Path to scanpath JSON |
 
+### Saliency & Congestion Export CLI
+
+Export per-coordinate saliency and Rosenholtz feature congestion values from Scrutinizer's vision pipeline — without Electron or GPU. Reuses `congestion-core.js` (Oklab DoG + local variance) directly in Node.js.
+
+```bash
+# Single image with coordinate file
+node scripts/export-saliency.js \
+  --input serp.png \
+  --coordinates coords.json \
+  --output saliency.json \
+  --radius 60
+
+# Batch mode (all trials)
+node scripts/export-saliency.js \
+  --input-dir ../attentional-foraging/site/serp-renders/ \
+  --coordinates-dir ../attentional-foraging/AdSERP/data/fixation-coords/ \
+  --output-dir ../attentional-foraging/AdSERP/data/saliency/
+```
+
+**Output per coordinate:**
+
+| Field | Description |
+|-------|-------------|
+| `saliency_mean` | Mean saliency within foveal radius (Oklab DoG, normalized) |
+| `saliency_max` | Peak saliency within radius |
+| `congestion_mean` | Mean Rosenholtz feature congestion (local variance across I/RG/BY) |
+| `congestion_max` | Peak congestion within radius |
+| `edge_density_mean` | Mean Sobel edge density within radius |
+| `edge_density_max` | Peak edge density within radius |
+
+Also outputs a composite `complexity_score` (0-100) and `complexity_rating` per image.
+
+**Performance:** ~100ms per image at 256px resolution. Full AdSERP dataset (2,776 trials) in ~5 minutes.
+
+**Spec:** [`docs/spec-saliency-export-cli.md`](spec-saliency-export-cli.md)
+
 ### Smoke Test (Quick Pipeline Sanity Check)
 
 Run before any shader or renderer changes to verify the capture pipeline works end-to-end:

@@ -268,6 +268,8 @@ The pipeline matches published data where mechanisms map cleanly to GPU operatio
 
 \textbf{Cognitive architecture integration.} The saliency branch point accepts any bitmap as attentional input, making Scrutinizer a rendering front-end for cognitive models such as SNIF-ACT~\citep{fu2007} and ACT-R's vision module~\citep{salvucci2001}.
 
+\textbf{DOM-anchored foveated heatmaps.} Traditional gaze heatmaps render fixations as Gaussian blobs in pixel coordinates, which break when the underlying page reflows at a different viewport width. Scrutinizer's batch gazeplot mode bulk-loads a full fixation sequence into the visual memory buffer and produces a foveated accumulation image showing exactly what the participant could have resolved. To solve the reflow alignment problem, we developed a DOM-anchoring pipeline: each fixation is mapped to the page element it landed on via \texttt{elementFromPoint}, stored as a CSS selector with sub-element offset. At render time---whether in the interactive viewer or in Scrutinizer's capture pipeline---the anchor is resolved from the live DOM at whatever viewport width is active. This decouples fixation positioning from the recording's display scaling and coordinate system entirely, extending the principle of DOM-based event logging~\citep{edmonds2003,edmonds2007} from interaction events to gaze data. An interactive demo with 10 curated AdSERP trials is available at \url{https://andyed.github.io/attentional-foraging/}.
+
 % ============================================================
 \section{Open Problems}
 

@@ -1,6 +1,6 @@
 # Wave 1: Color Search Validation Report
 
-Generated: 2026-03-17
+Generated: 2026-03-30
 Parameters: rg_decay=0.085, yv_decay=0.014, supra=0.5
 Geometry: fovea_radius=45px, ppd=45
 

@@ -78,3 +78,6 @@ build/certs/
 build_error.txt
 build_error.txt
 docs/drafts/
+
+# Private correspondence with collaborators
+comms/

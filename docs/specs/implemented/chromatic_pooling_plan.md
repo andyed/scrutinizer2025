@@ -15,7 +15,6 @@ planStatus:
   updated: "2026-03-04T15:23:11.000Z"
   progress: 0
 ---
-
 # Chromatic Pooling — Per-Channel RG/YV Eccentricity Decay
 
 ## Goals
@@ -152,7 +151,7 @@ this.config.yv_freq_decay = p.yv_freq_decay ?? defaults.yv_freq_decay;
 Enable chromatic pooling on the two research modes where DoG is active:
 
 | Mode | Enable? | Rationale |
-|------|---------|-----------|
+| --- | --- | --- |
 | 0 (High-Key) | **Yes** | Default research mode, DoG enabled |
 | 1 (Biological) | **Yes** | DoG enabled, Purkinje still applies on top |
 | 2 (Frosted) | No | No DoG, different aesthetic |
@@ -182,7 +181,7 @@ Add a checkbox to the Simulation > Behavior submenu:
 ## Files Modified
 
 | File | Change |
-|------|--------|
+| --- | --- |
 | `renderer/shaders/peripheral.frag` | Add 4 uniforms, `chromaticAttenuate()` function, per-band chromatic path in `sampleDoGReconstructed()`, V4 desat guard |
 | `renderer/webgl-renderer.js` | Add 4 uniform locations, config defaults, lookup, upload, mode loading |
 | `shared/modes.json` | Add `chromatic_pooling`, `rg_decay`, `yv_decay`, `yv_freq_decay` to modes 0, 1, 9 |
@@ -207,7 +206,7 @@ No new textures, no new passes, no CPU-side computation. Pure fragment shader co
 
 ## Open Questions
 
-1. **ecc_deg conversion**: Currently `normEcc * 1.0` uses fovea_deg = 1.0 (1° foveal radius). Should we pass actual fovea_deg as a uniform for accuracy? (Low priority — 1° radius is standard.)
+1. **ecc\_deg conversion**: Currently `normEcc * 1.0` uses fovea_deg = 1.0 (1° foveal radius). Should we pass actual fovea_deg as a uniform for accuracy? (Low priority — 1° radius is standard.)
 
 2. **Interaction with saliency modulation**: When saliency modulation preserves detail in salient regions, should it also preserve color? Currently `u_desat_floor` gates the V4 chrominance path — if we're skipping V4 uniform path, we need an equivalent gate on the chromatic attenuation. Probably: `rg_atten = mix(rg_atten, 1.0, saliency * u_desat_floor)`.
 
