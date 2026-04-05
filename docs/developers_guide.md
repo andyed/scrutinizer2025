@@ -794,15 +794,6 @@ npm run capture-smoke -- --force  # Full recapture (~40s)
 
 Uses local `file://` reference pages — no network dependency. Output in `tests/smoke-captures/` (gitignored). If all 6 pass, the Electron → WebGL → capture → PNG pipeline is intact.
 
-### Browser ↔ Figma Golden Compare (Parity Harness)
-- Capture browser goldens and compute SSIM/PSNR against Figma exports:
-    ```bash
-    npm run golden-compare -- --version=1.4.3
-    ```
-- Figma pairing: export plugin canvas PNGs with identical filenames into docs/golden/figma/v1.4.3, then rerun with `--skip-browser-capture` to avoid recapturing and generate summary-<version>.json.
-- Flags: `--figma-only`, `--browser-only`, `--threshold-ssim=0.98`, `--threshold-psnr=35`. Storage layout and workflow are in docs/golden/README.md.
-- Determinism: keep TEST_* env (seed, fixation, viewport) aligned between browser capture and Figma export for meaningful diffs.
-
 ### Manual Testing
 To run the standard smoke test:
 ```bash
