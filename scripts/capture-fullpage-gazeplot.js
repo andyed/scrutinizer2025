@@ -42,6 +42,7 @@ const batchMode = hasFlag('batch');
 const layoutFreezePath = getArg('layout-freeze', null);
 const docHeightOverride = getArg('doc-height', null);
 const anchorFilePath = getArg('anchors', null);
+const resolvedFilePath = getArg('resolved', null);
 const readingSpan = hasFlag('reading-span');
 
 if (!dataDir || !trialId) {
@@ -68,8 +69,9 @@ if (readingSpan && scanpathData.fixations) {
         const dx = px - ppx;
         const dy = py - ppy;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        // Gate: predominantly horizontal, > 20px, not a return sweep (massive leftward jump)
-        if (dist > 20 && dist < 500 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        // Gate: rightward horizontal saccade only (LTR reading direction)
+        // Leftward saccades are return sweeps — no reading span applies
+        if (dist > 20 && dist < 500 && dx > 0 && dx > Math.abs(dy) * 1.5) {
             fixations[i].vdx = dx / dist;  // normalized direction
             fixations[i].vdy = dy / dist;
             annotated++;
@@ -141,7 +143,8 @@ const env = {
     SCREENSHOT_MODE: 'update',
     ELECTRON_RUN_AS_NODE: undefined,
     ...(layoutFreezeCSS ? { TEST_INJECT_CSS: scanpathFile.replace('.json', '-freeze.css') } : {}),
-    ...(anchorFilePath ? { TEST_ANCHOR_FILE: path.resolve(anchorFilePath) } : {}),
+    ...(anchorFilePath && !resolvedFilePath ? { TEST_ANCHOR_FILE: path.resolve(anchorFilePath) } : {}),
+    ...(resolvedFilePath ? { TEST_RESOLVED_FILE: path.resolve(resolvedFilePath) } : {}),
     // Tiled mode only: capture tiles at each scroll position and stitch
     ...(singleMode ? {} : {
         TEST_FULLPAGE_TILES: String(tileCount),

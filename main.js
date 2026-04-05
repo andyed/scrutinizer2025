@@ -1822,13 +1822,18 @@ function runIntegrationTest() {
                                     mainWindow.scrutinizerHud.webContents.send('menu:set-visual-memory', vmLimit);
                                     await new Promise(resolve => setTimeout(resolve, 200));
 
-                                    // ── DOM anchor resolution (if available) ──
-                                    // Resolve fixation positions from CSS selectors + offsets,
-                                    // matching build-gh-pages.js behavior for pixel-accurate
-                                    // alignment between foveation mask and overlay dots.
+                                    // ── Pre-resolved positions (single source of truth from Playwright) ──
+                                    // build-gh-pages.js resolves anchors and writes fixation-resolved/{trial}.json.
+                                    // Use those directly — no re-resolution in Electron.
+                                    const resolvedPath = process.env.TEST_RESOLVED_FILE;
                                     const anchorPath = process.env.TEST_ANCHOR_FILE;
                                     let resolvedPositions = null;
-                                    if (anchorPath && require('fs').existsSync(anchorPath)) {
+                                    if (resolvedPath && require('fs').existsSync(resolvedPath)) {
+                                        resolvedPositions = JSON.parse(require('fs').readFileSync(resolvedPath, 'utf8'));
+                                        const snapped = resolvedPositions.filter(r => r).length;
+                                        console.log(`[Test] Using pre-resolved positions: ${snapped}/${resolvedPositions.length} (from Playwright)`);
+                                    } else if (anchorPath && require('fs').existsSync(anchorPath)) {
+                                        // Fallback: resolve anchors in Electron (may differ from Playwright)
                                         const anchors = JSON.parse(require('fs').readFileSync(anchorPath, 'utf8'));
                                         resolvedPositions = await mainWindow.scrutinizerView.webContents.executeJavaScript(`
                                             (async (anchors) => {
@@ -1850,7 +1855,7 @@ function runIntegrationTest() {
                                             })(${JSON.stringify(anchors)})
                                         `);
                                         const snapped = resolvedPositions.filter(r => r).length;
-                                        console.log(`[Test] DOM anchor resolution: ${snapped}/${anchors.length} resolved`);
+                                        console.log(`[Test] DOM anchor resolution (Electron fallback): ${snapped}/${anchors.length} resolved`);
                                     }
 
                                     // Get physical capture size for coordinate scaling.
