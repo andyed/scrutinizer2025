@@ -992,8 +992,23 @@ function createScrutinizerWindow(startUrl) {
         }
     });
 
-    contentView.webContents.on('did-finish-load', () => {
+    contentView.webContents.on('did-finish-load', async () => {
         console.log('[Main] ContentView did-finish-load');
+
+        // Inject layout-freeze CSS if provided (for deterministic rendering)
+        if (process.env.TEST_INJECT_CSS) {
+            try {
+                const cssPath = process.env.TEST_INJECT_CSS;
+                if (require('fs').existsSync(cssPath)) {
+                    const css = require('fs').readFileSync(cssPath, 'utf8');
+                    await contentView.webContents.insertCSS(css);
+                    console.log(`[Main] Injected layout-freeze CSS (${css.length} bytes)`);
+                }
+            } catch (e) {
+                console.warn('[Main] Failed to inject CSS:', e.message);
+            }
+        }
+
         // Force structure scan to ensure saliency map updates (Critical for initial load)
         contentView.webContents.send('browser:force-scan');
 
@@ -1807,6 +1822,37 @@ function runIntegrationTest() {
                                     mainWindow.scrutinizerHud.webContents.send('menu:set-visual-memory', vmLimit);
                                     await new Promise(resolve => setTimeout(resolve, 200));
 
+                                    // ── DOM anchor resolution (if available) ──
+                                    // Resolve fixation positions from CSS selectors + offsets,
+                                    // matching build-gh-pages.js behavior for pixel-accurate
+                                    // alignment between foveation mask and overlay dots.
+                                    const anchorPath = process.env.TEST_ANCHOR_FILE;
+                                    let resolvedPositions = null;
+                                    if (anchorPath && require('fs').existsSync(anchorPath)) {
+                                        const anchors = JSON.parse(require('fs').readFileSync(anchorPath, 'utf8'));
+                                        resolvedPositions = await mainWindow.scrutinizerView.webContents.executeJavaScript(`
+                                            (async (anchors) => {
+                                                const results = [];
+                                                for (const a of anchors) {
+                                                    if (!a) { results.push(null); continue; }
+                                                    const el = document.querySelector(a.selector);
+                                                    if (!el) { results.push(null); continue; }
+                                                    el.scrollIntoView({ block: 'center' });
+                                                    await new Promise(r => setTimeout(r, 5));
+                                                    const rect = el.getBoundingClientRect();
+                                                    results.push({
+                                                        x: rect.left + a.offsetX,
+                                                        y: rect.top + window.scrollY + a.offsetY,
+                                                    });
+                                                }
+                                                window.scrollTo(0, 0);
+                                                return results;
+                                            })(${JSON.stringify(anchors)})
+                                        `);
+                                        const snapped = resolvedPositions.filter(r => r).length;
+                                        console.log(`[Test] DOM anchor resolution: ${snapped}/${anchors.length} resolved`);
+                                    }
+
                                     // Get physical capture size for coordinate scaling.
                                     // FPOGX/FPOGY are "relative to the top-left corner of the screenshot"
                                     // (AdSERP docs). Screenshot is at screenWidth (1280px). Viewport
@@ -1821,14 +1867,19 @@ function runIntegrationTest() {
                                     console.log(`[Test] Batch coord mapping: stim=${stimW}x${stimH} phys=${physSize.width}x${physSize.height} scale=${scaleX.toFixed(2)}x${scaleY.toFixed(2)}`);
 
                                     // Build full VM buffer in physical canvas pixels.
-                                    // Coordinates map directly from screenshot-space to physical canvas.
+                                    // Use DOM-resolved positions when available, fall back to raw coords.
                                     const vmPoints = fixations
                                         .filter(f => f.pageY !== undefined || f.y !== undefined)
-                                        .map(f => ({
-                                            x: f.x * scaleX,
-                                            y: ((f.pageY !== undefined ? f.pageY : f.y)) * scaleY,
-                                            radius: (f.radius || 45) * scaleX
-                                        }));
+                                        .map((f, i) => {
+                                            const resolved = resolvedPositions && resolvedPositions[i];
+                                            const x = resolved ? resolved.x : f.x;
+                                            const y = resolved ? resolved.y : (f.pageY !== undefined ? f.pageY : f.y);
+                                            return {
+                                                x: x * scaleX,
+                                                y: y * scaleY,
+                                                radius: (f.radius || 45) * scaleX,
+                                            };
+                                        });
 
                                     // Bulk-load into VM buffer and trigger one render pass
                                     await mainWindow.scrutinizerHud.webContents.executeJavaScript(`

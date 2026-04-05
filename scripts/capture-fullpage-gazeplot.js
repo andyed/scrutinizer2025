@@ -39,6 +39,9 @@ const trialId = getArg('trial', null);
 const modeId = getArg('mode', '0');
 const singleMode = hasFlag('single');
 const batchMode = hasFlag('batch');
+const layoutFreezePath = getArg('layout-freeze', null);
+const docHeightOverride = getArg('doc-height', null);
+const anchorFilePath = getArg('anchors', null);
 
 if (!dataDir || !trialId) {
     console.error('Usage: --data=<path> --trial=<id>');
@@ -68,7 +71,7 @@ const vpW = meta.screenWidth || 1280;
 const vpH = meta.screenHeight || 1024;
 
 // Document height for tile count
-const docH = meta.documentHeight || 2642;
+const docH = docHeightOverride ? parseInt(docHeightOverride) : (meta.documentHeight || 2642);
 // Add 1 extra tile to account for capture height < viewport height
 // (title bar/chrome reduces actual capture area by ~40px)
 const tileCount = singleMode ? 0 : Math.ceil(docH / vpH) + 1;
@@ -81,6 +84,16 @@ console.log(`  Document:  ${meta.documentWidth}x${docH}`);
 console.log(`  Mode:      ${batchMode ? 'BATCH (bulk-load VM)' : singleMode ? 'single (full-height)' : `tiled (${tileCount} × ${vpH}px)`}`);
 console.log(`  Render:    ${modeId}`);
 console.log();
+
+// Layout freeze: inject CSS to hold original element dimensions
+let layoutFreezeCSS = '';
+if (layoutFreezePath && fs.existsSync(layoutFreezePath)) {
+    const entries = JSON.parse(fs.readFileSync(layoutFreezePath, 'utf8'));
+    layoutFreezeCSS = entries.map(e =>
+        `${e.selector} { min-width: ${e.width}px !important; min-height: ${e.height}px !important; max-height: ${e.height}px !important; }`
+    ).join('\n');
+    console.log(`  Layout freeze: ${entries.length} elements from ${path.basename(layoutFreezePath)}`);
+}
 
 // Launch Electron — walk fixations with visual memory, then capture
 const env = {
@@ -104,12 +117,20 @@ const env = {
     TEST_OUTPUT_FILENAME: `${trialId}_fullpage_gazeplot.png`,
     SCREENSHOT_MODE: 'update',
     ELECTRON_RUN_AS_NODE: undefined,
+    ...(layoutFreezeCSS ? { TEST_INJECT_CSS: scanpathFile.replace('.json', '-freeze.css') } : {}),
+    ...(anchorFilePath ? { TEST_ANCHOR_FILE: path.resolve(anchorFilePath) } : {}),
     // Tiled mode only: capture tiles at each scroll position and stitch
     ...(singleMode ? {} : {
         TEST_FULLPAGE_TILES: String(tileCount),
         TEST_FULLPAGE_DOC_HEIGHT: String(docH),
     }),
 };
+
+// Write layout freeze CSS to temp file for Electron to inject
+if (layoutFreezeCSS) {
+    const cssPath = scanpathFile.replace('.json', '-freeze.css');
+    fs.writeFileSync(cssPath, layoutFreezeCSS);
+}
 
 console.log('  Launching Scrutinizer...\n');
 
