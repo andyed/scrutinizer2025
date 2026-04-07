@@ -1122,7 +1122,7 @@ function createScrutinizerWindow(startUrl) {
                 blur: currentBlur || 10,
                 intensity: currentIntensity !== undefined ? currentIntensity : 1.0,
                 enabled: currentEnabled !== undefined ? currentEnabled : true,
-                visualMemory: currentVisualMemory || 20,
+                visualMemory: currentVisualMemory !== undefined ? currentVisualMemory : 0,
                 comfortMode: settingsManager.get('comfortMode') || false,
                 showWelcome: currentShowWelcome !== undefined ? currentShowWelcome : true,
                 enableSaliencyModulation: enableSaliency

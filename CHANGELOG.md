@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.7.2] - 2026-04-06
+
+### Fixed
+- **Visual memory activating on launch despite Off setting**: `currentVisualMemory || 20` treated the saved value `0` (Off) as falsy, silently enabling Inhibition of Return mode (limit=20) on every launch. The menu correctly showed "Off" but the memory mask was active, preserving previously-fixated text in the far periphery. Fixed with explicit `undefined` check.
+
 ## [2.7.1] - 2026-03-30
 
 ### Added

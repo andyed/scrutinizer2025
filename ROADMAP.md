@@ -1,6 +1,6 @@
 # Scrutinizer Roadmap
 
-Last updated: 2026-03-30 (v2.7.1 + Option A)
+Last updated: 2026-04-06 (v2.7.2)
 
 ## What's implemented
 
@@ -110,6 +110,9 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 ---
 
 ## Release history
+
+### v2.7.2: Visual Memory Init Fix (2026-04-06)
+- Fix visual memory silently activating on launch when set to Off (`0 || 20` falsy bug)
 
 ### v2.7.1: Chromatic Fidelity & Scanpath Replay (2026-03-25)
 - Unified eccentricity master curve: 6 overlapping smoothsteps → 1 C2-continuous curve + power functions, eliminating Mach bands in parafoveal color transitions
