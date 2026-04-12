@@ -7,8 +7,21 @@
  *   2. Raw -> Scrutinizer output (our real-time approximation)
  *   3. Brown metamer -> Scrutinizer output (the validation gap)
  *
- * Eccentricity bands (from gaze center, matching CMF-derived DoG cutoffs):
- *   Band 0: 0-90px   (0-2 deg)   Fovea — should be identical
+ * Eccentricity bands (from gaze center, matching CMF-derived DoG cutoffs).
+ * Band radii use the SAME elliptical metric as the shader (delta.x /= aspect),
+ * so Band 0 measures the actual region protected by u_fovea_protect, not a
+ * naive pixel circle. See FOVEA_ASPECT_RATIO below.
+ *
+ *   Band 0: 0-90px   (0-2 deg)   Foveola — engineering invariant: enforcement
+ *                                of u_fovea_protect within the elliptical
+ *                                protected region (NOT a perceptual claim).
+ *                                Note: Band 0 is wider (0-2°) than the fully
+ *                                protected disc (0-0.5°). With u_fovea_protect on,
+ *                                the inner half of Band 0 is true passthrough and
+ *                                the outer half is the smoothstep blend. Band 0
+ *                                SSIM should be high and stable, but ≠ 1.0.
+ *                                TODO: split into Band 0a (0-0.5°, true invariant)
+ *                                and Band 0b (0.5-2°, transition) for a clean test.
  *   Band 1: 90-180px  (2-4 deg)   Parafovea
  *   Band 2: 180-360px (4-8 deg)   Near periphery
  *   Band 3: 360-720px (8-16 deg)  Mid periphery
@@ -28,6 +41,13 @@ const DEFAULT_MANIFEST = path.join(ROOT, 'tests', 'golden-captures', 'brown-meta
 
 const manifestArg = process.argv.find(a => a.startsWith('--manifest='));
 const MANIFEST_PATH = manifestArg ? manifestArg.split('=')[1] : DEFAULT_MANIFEST;
+
+// Elliptical fovea shape — must match the shader's u_fovea_aspect_ratio default.
+// Sources of truth: renderer/webgl-renderer.js:732, renderer/webgpu-crowding-compute.js:173,
+// renderer/shaders/crowding-stats.wgsl:27. If those drift, this drifts.
+// TODO(biology): the 1.33 default has no inline citation in source; keep this in
+// sync with whatever the shader settles on, and revisit when the constant is grounded.
+const FOVEA_ASPECT_RATIO = 1.33;
 
 // Eccentricity bands in pixels (from gaze center)
 // Base eccentricity bands at 45 px/deg (1x resolution, fovea radius = 45px).
@@ -144,13 +164,18 @@ function bandMetrics(aPng, bPng, gazeX, gazeY, rMin, rMax) {
   const aLuma = toLuma(aPng);
   const bLuma = toLuma(bPng);
 
-  // Collect pixel values within the band
+  // Collect pixel values within the band.
+  // Use the same elliptical metric as the shader (peripheral.frag:1862-1864):
+  // dx is divided by FOVEA_ASPECT_RATIO before computing radial distance, so
+  // the bands trace the actual elliptical fovea, not a naive pixel circle.
+  // Without this, Band 0's vertical extremes fall outside u_fovea_protect's
+  // elliptical hard-passthrough disc and the invariant won't measure clean.
   const aVals = [];
   const bVals = [];
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const dx = x - gazeX;
+      const dx = (x - gazeX) / FOVEA_ASPECT_RATIO;
       const dy = y - gazeY;
       const r = Math.sqrt(dx * dx + dy * dy);
       if (r >= rMin && r < rMax) {
