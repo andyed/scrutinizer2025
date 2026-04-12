@@ -169,6 +169,9 @@ class WebGPUCrowdingCompute {
      * @param {{ cmf_a: number, ecc_scaling: number }} cmfConfig
      * @param {number} corticalMax - precomputed ln(r_max/a + 1)
      * @param {number} foveaAspectRatio - elliptical fovea shape (default 1.33)
+     *   TODO(biology): 1.33 has no inline citation. Sync with
+     *   webgl-renderer.js:732, crowding-stats.wgsl:27, and
+     *   scripts/compare-brown-metamers.js (FOVEA_ASPECT_RATIO).
      */
     uploadAndConfigure(rgba, foveaX, foveaY, foveaRadius, cmfConfig, corticalMax, foveaAspectRatio = 1.33) {
         if (this._destroyed) return;

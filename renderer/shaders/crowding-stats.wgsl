@@ -25,6 +25,9 @@ struct Config {
     ecc_scaling: f32,
     aspect: f32,            // width / height (screen aspect ratio)
     fovea_aspect_ratio: f32, // elliptical fovea shape (default 1.33)
+                             // TODO(biology): 1.33 has no inline citation. Sync with
+                             // webgl-renderer.js:732, webgpu-crowding-compute.js:173,
+                             // scripts/compare-brown-metamers.js (FOVEA_ASPECT_RATIO).
     temporal_blend: f32,     // EMA smoothing factor (0=frozen, 1=no smoothing)
     _pad2: f32,
     _pad3: f32,

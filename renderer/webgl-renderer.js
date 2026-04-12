@@ -727,7 +727,12 @@
                     ipcRenderer.send('log:renderer', `[WebGLRenderer] First render: ${width}x${height}, radius=${foveaRadius}, mode=${mongrelMode}`);
                 }
 
-                // Safety check for aspect ratio to prevent division by zero in shader
+                // Safety check for aspect ratio to prevent division by zero in shader.
+                // TODO(biology): the 1.33 default has no inline citation. Plausible
+                // post-hoc as horizontal-raphe asymmetry or Rayner reading-span
+                // collapsed to a symmetric ellipse, but neither is derived in source.
+                // Sync with webgpu-crowding-compute.js:173 and crowding-stats.wgsl:27
+                // and scripts/compare-brown-metamers.js (FOVEA_ASPECT_RATIO).
                 if (!foveaAspectRatio || foveaAspectRatio < 0.1) {
                     foveaAspectRatio = 1.33;
                 }
