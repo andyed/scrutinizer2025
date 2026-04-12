@@ -75,7 +75,7 @@ function rebuildMenu() {
     // Ensure settings are initialized
     const radius = currentRadius || 180;
     const blur = currentBlur || 10;
-    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur, currentMobileEmulation, currentAestheticMode, currentCongestionMode, currentEccentricityMode, currentSaliencyMapOn, currentStructureMapOn, currentSaliencyResolution, currentCongestionResolution));
+    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur, currentMobileEmulation, currentAestheticMode, currentCongestionMode, currentEccentricityMode, currentSaliencyMapOn, currentStructureMapOn, currentSaliencyResolution, currentCongestionResolution, currentVisualMemory !== undefined ? currentVisualMemory : 0));
     Menu.setApplicationMenu(menu);
 
     // Explicitly set for all non-HUD windows (Windows/Linux)
@@ -121,7 +121,10 @@ ipcMain.on('settings:welcome-changed', (event, show) => {
 ipcMain.on('settings:visual-memory-changed', (event, value) => {
     currentVisualMemory = value;
     settingsManager.set('visualMemory', value);
-    // rebuildMenu(); // If we want to update checked state
+    // Sync the Visual Memory radio group — otherwise the menu lies across
+    // launches when a non-zero value persists (the cause of v2.7.2 and its
+    // re-regression via menu state on 2026-04-12).
+    rebuildMenu();
 });
 
 ipcMain.on('settings:comfort-mode-changed', (event, enabled) => {

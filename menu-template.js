@@ -2,7 +2,7 @@ const { app, shell } = require('electron');
 
 const { RADIUS_OPTIONS, ASPECT_OPTIONS, INTENSITY_OPTIONS } = require('./shared/constants.json');
 
-function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10, currentMobileEmulation = false, currentAestheticMode = 0, currentCongestionMode = 0, currentEccentricityMode = 0, currentSaliencyMapOn = false, currentStructureMapOn = false, currentSaliencyResolution = 256, currentCongestionResolution = 512) {
+function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10, currentMobileEmulation = false, currentAestheticMode = 0, currentCongestionMode = 0, currentEccentricityMode = 0, currentSaliencyMapOn = false, currentStructureMapOn = false, currentSaliencyResolution = 256, currentCongestionResolution = 512, currentVisualMemory = 0) {
     const isMac = process.platform === 'darwin';
     const { BrowserWindow } = require('electron');
 
@@ -507,32 +507,39 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         { type: 'separator' },
                         {
                             label: 'Visual Memory',
+                            // Radios are synced to currentVisualMemory via rebuildMenu() —
+                            // hardcoding `checked: true` on Off (as this used to) made the
+                            // menu lie when settings persisted a non-zero value across launches.
                             submenu: [
                                 {
                                     label: 'Off (Default)',
                                     type: 'radio',
-                                    checked: true,
+                                    checked: currentVisualMemory === 0,
                                     click: () => sendToOverlays('menu:set-visual-memory', 0)
                                 },
                                 {
                                     label: 'Limited (5 fixations)',
                                     type: 'radio',
+                                    checked: currentVisualMemory === 5,
                                     click: () => sendToOverlays('menu:set-visual-memory', 5)
                                 },
                                 {
                                     label: 'Extended (10 fixations)',
                                     type: 'radio',
+                                    checked: currentVisualMemory === 10,
                                     click: () => sendToOverlays('menu:set-visual-memory', 10)
                                 },
                                 {
                                     label: 'Infinite',
                                     type: 'radio',
+                                    checked: currentVisualMemory === -1,
                                     click: () => sendToOverlays('menu:set-visual-memory', -1)
                                 },
                                 { type: 'separator' },
                                 {
                                     label: 'Inhibition of Return (10 fixations)',
                                     type: 'radio',
+                                    checked: currentVisualMemory === 20,
                                     click: () => sendToOverlays('menu:set-visual-memory', 20)
                                 }
                             ]
