@@ -881,6 +881,13 @@
             }
         }
 
+        toggleFoveaProtect(enabled) {
+            if (this.renderer) {
+                this.renderer.config.fovea_protect = enabled;
+                ipcRenderer.send('log:renderer', `[Scrutinizer] Foveal passthrough: ${enabled}`);
+            }
+        }
+
         toggleReadingSpan(enabled) {
             if (this.renderer) {
                 this.renderer.config.reading_span = enabled;

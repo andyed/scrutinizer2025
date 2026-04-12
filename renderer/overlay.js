@@ -274,6 +274,10 @@
             scrutinizer.toggleSaccadicBlindness(enabled);
         });
 
+        ipcRenderer.on('menu:toggle-fovea-protect', (e, enabled) => {
+            scrutinizer.toggleFoveaProtect(enabled);
+        });
+
         ipcRenderer.on('menu:toggle-reading-span', (e, enabled) => {
             scrutinizer.toggleReadingSpan(enabled);
         });

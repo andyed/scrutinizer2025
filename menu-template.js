@@ -576,6 +576,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             click: (menuItem) => sendToOverlays('menu:toggle-saccadic-blindness', menuItem.checked)
                         },
                         {
+                            label: 'Foveal Passthrough (Band 0 invariant)',
+                            type: 'checkbox',
+                            checked: true,
+                            click: (menuItem) => sendToOverlays('menu:toggle-fovea-protect', menuItem.checked)
+                        },
+                        {
                             label: 'Reading Span (Rayner)',
                             type: 'checkbox',
                             checked: true,

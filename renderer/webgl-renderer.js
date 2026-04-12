@@ -108,6 +108,9 @@
                 // Saccadic blindness (suppress fovea during movement)
                 this.saccadicBlindnessLocation = null;
 
+                // Hard foveal passthrough (Band 0 invariant)
+                this.foveaProtectLocation = null;
+
                 // Reading span (Rayner asymmetric foveal envelope)
                 this.velocityDirLocation = null;
                 this.readingSpanLocation = null;
@@ -171,6 +174,7 @@
                     congestion_pooling: true,
                     saliency_acuity_e2: 8.0, // Half-sensitivity eccentricity (deg) for saliency gating
                     saccadic_blindness: true,
+                    fovea_protect: true, // Hard inner-fovea passthrough — Band 0 invariant
                     reading_span: true,
                     reading_span_strength: 1.0,
                     compute_tier: 0
@@ -289,6 +293,7 @@
 
                 // Saccadic blindness uniform lookup
                 this.saccadicBlindnessLocation = gl.getUniformLocation(this.program, "u_saccadic_blindness");
+                this.foveaProtectLocation = gl.getUniformLocation(this.program, "u_fovea_protect");
 
                 // Reading span (Rayner asymmetric foveal envelope) uniform lookups
                 this.velocityDirLocation = gl.getUniformLocation(this.program, "u_velocity_dir");
@@ -861,6 +866,7 @@
                 gl.uniform1f(this.enableSaliencyModulationLocation, enableSaliencyModulation);
                 gl.uniform1i(this.showCongestionLocation, this.config.show_congestion);
                 gl.uniform1f(this.saccadicBlindnessLocation, this.config.saccadic_blindness ? 1.0 : 0.0);
+                gl.uniform1f(this.foveaProtectLocation, this.config.fovea_protect ? 1.0 : 0.0);
                 gl.uniform2f(this.velocityDirLocation, velocityDirX, velocityDirY);
                 gl.uniform1f(this.readingSpanLocation, this.config.reading_span ? 1.0 : 0.0);
                 gl.uniform1f(this.readingSpanStrengthLocation, this.config.reading_span_strength);

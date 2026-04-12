@@ -63,6 +63,12 @@ uniform float u_desat_floor;      // Min desaturation multiplier in salient regi
 // color appearance decays more slowly — Jiang, Shooner & Mullen (2022) found power-law
 // exponent ~0.5 maps threshold sensitivity to perceived saturation at high contrasts.
 uniform float u_saccadic_blindness; // 0.0=off, 1.0=suppress fovea during saccades
+// Hard foveal passthrough — bypass shader processing inside the foveola.
+// Why: gives compare-brown's Band 0 a real invariant; eliminates leakage from
+// LGN/V1/saliency/memory state into the inner disc the user expects untouched.
+// Inner half (dist < fovea_radius*0.5) is full passthrough; smoothstep blends
+// out to fovea_radius so there's no visible ring.
+uniform float u_fovea_protect;      // 0.0=continuous (legacy), 1.0=hard inner passthrough
 uniform vec2  u_velocity_dir;          // Directional velocity (px/ms) for reading span
 uniform float u_reading_span;          // 0=strict circle, 1=asymmetric envelope (Rayner 1998)
 uniform float u_reading_span_strength; // 0.7=comfort, 1.0=full Rayner asymmetry
@@ -1961,7 +1967,15 @@ void main() {
     V1_Signal v1 = processV1(uv, uv_corrected, lgn, config, dist_stable, radial_dir, fovea_radius, parafovea_radius, isFarPeriphery, isParafovea, memoryStrength);
     
     vec3 finalRGB = processV4(uv, v1, lgn, config, dist, fovea_radius, parafovea_radius, saccadeFactor, memoryStrength);
-    
+
+    // Hard foveal passthrough (see u_fovea_protect declaration).
+    // dist already includes comfort_radius and saccadic-blindness shrinking,
+    // so the protected disc tracks both correctly.
+    if (u_fovea_protect > 0.5) {
+        float protectFactor = smoothstep(fovea_radius * 0.5, fovea_radius, dist);
+        finalRGB = mix(sampleSource(uv).rgb, finalRGB, protectFactor);
+    }
+
     vec4 color = vec4(finalRGB, 1.0);
 
     float scrollbarWidth = 17.0;
