@@ -2,6 +2,42 @@
 
 **Prepared:** 2026-04-18. **Orthogonal to** `docs/dom-aware-perception-plan.md` — this addresses an independent broken baseline. **Depends on** the retrospective in `docs/next-steps-2026-04.md`.
 
+---
+
+## Revision 2026-04-18 (after Phase 1 landed) — Phase 2 priority revised
+
+**Context:** Phase 1A + 1B landed (commit `4adc188`). Mode 15's pyramid-synth pipeline now validates + runs for the first time on this machine. User loaded Google.com in mode 15 to eyeball the output.
+
+**What we observed:**
+- Fovea pixel-perfect (foveal passthrough working).
+- Text regions in periphery → **disintegrated particle-scatter**, text outlines vaguely visible but illegible.
+- White space between text regions → **mostly clean**, no wedge artifact.
+- No visible sector-boundary discontinuities in flat regions.
+
+**What this means for Phase 2:** the science-agent's original noise-wedge root-cause ranking was wrong about the dominant mechanism in the actual output. Re-audit (this session) votes C — variance audit first, then targeted fix, POU deferred.
+
+**Revised mechanism ranking:**
+
+| Mechanism | Original rank | Revised rank | Notes |
+|---|---|---|---|
+| Hard sector-boundary wedges (POU target) | 70% | **≤10%** | Observation falsifies: white space is clean. Would only become visible on high-contrast UI boundaries *after* amplitude is fixed. |
+| `noise_var = 0.5` hard-coded in `pyramid-synth.wgsl:314` → scale factor `sqrt(target_var / 0.5)` miscalibrated if actual noise variance ≠ 0.5 | not ranked | **~50%** | Load-bearing calibration constant. If the assumed noise-field variance is wrong, every band is mis-scaled and `detail_strength` amplification then shows the miscalibration as speckle. Classic Portilla-Simoncelli failure mode: magnitude matched marginally, phase not constrained. Text outlines visible (DC/residual correct) + identity destroyed (AC phase wrong) is that exact signature. |
+| `detail_strength = mix(0.5, 3.0, alpha)` amplification (`reconstruct:482`) on mis-scaled `synth_luma` | 20% | **~30%** | Amplifies whatever upstream miscalibration exists. Gate or clamp is a band-aid over the symptom. |
+| Low-population sector FP quantization (`FP_SCALE = 1024`) | 10% | **~10%** | Contributes to `synth_luma` amplitude variance in small-N sectors near fovea boundary. |
+
+**Revised Phase 2 sequence:**
+
+1. **Noise-variance audit (30 min, 1 commit).** Instrument a debug path that reports actual variance of `n0..n3` before `match_stats` (GPU readback + `console.log`). Cheapest info-gaining step. Strictly dominant over guessing which intervention to ship.
+2. **If `noise_var ≠ 0.5`:** fix the root calibration. Options: (a) normalize the seeded noise to unit variance at generation time in `seed_noise`, (b) measure variance empirically per-run and pass to `match_stats` as a uniform. Option (a) is simpler. This may dissolve the speckle without any detail_strength intervention.
+3. **If `noise_var ≈ 0.5`:** ship the variance-gate on `detail_strength` as the targeted intervention: `detail_strength = mix(0.5, 3.0, alpha) * smoothstep(eps, 10·eps, sector_variance)`. Ad-hoc but addresses mechanism #2 directly. The TTM-literature-correct fix (auto-correlation + cross-orientation phase in `match_stats`) is bigger and should follow only if the gate isn't sufficient.
+4. **POU sector blending stays queued — but drops in priority.** Land only if high-contrast UI boundary regions start showing wedges *after* amplitude is fixed.
+
+**Citations (Portilla-Simoncelli lineage):** marginal-variance-only matching produces correct envelope with wrong AC phase structure. The fix that escapes this failure mode is enforcing auto-correlation of magnitude and low-pass bands (Portilla & Simoncelli 2000 §IV; Freeman & Simoncelli 2011 §3.3). Our cross-scale magnitude injection at `pyramid-synth.wgsl:335-344` is an approximation of cross-scale correlation; it is applied to an already-mis-scaled noise field, so its correctness depends on step 2 being right.
+
+**What's unchanged in the plan:** Phase 1A + 1B shipped as written. Phases 3, 4, W2 unchanged. Only the Phase 2 internal ordering + hypothesis was revised.
+
+---
+
 ## Context
 
 A key Scrutinizer goal is emulating the **radial metamer** (Brown / Freeman-Simoncelli / Rosenholtz pooled texture synthesis over polar sectors). Mode 15 `tier3_synthesis` is the target for that. It is currently **silently falling back to rectilinear MIP pooling** (`sampleDoGReconstructed` / `sampleMIPPooled`) because `createBindGroupLayout` fails validation on `reconBGL` in `renderer/webgpu-pyramid-compute.js` — the layout has 9 storage bindings and the default WebGPU limit is 8. The error is swallowed by `uncapturederror` and never propagates to JS control flow.
