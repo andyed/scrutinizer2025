@@ -1,7 +1,7 @@
 # Wave 2: Spatial Acuity Validation Report
 
-Generated: 2026-03-16
-Parameters: rg_decay=0.072, yv_decay=0.014, supra=0.5
+Generated: 2026-04-12
+Parameters: rg_decay=0.085, yv_decay=0.014, supra=0.5
 Geometry: fovea_radius=45px, ppd=45
 
 ## Tier 1: Must Pass
