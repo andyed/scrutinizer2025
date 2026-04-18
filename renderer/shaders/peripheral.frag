@@ -1902,12 +1902,23 @@ vec3 sampleDomAwarePrimitive(vec3 L_background, vec2 uv) {
         letterFidelity = smoothstep(-1.0, 1.0, lOct);
     }
     float wordCoherence = 1.0;
-    if (ecc_deg > 0.0 && spacingDeg > 0.0) {
+    if (xHeightDeg > 0.0 && ecc_deg > 0.0 && spacingDeg > 0.0) {
         float sCrit = 0.5 * ecc_deg; // Bouma b = 0.5
         if (sCrit > 0.0) {
             float wOct = log2(spacingDeg / sCrit);
             wordCoherence = smoothstep(-0.6, 0.6, wOct);
         }
+    } else if (xHeightDeg <= 0.0) {
+        // Non-text primitive (icon, empty input, icon-only button): no
+        // geometry metadata to drive crowding. Fall back to a coarse
+        // eccentricity-based decay so these elements still degrade toward
+        // L_blob in the periphery. Stages 6–7 will replace this with
+        // type-specific calibrations (Strasburger shape acuity for icons,
+        // Treisman closure for inputs/buttons). Until then: 1.0 at fovea,
+        // 0.0 by ~8° — a conservative "this is still an identifiable UI
+        // element" envelope that puts the weight on L_background pooling
+        // once it drops.
+        wordCoherence = 1.0 - smoothstep(2.0, 8.0, ecc_deg);
     }
     // paragraphPresence: gist-level extent. Per-fragment bbox extent isn't
     // directly available; use 1.0 as a conservative floor (primitive is
