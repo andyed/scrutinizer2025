@@ -624,6 +624,18 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             type: 'radio',
                             checked: currentAestheticMode === 15,
                             click: () => { sendToOverlays('menu:set-aesthetic-mode', 15); app.emit('aesthetic-mode-changed', 15); }
+                        },
+                        {
+                            label: 'Text Baseline (Pre-DOM-Aware)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 16,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 16); app.emit('aesthetic-mode-changed', 16); }
+                        },
+                        {
+                            label: 'DOM-Aware Text (Procedural)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 20,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 20); app.emit('aesthetic-mode-changed', 20); }
                         }
                     ]
                 },
