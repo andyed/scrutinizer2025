@@ -2613,6 +2613,16 @@ function runBatchCapture() {
                     mainWindow.scrutinizerHud.webContents.send('menu:set-debug-boundary', 2.0);
                 }
 
+                // Force a DOM scan so the DOM-aware compositor (mode 20+) has
+                // a populated primitive-map before capture. Live sessions get
+                // this via mutation/scroll/load triggers; batch capture can't
+                // rely on those firing inside the per-shot window.
+                if (mainWindow.scrutinizerView &&
+                    mainWindow.scrutinizerView.webContents &&
+                    !mainWindow.scrutinizerView.webContents.isDestroyed()) {
+                    mainWindow.scrutinizerView.webContents.send('scrutinizer:force-scan');
+                }
+
                 // Wait for render
                 await new Promise(resolve => setTimeout(resolve, 1500));
 

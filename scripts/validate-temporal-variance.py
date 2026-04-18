@@ -41,7 +41,12 @@ BAND_LABELS = ["fovea", "parafovea", "near_peri", "mid_peri", "far_peri", "extre
 # attention-capturing (magnocellular pathway coverage peaks there).
 MOTION_SENSITIVE_BANDS = ("parafovea", "near_peri")
 
-DEFAULT_BASELINE_MODE = "16"
+# Default baseline is mode 15 (TTM) because mode 20 inherits its pipeline as
+# L_background in the four-term composite — the right "zero-add-motion"
+# reference is the pipeline the compositor sits on top of, not the quiet
+# pre-synthesis pipeline (mode 16). Override with --baseline=16 to measure
+# total synthesis-plus-compositor motion instead.
+DEFAULT_BASELINE_MODE = "15"
 DEFAULT_CEILING = 1.3
 
 

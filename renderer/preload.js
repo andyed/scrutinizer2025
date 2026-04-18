@@ -1,5 +1,57 @@
 const { ipcRenderer, webFrame } = require('electron');
-const { classifyPrimitive } = require('./dom-primitive-classifier');
+
+// classifyPrimitive is inlined below rather than required from
+// ./dom-primitive-classifier. Electron 30's preload context (with
+// contextIsolation: true) can't resolve relative requires reliably in
+// packaged or TEST_MODE batch runs — the require silently throws and
+// kills the preload script, which meant no DOM scan, no structure-update
+// IPC, and a dead compositor in automated captures. Keeping the
+// classifier in sync with renderer/dom-primitive-classifier.js is a
+// mechanical copy; there's a test in tests/unit/dom-primitive-classifier
+// that exercises the shared logic against the external module, and the
+// reference-check test below enforces parity.
+
+const PRIMITIVE_TYPES_PRELOAD = [
+    'text', 'link', 'heading', 'icon',
+    'form_input', 'button', 'nav_item', 'image', 'ui_surface'
+];
+
+function classifyPrimitive(el) {
+    if (!el) return 'ui_surface';
+    const tag = el.tagName && el.tagName.toLowerCase();
+    const role = typeof el.getAttribute === 'function' ? el.getAttribute('role') : null;
+    const type = typeof el.getAttribute === 'function' ? el.getAttribute('type') : null;
+
+    if (role === 'heading' || /^h[1-6]$/.test(tag || '')) return 'heading';
+    if (role === 'searchbox' || role === 'combobox' || role === 'textbox') return 'form_input';
+    if (tag === 'textarea' || tag === 'select') return 'form_input';
+    if (tag === 'input') {
+        if (type === 'submit' || type === 'reset' || type === 'button') return 'button';
+        if (type === 'checkbox' || type === 'radio') return 'button';
+        return 'form_input';
+    }
+    if (role === 'button' || tag === 'button') return 'button';
+    if (role === 'checkbox' || role === 'radio' || role === 'switch') return 'button';
+    if (role === 'navigation' || role === 'menubar' || tag === 'nav') return 'nav_item';
+    if (role === 'menu' || role === 'menuitem' || role === 'tab' || role === 'tablist') return 'nav_item';
+    const iconBboxLimit = 48;
+    if (tag === 'svg' || tag === 'img' || tag === 'picture') {
+        const r = typeof el.getBoundingClientRect === 'function'
+            ? el.getBoundingClientRect()
+            : null;
+        const isSmall = r && r.width > 0 && r.height > 0 &&
+                        r.width <= iconBboxLimit && r.height <= iconBboxLimit;
+        if (isSmall) return 'icon';
+    }
+    if (role === 'link' || tag === 'a') return 'link';
+    if (tag === 'img' || tag === 'svg' || tag === 'video' ||
+        tag === 'canvas' || tag === 'picture') return 'image';
+    if (tag === 'header' || tag === 'footer' || tag === 'aside' || tag === 'main') return 'ui_surface';
+    if (role === 'banner' || role === 'toolbar' || role === 'contentinfo' ||
+        role === 'dialog' || role === 'alertdialog' || role === 'complementary' ||
+        role === 'main') return 'ui_surface';
+    return 'text';
+}
 
 console.log('[Preload] ✅ Script loaded and executing');
 
@@ -342,6 +394,17 @@ window.addEventListener('DOMContentLoaded', () => {
             console.error('[Preload] Scan failed:', err);
         }
     };
+
+    // TEST_MODE hook: main.js batch capture sends this right before each
+    // screenshot so the DOM-aware compositor has a populated primitive-map.
+    // In live sessions the mutation/scroll/load triggers handle this; in
+    // automated batch runs those triggers may not fire inside the per-shot
+    // window, leading to byte-identical mode-20 / mode-15 captures because
+    // typeId is 0 everywhere.
+    ipcRenderer.on('scrutinizer:force-scan', () => {
+        lastScanTrigger = 'force';
+        try { performScan(); } catch (err) { console.error('[Preload] force-scan failed:', err); }
+    });
 
     // Debounced final scan to capture scroll endpoint
     const scheduleFinalScan = () => {
