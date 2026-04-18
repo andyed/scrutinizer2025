@@ -7,6 +7,7 @@ uniform sampler2D u_maskTexture;  // Visual memory mask
 uniform sampler2D u_structureMap; // Structure Map (R=Rhythm, G=Density, B=Type)
 uniform sampler2D u_primitiveMap; // DOM-aware (R=type_id, G=identity, B=category, A=extent); Stage 3 plumbing, sampled in Stage 4
 uniform sampler2D u_primitiveMeta; // DOM-aware geometry (R=xHeightPx, 0 elsewhere); stroke period = R/3 for procedural L_categorical
+uniform float u_dom_aware_enabled; // 0 = baseline pipeline only; 1 = DOM-aware compositor dispatches on primitive_type_id
 uniform sampler2D u_saliencyMap;  // Saliency Map (R=Saliency, G=Congestion, B=EdgeDensity)
 uniform float u_useMask;
 
@@ -1859,6 +1860,103 @@ vec3 congestionHeatmap(float t) {
     }
 }
 
+// === DOM-AWARE PERIPHERAL COMPOSITOR ===
+// Procedural implementation of docs/dom-aware-perception-plan.md.
+// Dispatches on primitive_type_id packed into u_primitiveMap.r; computes the
+// four-term composite of (identity, category-identity, extent-category,
+// 1-extent) weighted L_canonical / L_categorical / L_blob / L_background.
+//
+// Calibration is computed shader-side using u_mouse for gaze and u_foveaRadius
+// as ppd (the existing convention in this shader; see comment at l.1160).
+// Formulas mirror renderer/peripheral-calibration.js:
+//   MAR ≈ 0.0875·e + 0.0633     (Strasburger 2011, Anstis 1974)
+//   sCrit ≈ 0.5·e                (Bouma 1970; Pelli & Tillman 2008)
+//
+// L_categorical for text is a two-frequency procedural field (Majaj 2002):
+//   horizontal envelope at x-height period × vertical stroke texture
+//   at x-height/3 period
+vec3 sampleDomAwarePrimitive(vec3 L_background, vec2 uv) {
+    vec4 pm = texture(u_primitiveMap, uv);
+    int typeId = int(pm.r * 255.0 + 0.5);
+    if (typeId == 0) {
+        return L_background; // ui_surface / non-primitive → baseline
+    }
+
+    // --- Eccentricity in degrees ---
+    vec2 fragPx = uv * u_resolution;
+    float ecc_px = distance(fragPx, u_mouse);
+    float ppd = max(u_foveaRadius, 1.0);
+    float ecc_deg = ecc_px / ppd;
+
+    // --- Primitive geometry ---
+    vec4 pmeta = texture(u_primitiveMeta, uv);
+    float xHeightPx = pmeta.r * 255.0;
+    float xHeightDeg = xHeightPx / ppd;
+    float spacingDeg = xHeightDeg * 0.5; // approximate inter-letter spacing
+
+    // --- Calibration (port of peripheral-calibration.js text calibrator) ---
+    float mar = 0.0875 * max(0.0, ecc_deg) + 0.0633;
+    float letterFidelity = 0.0;
+    if (xHeightDeg > 0.0 && mar > 0.0) {
+        float lOct = log2(xHeightDeg / mar);
+        letterFidelity = smoothstep(-1.0, 1.0, lOct);
+    }
+    float wordCoherence = 1.0;
+    if (ecc_deg > 0.0 && spacingDeg > 0.0) {
+        float sCrit = 0.5 * ecc_deg; // Bouma b = 0.5
+        if (sCrit > 0.0) {
+            float wOct = log2(spacingDeg / sCrit);
+            wordCoherence = smoothstep(-0.6, 0.6, wOct);
+        }
+    }
+    // paragraphPresence: gist-level extent. Per-fragment bbox extent isn't
+    // directly available; use 1.0 as a conservative floor (primitive is
+    // present where the map is non-zero — extent always detected at gist).
+    float paragraphPresence = 1.0;
+
+    // Monotone ordering enforced by the plan formula.
+    float identityFidelity = min(letterFidelity, wordCoherence);
+    float categoryFidelity = max(identityFidelity, wordCoherence);
+    float extentPresence   = max(categoryFidelity, paragraphPresence);
+
+    // --- Layers ---
+    vec3 L_canonical = sampleSource(uv).rgb;
+
+    vec3 L_categorical = L_canonical; // default: no degradation
+    if (typeId == 1 /* text */ && xHeightPx > 1.0) {
+        // Two-frequency stroke field. Ink luminance from local mean.
+        float yPx = fragPx.y;
+        float xPx = fragPx.x;
+        float envelope = 0.5 + 0.5 * sign(sin(yPx * 3.14159265 / xHeightPx));
+        float strokePeriod = max(xHeightPx / 3.0, 1.0);
+        float stroke = 0.5 + 0.5 * sign(sin(xPx * 3.14159265 / strokePeriod));
+        float meanLum = dot(L_canonical, vec3(0.299, 0.587, 0.114));
+        vec3 ink = vec3(meanLum);
+        vec3 paper = vec3(min(1.0, meanLum + 0.5));
+        float strokeMask = envelope * stroke;
+        L_categorical = mix(paper, ink, strokeMask);
+    }
+
+    // L_blob: mean luminance × line-rhythm modulation. MIP LOD 5 ≈ mean over
+    // ~32-texel pooling region — the scale at which "text-ness" survives as a
+    // blob under TTM-style pooling.
+    vec3 L_blob = textureLod(u_texture, uv, 5.0).rgb;
+    if (typeId == 1 /* text */ && xHeightPx > 1.0) {
+        float yPx = fragPx.y;
+        float rhythm = 0.5 + 0.5 * sin(yPx * 3.14159265 / max(xHeightPx * 2.0, 1.0));
+        L_blob = mix(L_blob, L_blob * 0.85, 0.25 * rhythm);
+    }
+
+    // Four-term composite (plan formula). Convex — weights sum to 1.
+    vec3 composited =
+          identityFidelity                          * L_canonical
+        + (categoryFidelity - identityFidelity)     * L_categorical
+        + (extentPresence  - categoryFidelity)      * L_blob
+        + (1.0 - extentPresence)                    * L_background;
+
+    return composited;
+}
+
 void main() {
     float aspect = u_resolution.x / u_resolution.y;
     vec2 uv = v_texCoord;
@@ -1976,6 +2074,13 @@ void main() {
     if (u_fovea_protect > 0.5) {
         float protectFactor = smoothstep(fovea_radius * 0.5, fovea_radius, dist);
         finalRGB = mix(sampleSource(uv).rgb, finalRGB, protectFactor);
+    }
+
+    // DOM-aware compositor dispatch. finalRGB becomes L_background; the
+    // compositor returns either the four-term composite (for classified
+    // primitives) or finalRGB unchanged (for ui_surface / non-primitive).
+    if (u_dom_aware_enabled > 0.5) {
+        finalRGB = sampleDomAwarePrimitive(finalRGB, uv);
     }
 
     vec4 color = vec4(finalRGB, 1.0);

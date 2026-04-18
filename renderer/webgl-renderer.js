@@ -145,6 +145,7 @@
 
                 // Default Configuration
                 this.config = {
+                    dom_aware_enabled: false,
                     lgn_use_structure_mask: true,
                     lgn_use_saliency_gate: true,
                     v1_distortion_type: 1, // Shatter
@@ -241,6 +242,7 @@
                 this.structureMapLocation = gl.getUniformLocation(this.program, "u_structureMap");
                 this.primitiveMapLocation = gl.getUniformLocation(this.program, "u_primitiveMap");
                 this.primitiveMetaLocation = gl.getUniformLocation(this.program, "u_primitiveMeta");
+                this.domAwareEnabledLocation = gl.getUniformLocation(this.program, "u_dom_aware_enabled");
                 this.saliencyMapLocation = gl.getUniformLocation(this.program, "u_saliencyMap");
                 this.hasStructureLocation = gl.getUniformLocation(this.program, "u_has_structure");
                 this.enableSaliencyModulationLocation = gl.getUniformLocation(this.program, "u_enable_saliency_modulation");
@@ -626,6 +628,7 @@
 
                 // Default: High-Key (0)
                 const defaults = {
+                    dom_aware_enabled: false,
                     lgn_use_structure_mask: true,
                     lgn_use_saliency_gate: true,
                     v1_distortion_type: 1, // Shatter
@@ -664,6 +667,7 @@
 
                     if (modeEntry && modeEntry.pipeline) {
                         const p = modeEntry.pipeline;
+                        this.config.dom_aware_enabled = p.dom_aware_enabled ?? defaults.dom_aware_enabled;
                         this.config.lgn_use_structure_mask = p.lgn_use_structure_mask ?? defaults.lgn_use_structure_mask;
                         this.config.lgn_use_saliency_gate = p.lgn_use_saliency_gate ?? defaults.lgn_use_saliency_gate;
                         this.config.lgn_ramp_end_mult = p.lgn_ramp_end_mult ?? defaults.lgn_ramp_end_mult;
@@ -898,6 +902,7 @@
 
                 // Upload Granular Uniforms
                 gl.uniform1f(this.lgnUseStructureMaskLocation, this.config.lgn_use_structure_mask ? 1.0 : 0.0);
+                gl.uniform1f(this.domAwareEnabledLocation, this.config.dom_aware_enabled ? 1.0 : 0.0);
                 gl.uniform1f(this.lgnUseSaliencyGateLocation, this.config.lgn_use_saliency_gate ? 1.0 : 0.0);
                 gl.uniform1i(this.v1DistortionTypeLocation, this.config.v1_distortion_type);
                 gl.uniform1f(this.v1StrengthMultLocation, this.config.v1_strength_mult);
