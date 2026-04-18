@@ -239,6 +239,7 @@
                 this.textureLocation = gl.getUniformLocation(this.program, "u_texture");
                 this.maskTextureLocation = gl.getUniformLocation(this.program, "u_maskTexture");
                 this.structureMapLocation = gl.getUniformLocation(this.program, "u_structureMap");
+                this.primitiveMapLocation = gl.getUniformLocation(this.program, "u_primitiveMap");
                 this.saliencyMapLocation = gl.getUniformLocation(this.program, "u_saliencyMap");
                 this.hasStructureLocation = gl.getUniformLocation(this.program, "u_has_structure");
                 this.enableSaliencyModulationLocation = gl.getUniformLocation(this.program, "u_enable_saliency_modulation");
@@ -381,6 +382,20 @@
                 const dummyStructure = new Uint8Array([255, 255, 255, 255]);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, dummyStructure);
 
+                // Create primitive map texture (GL_TEXTURE6) — DOM-aware perception
+                // path. R=primitive_type_id; id 0 = ui_surface / baseline fallback,
+                // so the default dummy routes shader dispatch to the existing
+                // pipeline until a real map is uploaded.
+                this.primitiveMapTexture = gl.createTexture();
+                gl.activeTexture(gl.TEXTURE6);
+                gl.bindTexture(gl.TEXTURE_2D, this.primitiveMapTexture);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                const dummyPrimitive = new Uint8Array([0, 0, 0, 0]);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, dummyPrimitive);
+
                 // Create saliency map texture (GL_TEXTURE3)
                 this.saliencyMapTexture = gl.createTexture();
                 gl.activeTexture(gl.TEXTURE3);
@@ -484,6 +499,17 @@
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
                 gl.generateMipmap(gl.TEXTURE_2D); // MIP chain for ratio reconstruction (LOD 4 blur)
                 gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true); // Restore default
+            }
+
+            uploadPrimitiveMap(image) {
+                const gl = this.gl;
+                gl.activeTexture(gl.TEXTURE6);
+                gl.bindTexture(gl.TEXTURE_2D, this.primitiveMapTexture);
+                // Disable alpha premultiplication — alpha carries extentPresence,
+                // RGB carries type_id + fidelity channels, all must survive intact.
+                gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+                gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
             }
 
             uploadSaliencyMap(image) {
@@ -785,6 +811,11 @@
                 gl.activeTexture(gl.TEXTURE5);
                 gl.bindTexture(gl.TEXTURE_2D, this.computeTexture);
                 gl.uniform1i(this.computeTextureLocation, 5);
+
+                // DOM-aware primitive map (Stage 3 plumbing; compositor reads in Stage 4)
+                gl.activeTexture(gl.TEXTURE6);
+                gl.bindTexture(gl.TEXTURE_2D, this.primitiveMapTexture);
+                gl.uniform1i(this.primitiveMapLocation, 6);
                 // For Tier 3+, always pass the config compute_tier so the shader can
                 // bypass V1 displacement even when compute texture isn't ready yet.
                 // For Tier 2.x, gate on _hasComputeData to avoid sampling empty texture.

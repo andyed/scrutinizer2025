@@ -18,6 +18,7 @@
 (() => {
     const Logger = require('./logger');
     const StructureMap = require('./structure-map.js');
+    const PrimitiveMap = require('./primitive-map.js');
     const GestaltProcessor = require('./gestalt-processor.js');
 
     class ContentAnalysis {
@@ -37,6 +38,13 @@
             this.lastBlocks = null;
             this.lastGroupedBlocks = null;
             this.currentMode = 0;
+
+            // ── Primitive Map (DOM-aware perception, parallel to structureMap) ──
+            // Populated with primitive_type_id from the DOM classifier. Calibration
+            // parameters (G/B/A) are zero-initialized for Stage 3; per-gaze
+            // calibration lands with the compositor in Stage 5. See
+            // docs/dom-aware-perception-plan.md.
+            this.primitiveMap = new PrimitiveMap();
 
             // ── Saliency Map (Visual attention heatmap) ──────────────
             // Target canvas: raw worker output. Current canvas: smoothed for GPU.
@@ -392,9 +400,11 @@
             if (this._areBlocksEqual(this.lastBlocks, blocks)) return;
             this.lastBlocks = blocks;
 
-            // Ensure map matches viewport
+            // Ensure maps match viewport
             this.structureMap.resize(this.canvas.width, this.canvas.height);
             this.structureMap.clear();
+            this.primitiveMap.resize(this.canvas.width, this.canvas.height);
+            this.primitiveMap.clear();
 
             // Gestalt grouping: merge adjacent text blocks into perceptual units
             const groupedBlocks = this.gestaltProcessor.process(blocks);
@@ -403,6 +413,10 @@
             // Draw blocks onto structure texture
             // Gestalt merge preserves ariaRole (max role wins), so all modes
             // use grouped blocks for proper closure.
+            //
+            // Also populate the primitive map in parallel with type_id only;
+            // calibration parameters (G/B/A) remain zero until Stage 5 wires
+            // per-gaze calibration. Stage 3 is the data-plumbing step.
             const dpr = window.devicePixelRatio || 1;
             for (const block of groupedBlocks) {
                 this.structureMap.drawBlock(
@@ -415,13 +429,30 @@
                     block.lineHeight,
                     block.ariaRole || 0
                 );
+
+                // Gestalt-merged blocks carry a `children` array of the original
+                // primitives; fall back to the merged block itself if absent.
+                const primitives = block.children || [block];
+                for (const p of primitives) {
+                    if (!p.primitiveType) continue;
+                    this.primitiveMap.drawBlock(
+                        p.x * dpr,
+                        p.y * dpr,
+                        p.w * dpr,
+                        p.h * dpr,
+                        p.primitiveType,
+                        null  // zero G/B/A until Stage 5 calibration-per-gaze
+                    );
+                }
             }
 
-            // Flush ImageData buffer to canvas before GPU upload
+            // Flush ImageData buffers to canvas before GPU upload
             this.structureMap.flush();
+            this.primitiveMap.flush();
 
             // Upload to GPU
             renderer.uploadStructureMap(this.structureMap.getCanvas());
+            renderer.uploadPrimitiveMap(this.primitiveMap.getCanvas());
             this.hasStructure = true;
 
             // Render debug annotations if structure visualization is active
