@@ -455,18 +455,22 @@
                     );
 
                     // x-height ≈ 0.5 × font size (Latin typography convention;
-                    // peripheral-calibration.js uses the same default). Zero
-                    // when fontSizePx is absent — non-text primitives.
-                    const xHeightPx = (typeof p.fontSizePx === 'number')
-                        ? p.fontSizePx * 0.5 * dpr
-                        : 0;
-                    this.primitiveMeta.drawBlock(
-                        p.x * dpr,
-                        p.y * dpr,
-                        p.w * dpr,
-                        p.h * dpr,
-                        { xHeightPx }
-                    );
+                    // peripheral-calibration.js uses the same default). Only
+                    // draw meta when we actually have a fontSizePx — otherwise
+                    // the interactive/landmark pass (which has no font info)
+                    // would overwrite the text-walker's x-height with zero
+                    // where their bboxes overlap (button-label text, link text,
+                    // nav text etc.), losing the stroke-field signature.
+                    if (typeof p.fontSizePx === 'number' && p.fontSizePx > 0) {
+                        const xHeightPx = p.fontSizePx * 0.5 * dpr;
+                        this.primitiveMeta.drawBlock(
+                            p.x * dpr,
+                            p.y * dpr,
+                            p.w * dpr,
+                            p.h * dpr,
+                            { xHeightPx }
+                        );
+                    }
                 }
             }
 
