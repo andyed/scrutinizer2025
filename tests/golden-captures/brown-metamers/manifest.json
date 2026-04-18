@@ -32,7 +32,7 @@
       "gaze": [0.5, 0.5],
       "raw": "../raw/ecommerce_center_raw.png",
       "brown": "ecommerce_center_brown.png",
-      "scrutinizer_mode0": "v2.7/ecommerce_product_image.png",
+      "scrutinizer_mode0": "v2.7/ecommerce_center.png",
       "scrutinizer_mode10": null,
       "scrutinizer_mode15": "v2.7/ecommerce_center_mode15_ttm_sectors.png"
     },
@@ -44,7 +44,7 @@
       "brown": "techmeme_center_brown.png",
       "scrutinizer_mode0": "v2.7/techmeme_center.png",
       "scrutinizer_mode10": null,
-      "scrutinizer_mode15": null
+      "scrutinizer_mode15": "v2.7/techmeme_center_mode15_ttm_sectors.png"
     },
     {
       "page": "crowding",
@@ -62,9 +62,9 @@
       "gaze": [0.5, 0.5],
       "raw": "../raw/color-spectrum_center_raw.png",
       "brown": "color-spectrum_center_brown.png",
-      "scrutinizer_mode0": null,
+      "scrutinizer_mode0": "v2.7/color-spectrum_center.png",
       "scrutinizer_mode10": null,
-      "scrutinizer_mode15": null
+      "scrutinizer_mode15": "v2.7/color-spectrum_center_mode15_ttm_sectors.png"
     }
   ]
 }
