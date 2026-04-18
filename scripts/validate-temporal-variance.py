@@ -114,15 +114,31 @@ def main():
         sys.exit(2)
 
     meta = json.loads(meta_path.read_text())
-    w, h = meta["viewport"]["width"], meta["viewport"]["height"]
-    cx = meta["centerPx"]["x"]
-    cy = meta["centerPx"]["y"]
-    ppd = meta["ppd"]
-    masks = band_masks(h, w, cx, cy, ppd)
+    # Screenshots are captured at device pixels (viewport × devicePixelRatio
+    # on retina), so the metadata's CSS-pixel viewport doesn't match the PNG
+    # dimensions. Read actual H/W from the first frame and scale the gaze
+    # center + ppd by the device-pixel factor before binning.
+    vp_w = meta["viewport"]["width"]
+    vp_h = meta["viewport"]["height"]
+    cx_css = meta["centerPx"]["x"]
+    cy_css = meta["centerPx"]["y"]
+    ppd_css = meta["ppd"]
 
     per_mode = {}
+    masks = None
     for mode in meta["modes"]:
         stack = load_frames(output_dir, mode, meta)
+        if masks is None:
+            _, h, w, _ = stack.shape
+            scale = h / vp_h if vp_h else 1.0
+            cx = cx_css * scale
+            cy = cy_css * scale
+            ppd = ppd_css * scale
+            print(
+                f"Device-pixel scale: {scale:.3f} "
+                f"(viewport {vp_w}×{vp_h}, image {w}×{h}, ppd={ppd:.1f})"
+            )
+            masks = band_masks(h, w, cx, cy, ppd)
         std_map = temporal_std_map(stack)
         band_means = band_mean_std(std_map, masks)
         per_mode[mode] = band_means
