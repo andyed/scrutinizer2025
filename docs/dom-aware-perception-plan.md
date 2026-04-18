@@ -60,8 +60,10 @@ Text's prior plan (`letterFidelity` / `wordCoherence` / `paragraphPresence`) is 
 Per primitive, three appearance layers are produced:
 
 - **`L_canonical`** — pixel-perfect rendering. For all types: a sample from `u_texture` (the already-captured page). No separate font/icon rasterization.
-- **`L_categorical`** — stylized representation that signals primitive type without preserving full identity. Text: horizontal stroke field at x-height. Icons: centroid intensity + dominant-orientation Gabor. Form inputs: rectangle outline + interior-contrast shading. Buttons: filled rectangle with implied bevel.
+- **`L_categorical`** — stylized representation that signals primitive type without preserving full identity. Text: an x-height-period horizontal envelope modulating vertical stroke-frequency texture (~3 cycles per x-height; Majaj et al. 2002 letter-channel spatial frequency). Single-frequency x-height banding alone is insufficient — it fails the horizontal/vertical stroke-energy ratio that distinguishes Latin text from horizontal gratings. Icons: centroid intensity + dominant-orientation Gabor. Form inputs: rectangle outline + interior-contrast shading. Buttons: filled rectangle with implied bevel.
 - **`L_blob`** — bbox at mean luminance with type-coded modulation. Text: baseline rhythm. Icons: centered intensity blob. Form inputs: edge emphasis. Buttons: filled rectangle.
+
+Stage 3 implementation note (revised): `L_categorical` and `L_blob` are produced **procedurally in the compositor shader** from per-primitive metadata (x-height, bbox, mean luminance from `u_texture` mips) rather than pre-rasterized into an appearance atlas. An atlas remains justified only for icons (Stage 6) where dominant-orientation Gabor requires per-instance PCA of the source pixels. This collapses the original 8–32 MB Stage 3 atlas budget to ~1–2 MB at Stage 6. The Stage 9 Wallis-analogue 2IFC battery should include sine-only vs. sine+stroke vs. atlas arms to settle the sufficiency question empirically.
 
 Composite (in compositor shader, per fragment in DOM-aware regions):
 
@@ -153,7 +155,9 @@ New function `sampleDomAwarePrimitive(uv, eccentricity)` in `peripheral.frag`, s
 
 ### Stage 5 — Text as first primitive (~2 days)
 
-Connect the text calibrator (Stage 1) + text rasterizer (Stage 3) + compositor dispatch (Stage 4). First visible result.
+Connect the text calibrator (Stage 1) + procedural text compositor (Stage 4) + per-gaze calibration wiring. First visible result.
+
+Procedural `L_categorical_text` in the fragment shader: `horizontalEnvelope(y, xHeight) × strokeTexture(x, xHeight/3)` where the envelope is a square wave at x-height period and the stroke texture is a pseudo-random or oriented-noise term at ~3 cycles per x-height frequency. Uses `u_primitiveMeta` (Stage 3c) for the per-primitive x-height; `u_primitiveMap.r` carries `primitive_type_id` for the dispatch branch.
 
 New `mode 20 dom_aware_text` inheriting mode 15 + `dom_aware_enabled: true, dom_aware_types: ["text"]`.
 
