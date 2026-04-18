@@ -442,9 +442,26 @@
 
                 // Gestalt-merged blocks carry a `children` array of the original
                 // primitives; fall back to the merged block itself if absent.
+                //
+                // Draw order matters: non-text primitives first, text last,
+                // so text regions always WIN in the primitive-map where a
+                // text rect sits inside a larger container bbox (<button>
+                // label, <figcaption> inside <figure>, inline text over an
+                // absolutely-positioned image, etc.). Both passes write
+                // primitive-meta so the x-height channel is never stale —
+                // non-text writes 0, text writes its xHeight. A prior
+                // "preserve non-zero meta" fix got this backward and caused
+                // stripe artifacts to appear over images whose bboxes
+                // spatially overlapped earlier-drawn text.
                 const primitives = block.children || [block];
+                const textBearing = [];
+                const nonTextBearing = [];
                 for (const p of primitives) {
                     if (!p.primitiveType) continue;
+                    const hasText = (typeof p.fontSizePx === 'number' && p.fontSizePx > 0);
+                    (hasText ? textBearing : nonTextBearing).push(p);
+                }
+                const drawPrimitive = (p) => {
                     this.primitiveMap.drawBlock(
                         p.x * dpr,
                         p.y * dpr,
@@ -453,25 +470,19 @@
                         p.primitiveType,
                         null  // zero G/B/A until Stage 5 calibration-per-gaze
                     );
-
-                    // x-height ≈ 0.5 × font size (Latin typography convention;
-                    // peripheral-calibration.js uses the same default). Only
-                    // draw meta when we actually have a fontSizePx — otherwise
-                    // the interactive/landmark pass (which has no font info)
-                    // would overwrite the text-walker's x-height with zero
-                    // where their bboxes overlap (button-label text, link text,
-                    // nav text etc.), losing the stroke-field signature.
-                    if (typeof p.fontSizePx === 'number' && p.fontSizePx > 0) {
-                        const xHeightPx = p.fontSizePx * 0.5 * dpr;
-                        this.primitiveMeta.drawBlock(
-                            p.x * dpr,
-                            p.y * dpr,
-                            p.w * dpr,
-                            p.h * dpr,
-                            { xHeightPx }
-                        );
-                    }
-                }
+                    const xHeightPx = (typeof p.fontSizePx === 'number' && p.fontSizePx > 0)
+                        ? p.fontSizePx * 0.5 * dpr
+                        : 0;
+                    this.primitiveMeta.drawBlock(
+                        p.x * dpr,
+                        p.y * dpr,
+                        p.w * dpr,
+                        p.h * dpr,
+                        { xHeightPx }
+                    );
+                };
+                for (const p of nonTextBearing) drawPrimitive(p);
+                for (const p of textBearing) drawPrimitive(p);
             }
 
             // Flush ImageData buffers to canvas before GPU upload
