@@ -1,4 +1,5 @@
 const { ipcRenderer, webFrame } = require('electron');
+const { classifyPrimitive } = require('./dom-primitive-classifier');
 
 console.log('[Preload] ✅ Script loaded and executing');
 
@@ -44,6 +45,20 @@ class DomAdapter {
         if (tag === 'footer') return 12;
 
         return 0;
+    }
+
+    /**
+     * Classify an element into one of 8 perceptual primitive types for the
+     * DOM-aware peripheral perception path. Delegates to the standalone
+     * classifier module so Jest can test the logic without electron stubs.
+     * See renderer/dom-primitive-classifier.js and
+     * docs/dom-aware-perception-plan.md.
+     *
+     * @param {HTMLElement} el
+     * @returns {string} one of text|link|heading|icon|form_input|button|nav_item|image|ui_surface
+     */
+    classifyPrimitive(el) {
+        return classifyPrimitive(el);
     }
 
     /**
@@ -113,7 +128,11 @@ class DomAdapter {
                     const weight = parseFloat(style.fontWeight) || 400;
                     const density = Math.min(1.0, Math.max(0.2, weight / 900));
 
-                    styleData = { density, lineHeight };
+                    styleData = {
+                        density,
+                        lineHeight,
+                        primitiveType: classifyPrimitive(parent)
+                    };
                     styleCache.set(parent, styleData);
                 }
 
@@ -136,7 +155,8 @@ class DomAdapter {
                         type: 1.0, // Text
                         density: styleData.density,
                         lineHeight: styleData.lineHeight * zoom,
-                        ariaRole
+                        ariaRole,
+                        primitiveType: styleData.primitiveType
                     });
                 }
             }
@@ -160,7 +180,8 @@ class DomAdapter {
                     type: 0.5, // Media
                     density: 0.8,
                     lineHeight: 0,
-                    ariaRole: 6
+                    ariaRole: 6,
+                    primitiveType: classifyPrimitive(el)
                 });
             }
         }
@@ -203,7 +224,8 @@ class DomAdapter {
                     type: 0.0, // UI
                     density: 1.0,
                     lineHeight: 0,
-                    ariaRole: this.classifyRole(el)
+                    ariaRole: this.classifyRole(el),
+                    primitiveType: classifyPrimitive(el)
                 });
             }
         }
@@ -230,7 +252,8 @@ class DomAdapter {
                     type: 0.0,
                     density: 0.3,
                     lineHeight: 0,
-                    ariaRole: this.classifyRole(el)
+                    ariaRole: this.classifyRole(el),
+                    primitiveType: classifyPrimitive(el)
                 });
             }
         }
