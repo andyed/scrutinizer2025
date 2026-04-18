@@ -1927,13 +1927,13 @@ vec3 sampleDomAwarePrimitive(vec3 L_background, vec2 uv) {
     vec3 L_canonical = sampleSource(uv).rgb;
 
     vec3 L_categorical = L_canonical; // default: no degradation
-    // Text-bearing primitives all get the procedural stroke field:
-    //   typeId 1 = text, 2 = link, 3 = heading. Links and headings inherit
-    //   text calibration at this stage (Stage 8 minimal); chromatic decay
-    //   for links (Hansen et al. 2009) lives in the baseline RG/YV path and
-    //   will be folded into the compositor when the full chromatic term ships.
-    bool isTextBearing = (typeId == 1 || typeId == 2 || typeId == 3);
-    if (isTextBearing && xHeightPx > 1.0) {
+    // Any primitive carrying an x-height (ie. containing text) gets the
+    // procedural stroke field. That's the right signal — not the type_id —
+    // because a button label, link text, nav item, or heading is still
+    // text at the retina. Non-text primitives (icons, images, landmarks)
+    // have xHeightPx = 0 by construction and fall through to L_canonical
+    // here; they'll get their own categorical layers in Stages 6–7.
+    if (xHeightPx > 1.0) {
         // Two-frequency stroke field. Pooled mean (LOD 3 ≈ 8-texel average)
         // gives a stable "local paper color" less noisy than fragment-point
         // sampling. Ink/paper then sit symmetrically ±0.35 from that mean,
@@ -1956,7 +1956,7 @@ vec3 sampleDomAwarePrimitive(vec3 L_background, vec2 uv) {
     // ~32-texel pooling region — the scale at which "text-ness" survives as a
     // blob under TTM-style pooling.
     vec3 L_blob = textureLod(u_texture, uv, 5.0).rgb;
-    if (isTextBearing && xHeightPx > 1.0) {
+    if (xHeightPx > 1.0) {
         float yPx = fragPx.y;
         float rhythm = 0.5 + 0.5 * sin(yPx * 3.14159265 / max(xHeightPx * 2.0, 1.0));
         L_blob = mix(L_blob, L_blob * 0.85, 0.25 * rhythm);
