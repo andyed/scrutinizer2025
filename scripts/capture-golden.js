@@ -73,7 +73,8 @@ const ALL_MODE_VARIANTS = [
     { id: 'mode10_mongrel', mode: '10', overlay: false },
     { id: 'mode12_isotropic', mode: '12', overlay: false },
     { id: 'mode14_pyramid', mode: '14', overlay: false },
-    { id: 'mode15_ttm', mode: '15', overlay: false }
+    { id: 'mode15_ttm', mode: '15', overlay: false },
+    { id: 'mode16_text_baseline', mode: '16', overlay: false }
 ];
 
 // Flag: --all-modes captures every mode on dashboard + article
@@ -111,9 +112,10 @@ const CAPTURE_TASKS = [
     // --- ECOMMERCE ---
     {
         page: 'ecommerce',
-        fixations: ['product_image'],
+        fixations: ['center', 'product_image'],
         variants: [
             { id: 'standard', mode: '0', overlay: false },
+            { id: 'mode15_ttm_sectors', mode: '15', overlay: false },
             ...MOBILE_VARIANTS
         ],
         selectors: {
@@ -139,6 +141,8 @@ const CAPTURE_TASKS = [
         page: 'color-spectrum',
         fixations: ['center'],
         variants: [
+            { id: 'standard', mode: '0', overlay: false },
+            { id: 'mode15_ttm_sectors', mode: '15', overlay: false },
             { id: 'mode0_smoothstep', mode: '0', overlay: false },
             { id: 'mode1_purkinje', mode: '1', overlay: false },
             { id: 'mode6_cmf', mode: '6', overlay: false },

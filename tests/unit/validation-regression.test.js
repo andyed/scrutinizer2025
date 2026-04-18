@@ -322,3 +322,37 @@ describe('Parameter sanity (modes.json regression guard)', function () {
         expect(CROWDING_THRESHOLD).toBeLessThan(1);
     });
 });
+
+// ─── Mode 16: Text Baseline freeze ──────────────────────────────────────────
+//
+// text_baseline_m16 is the DOM-aware-perception-plan's baseline comparison arm
+// for 2IFC psychophysics validation. It must remain a byte-identical clone of
+// mode 0's pipeline (with distinct top-level metadata) until intentional
+// divergence. Any unintended drift breaks the psychophysics comparison.
+//
+// See docs/dom-aware-perception-plan.md.
+
+describe('Mode 16 (text_baseline_m16) baseline freeze', function () {
+    const baseline = modes.modes['text_baseline_m16'];
+
+    it('exists in modes.json', function () {
+        expect(baseline).toBeDefined();
+        expect(baseline.id).toBe(16);
+    });
+
+    it('pipeline is byte-identical to mode 0 (highkey)', function () {
+        // Deep equality on the pipeline object. If this fails, either mode 0
+        // changed (propagate to mode 16 intentionally) or mode 16 drifted
+        // (revert to mode 0 unless the plan doc authorizes divergence).
+        expect(baseline.pipeline).toEqual(pipeline);
+    });
+
+    it('category is "research" (not user-facing default)', function () {
+        expect(baseline.category).toBe('research');
+    });
+
+    it('has architectural_purpose documenting baseline-arm role', function () {
+        expect(baseline.architectural_purpose).toBeDefined();
+        expect(baseline.architectural_purpose).toMatch(/baseline|2IFC|DOM-aware/i);
+    });
+});
