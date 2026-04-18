@@ -51,6 +51,10 @@ data/coco-search18/images/
 # Local scratch output — regenerated artifacts, not repo material
 output/
 
+# Temporal-variance capture artifacts — PNG stacks + report, regenerate via
+# `npm run test:temporal-variance`. Too large + machine-specific for git.
+tests/temporal-variance/
+
 # Pyramid validation reference data — regenerate with generate-pyramid-reference.py
 tests/validation/pyramid-reference/
 

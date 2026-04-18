@@ -17,6 +17,7 @@
     "test:memory": "node scripts/run-electron.js tests/run-test.js tests/memory-test.html",
     "test:perf": "node scripts/run-electron.js tests/run-test.js tests/perf-test.html",
     "test:integration": "cross-env TEST_MODE=true node scripts/run-electron.js .",
+    "test:temporal-variance": "node scripts/capture-temporal-variance.js && uv run --python 3.12 scripts/validate-temporal-variance.py && cross-env NODE_OPTIONS=\"--no-warnings\" jest tests/unit/temporal-variance.test.js",
     "test": "npm run test:unit && npm run test:visual && npm run test:memory && npm run test:integration",
     "capture-smoke": "node scripts/capture-smoke.js",
     "capture-golden": "node scripts/capture-golden.js",
