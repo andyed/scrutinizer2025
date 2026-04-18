@@ -38,6 +38,32 @@
 
 ---
 
+## Revision 2026-04-18 (continued) — noise-variance audit result
+
+**Step 1 complete.** Instrumented `WebGPUPyramidCompute._completeNoiseAudit()` to GPU-readback band-0 noise after `seed_noise`, compute CPU-side mean+variance, log through `ipcRenderer.send('log:renderer', ...)`. Two captures on dashboard fixture:
+
+```
+band 0, n=504960: mean=0.0005 variance=0.5001 std=0.7072 range=[-1.991, 1.998]
+band 0, n=504960: mean=-0.0000 variance=0.4993 std=0.7066 range=[-1.991, 1.996]
+```
+
+**Verdict:** `noise_var ≈ 0.5001` — within tolerance of the hard-coded 0.5 assumption at `pyramid-synth.wgsl:314`. Mechanism #1 (noise-variance miscalibration at the source) is **ruled out**. The scale factor `sqrt(target_var / 0.5)` downstream is using a correct constant.
+
+**What this means for Phase 2 — step 2 → step 3:** we skip the "normalize the noise field" intervention and go directly to the `detail_strength` variance-gate. The observed speckle is therefore attributable to:
+
+- **#2 dominant (now):** `detail_strength = mix(0.5, 3.0, alpha)` at `reconstruct:482` amplifying structurally-correct-magnitude-but-phase-unconstrained `synth_luma` up to 3× on mid-eccentricity sectors with nonzero `target_var*`. Classic Portilla-Simoncelli failure mode: marginal magnitude matched, AC phase not constrained.
+- **#3 contributing:** cross-scale injection at `pyramid-synth.wgsl:335-344` applies `ps*` factors on an already-unconstrained noise field. Its correctness presupposed correct marginals, which we now know holds.
+
+**Next commit:** land `detail_strength` variance-gate per the original proposal:
+```wgsl
+detail_strength = mix(0.5, 3.0, alpha) * smoothstep(eps, 10.0 * eps, sector_variance);
+```
+Ship as a separate PR so the audit data and the intervention are each individually revertible.
+
+**If variance-gate insufficient:** escalate to the TTM-literature-correct fix — auto-correlation of magnitude + cross-orientation phase enforcement in `match_stats`. That's the Phase 3 (oriented stats) territory and multi-week, per the original plan.
+
+---
+
 ## Context
 
 A key Scrutinizer goal is emulating the **radial metamer** (Brown / Freeman-Simoncelli / Rosenholtz pooled texture synthesis over polar sectors). Mode 15 `tier3_synthesis` is the target for that. It is currently **silently falling back to rectilinear MIP pooling** (`sampleDoGReconstructed` / `sampleMIPPooled`) because `createBindGroupLayout` fails validation on `reconBGL` in `renderer/webgpu-pyramid-compute.js` — the layout has 9 storage bindings and the default WebGPU limit is 8. The error is swallowed by `uncapturederror` and never propagates to JS control flow.
