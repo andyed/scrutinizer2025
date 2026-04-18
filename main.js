@@ -950,12 +950,11 @@ function createScrutinizerWindow(startUrl) {
     const syncHudBounds = () => {
         if (!win.isDestroyed() && !hudWindow.isDestroyed()) {
             const contentBounds = win.getContentBounds();
-            // Adjust for toolbar
             hudWindow.setBounds({
                 x: contentBounds.x,
-                y: contentBounds.y + TOOLBAR_HEIGHT,
+                y: contentBounds.y + toolbarOffset,
                 width: contentBounds.width,
-                height: contentBounds.height - TOOLBAR_HEIGHT
+                height: contentBounds.height - toolbarOffset
             });
         }
     };
@@ -2051,12 +2050,11 @@ function runIntegrationTest() {
                                     // The HUD is offset by TOOLBAR_HEIGHT (40px) from content top.
                                     // screenX/Y must land in HUD coordinates after overlay.js subtracts window.screenX/Y.
                                     const cb = mainWindow.getContentBounds();
-                                    const TOOLBAR_HEIGHT = 40;
-                                    // HUD position: x = cb.x, y = cb.y + TOOLBAR_HEIGHT
-                                    // HUD size: cb.width x (cb.height - TOOLBAR_HEIGHT)
+                                    // HUD position: x = cb.x, y = cb.y + toolbarOffset
+                                    // HUD size: cb.width x (cb.height - toolbarOffset)
                                     const hudW = cb.width;
-                                    const hudH = cb.height - TOOLBAR_HEIGHT;
-                                    console.log(`[Test] Gazeplot walk: displayW=${displayW} displayH=${displayH} contentBounds=${cb.x},${cb.y},${cb.width}x${cb.height} hudOffset=${TOOLBAR_HEIGHT} hudSize=${hudW}x${hudH}`);
+                                    const hudH = cb.height - toolbarOffset;
+                                    console.log(`[Test] Gazeplot walk: displayW=${displayW} displayH=${displayH} contentBounds=${cb.x},${cb.y},${cb.width}x${cb.height} hudOffset=${toolbarOffset} hudSize=${hudW}x${hudH}`);
 
                                     for (let fi = 0; fi < fixations.length; fi++) {
                                         const fix = fixations[fi];
@@ -2067,7 +2065,7 @@ function runIntegrationTest() {
                                         // where window.screenX = cb.x (HUD x position)
                                         // So: screenX = cb.x + normX * hudW
                                         const screenX = cb.x + normX * hudW;
-                                        const screenY = (cb.y + TOOLBAR_HEIGHT) + normY * hudH;
+                                        const screenY = (cb.y + toolbarOffset) + normY * hudH;
                                         const duration = fix.tEnd - fix.tStart;
 
                                         // Rapidly send position to converge GazeModel smoothing.
