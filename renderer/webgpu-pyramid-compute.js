@@ -370,6 +370,14 @@ class WebGPUPyramidCompute {
     }
 
     _createSynthPipelines() {
+        // Push a validation error scope so any BGL / pipeline failure is
+        // captured synchronously during construction instead of being
+        // swallowed by the device's `uncapturederror` event. The root cause
+        // of the silent MIP-fallback bug (see docs/radial-ttm-fix-plan.md)
+        // was precisely that `reconBGL` creation failed silently with
+        // 9 storage bindings under WebGPU's default 8-binding limit.
+        this.device.pushErrorScope('validation');
+
         const module = this.device.createShaderModule({ code: this.synthShaderCode });
 
         // seed_noise: config, noise0-3 (read_write)
@@ -425,6 +433,26 @@ class WebGPUPyramidCompute {
             layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.reconBGL] }),
             compute: { module, entryPoint: 'reconstruct' },
         });
+
+        // Pop validation error scope. popErrorScope returns a promise that
+        // resolves to the first captured error (or null if none). Stash it
+        // for isPipelineHealthy() — the caller can await + branch on it to
+        // degrade mode 15 to Tier 2.5 instead of rendering zeros silently.
+        this._synthHealthPromise = this.device.popErrorScope();
+    }
+
+    /**
+     * Returns a promise that resolves to { healthy: boolean, error: GPUError|null }.
+     * Call this after construction — if healthy is false, the synth pipeline
+     * (including reconBGL, the 9-binding pipeline under the WebGPU default
+     * 8-limit) failed validation. Caller should degrade compute_tier to
+     * 2.5 (pyramid mongrel) or lower and surface a warning to the user
+     * rather than silently rendering the MIP fallback.
+     */
+    async isPipelineHealthy() {
+        if (!this._synthHealthPromise) return { healthy: true, error: null };
+        const error = await this._synthHealthPromise;
+        return { healthy: !error, error };
     }
 
     /**
