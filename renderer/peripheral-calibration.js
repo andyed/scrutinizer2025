@@ -141,10 +141,14 @@
         const wC = wordCoherence(spacingDeg, eccDeg);
         const pP = paragraphPresence(extentDeg, eccDeg);
 
-        // Monotone ordering: identity ≤ category ≤ extent. Reading an
-        // individual letter requires both acuity and uncrowded spacing.
+        // Monotone ordering: identity ≤ category ≤ extent.
+        // identity requires BOTH acuity (letter shape resolvable) and uncrowded
+        // spacing. category only needs one: resolvable x-height banding
+        // (letterFidelity) OR resolvable word rhythm (wordCoherence). Earlier
+        // max(identity, wC) collapsed to wC alone and killed the stripe-layer
+        // weight — the compositor's L_categorical term never got a turn.
         const identityFidelity = Math.min(lF, wC);
-        const categoryFidelity = Math.max(identityFidelity, wC);
+        const categoryFidelity = Math.max(lF, wC);
         const extentPresence = Math.max(categoryFidelity, pP);
 
         return { identityFidelity, categoryFidelity, extentPresence };

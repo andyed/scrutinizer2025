@@ -1914,9 +1914,13 @@ vec3 sampleDomAwarePrimitive(vec3 L_background, vec2 uv) {
     // present where the map is non-zero — extent always detected at gist).
     float paragraphPresence = 1.0;
 
-    // Monotone ordering enforced by the plan formula.
+    // Monotone ordering enforced by the plan formula. categoryFidelity uses
+    // max(letter, word) — either is sufficient for "this looks like text":
+    // resolvable x-height banding (letterFidelity) or resolvable word rhythm
+    // (wordCoherence). Earlier formulation max(identity, wordCoherence)
+    // algebraically collapsed to just wordCoherence, killing the stripe layer.
     float identityFidelity = min(letterFidelity, wordCoherence);
-    float categoryFidelity = max(identityFidelity, wordCoherence);
+    float categoryFidelity = max(letterFidelity, wordCoherence);
     float extentPresence   = max(categoryFidelity, paragraphPresence);
 
     // --- Layers ---
@@ -1924,15 +1928,20 @@ vec3 sampleDomAwarePrimitive(vec3 L_background, vec2 uv) {
 
     vec3 L_categorical = L_canonical; // default: no degradation
     if (typeId == 1 /* text */ && xHeightPx > 1.0) {
-        // Two-frequency stroke field. Ink luminance from local mean.
+        // Two-frequency stroke field. Pooled mean (LOD 3 ≈ 8-texel average)
+        // gives a stable "local paper color" less noisy than fragment-point
+        // sampling. Ink/paper then sit symmetrically ±0.35 from that mean,
+        // producing ~0.7 dynamic range regardless of source polarity
+        // (dark-on-light vs light-on-dark).
         float yPx = fragPx.y;
         float xPx = fragPx.x;
         float envelope = 0.5 + 0.5 * sign(sin(yPx * 3.14159265 / xHeightPx));
         float strokePeriod = max(xHeightPx / 3.0, 1.0);
         float stroke = 0.5 + 0.5 * sign(sin(xPx * 3.14159265 / strokePeriod));
-        float meanLum = dot(L_canonical, vec3(0.299, 0.587, 0.114));
-        vec3 ink = vec3(meanLum);
-        vec3 paper = vec3(min(1.0, meanLum + 0.5));
+        vec3 pooledCol = textureLod(u_texture, uv, 3.0).rgb;
+        float meanLum = dot(pooledCol, vec3(0.299, 0.587, 0.114));
+        vec3 ink = vec3(clamp(meanLum - 0.35, 0.0, 1.0));
+        vec3 paper = vec3(clamp(meanLum + 0.35, 0.0, 1.0));
         float strokeMask = envelope * stroke;
         L_categorical = mix(paper, ink, strokeMask);
     }
