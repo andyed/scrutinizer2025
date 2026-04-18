@@ -1860,6 +1860,28 @@ vec3 congestionHeatmap(float t) {
     }
 }
 
+// Apply the shared RG/YV eccentricity decay in Oklab space. Same fade curves
+// as the baseline V4 path at ~line 1630 (Shooner/Jiang/Mullen 2022 suprathreshold;
+// Hansen et al. 2009 scene-scale color survival):
+//   rgFade = smoothstep(1, 12, e)·0.7 + smoothstep(12, 50, e)·0.27
+//   yvFade = smoothstep(3, 20, e)·0.35 + smoothstep(20, 60, e)·0.55
+// Factored here so both the baseline chromatic branch and the DOM-aware
+// compositor can share a single attenuation curve. Without this, the
+// non-text L_categorical interior bypassed the project's own chromatic
+// decay and over-preserved icon chroma at eccentricities where Mullen 1991
+// / Anderson-Mullen-Hess 1991 / Nagy-Sanchez 1990 show chromatic CSF
+// cutoff and color-categorization errors both increase for small patches.
+vec3 applyChromaticEccentricityDecay(vec3 rgb, float ecc_deg) {
+    vec3 lab = rgbToOklab(rgb);
+    float rgFade = smoothstep(1.0, 12.0, ecc_deg) * 0.7
+                 + smoothstep(12.0, 50.0, ecc_deg) * 0.27;
+    float yvFade = smoothstep(3.0, 20.0, ecc_deg) * 0.35
+                 + smoothstep(20.0, 60.0, ecc_deg) * 0.55;
+    lab.y *= (1.0 - rgFade);
+    lab.z *= (1.0 - yvFade);
+    return oklabToRgb(lab);
+}
+
 // === DOM-AWARE PERIPHERAL COMPOSITOR ===
 // Procedural implementation of docs/dom-aware-perception-plan.md.
 // Dispatches on primitive_type_id packed into u_primitiveMap.r; computes the
@@ -1965,9 +1987,17 @@ vec3 sampleDomAwarePrimitive(vec3 L_background, vec2 uv) {
             // Outline: darker than local mean — visible against interior.
             L_categorical = vec3(clamp(meanLum - 0.4, 0.0, 1.0));
         } else {
-            // Interior: slightly dimmed pooled mean. Keeps color signature
-            // (link-blue icon reads blue) but loses detail.
-            L_categorical = pooledCol * 0.92;
+            // Interior: pooled mean routed through the shared RG/YV
+            // eccentricity decay so icon/input/button chroma attenuates with
+            // the same Oklab curve the baseline path uses. Preserves the
+            // low-SF chromatic category signal in the near periphery while
+            // letting it fade at the eccentricities where small-patch
+            // chromatic CSF drops out (Mullen 1991; Anderson/Mullen/Hess
+            // 1991; Nagy & Sanchez 1990 peripheral color categorization).
+            // Note: Hansen et al. 2009 report scene-scale color survival —
+            // that result does NOT generalize to ~0.3–1° icon patches, so
+            // don't re-motivate this as "color always survives shape."
+            L_categorical = applyChromaticEccentricityDecay(pooledCol, ecc_deg) * 0.92;
         }
     }
 
