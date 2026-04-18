@@ -240,6 +240,7 @@
                 this.maskTextureLocation = gl.getUniformLocation(this.program, "u_maskTexture");
                 this.structureMapLocation = gl.getUniformLocation(this.program, "u_structureMap");
                 this.primitiveMapLocation = gl.getUniformLocation(this.program, "u_primitiveMap");
+                this.primitiveMetaLocation = gl.getUniformLocation(this.program, "u_primitiveMeta");
                 this.saliencyMapLocation = gl.getUniformLocation(this.program, "u_saliencyMap");
                 this.hasStructureLocation = gl.getUniformLocation(this.program, "u_has_structure");
                 this.enableSaliencyModulationLocation = gl.getUniformLocation(this.program, "u_enable_saliency_modulation");
@@ -396,6 +397,19 @@
                 const dummyPrimitive = new Uint8Array([0, 0, 0, 0]);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, dummyPrimitive);
 
+                // Create primitive meta texture (GL_TEXTURE7) — geometry metadata
+                // (x-height in R). Dummy x-height=0 means "no text metadata," so
+                // the compositor falls through to baseline.
+                this.primitiveMetaTexture = gl.createTexture();
+                gl.activeTexture(gl.TEXTURE7);
+                gl.bindTexture(gl.TEXTURE_2D, this.primitiveMetaTexture);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                const dummyMeta = new Uint8Array([0, 0, 0, 0]);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, dummyMeta);
+
                 // Create saliency map texture (GL_TEXTURE3)
                 this.saliencyMapTexture = gl.createTexture();
                 gl.activeTexture(gl.TEXTURE3);
@@ -507,6 +521,15 @@
                 gl.bindTexture(gl.TEXTURE_2D, this.primitiveMapTexture);
                 // Disable alpha premultiplication — alpha carries extentPresence,
                 // RGB carries type_id + fidelity channels, all must survive intact.
+                gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+                gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+            }
+
+            uploadPrimitiveMeta(image) {
+                const gl = this.gl;
+                gl.activeTexture(gl.TEXTURE7);
+                gl.bindTexture(gl.TEXTURE_2D, this.primitiveMetaTexture);
                 gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
                 gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
@@ -816,6 +839,11 @@
                 gl.activeTexture(gl.TEXTURE6);
                 gl.bindTexture(gl.TEXTURE_2D, this.primitiveMapTexture);
                 gl.uniform1i(this.primitiveMapLocation, 6);
+
+                // DOM-aware primitive meta (per-primitive geometry: x-height)
+                gl.activeTexture(gl.TEXTURE7);
+                gl.bindTexture(gl.TEXTURE_2D, this.primitiveMetaTexture);
+                gl.uniform1i(this.primitiveMetaLocation, 7);
                 // For Tier 3+, always pass the config compute_tier so the shader can
                 // bypass V1 displacement even when compute texture isn't ready yet.
                 // For Tier 2.x, gate on _hasComputeData to avoid sampling empty texture.

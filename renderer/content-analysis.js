@@ -19,6 +19,7 @@
     const Logger = require('./logger');
     const StructureMap = require('./structure-map.js');
     const PrimitiveMap = require('./primitive-map.js');
+    const PrimitiveMeta = require('./primitive-meta.js');
     const GestaltProcessor = require('./gestalt-processor.js');
 
     class ContentAnalysis {
@@ -45,6 +46,13 @@
             // calibration lands with the compositor in Stage 5. See
             // docs/dom-aware-perception-plan.md.
             this.primitiveMap = new PrimitiveMap();
+
+            // ── Primitive Meta (per-primitive geometry metadata) ─────
+            // Carries x-height per text primitive for the procedural
+            // L_categorical stroke-field compositor (Stage 4+). Separate
+            // texture from primitive-map so type+calibration concerns stay
+            // decoupled from geometry.
+            this.primitiveMeta = new PrimitiveMeta();
 
             // ── Saliency Map (Visual attention heatmap) ──────────────
             // Target canvas: raw worker output. Current canvas: smoothed for GPU.
@@ -405,6 +413,8 @@
             this.structureMap.clear();
             this.primitiveMap.resize(this.canvas.width, this.canvas.height);
             this.primitiveMap.clear();
+            this.primitiveMeta.resize(this.canvas.width, this.canvas.height);
+            this.primitiveMeta.clear();
 
             // Gestalt grouping: merge adjacent text blocks into perceptual units
             const groupedBlocks = this.gestaltProcessor.process(blocks);
@@ -443,16 +453,32 @@
                         p.primitiveType,
                         null  // zero G/B/A until Stage 5 calibration-per-gaze
                     );
+
+                    // x-height ≈ 0.5 × font size (Latin typography convention;
+                    // peripheral-calibration.js uses the same default). Zero
+                    // when fontSizePx is absent — non-text primitives.
+                    const xHeightPx = (typeof p.fontSizePx === 'number')
+                        ? p.fontSizePx * 0.5 * dpr
+                        : 0;
+                    this.primitiveMeta.drawBlock(
+                        p.x * dpr,
+                        p.y * dpr,
+                        p.w * dpr,
+                        p.h * dpr,
+                        { xHeightPx }
+                    );
                 }
             }
 
             // Flush ImageData buffers to canvas before GPU upload
             this.structureMap.flush();
             this.primitiveMap.flush();
+            this.primitiveMeta.flush();
 
             // Upload to GPU
             renderer.uploadStructureMap(this.structureMap.getCanvas());
             renderer.uploadPrimitiveMap(this.primitiveMap.getCanvas());
+            renderer.uploadPrimitiveMeta(this.primitiveMeta.getCanvas());
             this.hasStructure = true;
 
             // Render debug annotations if structure visualization is active

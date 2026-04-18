@@ -6,6 +6,7 @@ uniform sampler2D u_texture;      // Captured browser frame (Live)
 uniform sampler2D u_maskTexture;  // Visual memory mask
 uniform sampler2D u_structureMap; // Structure Map (R=Rhythm, G=Density, B=Type)
 uniform sampler2D u_primitiveMap; // DOM-aware (R=type_id, G=identity, B=category, A=extent); Stage 3 plumbing, sampled in Stage 4
+uniform sampler2D u_primitiveMeta; // DOM-aware geometry (R=xHeightPx, 0 elsewhere); stroke period = R/3 for procedural L_categorical
 uniform sampler2D u_saliencyMap;  // Saliency Map (R=Saliency, G=Congestion, B=EdgeDensity)
 uniform float u_useMask;
 

@@ -117,11 +117,15 @@ class DomAdapter {
                 if (!styleData) {
                     const style = window.getComputedStyle(parent);
 
+                    // Font Size — always compute it; used for x-height
+                    // derivation in the DOM-aware compositor.
+                    const fontSize = parseFloat(style.fontSize);
+                    const fontSizePx = isNaN(fontSize) ? 16 : fontSize;
+
                     // Parse Line Height
                     let lineHeight = parseFloat(style.lineHeight);
                     if (isNaN(lineHeight)) {
-                        const fontSize = parseFloat(style.fontSize);
-                        lineHeight = isNaN(fontSize) ? 16 : fontSize * 1.2;
+                        lineHeight = fontSizePx * 1.2;
                     }
 
                     // Calculate Density (Mass)
@@ -131,6 +135,7 @@ class DomAdapter {
                     styleData = {
                         density,
                         lineHeight,
+                        fontSizePx,
                         primitiveType: classifyPrimitive(parent)
                     };
                     styleCache.set(parent, styleData);
@@ -155,6 +160,7 @@ class DomAdapter {
                         type: 1.0, // Text
                         density: styleData.density,
                         lineHeight: styleData.lineHeight * zoom,
+                        fontSizePx: styleData.fontSizePx * zoom,
                         ariaRole,
                         primitiveType: styleData.primitiveType
                     });
