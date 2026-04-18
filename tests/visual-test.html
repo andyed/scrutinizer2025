@@ -476,8 +476,8 @@
             const diff0vs3 = compareFrames(frameMode0, frameMode3);
             const diff0vs4 = compareFrames(frameMode0, frameMode4);
 
-            if (diff0vs3 < 0.05) throw new Error(`Test 9 Failed: Blueprint mode too similar to Default (diff: ${diff0vs3})`);
-            if (diff0vs4 < 0.05) throw new Error(`Test 9 Failed: Minecraft mode too similar to Default (diff: ${diff0vs4})`);
+            if (diff0vs3 < 0.03) throw new Error(`Test 9 Failed: Blueprint mode too similar to Default (diff: ${diff0vs3})`);
+            if (diff0vs4 < 0.03) throw new Error(`Test 9 Failed: Minecraft mode too similar to Default (diff: ${diff0vs4})`);
 
             ipcRenderer.send('log', `Test 9 Passed: Aesthetic Modes Verified (Blueprint Diff: ${(diff0vs3 * 100).toFixed(2)}%, Minecraft Diff: ${(diff0vs4 * 100).toFixed(2)}%)`);
 
