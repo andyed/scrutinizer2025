@@ -1938,12 +1938,44 @@ vec3 sampleDomAwarePrimitive(vec3 L_background, vec2 uv) {
     vec3 L_canonical = sampleSource(uv).rgb;
 
     vec3 L_categorical = L_canonical; // default: no degradation
+
+    // --- Non-text primitives: procedural shape/edge signal (Stages 6+7) ---
+    // Icons, form inputs, buttons without labels, generic UI rectangles —
+    // xHeightPx=0 by construction, so they fall out of the text branch.
+    // Plan spec wants per-type L_categorical (centroid+Gabor for icons,
+    // rectangle outline for inputs, filled rect + bevel for buttons). A
+    // four-tap edge detection on u_primitiveMap gets us most of the way
+    // there procedurally: any primitive's bbox produces an outline where
+    // the type_id differs from a neighbor texel, and the interior shows
+    // a dimmed pooled mean — the "there's a bounded element here" signal
+    // all three types share. Full type-specific layers (Gabor, bevel) can
+    // refine this later; the outline alone restores shape visibility in
+    // periphery where the eccentricity fallback was fading to smooth blur.
+    if (xHeightPx <= 0.0 && typeId != 0) {
+        vec2 ts = 1.0 / vec2(textureSize(u_primitiveMap, 0));
+        int id_n = int(texture(u_primitiveMap, uv + vec2(0.0, ts.y)).r * 255.0 + 0.5);
+        int id_s = int(texture(u_primitiveMap, uv - vec2(0.0, ts.y)).r * 255.0 + 0.5);
+        int id_e = int(texture(u_primitiveMap, uv + vec2(ts.x, 0.0)).r * 255.0 + 0.5);
+        int id_w = int(texture(u_primitiveMap, uv - vec2(ts.x, 0.0)).r * 255.0 + 0.5);
+        bool isEdge = (id_n != typeId) || (id_s != typeId) ||
+                      (id_e != typeId) || (id_w != typeId);
+        vec3 pooledCol = textureLod(u_texture, uv, 3.0).rgb;
+        float meanLum = dot(pooledCol, vec3(0.299, 0.587, 0.114));
+        if (isEdge) {
+            // Outline: darker than local mean — visible against interior.
+            L_categorical = vec3(clamp(meanLum - 0.4, 0.0, 1.0));
+        } else {
+            // Interior: slightly dimmed pooled mean. Keeps color signature
+            // (link-blue icon reads blue) but loses detail.
+            L_categorical = pooledCol * 0.92;
+        }
+    }
+
+    // --- Text-bearing primitives: procedural stroke field ---
     // Any primitive carrying an x-height (ie. containing text) gets the
     // procedural stroke field. That's the right signal — not the type_id —
     // because a button label, link text, nav item, or heading is still
-    // text at the retina. Non-text primitives (icons, images, landmarks)
-    // have xHeightPx = 0 by construction and fall through to L_canonical
-    // here; they'll get their own categorical layers in Stages 6–7.
+    // text at the retina.
     if (xHeightPx > 1.0) {
         // Two-frequency stroke field. Pooled mean (LOD 3 ≈ 8-texel average)
         // gives a stable "local paper color" less noisy than fragment-point
