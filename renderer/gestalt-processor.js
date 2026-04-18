@@ -130,17 +130,43 @@ class GestaltProcessor {
 
     /**
      * Merges a list of clusters into single bounding boxes.
+     *
+     * The merged block carries:
+     *   - an aggregate type (area-weighted dominant child type), used by
+     *     structure-map consumers that expect a single pooled value
+     *   - a `children` array of the original blocks, so the DOM-aware
+     *     compositor (see docs/dom-aware-perception-plan.md) can iterate
+     *     individual primitives without losing the merged bbox's role in
+     *     spatial grouping.
+     *
+     * Previously any interactive child collapsed the whole cluster to
+     * type=0.0 (UI), which destroyed text-ness whenever a paragraph
+     * contained a single inline link. Now the aggregate is area-weighted:
+     * a 300-word paragraph with one small link stays text.
      */
     mergeClusters(clusters) {
         return clusters.map(cluster => {
-            if (cluster.length === 1) return cluster[0];
+            if (cluster.length === 1) {
+                // Single-member cluster: pass block through but still expose
+                // children so downstream consumers can rely on the contract.
+                const only = cluster[0];
+                if (!only.children) {
+                    return { ...only, children: [only] };
+                }
+                return only;
+            }
 
             let minX = Infinity, minY = Infinity;
             let maxX = -Infinity, maxY = -Infinity;
             let totalDensity = 0;
-            let hasInteractive = false;
             let lineHeightSum = 0;
             let primaryRole = 0;
+
+            // Area-weighted type tallies — resolves the "paragraph with one
+            // link becomes UI" bug by letting the dominant-content type win.
+            let textArea = 0;
+            let mediaArea = 0;
+            let uiArea = 0;
 
             for (const b of cluster) {
                 minX = Math.min(minX, b.x);
@@ -150,9 +176,14 @@ class GestaltProcessor {
                 totalDensity += b.density;
                 lineHeightSum += b.lineHeight;
 
-                // Type 0.0 is UI/Interactive. Type 1.0 is Text.
-                // If we detect interaction, the whole group becomes interactive (Fitts's Law target).
-                if (b.type < 0.9) hasInteractive = true;
+                const area = Math.max(0, b.w) * Math.max(0, b.h);
+                if (b.type >= 0.9) {
+                    textArea += area;
+                } else if (b.type >= 0.4) {
+                    mediaArea += area;
+                } else {
+                    uiArea += area;
+                }
 
                 // Preserve most specific ARIA role through merge (highest ID wins)
                 if (b.ariaRole && b.ariaRole > primaryRole) {
@@ -160,18 +191,28 @@ class GestaltProcessor {
                 }
             }
 
+            // Dominant type by area. Ties broken toward text (preserves
+            // reading-path behavior; matches the bug-fix intent).
+            let aggregateType;
+            if (textArea >= mediaArea && textArea >= uiArea) {
+                aggregateType = 1.0;
+            } else if (mediaArea >= uiArea) {
+                aggregateType = 0.5;
+            } else {
+                aggregateType = 0.0;
+            }
+
             return {
                 x: minX,
                 y: minY,
                 w: maxX - minX,
                 h: maxY - minY,
-                // If the group contains any interactive elements (links), treat the whole blob as UI (0.0).
-                // Otherwise it's purely passive text (1.0).
-                type: hasInteractive ? 0.0 : 1.0,
+                type: aggregateType,
                 // Average density boosted by "Group Strength" (more items = more dense)
                 density: Math.min(1.0, (totalDensity / cluster.length) * 1.2),
                 lineHeight: lineHeightSum / cluster.length, // Average rhythm
-                ariaRole: primaryRole
+                ariaRole: primaryRole,
+                children: cluster
             };
         });
     }

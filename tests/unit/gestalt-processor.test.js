@@ -287,11 +287,15 @@ describe('GestaltProcessor.mergeClusters', () => {
         expect(gp.mergeClusters([])).toEqual([]);
     });
 
-    it('mergeClusters_singleItemCluster_returnsOriginalBlock', () => {
+    it('mergeClusters_singleItemCluster_exposesChildrenArray', () => {
         const gp = new GestaltProcessor();
         const block = makeBlock(10, 20, 30, 40);
         const result = gp.mergeClusters([[block]]);
-        expect(result[0]).toBe(block);
+        // Single-member cluster: block fields pass through, and a children
+        // array is exposed so downstream consumers can rely on the contract.
+        expect(result[0].x).toBe(10);
+        expect(result[0].y).toBe(20);
+        expect(result[0].children).toEqual([block]);
     });
 
     it('mergeClusters_twoBlocks_boundingBoxUnion', () => {
@@ -308,15 +312,38 @@ describe('GestaltProcessor.mergeClusters', () => {
         expect(result[0].h).toBe(40);
     });
 
-    it('mergeClusters_typeFlagPromotion_interactiveWinsOverText', () => {
+    // Regression guard for the paragraph-with-one-link bug flagged in
+    // docs/dom-aware-perception-plan.md. Aggregate type is area-weighted
+    // dominant, so a small inline link does not destroy text-ness.
+    it('mergeClusters_paragraphWithInlineLink_staysText', () => {
         const gp = new GestaltProcessor();
-        // One interactive block (type=0.0) mixed with text blocks (type=1.0)
-        // → merged block should be type 0.0 (interactive)
-        const text1 = makeBlock(0,  0, 50, 20, { type: 1.0 });
-        const link  = makeBlock(55, 0, 50, 20, { type: 0.0 });
-        const text2 = makeBlock(110,0, 50, 20, { type: 1.0 });
-        const result = gp.mergeClusters([[text1, link, text2]]);
+        // Three text runs of equal size + one small inline link → text dominates.
+        const text1 = makeBlock(0,   0, 200, 20, { type: 1.0 });
+        const text2 = makeBlock(220, 0, 200, 20, { type: 1.0 });
+        const text3 = makeBlock(440, 0, 200, 20, { type: 1.0 });
+        const link  = makeBlock(210, 0,  30, 20, { type: 0.0 });
+        const result = gp.mergeClusters([[text1, text2, text3, link]]);
+        expect(result[0].type).toBe(1.0);
+    });
+
+    it('mergeClusters_uiDominant_becomesUI', () => {
+        const gp = new GestaltProcessor();
+        // Toolbar: three buttons, tiny text label → UI dominates.
+        const b1 = makeBlock(0,   0, 60, 30, { type: 0.0 });
+        const b2 = makeBlock(70,  0, 60, 30, { type: 0.0 });
+        const b3 = makeBlock(140, 0, 60, 30, { type: 0.0 });
+        const lbl = makeBlock(0, 40, 20, 10, { type: 1.0 });
+        const result = gp.mergeClusters([[b1, b2, b3, lbl]]);
         expect(result[0].type).toBe(0.0);
+    });
+
+    it('mergeClusters_preservesChildrenArray', () => {
+        const gp = new GestaltProcessor();
+        const a = makeBlock(0,  0, 50, 20);
+        const b = makeBlock(55, 0, 50, 20);
+        const c = makeBlock(110, 0, 50, 20, { type: 0.0 });
+        const result = gp.mergeClusters([[a, b, c]]);
+        expect(result[0].children).toEqual([a, b, c]);
     });
 
     it('mergeClusters_allTextBlocks_typeRemainsText', () => {
