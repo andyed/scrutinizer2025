@@ -154,9 +154,12 @@ describe('classifyPrimitive', () => {
             expect(classifyPrimitive(el)).toBe('image');
         });
 
-        it('small SVG with no label and no interactive ancestor → image (not icon)', () => {
+        it('small SVG with no label and no interactive ancestor → icon (perceptual)', () => {
+            // Smallness alone is the perceptual test — ARIA/alt metadata is
+            // a semantic signal peripheral vision can't read. See the comment
+            // in dom-primitive-classifier.js at rule 5.
             const el = makeEl('svg', { rect: { width: 20, height: 20 } });
-            expect(classifyPrimitive(el)).toBe('image');
+            expect(classifyPrimitive(el)).toBe('icon');
         });
     });
 

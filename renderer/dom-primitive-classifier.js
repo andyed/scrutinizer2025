@@ -54,10 +54,12 @@ function classifyPrimitive(el) {
     if (role === 'navigation' || role === 'menubar' || tag === 'nav') return 'nav_item';
     if (role === 'menu' || role === 'menuitem' || role === 'tab' || role === 'tablist') return 'nav_item';
 
-    // 5. Icon — small SVG/img in an interactive ancestor, or with an
-    // aria-label (accessibility signal that a graphic carries meaning).
-    // Runs before the generic 'image' fallback so a 24×24 toolbar SVG becomes
-    // an icon, not an image.
+    // 5. Icon — small SVG/img/picture. We used to gate on ARIA/alt OR an
+    // interactive ancestor (the "is it semantically meaningful" test), but
+    // peripheral vision doesn't read ARIA. For Scrutinizer's perceptual
+    // modeling the retinal test is smallness alone — a ~24px glyph reads
+    // as an icon whether or not the author remembered to label it. Large
+    // SVG/img still falls through to the generic 'image' bucket below.
     const iconBboxLimit = 48; // px; empirical upper bound for icon-sized graphics
     if (tag === 'svg' || tag === 'img' || tag === 'picture') {
         const r = typeof el.getBoundingClientRect === 'function'
@@ -65,12 +67,7 @@ function classifyPrimitive(el) {
             : null;
         const isSmall = r && r.width > 0 && r.height > 0 &&
                         r.width <= iconBboxLimit && r.height <= iconBboxLimit;
-        const hasLabel = (typeof el.getAttribute === 'function') &&
-                         (el.getAttribute('aria-label') || el.getAttribute('alt'));
-        const inInteractive = typeof el.closest === 'function'
-            ? !!el.closest('a, button, [role=button], [role=link]')
-            : false;
-        if (isSmall && (hasLabel || inInteractive)) return 'icon';
+        if (isSmall) return 'icon';
     }
 
     // 6. Link

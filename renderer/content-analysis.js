@@ -461,6 +461,15 @@
                     const hasText = (typeof p.fontSizePx === 'number' && p.fontSizePx > 0);
                     (hasText ? textBearing : nonTextBearing).push(p);
                 }
+                // Within non-text, draw larger bboxes first so smaller inner
+                // primitives (icons inside buttons, inputs inside forms) win
+                // the primitive-map at the inner region. Without this, the
+                // interactive ancestor (button/landmark) overwrites its icon
+                // child and the edge-detection compositor has no type
+                // boundary to draw around the icon.
+                nonTextBearing.sort(
+                    (a, b) => (b.w * b.h) - (a.w * a.h)
+                );
                 const drawPrimitive = (p) => {
                     this.primitiveMap.drawBlock(
                         p.x * dpr,

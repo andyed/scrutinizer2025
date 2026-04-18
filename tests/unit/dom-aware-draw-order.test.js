@@ -64,6 +64,10 @@ function populateMaps(primitiveMap, primitiveMeta, children, dpr = 1) {
         const hasText = (typeof p.fontSizePx === 'number' && p.fontSizePx > 0);
         (hasText ? textBearing : nonTextBearing).push(p);
     }
+    // Within non-text: largest bbox first so inner primitives (icons inside
+    // buttons, inputs inside forms) win the primitive-map at the inner
+    // region and edge detection has a type boundary to render.
+    nonTextBearing.sort((a, b) => (b.w * b.h) - (a.w * a.h));
     const drawPrimitive = (p) => {
         primitiveMap.drawBlock(
             p.x * dpr, p.y * dpr, p.w * dpr, p.h * dpr,
@@ -184,6 +188,21 @@ describe('DOM-aware draw order — text wins over non-text in overlapping region
         expect(Array.from(A.pmeta.imageData.data)).toEqual(Array.from(B.pmeta.imageData.data));
     });
 
+    it('icon inside button → icon typeId wins at icon region (regression for invisible-icons-in-buttons)', () => {
+        const { pmap, pmeta } = setup();
+        const children = [
+            { x: 0, y: 0, w: 100, h: 40, primitiveType: 'button' },
+            { x: 10, y: 10, w: 20, h: 20, primitiveType: 'icon' },
+        ];
+        populateMaps(pmap, pmeta, children);
+        // Sample inside icon region.
+        const iconTexel = sampleMap(pmap, 20, 20);
+        expect(iconTexel.r).toBe(PRIMITIVE_TYPE_IDS.icon);
+        // Sample button-only region (outside icon).
+        const buttonTexel = sampleMap(pmap, 60, 20);
+        expect(buttonTexel.r).toBe(PRIMITIVE_TYPE_IDS.button);
+    });
+
     it('primitives with no text content emit xHeight = 0 across full bbox', () => {
         const { pmap, pmeta } = setup();
         const children = [
@@ -219,5 +238,7 @@ describe('content-analysis.js still carries the draw-order pattern', () => {
         // Must always write primitive-meta (no conditional skip):
         const drawMetaCount = (src.match(/primitiveMeta\.drawBlock/g) || []).length;
         expect(drawMetaCount).toBeGreaterThanOrEqual(1);
+        // Must sort non-text by descending bbox area so inner primitives win:
+        expect(src).toMatch(/nonTextBearing\.sort/);
     });
 });
