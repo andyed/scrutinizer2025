@@ -38,6 +38,19 @@ tests/smoke-captures/
 # Compute texture captures — raw RGBA dumps, regenerate with capture-compute-texture.js
 tests/compute-captures/
 
+# Figma Store captures — private store-listing screenshots, not for public repo
+tests/figma-store-captures/
+scripts/capture-figma-store.js
+
+# Mind2Web experiment — local experiment data, not repo material
+tests/mind2web-experiment/
+
+# Coco-Search18 image dataset — large, download locally
+data/coco-search18/images/
+
+# Local scratch output — regenerated artifacts, not repo material
+output/
+
 # Pyramid validation reference data — regenerate with generate-pyramid-reference.py
 tests/validation/pyramid-reference/
 
