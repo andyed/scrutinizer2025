@@ -59,10 +59,9 @@ function buildSpecs() {
         for (let i = 0; i < SWEEP.frameCount; i++) {
             const dxPx = (i - centerFrame) * SWEEP.stepPx;
             const fixationX = SWEEP.centerX + dxPx / VIEWPORT_WIDTH;
-            const filename = path.join(
-                OUTPUT_DIR,
-                `${FIXTURE.slug}_mode${mode}_frame${String(i).padStart(2, '0')}.png`
-            );
+            // capture-runner / main.js prefix filename with outputDir, so pass
+            // basename only — absolute paths get double-prefixed.
+            const filename = `${FIXTURE.slug}_mode${mode}_frame${String(i).padStart(2, '0')}.png`;
             specs.push({
                 filename,
                 url:        FIXTURE.url,
@@ -109,7 +108,7 @@ async function main() {
             mode:      s.mode,
             fixationX: s.fixationX,
             fixationY: s.fixationY,
-            filename:  path.basename(s.filename),
+            filename:  s.filename,
         })),
     };
     fs.writeFileSync(
