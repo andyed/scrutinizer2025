@@ -479,28 +479,7 @@ fn reconstruct(
     //   Tile mode (Tier 2.75): Use tile_mean_L as DC base (original behavior).
     //
     // detail_strength scales with alpha: stronger bandpass noise in far periphery.
-    //
-    // Two amplitude-sanity dampeners (radial-ttm-fix-plan §Revision 2026-04-18):
-    //   1. Cap max amplification at 1.5 instead of 3.0. The 3x factor amplified
-    //      phase-unconstrained synth_luma (classic Portilla-Simoncelli marginal-
-    //      magnitude-matched-phase-wrong failure) into visible speckle in
-    //      mid-eccentricity text regions. 1.5 keeps bandpass noise visible
-    //      without over-amplifying the phase-incorrect structure.
-    //   2. Gate by sector target-variance sum. On low-variance sectors (white
-    //      space), cross-scale injection at synth lines 335-344 can inject
-    //      residual noise even when target_var is ~0; the gate collapses
-    //      detail_strength to 0 in that regime so incidental noise doesn't
-    //      crystallize into speckle on flat backgrounds.
-    var detail_strength = mix(0.5, 1.5, alpha);
-    if (rc_config.use_sectors != 0u) {
-        let sid_for_var = computeSectorIdRC(x, y);
-        let target_var_sum = rc_stats[sid_for_var * STATS_STRIDE + 4u]
-                           + rc_stats[sid_for_var * STATS_STRIDE + 5u]
-                           + rc_stats[sid_for_var * STATS_STRIDE + 6u]
-                           + rc_stats[sid_for_var * STATS_STRIDE + 7u];
-        let variance_gate = smoothstep(0.0001, 0.001, target_var_sum);
-        detail_strength = detail_strength * variance_gate;
-    }
+    let detail_strength = mix(0.5, 3.0, alpha);
 
     // DC component: sector/tile mean luminance.
     // For isolated content (single letter on white), mean ≈ white — letter identity is
