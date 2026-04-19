@@ -637,24 +637,6 @@
                             this.webgpuCompute = new WebGPUPyramidCompute(this.webgpuDevice, halfW, halfH, sectorConfig);
                             this.webgpuTier = 2.75;
                             this.renderer.setComputeTier(2.75);
-                            // Health check: if the pyramid synth pipeline
-                            // failed validation (silent-fallback bug from
-                            // the 9-binding reconBGL under 8-binding cap),
-                            // drop mode 15 to Tier 2.5 instead of rendering
-                            // zeros via TEXTURE5. See radial-ttm-fix-plan.md.
-                            this.webgpuCompute.isPipelineHealthy().then(({ healthy, error }) => {
-                                if (!healthy) {
-                                    console.error(
-                                        '[Scrutinizer] Pyramid synth pipeline failed validation — ' +
-                                        'mode 15 TTM Tier 3 will be degraded to Tier 2.5. Error:',
-                                        error && error.message ? error.message : error
-                                    );
-                                    this.webgpuTier = 2.5;
-                                    this.renderer.setComputeTier(2.5);
-                                }
-                            }).catch((err) => {
-                                console.error('[Scrutinizer] Health check threw:', err);
-                            });
                         } else {
                             this.webgpuCompute = new WebGPUCrowdingCompute(this.webgpuDevice, halfW, halfH);
                             this.webgpuTier = 2.5;
