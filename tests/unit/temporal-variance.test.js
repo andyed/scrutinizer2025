@@ -62,14 +62,7 @@ describe('Temporal variance — DOM-aware mode 20 motion-artifact ceiling', () =
         }
     });
 
-    test('Python analyzer reported no failures for mode 20', () => {
-        // Only mode-20 ratios are the subject of this regression. The analyzer
-        // also emits failures for other (mode, band) pairs when they exceed
-        // the ceiling — those are legitimate diagnostic signals (mode 16 vs
-        // baseline 15 is naturally noisy because mode 16 is pre-TTM quiet
-        // pipeline and 15 is TTM-synthesis-active). Filter them out here;
-        // the test should only fail on mode-20-specific regressions.
-        const mode20Failures = report.failures.filter(f => f.startsWith('mode 20 '));
-        expect(mode20Failures).toEqual([]);
+    test('Python analyzer reported no failures', () => {
+        expect(report.failures).toEqual([]);
     });
 });
