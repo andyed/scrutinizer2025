@@ -634,10 +634,7 @@
                                 cmfA: this.renderer.config.cmf_a || 2.78,
                                 maxEccDeg: 15,
                             } : null;
-                            this.webgpuCompute = new WebGPUPyramidCompute(
-                                this.webgpuDevice, halfW, halfH, sectorConfig,
-                                { log: (msg) => ipcRenderer.send('log:renderer', msg) }
-                            );
+                            this.webgpuCompute = new WebGPUPyramidCompute(this.webgpuDevice, halfW, halfH, sectorConfig);
                             this.webgpuTier = 2.75;
                             this.renderer.setComputeTier(2.75);
                             // Health check: if the pyramid synth pipeline

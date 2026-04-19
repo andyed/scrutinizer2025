@@ -50,11 +50,7 @@ class WebGPUPyramidCompute {
      *   Sectors scale with eccentricity (Blauch et al. 2026) — small foveal,
      *   large peripheral — so tile means in far periphery naturally destroy content.
      */
-    constructor(device, width, height, sectorConfig = null, options = {}) {
-        // `options.log` lets the caller pipe audit/diagnostic output through
-        // a channel that actually reaches main stdout (ipcRenderer.send
-        // 'log:renderer'), rather than stranding it in the HUD's devtools.
-        this._log = options.log || ((msg) => console.log(msg));
+    constructor(device, width, height, sectorConfig = null) {
         this.device = device;
         this.width = width;
         this.height = height;
@@ -245,29 +241,15 @@ class WebGPUPyramidCompute {
             });
         }
 
-        // Synthesis: 4 noise band buffers (all at band_0 resolution for simplicity).
-        // COPY_SRC is added so _auditNoiseVariance() can copy into a staging
-        // buffer for one-shot CPU-side variance measurement. The audit is
-        // load-bearing for validating pyramid-synth.wgsl:314's hard-coded
-        // `noise_var = 0.5` assumption — see docs/radial-ttm-fix-plan.md
-        // revision 2026-04-18.
+        // Synthesis: 4 noise band buffers (all at band_0 resolution for simplicity)
         const noisePixels = this.levels[0].pixels;
         this.noiseBuffers = [];
         for (let k = 0; k < PYRAMID_LEVELS; k++) {
             this.noiseBuffers.push(this.device.createBuffer({
                 size: Math.max(noisePixels * 4, 16),
-                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+                usage: GPUBufferUsage.STORAGE,
             }));
         }
-
-        // One-shot audit staging buffer (one band at a time to keep it cheap).
-        this._noiseAuditStaging = this.device.createBuffer({
-            size: Math.max(noisePixels * 4, 16),
-            usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-        });
-        this._noiseAuditDone = false;
-        this._noiseAuditPending = false;
-        this._noiseAuditPixelCount = noisePixels;
 
         // Synthesis output buffer: RGBA8 packed as u32 (same as Tier 2.5)
         this.synthOutputBuffer = this.device.createBuffer({
@@ -712,21 +694,6 @@ class WebGPUPyramidCompute {
         seedPass.dispatchWorkgroups(wgX, wgY);
         seedPass.end();
 
-        // One-shot audit: on the first run after construction, snapshot
-        // band-0's noise to staging for CPU-side variance readback. See
-        // docs/radial-ttm-fix-plan.md revision 2026-04-18 — the hard-coded
-        // `noise_var = 0.5` at pyramid-synth.wgsl:314 is the load-bearing
-        // calibration constant, and we need to confirm it matches the
-        // actual distribution of the seeded noise.
-        if (!this._noiseAuditDone && !this._noiseAuditPending) {
-            encoder.copyBufferToBuffer(
-                this.noiseBuffers[0], 0,
-                this._noiseAuditStaging, 0,
-                this._noiseAuditPixelCount * 4
-            );
-            this._noiseAuditPending = true;
-        }
-
         // Match stats (iterative)
         const matchBG = this.device.createBindGroup({
             layout: this.matchBGL,
@@ -811,73 +778,6 @@ class WebGPUPyramidCompute {
         );
 
         this.device.queue.submit([encoder.finish()]);
-
-        // Fire off the one-shot noise-variance audit if we queued a copy
-        // this frame. Async, no await — the compute result isn't blocked
-        // on it. Results surface via console.log once the map resolves.
-        if (this._noiseAuditPending && !this._noiseAuditDone) {
-            this._noiseAuditDone = true;
-            this._noiseAuditPending = false;
-            this._completeNoiseAudit().catch(err => {
-                console.error('[WebGPU Pyramid] Noise audit failed:', err);
-            });
-        }
-    }
-
-    /**
-     * Complete the one-shot noise-variance audit. Awaits the staging buffer's
-     * CPU map, computes mean + variance of band-0 noise, logs. See
-     * docs/radial-ttm-fix-plan.md revision 2026-04-18 for why this audit is
-     * load-bearing: pyramid-synth.wgsl:314's `noise_var = 0.5` drives the
-     * band-scale factor `sqrt(target_var / 0.5)`, and if the actual noise
-     * distribution differs, every synthesized band is mis-scaled and the
-     * detail_strength amplification surfaces the miscalibration as the
-     * peripheral-text speckle observed on google.com in mode 15.
-     */
-    async _completeNoiseAudit() {
-        await this._noiseAuditStaging.mapAsync(GPUMapMode.READ);
-        const data = new Float32Array(
-            this._noiseAuditStaging.getMappedRange().slice(0)
-        );
-        this._noiseAuditStaging.unmap();
-
-        const n = data.length;
-        let sum = 0;
-        let min = Infinity;
-        let max = -Infinity;
-        for (let i = 0; i < n; i++) {
-            const v = data[i];
-            sum += v;
-            if (v < min) min = v;
-            if (v > max) max = v;
-        }
-        const mean = sum / n;
-        let sqSum = 0;
-        for (let i = 0; i < n; i++) {
-            const d = data[i] - mean;
-            sqSum += d * d;
-        }
-        const variance = sqSum / n;
-        const std = Math.sqrt(variance);
-
-        // Count non-zero samples — seed_noise may leave some entries unset
-        // if the workgroup dispatch doesn't cover the full buffer.
-        let nonzero = 0;
-        for (let i = 0; i < n; i++) if (data[i] !== 0) nonzero++;
-
-        this._log(
-            `[WebGPU Pyramid] Noise audit (band 0, n=${n}): ` +
-            `mean=${mean.toFixed(4)} variance=${variance.toFixed(4)} ` +
-            `std=${std.toFixed(4)} range=[${min.toFixed(3)}, ${max.toFixed(3)}] ` +
-            `nonzero=${nonzero}/${n} (${(100 * nonzero / n).toFixed(1)}%)`
-        );
-        this._log(
-            `[WebGPU Pyramid] Hard-coded assumption at pyramid-synth.wgsl:314 is ` +
-            `noise_var = 0.5. Actual variance: ${variance.toFixed(4)}. ` +
-            (Math.abs(variance - 0.5) > 0.1
-                ? `MISMATCH — band scale factor sqrt(target_var/0.5) is wrong by ~${(Math.sqrt(0.5/variance)).toFixed(2)}x.`
-                : `Within tolerance.`)
-        );
     }
 
     /**
