@@ -53,11 +53,19 @@
   "pooled_stat_path": {
     "file": "renderer/shaders/peripheral.frag",
     "function": "sampleDoGReconstructed",
-    "signature": "vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius, float dog_e2, float dog_sharpness, float visual_ecc, vec2 undistortedUV)",
+    "signature_prefix": "vec4 sampleDoGReconstructed(",
     "line": 187,
-    "file_commit": "4d4c919014b5b717cfb2014c2abebfe04bf2c4de",
-    "note": "DoG-reconstructed sampling path. Not the MIP fallback (sampleMIPPooled at line 628). Must be the active path at runtime — Step 3 wires the capability-detect branch to throw if MIP fallback is silently substituted."
+    "file_blob_sha": "08d8a1e77875f86fe18426699f15a53181cfbcbf",
+    "note": "DoG-reconstructed sampling path. Not the MIP fallback (sampleMIPPooled at line 628). file_blob_sha is the git blob SHA (git hash-object) — any edit to the file invalidates it. signature_prefix is grepped from the live file at the pinned line to catch function renames and signature changes. Step 3 wires the capability-detect branch to throw if MIP fallback is silently substituted at runtime."
   },
+
+  "modes_json_drift_pin": {
+    "file": "shared/modes.json",
+    "file_blob_sha": "36398402debf8d49ad2ed95d08bab9c6702cd0a1",
+    "note": "Blob SHA of shared/modes.json at freeze. validateLive() re-reads the file and compares. Catches the mode-15-style silent drift where pipeline knobs are edited without updating the Arm-0 snapshot."
+  },
+
+  "pool_constants_note": "Schwartz CMF e0 and Rosenholtz pool-size constants are not separate knobs — both are encoded in pipeline.cmf_a (2.78) and pipeline.ecc_scaling (0.75). Schwartz M(e) = log(1 + e/cmf_a); pool-radius schedule c[k] = cmf_a * (exp(k*0.5*scale) - 1) / fovea_deg with scale = cortical_max / maxMipLevel / (ecc_scaling / 0.75). See peripheral.frag lines 322-338, 558-561.",
 
   "surround": {
     "definition": "rosenholtz_pool_at_retinotopic_location",
