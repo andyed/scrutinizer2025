@@ -53,6 +53,9 @@ data/mind2web-cache-*/
 # Keep split manifest tracked
 !data/mind2web-split.json
 
+# Scratch — extracted actions, scratch renders, one-off artifacts.
+tmp/
+
 # Coco-Search18 image dataset — large, download locally
 data/coco-search18/images/
 
