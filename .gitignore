@@ -45,6 +45,14 @@ scripts/capture-figma-store.js
 # Mind2Web experiment — local experiment data, not repo material
 tests/mind2web-experiment/
 
+# Mind2Web full train split — 13GB raw_html corpus, download locally.
+# Pooled-stat caches are regenerated per config_hash via
+# scripts/mind2web-extract-task.js. See docs/stage9-mind2web-validation.md.
+data/mind2web/
+data/mind2web-cache-*/
+# Keep split manifest tracked
+!data/mind2web-split.json
+
 # Coco-Search18 image dataset — large, download locally
 data/coco-search18/images/
 
