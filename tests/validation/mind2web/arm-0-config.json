@@ -65,6 +65,34 @@
     "note": "Blob SHA of shared/modes.json at freeze. validateLive() re-reads the file and compares. Catches the mode-15-style silent drift where pipeline knobs are edited without updating the Arm-0 snapshot."
   },
 
+  "pixel_source": {
+    "dataset": "Mind2Web Raw Dump",
+    "distribution": "Globus",
+    "endpoint_id": "32e6b738-a0b0-47f8-b475-26bf1c5ebf19",
+    "path_template": "raw_dump/task/{annotation_id}/processed/snapshots/{action_uid}_before.mhtml",
+    "format": "MHTML",
+    "viewport_width_px": 1280,
+    "description": "Per-action page state captured with Playwright Page.captureSnapshot. MHTML is Chromium's single-file bundle (HTML + CSS + images + fonts base64-inlined). Loaded into Electron BrowserView via file:// URL; Chromium rehydrates the full styled page with a live DOM. Arm-0 samples the peripheral shader's output over those pixels; Arm-1 additionally uses the live DOM for renderer/preload.js primitive classification. Canonical pixel source as of v3 pivot — see memo §Pixel-source pivot for history of v1 (naked-DOM, broken) and v2 (Multimodal screenshot, correct pixels but no DOM) predecessors.",
+    "viability_tested_on": "united.com task 401c4e6f, actions 1 (combobox) and 4 (calendar). On action 1 (N=5 same-type distractors), v3 AUC = v2 AUC = 0.800 exactly. On action 4 (N=262 calendar cells), divergence of ~0.4 AUC reveals pathological-UI failure mode (see pathological_ui_filter).",
+    "bbox_space_authority": "bounding_box_rect values in Multimodal-Mind2Web raw_html attributes are authoritative against the MHTML render at 1280-wide viewport. Scrutinizer's BrowserView window is sized to viewport.viewport_w exactly; no reflow."
+  },
+
+  "metadata_source": {
+    "dataset": "Multimodal-Mind2Web",
+    "dataset_url": "https://huggingface.co/datasets/osunlp/Multimodal-Mind2Web",
+    "dataset_release": "2024-03-18",
+    "split": "train",
+    "format": "parquet",
+    "used_for": "bboxes (bounding_box_rect attrs in raw_html), pos_candidates, neg_candidates, action metadata, action_uid → MHTML filename lookup",
+    "note": "The screenshots in this dataset serve as the v2 sanity baseline for verifying MHTML rehydration isn't systematically biased. They are not the primary metric input as of v3."
+  },
+
+  "pathological_ui_filter": {
+    "max_same_type_distractors_visible": 50,
+    "rationale": "On high-N same-type distractor pools (calendars with 250+ near-identical <td> cells, time-slot grids, paginated identical list items), pixel-level target discrimination is structurally not well-posed. Rehydration drift of a few pixels flips ranks by dozens of positions. Observed on united.com action 4: v2 AUC=0.709 vs v3 AUC=0.306 on the same 262 calendar cells. Conservative cut at 50 distractors; tighter distractor-variance-based filter is a secondary analysis.",
+    "applies_to": "primary analysis only. Secondary analyses may report these cases labelled as exploratory."
+  },
+
   "feature_congestion_path": {
     "file": "renderer/congestion-core.js",
     "file_blob_sha": "9131bfc86d6ca1b85cd28b948da90dd8db575e31",

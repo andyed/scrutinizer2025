@@ -184,6 +184,10 @@ def main():
     ap.add_argument("--action-idx", type=int, help="0-based action index within the task")
     ap.add_argument("--pick-first-valid", action="store_true",
                     help="Ignore --task-id/--action-idx; find the first action that meets v0 constraints")
+    ap.add_argument("--domain", default=None,
+                    help="Restrict --pick-first-valid to tasks with this domain (e.g. Shopping)")
+    ap.add_argument("--primitive", default=None,
+                    help="Restrict --pick-first-valid to target primitive (button|link|form_input)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -194,18 +198,23 @@ def main():
 
     if args.pick_first_valid:
         for task in iter_corpus(corpus_dir):
+            if args.domain and task.get("domain") != args.domain:
+                continue
             for idx in range(1, len(task.get("actions") or [])):
                 try:
                     rec = extract_action(task, idx)
                 except ValueError:
                     continue
+                if args.primitive and rec["target"]["primitive"] != args.primitive:
+                    continue
                 if meets_v0_constraints(rec):
                     write_out(rec, args.out)
                     print(f"Picked: task={rec['task_id']} action={idx} "
-                          f"website={rec['website']} primitive={rec['target']['primitive']} "
+                          f"website={rec['website']} domain={rec['domain']} "
+                          f"primitive={rec['target']['primitive']} "
                           f"distractors={len(rec['same_type_distractors'])}")
                     return
-        print("No action meets v0 constraints.", file=sys.stderr)
+        print("No action meets constraints.", file=sys.stderr)
         sys.exit(1)
 
     if not args.task_id or args.action_idx is None:

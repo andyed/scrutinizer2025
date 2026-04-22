@@ -1,6 +1,6 @@
 # Stage 9 — Mind2Web Target-Discrimination Validation
 
-**Status:** v0 memo, 2026-04-21. Replaces the free-viewing UEyes plan as the primary validation target; UEyes becomes a secondary bottom-up-only ablation.
+**Status:** v3, 2026-04-22. Replaces the free-viewing UEyes plan as the primary validation target; UEyes becomes a secondary bottom-up-only ablation. Pixel source pivoted from naked-DOM re-render (v1) → Multimodal-Mind2Web screenshot (v2) → Mind2Web raw-dump MHTML (v3). See §Pixel-source pivot for history.
 
 **Companion docs:**
 - `docs/specs/mind2web_attention_experiment.md` — pipeline + task selection
@@ -177,3 +177,54 @@ Still open — resolve at the step noted:
 - Three empty validation-sheet stubs.
 
 Arm-0 renders on eval tasks are the next concrete run, after this memo is committed and the config_hash is frozen.
+
+## Pixel-source pivot (v1 → v2 → v3)
+
+The memo's original implementation assumed Scrutinizer could re-render Mind2Web's `raw_html` through its BrowserView and sample the peripheral shader's output at the bbox coordinates embedded in the DOM. This turned out to be wrong, and correcting it took three iterations. Recording the history here because the wrong path was plausible enough that future-me would likely re-try it.
+
+### v1 (naked-DOM re-render) — ❌ broken
+
+Pipeline: `raw_html → file:// URL → Electron BrowserView → mode 16 peripheral render → PNG → sample at bbox centers`.
+
+Finding: Mind2Web's `raw_html` contains **zero stylesheets, zero `<style>` blocks, zero inline `style=` attributes, zero external `src=` references**. The DOM has `class=` attributes (1968 of them in a typical page) but no CSS to match. Scrutinizer rendered naked DOM with browser-default styling. The `bounding_box_rect` values baked into each node as attributes were captured against the *original* CSS'd render, so sampling at those coords on a naked-DOM re-render returned pixels from the wrong elements.
+
+Result on united.com action 1 (combobox, N=5 same-type distractors): per-trial AUC = 0.800 in v2 (correct pixels), **0.000** in v1 on the exploretock form page equivalent. The v0/v1 numbers are artifacts of mis-aligned sampling, not real discrimination signals.
+
+### v2 (Multimodal-Mind2Web screenshot) — ✓ correct pixels, ✗ no DOM
+
+Pivot discovery: the 2024-03-18 [Multimodal-Mind2Web](https://huggingface.co/datasets/osunlp/Multimodal-Mind2Web) release pairs each action with the authoritative webpage screenshot (1280-wide full-page PNG). The screenshot IS the pixels `bounding_box_rect` was captured against, by construction.
+
+Pipeline: `screenshot PNG → minimal HTML stub wrapping the image at 1280×768 viewport → Electron BrowserView → mode 16 shader processes the image → sample at bbox centers`. Matches `scripts/capture-coco-periph.js` pattern for static-image peripheral rendering.
+
+Result on united.com action 1: AUC = 0.800 (vs 0.000 for v1's naked-DOM). Real signal.
+
+Limitation: the screenshot is a rendered image. `renderer/preload.js` has nothing to classify — there is no live DOM. This forecloses Arm-1 (DOM-aware, mode 20+) validation, which needs preload.js to produce a primitive-map texture the shader consumes. v2 validates Arm-0 (bottom-up) but cannot compare Arm-0 vs. Arm-1 on the same corpus.
+
+### v3 (Mind2Web raw-dump MHTML) — ✓ correct pixels, ✓ live DOM
+
+Pivot discovery: Mind2Web's raw dump (Globus endpoint `32e6b738-a0b0-47f8-b475-26bf1c5ebf19`, self-serve with Google login) ships per-action MHTML snapshots at `task/{annotation_id}/processed/snapshots/{action_uid}_before.mhtml`. MHTML is the Chromium single-file bundle format — HTML + CSS + images + fonts all base64-inlined. Electron's BrowserView loads MHTML natively via `file://…mhtml` and rehydrates the full styled page including live DOM.
+
+Pipeline: `MHTML → file:// URL → Electron BrowserView (rehydrates CSS + resources) → mode 16 shader over the live page → sample at bbox centers`. preload.js's primitive classifier now has a real DOM to walk, unblocking Arm-1.
+
+Result comparison on united.com task, same bboxes / fovea / config:
+
+| action | same-type N | v2 AUC | v3 AUC |
+|---|---|---|---|
+| idx 1 (combobox, TYPE Brooklyn) | 5 | 0.800 | **0.800** |
+| idx 4 (calendar, CLICK date) | 262 | 0.709 | 0.306 |
+
+MHTML rehydration is not pixel-byte-equivalent to the Multimodal screenshot — tiny JS-state / font / timing differences shift values. But the AUC metric is rank-based, and on well-posed actions (few same-type distractors, clearly-different candidates) the rank order is preserved. Divergence only shows up on pathological UIs where same-type distractors are near-identical by construction.
+
+### Pathological-UI exclusion
+
+**Rule (pre-registered):** actions with > 50 same-type distractors *where those distractors are structurally near-identical* are excluded from the primary analysis. Canonical examples: calendar date pickers (250+ `<td>` cells, all white), time-slot grids, paginated identical list items. Discrimination is not well-posed here — a human without top-down task knowledge couldn't distinguish the correct candidate either, and a few pixels of rehydration drift flips ranks by dozens of positions.
+
+The simpler **operational filter** used during extraction: drop trials where same-type distractor count exceeds **50** (the 95th percentile of Mind2Web trial distractor counts within the first viewport). Implemented in `scripts/mind2web-extract-multimodal.py` constraint check. This is the conservative cut; a more principled filter (distractor-variance-based) can replace it in a secondary analysis.
+
+### Canonical pixel source (v3+)
+
+Arm-0 and Arm-1 both validate against MHTML-rehydrated pixels. The Multimodal-Mind2Web parquet remains the canonical **metadata** source (bboxes, pos/neg_candidates, action_uid → MHTML filename lookup). The screenshots in that dataset are retained as a secondary "sanity baseline" for verifying MHTML rehydration isn't systematically biased, but are not the primary metric input.
+
+### What the v1/v2 cache files mean
+
+The `data/mind2web-cache-<hash>/*/*-v1.{png,json}` and `*-v2.{png,json}` artifacts from the Step 3 v0 and Step 3 v1 commits (hash prefix `17f60ab97e5c`, `1702a0aa0d57`) are artifacts of the misaligned pixel source. They are not valid validation results. The config_hash change to the v3 hash invalidates them by design — cache files keyed by old hashes are ignored.

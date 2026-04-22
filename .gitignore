@@ -45,13 +45,18 @@ scripts/capture-figma-store.js
 # Mind2Web experiment — local experiment data, not repo material
 tests/mind2web-experiment/
 
-# Mind2Web full train split — 13GB raw_html corpus, download locally.
-# Pooled-stat caches are regenerated per config_hash via
-# scripts/mind2web-extract-task.js. See docs/stage9-mind2web-validation.md.
+# Mind2Web text-only corpus — 13GB raw_html, download locally.
+# Multimodal-Mind2Web parquet cache — ~7GB with bundled screenshots.
+# Mind2Web raw-dump MHTMLs — ~20GB for dev+eval subset, self-serve via Globus.
+# Pooled-stat caches are regenerated per config_hash.
+# See docs/stage9-mind2web-validation.md for setup.
 data/mind2web/
 data/mind2web-cache-*/
-# Keep split manifest tracked
+data/mind2web-multimodal/
+data/mind2web-mhtml/
+# Keep split manifest + summaries tracked
 !data/mind2web-split.json
+!data/mind2web-summaries.json
 
 # Scratch — extracted actions, scratch renders, one-off artifacts.
 tmp/

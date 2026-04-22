@@ -10,6 +10,7 @@ const ALLOWED_TOP_LEVEL_KEYS = new Set([
     'mode_id', 'mode_name',
     'dom_aware', 'ior', 'anisotropy_h',
     'viewing', 'pipeline', 'pooled_stat_path', 'modes_json_drift_pin',
+    'pixel_source', 'metadata_source', 'pathological_ui_filter',
     'feature_congestion_path', 'pooled_stat_vector',
     'pool_constants_note', 'surround',
     'metric', 'bootstrap', 'multiplicity',
@@ -90,6 +91,12 @@ function validate(cfg) {
     }
     if (cfg.feature_congestion_path?.sigma !== 2.5) {
         throw new Error(`Arm-0 feature_congestion_path.sigma must be 2.5 (Rosenholtz 2007 variance window)`);
+    }
+    if (cfg.pixel_source?.format !== 'MHTML') {
+        throw new Error(`Arm-0 pixel_source.format must be 'MHTML' (v3 canonical; naked-DOM and screenshot sources are superseded)`);
+    }
+    if (cfg.pathological_ui_filter?.max_same_type_distractors_visible !== 50) {
+        throw new Error(`Arm-0 pathological_ui_filter.max_same_type_distractors_visible must be 50`);
     }
 }
 

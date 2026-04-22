@@ -19,7 +19,7 @@ const CONFIG_PATH = path.join(REPO_ROOT, 'tests/validation/mind2web/arm-0-config
 const MODES_PATH = path.join(REPO_ROOT, 'shared/modes.json');
 const FRAG_PATH = path.join(REPO_ROOT, 'renderer/shaders/peripheral.frag');
 
-const EXPECTED_HASH_PREFIX = '1702a0aa0d57';
+const EXPECTED_HASH_PREFIX = '594c5636cbcd';
 
 describe('Mind2Web Arm-0 config hash', () => {
     let cfg;
@@ -104,6 +104,8 @@ describe('Mind2Web Arm-0 config hash', () => {
             c => { c.pooled_stat_vector.channels = c.pooled_stat_vector.channels.slice(0, 4); },
             c => { c.pooled_stat_vector.channels[4].name = 'edge_density'; },
             c => { c.feature_congestion_path.sigma = 3.0; },
+            c => { c.pixel_source.format = 'PNG'; },
+            c => { c.pathological_ui_filter.max_same_type_distractors_visible = 100; },
         ];
         for (const flip of flips) {
             const copy = JSON.parse(JSON.stringify(cfg));
