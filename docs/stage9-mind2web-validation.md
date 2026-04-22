@@ -23,7 +23,7 @@ This is an information-theoretic claim about the peripheral representation, not 
 
 - **Mind2Web** full train split: 11 JSON files, 1,009 tasks, 7,775 actions across 73 websites × 3 domains (Travel 467, Shopping 281, Entertainment 261).
 - Each action carries a target element with `backend_node_id`, `bounding_box_rect`, `tag`, and a pool of `neg_candidates` with the same attributes.
-- **Valid transitions** (where prior-action gaze is defined): **6,088**. First-actions (N=1,262) dropped from primary analysis because landing-gaze is a modeling assumption, not data.
+- **Valid transitions** (where prior-action gaze is defined): **6,088**. First-actions (N=1,262, ~17%) dropped from primary analysis because landing-gaze is a modeling assumption, not data. Caveat for the paper: first-actions land on homepage-prominent elements (logo, hero button, search) and are likely an easier subset; reported AUCs under-estimate performance on the natural task-start distribution.
 
 ## Eccentricity distribution (locked for bin design)
 
@@ -58,6 +58,9 @@ One mode, one set of constants, pinned in a `config_hash` and committed to this 
 - **Anisotropy factor `h`:** isotropic (h=1.0).
 - **IOR:** off for this validation. Per-action gaze is reset to prior-action target center, so inhibition-of-return over a scanpath is not modeled.
 - **Gaze initialization:** center of prior-action target's `bounding_box_rect`. First-actions excluded from primary analysis.
+- **Viewport / bbox provenance:** Mind2Web `bounding_box_rect` values are authoritative and were captured at a 1280px-wide render. Scrutinizer's BrowserView renders to a matching 1280×768 viewport with no reflow. No DPR scaling applied to bbox coordinates. Any bbox-space mismatch fails the bbox-projection round-trip test in Step 3 and blocks progression.
+- **Scroll state:** for SCROLL-then-CLICK transitions, the prior-action gaze is set to the **post-scroll viewport center**, not the pre-scroll target center. SCROLL actions themselves do not produce transitions (no discrimination test on a scroll target).
+- **Pooled-stat vector path:** the DoG-reconstructed sampling in `renderer/shaders/peripheral.frag` (not the MIP fallback). Exact function name and commit SHA pinned in `tests/validation/mind2web/arm-0-config.json` at Step 1.
 
 An **Arm-1 exploratory** run using the latest DOM-aware composite (mode 20+) is a follow-up, not a headline number.
 
@@ -70,6 +73,8 @@ An **Arm-1 exploratory** run using the latest DOM-aware composite (mode 20+) is 
   2. Extract the pooled-statistic vector at each candidate's bbox center: the correct target *t⁺* and same-type `neg_candidates` *t⁻*.
   3. Compute distinctiveness score `S(c) = ‖stats(c) − stats(surround(c))‖₂` for each candidate *c*.
   4. Compute rank of *t⁺* among same-type distractors by *S*. Convert to per-trial AUC.
+
+**`surround(c)` definition (pre-registered):** the Rosenholtz pooling region at *c*'s retinotopic location given gaze *g* — i.e. the pooled-statistics window that the peripheral model itself assigns to the cortical patch subtending *c*. This is the mechanistically coherent choice: the distinctiveness score asks whether *c* stands out from the local-pool average that the model's own geometry specifies. Other candidates considered (fixed-radius pixel annulus, full-page-minus-c, same-type distractors only) were rejected as not aligned with the model being tested.
 
 **Secondary metrics** reported for triangulation but not headline: KL divergence, crowding-inspired flanker-density measure.
 
@@ -90,16 +95,17 @@ Same-type `neg_candidates` for each action, visible in viewport at the prior-act
 ## Success criteria
 
 - **Bin 1 sanity (0–5°):** Arm-0 AUC ≥ 0.85 per primitive. Fail-loud gate; not a contribution claim.
-- **Bin 2 headline (5–20°):** Arm-0 AUC > distance-only baseline with bootstrap-CI lower bound > baseline upper bound, separately for button, link, and form_input. This is the headline result.
-- **Bin 3 differentiator (20–30°):** Arm-0 AUC > 0.6 with bootstrap-CI lower bound > 0.5, separately per primitive.
-- **Ablation ordering:** the predicted baseline ordering holds in at least bin 2 for all three primary primitives. Violations flagged but do not by themselves disqualify the result.
+- **Bin 2 headline (5–20°):** **Paired bootstrap** on the per-trial difference `AUC_Arm0(trial) − AUC_distance-only(trial)`, 1,000 resamples at trial level. Contribution claim holds for a given primitive iff the 95% CI lower bound of the paired difference > 0, **Bonferroni-corrected to α = 0.05/3 = 0.0167 per primitive** (equivalently, the 98.33% CI lower bound of the paired difference > 0). Separately for button, link, and form_input.
+- **Bin 3 differentiator (20–30°):** Arm-0 AUC > 0.6 with paired-bootstrap 95% CI lower bound > 0.5, separately per primitive. Bonferroni correction also applied (98.33% CI).
+- **Ablation ordering:** the predicted baseline ordering holds in at least bin 2 for all three primary primitives. Violations flagged but do not by themselves disqualify the result. (Five-way ordinal claim; exploratory.)
 
 ## Pre-registered primary analysis
 
 - **Primary primitives:** button, link, form_input (N ≥ 1,300 each).
 - **Primary bin:** bin 2 (5–20°).
 - **Primary comparison:** Arm-0 vs. distance-only baseline.
-- **Primary statistic:** bootstrap CI on AUC-per-primitive-per-bin, 1,000 resamples at trial level.
+- **Primary statistic:** paired bootstrap on per-trial `AUC_Arm0 − AUC_distance-only`, 1,000 resamples at trial level, 95% CI (or 98.33% CI with Bonferroni correction applied — see success criteria).
+- **Multiplicity:** three primary comparisons (one per primitive) under Bonferroni at family α=0.05.
 
 Everything else (bin 1, bin 3, icon/image, heading, other, secondary metrics, Arm-1 exploratory, per-site AUC) is **exploratory**, reported separately and labeled as such. No hypothesis tests on exploratory cells.
 
@@ -133,11 +139,13 @@ Per sheet:
 
 ## Open questions (lock before first at-scale run)
 
-1. **`config_hash` format.** JSON or CLI-arg string? Proposal: JSON committed to `tests/validation/mind2web/arm-0-config.json`, SHA256'd, hash-prefix included in every output filename.
-2. **Pooled-statistic vector definition.** Rosenholtz feature bank as currently implemented vs. a pared-down subset. Pin current default; don't tune.
-3. **Distractor cap.** Some actions have 1,000+ `neg_candidates`. Cap at top-N by distance-from-target (within viewport) or keep all? Proposal: keep all same-type visible distractors; if mean distractor count > 100 skews bootstrap, revisit.
-4. **Per-website stratification.** Should bootstrap resample at trial level, website level, or nested? Proposal: trial-level for primary; per-website breakdown as exploratory.
-5. **Rendering geometry.** Mind2Web raw_html uses `bounding_box_rect` from a 1280-wide render. Scrutinizer's BrowserView render geometry must match for bboxes to be valid. Pin viewport size in config_hash.
+Resolved (folded into Arm-0 spec above): `config_hash` format (canonical-JSON + SHA256), pooled-stat vector path (`peripheral.frag` DoG-reconstructed sampling), rendering geometry (1280×768 no-reflow), `surround(c)` (Rosenholtz pool at retinotopic location), bootstrap protocol (paired, trial-level), multiplicity (Bonferroni α/3).
+
+Still open — resolve at the step noted:
+
+1. **Distractor cap** — resolve at Step 4 smoke-test once actual `neg_candidates` distribution is observed on the 5 demo tasks. Proposal: keep all same-type visible distractors; cap at top-100 by distance-from-target only if median count > 50 skews bootstrap.
+2. **Same-type filter on `other` (span/div/generic/label).** ~22% of targets collapse to "other" across heterogeneous tags. Resolve at Step 4: either (a) require exact-tag match within the "other" bucket (span-vs-span, div-vs-div), or (b) accept any "other"-bucket distractor. Low stakes — `other` is exploratory only.
+3. **Heading at N=30** — standalone sheet is underpowered. Options: fold into "other," drop, or report as a caveat in the exploratory section. Resolve at Step 5 dev run.
 
 ## What ships next
 
