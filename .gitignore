@@ -111,3 +111,6 @@ docs/drafts/
 
 # Private correspondence with collaborators
 comms/
+
+# Unrelated to this repo (video project tooling)
+scripts/burn-tooltips.sh
