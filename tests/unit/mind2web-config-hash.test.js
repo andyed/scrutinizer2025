@@ -19,7 +19,7 @@ const CONFIG_PATH = path.join(REPO_ROOT, 'tests/validation/mind2web/arm-0-config
 const MODES_PATH = path.join(REPO_ROOT, 'shared/modes.json');
 const FRAG_PATH = path.join(REPO_ROOT, 'renderer/shaders/peripheral.frag');
 
-const EXPECTED_HASH_PREFIX = '17f60ab97e5c';
+const EXPECTED_HASH_PREFIX = '1702a0aa0d57';
 
 describe('Mind2Web Arm-0 config hash', () => {
     let cfg;
@@ -100,6 +100,10 @@ describe('Mind2Web Arm-0 config hash', () => {
             c => { c.scroll_gaze_policy = 'pre_scroll_target'; },
             c => { c.surround.definition = 'fixed_radius_pixel_annulus'; },
             c => { c.primary_primitives = ['link', 'button', 'form_input']; },
+            c => { c.pooled_stat_vector.dim = 4; },
+            c => { c.pooled_stat_vector.channels = c.pooled_stat_vector.channels.slice(0, 4); },
+            c => { c.pooled_stat_vector.channels[4].name = 'edge_density'; },
+            c => { c.feature_congestion_path.sigma = 3.0; },
         ];
         for (const flip of flips) {
             const copy = JSON.parse(JSON.stringify(cfg));
@@ -139,6 +143,18 @@ describe('validateLive — filesystem drift detectors', () => {
         const copy = JSON.parse(JSON.stringify(cfg));
         copy.pooled_stat_path.file_blob_sha = '0'.repeat(40);
         expect(() => hasher.validateLive(copy, REPO_ROOT)).toThrow(/peripheral\.frag blob SHA drift/);
+    });
+
+    it('fails on congestion-core.js blob SHA drift', () => {
+        const copy = JSON.parse(JSON.stringify(cfg));
+        copy.feature_congestion_path.file_blob_sha = '0'.repeat(40);
+        expect(() => hasher.validateLive(copy, REPO_ROOT)).toThrow(/congestion-core\.js blob SHA drift/);
+    });
+
+    it('fails if congestion-core.js is missing a required FC function', () => {
+        const copy = JSON.parse(JSON.stringify(cfg));
+        copy.feature_congestion_path.functions_used = ['nonexistent_fc_fn'];
+        expect(() => hasher.validateLive(copy, REPO_ROOT)).toThrow(/missing required function: nonexistent_fc_fn/);
     });
 
     it('fails if signature_prefix is absent at pinned line', () => {

@@ -28,6 +28,90 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const hasher = require(path.join(REPO_ROOT, 'scripts/mind2web-config-hash.js'));
 const bbx = require(path.join(REPO_ROOT, 'scripts/mind2web-bbox-transform.js'));
 const { run: runCapture } = require(path.join(REPO_ROOT, 'scripts/lib/capture-runner.js'));
+const {
+    gaussianBlur, computeLocalVariance, normalizeFeature,
+} = require(path.join(REPO_ROOT, 'renderer/congestion-core.js'));
+
+// Oklab I/|a|/|b| decomposition. Pinned copy of scripts/export-saliency.js:30-60.
+// The two files must match — any drift in either is a validation fault. The
+// blob SHA of congestion-core.js is pinned in arm-0-config.json; export-
+// saliency.js itself is not used at runtime here (we duplicate the math to
+// avoid coupling to its CLI signature), but the constants trace to Ottosson
+// 2020 Oklab.
+function srgbToLinear(c) {
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+function linearSrgbToOklab(r, g, b) {
+    const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+    const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+    const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+    const l_ = Math.cbrt(l);
+    const m_ = Math.cbrt(m);
+    const s_ = Math.cbrt(s);
+    return {
+        L: 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+        a: 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+        b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_,
+    };
+}
+
+/**
+ * Compute Rosenholtz Feature Congestion channels on a peripheral-rendered PNG.
+ * Returns three normalized-to-[0,1] variance maps: var_I, var_RG, var_BY.
+ * Matches scripts/export-saliency.js:computeSaliencyMaps lines 80-108.
+ */
+function computeFcChannels(png, sigma) {
+    const { width: w, height: h, data } = png;
+    const len = w * h;
+    const I = new Float32Array(len);
+    const RG = new Float32Array(len);
+    const BY = new Float32Array(len);
+    for (let i = 0; i < len; i++) {
+        const rLin = srgbToLinear(data[i * 4] / 255.0);
+        const gLin = srgbToLinear(data[i * 4 + 1] / 255.0);
+        const bLin = srgbToLinear(data[i * 4 + 2] / 255.0);
+        const lab = linearSrgbToOklab(rLin, gLin, bLin);
+        I[i] = lab.L;
+        RG[i] = Math.abs(lab.a);
+        BY[i] = Math.abs(lab.b);
+    }
+    return {
+        var_I:  normalizeFeature(computeLocalVariance(I,  w, h, sigma)),
+        var_RG: normalizeFeature(computeLocalVariance(RG, w, h, sigma)),
+        var_BY: normalizeFeature(computeLocalVariance(BY, w, h, sigma)),
+        width: w, height: h,
+    };
+}
+
+/**
+ * Sample a Float32Array feature map at (x, y). Clamps to edges.
+ */
+function sampleFeature(map, width, height, x, y) {
+    const xi = Math.max(0, Math.min(width - 1, Math.round(x)));
+    const yi = Math.max(0, Math.min(height - 1, Math.round(y)));
+    return map[yi * width + xi];
+}
+
+/**
+ * Mean of a Float32Array feature map over an annulus around (x, y).
+ */
+function annulusMeanFeature(map, width, height, x, y, r_inner, r_outer) {
+    let sum = 0, n = 0;
+    const x0 = Math.max(0, Math.floor(x - r_outer));
+    const x1 = Math.min(width - 1, Math.ceil(x + r_outer));
+    const y0 = Math.max(0, Math.floor(y - r_outer));
+    const y1 = Math.min(height - 1, Math.ceil(y + r_outer));
+    for (let yi = y0; yi <= y1; yi++) {
+        for (let xi = x0; xi <= x1; xi++) {
+            const dx = xi - x, dy = yi - y;
+            const d = Math.hypot(dx, dy);
+            if (d < r_inner || d > r_outer) continue;
+            sum += map[yi * width + xi];
+            n++;
+        }
+    }
+    return n > 0 ? sum / n : null;
+}
 
 function getArg(name, def = null) {
     const prefix = `--${name}=`;
@@ -129,11 +213,17 @@ async function main() {
     }
     assertNotUniform(png);
 
-    // 7. Extract pooled-stat vectors (v0: 4-D RGBA at screen-space bbox center,
-    //    primary metric per memo. Surround pool sample is a 29px annulus mean
-    //    — placeholder for the Rosenholtz retinotopic pool; Step 3 v1 will
-    //    derive the annulus radius from the shader's pool schedule).
-    const surroundRadiusPx = cfg.viewing.px_per_deg;  // 1° as a v0 placeholder
+    // 7. Extract pooled-stat vectors. 7-D per memo: [R, G, B, A, var_I, var_RG,
+    //    var_BY]. All dims normalized to [0,1] before L2 — RGBA by /255, FC
+    //    by per-frame max (normalizeFeature). Surround is annulus-mean at a
+    //    1° placeholder radius (Step 3 v1); the retinotopic pool schedule
+    //    from peripheral.frag:322-338 will replace this once the per-mip
+    //    pool math is wired into the driver.
+    const surroundRadiusPx = cfg.viewing.px_per_deg;  // 1° placeholder
+
+    const fcSigma = cfg.feature_congestion_path.sigma;
+    console.log(`  Computing Feature Congestion (σ=${fcSigma}, 3 channels, full 1280x${png.height} frame)...`);
+    const fc = computeFcChannels(png, fcSigma);
 
     const candidates = [
         { role: 'target', primitive: action.target.primitive, tag: action.target.tag, bbox: action.target.bbox, is_target: true },
@@ -145,27 +235,57 @@ async function main() {
     const results = [];
     for (const c of candidates) {
         if (!bbx.bboxVisibleAfterScroll(c.bbox, scroll_y, viewport)) {
-            results.push({ ...c, visible: false, center_rgba: null, surround_rgba: null, eccentricity_px: null });
+            results.push({ ...c, visible: false });
             continue;
         }
         const centerDoc = bbx.docBboxCenter(c.bbox);
         const centerScreen = bbx.docToScreen(centerDoc, scroll_y, viewport);
         const ecc = bbx.screenEccentricityPx(foveaScreen, centerScreen);
-        const center_rgba = samplePixel(png, centerScreen.x, centerScreen.y);
-        const surround_rgba = sampleAnnulusMean(png, centerScreen.x, centerScreen.y, surroundRadiusPx);
+
+        // RGBA at center (0-255 raw)
+        const rgba_raw = samplePixel(png, centerScreen.x, centerScreen.y);
+        // RGBA annulus mean around center (0-255)
+        const rgba_surround_raw = sampleAnnulusMean(png, centerScreen.x, centerScreen.y, surroundRadiusPx);
+        // FC channels at center and surround (0-1 already)
+        const fcCenter = {
+            var_I: sampleFeature(fc.var_I, fc.width, fc.height, centerScreen.x, centerScreen.y),
+            var_RG: sampleFeature(fc.var_RG, fc.width, fc.height, centerScreen.x, centerScreen.y),
+            var_BY: sampleFeature(fc.var_BY, fc.width, fc.height, centerScreen.x, centerScreen.y),
+        };
+        const fcSurround = {
+            var_I:  annulusMeanFeature(fc.var_I,  fc.width, fc.height, centerScreen.x, centerScreen.y, surroundRadiusPx * 0.5, surroundRadiusPx),
+            var_RG: annulusMeanFeature(fc.var_RG, fc.width, fc.height, centerScreen.x, centerScreen.y, surroundRadiusPx * 0.5, surroundRadiusPx),
+            var_BY: annulusMeanFeature(fc.var_BY, fc.width, fc.height, centerScreen.x, centerScreen.y, surroundRadiusPx * 0.5, surroundRadiusPx),
+        };
+
+        // 7-D unit-cube vector: RGBA/255 + var_* already in [0,1]
+        const vector_center = [
+            rgba_raw[0] / 255, rgba_raw[1] / 255, rgba_raw[2] / 255, rgba_raw[3] / 255,
+            fcCenter.var_I, fcCenter.var_RG, fcCenter.var_BY,
+        ];
+        const vector_surround = rgba_surround_raw ? [
+            rgba_surround_raw[0] / 255, rgba_surround_raw[1] / 255, rgba_surround_raw[2] / 255, rgba_surround_raw[3] / 255,
+            fcSurround.var_I ?? 0, fcSurround.var_RG ?? 0, fcSurround.var_BY ?? 0,
+        ] : null;
+
+        const distinctiveness_l2 = vector_surround
+            ? Math.sqrt(vector_center.reduce((s, v, i) => s + (v - vector_surround[i]) ** 2, 0))
+            : null;
+
         results.push({
             ...c,
             visible: true,
             center_screen: { x: Math.round(centerScreen.x), y: Math.round(centerScreen.y) },
             eccentricity_px: ecc,
             eccentricity_deg: ecc / cfg.viewing.px_per_deg,
-            center_rgba,
-            surround_rgba,
+            vector_center,
+            vector_surround,
+            distinctiveness_l2,
         });
     }
 
     const cacheRecord = {
-        schema_version: 1,
+        schema_version: 2,
         config_hash_prefix: hashPrefix,
         task_id: action.task_id,
         action_idx: action.action_idx,
@@ -174,10 +294,12 @@ async function main() {
         mode_id: cfg.mode_id,
         viewport,
         scroll_y,
-        fovea_screen: { x: spec.fixationX, y: spec.fixationY },
+        fovea_screen: { x: Number(spec.fixationX), y: Number(spec.fixationY) },
         fovea_doc: priorCenter,
         surround_radius_px: surroundRadiusPx,
-        surround_method: 'annulus_mean_v0_placeholder',
+        surround_method: 'annulus_mean_1deg_placeholder_v1',
+        vector_channels: ['R', 'G', 'B', 'A', 'var_I', 'var_RG', 'var_BY'],
+        fc_sigma: fcSigma,
         candidates: results,
     };
     fs.writeFileSync(jsonPath, JSON.stringify(cacheRecord, null, 2) + '\n', 'utf-8');
@@ -185,16 +307,26 @@ async function main() {
     console.log(`\n━━━ Cache written ━━━`);
     console.log(`  PNG:  ${path.relative(REPO_ROOT, pngPath)}`);
     console.log(`  JSON: ${path.relative(REPO_ROOT, jsonPath)}`);
-    console.log(`\n  Candidates:`);
+    console.log(`\n  7-D distinctiveness per candidate (higher = more discriminable from local pool):`);
+    console.log(`    ${'role'.padEnd(11)} ${'tag'.padEnd(8)} ${'ecc'.padEnd(7)} ${'L2_7d'.padEnd(8)} ${'var_I_c'.padEnd(9)} ${'var_RG_c'.padEnd(10)} ${'var_BY_c'.padEnd(10)}`);
     for (const r of results) {
         if (!r.visible) {
             console.log(`    ${r.role.padEnd(11)} ${r.tag.padEnd(8)} [OFFSCREEN]`);
             continue;
         }
-        const rgba = r.center_rgba;
-        const sur = r.surround_rgba;
-        const l2 = Math.hypot(rgba[0] - sur[0], rgba[1] - sur[1], rgba[2] - sur[2]);
-        console.log(`    ${r.role.padEnd(11)} ${r.tag.padEnd(8)} ecc=${r.eccentricity_deg.toFixed(1)}°  center_rgb=(${rgba[0]},${rgba[1]},${rgba[2]})  L2_vs_surround=${l2.toFixed(1)}`);
+        const v = r.vector_center;
+        console.log(`    ${r.role.padEnd(11)} ${r.tag.padEnd(8)} ${r.eccentricity_deg.toFixed(1).padStart(5)}°  ${r.distinctiveness_l2.toFixed(3).padStart(6)}  ${v[4].toFixed(4).padStart(8)}  ${v[5].toFixed(4).padStart(8)}  ${v[6].toFixed(4).padStart(8)}`);
+    }
+
+    // Target discrimination summary
+    const targetR = results.find(r => r.is_target);
+    const distractors = results.filter(r => !r.is_target && r.visible);
+    if (targetR && distractors.length > 0) {
+        const targetL2 = targetR.distinctiveness_l2;
+        const distractorL2s = distractors.map(d => d.distinctiveness_l2).sort((a, b) => b - a);
+        const rankOfTarget = distractorL2s.filter(l => l > targetL2).length; // 0 = target most distinct
+        const auc = (distractors.length - rankOfTarget) / distractors.length;
+        console.log(`\n  Target rank-by-distinctiveness: ${rankOfTarget + 1}/${distractors.length + 1}  (per-trial AUC = ${auc.toFixed(3)})`);
     }
 }
 

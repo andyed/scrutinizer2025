@@ -10,6 +10,7 @@ const ALLOWED_TOP_LEVEL_KEYS = new Set([
     'mode_id', 'mode_name',
     'dom_aware', 'ior', 'anisotropy_h',
     'viewing', 'pipeline', 'pooled_stat_path', 'modes_json_drift_pin',
+    'feature_congestion_path', 'pooled_stat_vector',
     'pool_constants_note', 'surround',
     'metric', 'bootstrap', 'multiplicity',
     'eccentricity_bins_deg', 'eccentricity_cap_deg',
@@ -79,6 +80,17 @@ function validate(cfg) {
     if (JSON.stringify(cfg.primary_primitives) !== expectedPrimitives) {
         throw new Error(`Arm-0 primary_primitives must be ["button","link","form_input"] in that order`);
     }
+    if (cfg.pooled_stat_vector?.dim !== 7) {
+        throw new Error(`Arm-0 pooled_stat_vector.dim must be 7 (RGBA + var_I + var_RG + var_BY)`);
+    }
+    const expectedChannels = ['R', 'G', 'B', 'A', 'var_I', 'var_RG', 'var_BY'];
+    const actualChannels = (cfg.pooled_stat_vector?.channels || []).map(c => c.name);
+    if (JSON.stringify(actualChannels) !== JSON.stringify(expectedChannels)) {
+        throw new Error(`Arm-0 pooled_stat_vector.channels must be [${expectedChannels.join(',')}] in that order`);
+    }
+    if (cfg.feature_congestion_path?.sigma !== 2.5) {
+        throw new Error(`Arm-0 feature_congestion_path.sigma must be 2.5 (Rosenholtz 2007 variance window)`);
+    }
 }
 
 // Live drift-detection. Reads the filesystem at repoRoot. Use in CLI and in
@@ -117,6 +129,25 @@ function validateLive(cfg, repoRoot) {
     const lineText = fragLines[pinnedLine - 1] || '';
     if (!lineText.includes(sigPrefix)) {
         throw new Error(`peripheral.frag line ${pinnedLine} does not contain signature_prefix "${sigPrefix}". Got: "${lineText.trim().slice(0, 80)}"`);
+    }
+
+    // 3. Re-hash congestion-core.js, compare to pinned blob SHA, and verify
+    //    all functions named in feature_congestion_path.functions_used are
+    //    exported. The pooled-stat vector depends on this module's output.
+    const fcPath = path.join(repoRoot, cfg.feature_congestion_path?.file || '');
+    if (!fs.existsSync(fcPath)) {
+        throw new Error(`feature_congestion_path.file does not exist: ${fcPath}`);
+    }
+    const fcBuf = fs.readFileSync(fcPath);
+    const fcSha = blobSha(fcBuf);
+    if (cfg.feature_congestion_path?.file_blob_sha !== fcSha) {
+        throw new Error(`${cfg.feature_congestion_path.file} blob SHA drift: pinned ${cfg.feature_congestion_path?.file_blob_sha}, actual ${fcSha}.`);
+    }
+    const fcSrc = fcBuf.toString('utf-8');
+    for (const fn of cfg.feature_congestion_path?.functions_used || []) {
+        if (!new RegExp(`function\\s+${fn}\\s*\\(`).test(fcSrc)) {
+            throw new Error(`${cfg.feature_congestion_path.file} missing required function: ${fn}`);
+        }
     }
 }
 

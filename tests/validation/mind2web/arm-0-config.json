@@ -65,6 +65,28 @@
     "note": "Blob SHA of shared/modes.json at freeze. validateLive() re-reads the file and compares. Catches the mode-15-style silent drift where pipeline knobs are edited without updating the Arm-0 snapshot."
   },
 
+  "feature_congestion_path": {
+    "file": "renderer/congestion-core.js",
+    "file_blob_sha": "9131bfc86d6ca1b85cd28b948da90dd8db575e31",
+    "functions_used": ["gaussianBlur", "computeLocalVariance", "normalizeFeature"],
+    "sigma": 2.5,
+    "note": "Rosenholtz 2007 Feature Congestion computation. Per-channel local variance at sigma=2.5 on Oklab I/|a|/|b| decompositions of the peripheral-rendered PNG. Constants match scripts/export-saliency.js computeSaliencyMaps(). validateLive() checks the blob SHA."
+  },
+
+  "pooled_stat_vector": {
+    "dim": 7,
+    "channels": [
+      {"name": "R",      "source": "peripheral_render_rgba_center", "normalize": "div_255"},
+      {"name": "G",      "source": "peripheral_render_rgba_center", "normalize": "div_255"},
+      {"name": "B",      "source": "peripheral_render_rgba_center", "normalize": "div_255"},
+      {"name": "A",      "source": "peripheral_render_rgba_center", "normalize": "div_255"},
+      {"name": "var_I",  "source": "oklab_L_local_variance",        "normalize": "frame_max"},
+      {"name": "var_RG", "source": "oklab_abs_a_local_variance",    "normalize": "frame_max"},
+      {"name": "var_BY", "source": "oklab_abs_b_local_variance",    "normalize": "frame_max"}
+    ],
+    "note": "7-D vector. RGBA sampled at candidate screen-space bbox center on the peripheral-rendered PNG. Three FC channels computed over the full 1280x768 rendered frame with sigma=2.5, then normalized to [0,1] by per-frame max. surround(c) = annulus-mean over all 7 dims at the retinotopic pool radius."
+  },
+
   "pool_constants_note": "Schwartz CMF e0 and Rosenholtz pool-size constants are not separate knobs — both are encoded in pipeline.cmf_a (2.78) and pipeline.ecc_scaling (0.75). Schwartz M(e) = log(1 + e/cmf_a); pool-radius schedule c[k] = cmf_a * (exp(k*0.5*scale) - 1) / fovea_deg with scale = cortical_max / maxMipLevel / (ecc_scaling / 0.75). See peripheral.frag lines 322-338, 558-561.",
 
   "surround": {

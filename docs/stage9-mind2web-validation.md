@@ -70,13 +70,34 @@ An **Arm-1 exploratory** run using the latest DOM-aware composite (mode 20+) is 
 
 - For each action *i* with prior-action gaze *g = center(target_{i−1})*:
   1. Render the full page through Arm-0 with fovea at *g*.
-  2. Extract the pooled-statistic vector at each candidate's bbox center: the correct target *t⁺* and same-type `neg_candidates` *t⁻*.
+  2. Extract the 7-D pooled-statistic vector at each candidate's bbox center: the correct target *t⁺* and same-type `neg_candidates` *t⁻*.
   3. Compute distinctiveness score `S(c) = ‖stats(c) − stats(surround(c))‖₂` for each candidate *c*.
   4. Compute rank of *t⁺* among same-type distractors by *S*. Convert to per-trial AUC.
 
-**`surround(c)` definition (pre-registered):** the Rosenholtz pooling region at *c*'s retinotopic location given gaze *g* — i.e. the pooled-statistics window that the peripheral model itself assigns to the cortical patch subtending *c*. This is the mechanistically coherent choice: the distinctiveness score asks whether *c* stands out from the local-pool average that the model's own geometry specifies. Other candidates considered (fixed-radius pixel annulus, full-page-minus-c, same-type distractors only) were rejected as not aligned with the model being tested.
+**Pooled-stat vector composition (7-D, pre-registered).** Computed on the peripheral-rendered PNG — i.e. the output of `sampleDoGReconstructed`, not the source image:
 
-**Secondary metrics** reported for triangulation but not headline: KL divergence, crowding-inspired flanker-density measure.
+| Dim | Channel | Source | Normalization |
+|---|---|---|---|
+| 1 | R | RGBA at bbox center / surround | / 255 |
+| 2 | G | RGBA at bbox center / surround | / 255 |
+| 3 | B | RGBA at bbox center / surround | / 255 |
+| 4 | A | RGBA at bbox center / surround | / 255 |
+| 5 | var_I  | Oklab L local variance, σ=2.5 | frame-max (normalizeFeature) |
+| 6 | var_RG | Oklab |a| local variance, σ=2.5 | frame-max |
+| 7 | var_BY | Oklab |b| local variance, σ=2.5 | frame-max |
+
+Rationale for 7-D over 4-D-RGBA: Step 3 v0 showed 4-D RGBA is thin on visually-homogeneous UI categories (form pages where all inputs are white rectangles), yielding target distinctiveness below distractors. The three Rosenholtz 2007 Feature Congestion channels — luminance variance, red-green variance, blue-yellow variance in Oklab space — add the texture/contrast structure that pure RGBA sampling misses. The memo's original secondary-metric clause ("crowding-inspired flanker-density measure") named exactly this family; v1 promotes it to primary because the thinness was real and observed.
+
+All 7 dimensions are normalized to [0, 1] before L2. RGBA dims: raw value / 255. FC dims: divided by the per-frame max (normalizeFeature in `renderer/congestion-core.js`), so the denominator is stable within a trial but not across trials — the 0–1 range encodes "how much local contrast does this candidate have relative to the busiest point in the rendered periphery of this page."
+
+**Code path pins (blob-SHA'd in `tests/validation/mind2web/arm-0-config.json`):**
+- `renderer/shaders/peripheral.frag::sampleDoGReconstructed` — DoG-reconstructed peripheral frame
+- `renderer/congestion-core.js::{computeLocalVariance, normalizeFeature, gaussianBlur}` — Rosenholtz FC
+- Oklab I/RG/BY decomposition formula from `scripts/export-saliency.js:80-108` (duplicated inline in the Mind2Web render driver with a pinning comment; the constants are rooted in Ottosson 2020)
+
+**`surround(c)` definition (pre-registered):** the Rosenholtz pooling region at *c*'s retinotopic location given gaze *g* — i.e. the pooled-statistics window that the peripheral model itself assigns to the cortical patch subtending *c*. Computed as an annulus-mean over the 7 vector dimensions at the candidate's screen-space bbox center. (Step 3 v0 used a 1°-radius placeholder; Step 3 v1 uses the pool-radius schedule `c[k] = cmf_a*(exp(k*0.5*scale)-1)/fovea_deg` from `peripheral.frag:322-338`.)
+
+**Secondary metrics** reported for triangulation but not headline: KL divergence over the same 7-D vector, edge-density at candidate center (Sobel+Gaussian per `computeEdgeDensity`).
 
 ## Baselines
 
