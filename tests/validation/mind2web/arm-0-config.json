@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "memo_commit": "501a75b",
+  "created": "2026-04-21",
+  "purpose": "Frozen Arm-0 reference config for Mind2Web target-discrimination validation. See docs/stage9-mind2web-validation.md.",
+
+  "mode_id": 16,
+  "mode_name": "text_baseline_m16",
+
+  "dom_aware": false,
+  "ior": false,
+  "anisotropy_h": 1.0,
+
+  "viewing": {
+    "px_per_deg": 29,
+    "viewport_w": 1280,
+    "viewport_h": 768,
+    "reflow_allowed": false,
+    "dpr_scaling_applied_to_bbox": false
+  },
+
+  "pipeline": {
+    "lgn_use_structure_mask": true,
+    "lgn_use_saliency_gate": true,
+    "lgn_ramp_end_mult": 6.0,
+    "v1_distortion_type": 1,
+    "v1_strength_mult": 1.0,
+    "v1_animate": false,
+    "v4_style_id": 0,
+    "dog_enabled": true,
+    "dog_e2": 0.15,
+    "dog_sharpness": 0.0,
+    "dog_oriented": true,
+    "dog_orient_bias": 1.0,
+    "dog_radial_bias": 0.0,
+    "cmf_enabled": true,
+    "cmf_a": 2.78,
+    "cmf_color_sigma": 0.0,
+    "ecc_scaling": 0.75,
+    "chromatic_pooling": true,
+    "rg_decay": 0.085,
+    "rg_freq_decay": 0.003,
+    "yv_decay": 0.014,
+    "yv_freq_decay": 0.008,
+    "supra_exponent": 0.5,
+    "crowding_density_threshold": 0.3,
+    "crowding_density_steepness": 20.0,
+    "congestion_pooling": true,
+    "reading_span": false,
+    "reading_span_strength": 1.0
+  },
+
+  "pooled_stat_path": {
+    "file": "renderer/shaders/peripheral.frag",
+    "function": "sampleDoGReconstructed",
+    "signature": "vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius, float dog_e2, float dog_sharpness, float visual_ecc, vec2 undistortedUV)",
+    "line": 187,
+    "file_commit": "4d4c919014b5b717cfb2014c2abebfe04bf2c4de",
+    "note": "DoG-reconstructed sampling path. Not the MIP fallback (sampleMIPPooled at line 628). Must be the active path at runtime — Step 3 wires the capability-detect branch to throw if MIP fallback is silently substituted."
+  },
+
+  "surround": {
+    "definition": "rosenholtz_pool_at_retinotopic_location",
+    "description": "Pooled-statistics window that the peripheral model itself assigns to the cortical patch subtending candidate c, given gaze g. Distinctiveness asks whether c stands out from the local-pool average specified by the model's own geometry.",
+    "rejected_alternatives": [
+      "fixed_radius_pixel_annulus",
+      "full_page_minus_c",
+      "same_type_distractors_only"
+    ]
+  },
+
+  "metric": {
+    "type": "L2",
+    "name": "distinctiveness",
+    "formula": "S(c) = ||stats(c) - stats(surround(c))||_2",
+    "secondary_reported_not_headline": ["KL_divergence", "crowding_flanker_density"]
+  },
+
+  "bootstrap": {
+    "type": "paired",
+    "statistic": "per_trial_auc_arm0_minus_auc_distance_only",
+    "n_resamples": 1000,
+    "level": "trial",
+    "ci_level": 0.95,
+    "bonferroni_adjusted_ci_level": 0.9833
+  },
+
+  "multiplicity": {
+    "correction": "bonferroni",
+    "family_alpha": 0.05,
+    "n_primary": 3,
+    "per_primitive_alpha": 0.0167
+  },
+
+  "eccentricity_bins_deg": [
+    {"name": "bin1_sanity", "low": 0, "high": 5},
+    {"name": "bin2_headline", "low": 5, "high": 20},
+    {"name": "bin3_differentiator", "low": 20, "high": 30}
+  ],
+  "eccentricity_cap_deg": 30,
+
+  "primary_primitives": ["button", "link", "form_input"],
+  "exploratory_primitives": ["icon_image", "nav_item", "heading", "other"],
+
+  "first_action_policy": "exclude_from_primary",
+  "scroll_gaze_policy": "post_scroll_viewport_center",
+
+  "distractor_min_per_trial": 4,
+
+  "split": {
+    "method": "website_hash_stratified",
+    "dev_fraction": 0.3333,
+    "eval_fraction": 0.6667,
+    "seed": 42
+  }
+}
