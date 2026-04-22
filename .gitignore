@@ -91,6 +91,11 @@ docs/arxiv-paper/*.out
 # Claude Code session data
 .claude/
 
+# claude-mem auto-generated scaffolds in subdirectories.
+# Root CLAUDE.md is hand-written and stays tracked.
+**/CLAUDE.md
+!/CLAUDE.md
+
 build/certs/
 build_error.txt
 build_error.txt
