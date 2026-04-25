@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mind2Web foveation study</title>
+<style>
+:root {
+  --bg: #0e0e0f;
+  --panel: #18181b;
+  --panel-2: #232326;
+  --fg: #f4f4f5;
+  --fg-dim: #a1a1aa;
+  --accent: #fbbf24;
+  --grid: #3f3f46;
+  --target: #fbbf24;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.45 -apple-system, "SF Pro Text", system-ui, sans-serif;
+  display: grid;
+  grid-template-columns: 240px 1fr 300px;
+  grid-template-rows: 56px 1fr;
+  height: 100vh;
+}
+header {
+  grid-column: 1 / -1;
+  background: var(--panel);
+  border-bottom: 1px solid var(--grid);
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 16px;
+}
+header h1 { font-size: 13px; margin: 0; font-weight: 700; letter-spacing: 0.02em; }
+header .controls { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+header label { color: var(--fg-dim); font-size: 12px; }
+header select {
+  background: var(--panel-2); color: var(--fg); border: 1px solid var(--grid);
+  padding: 4px 8px; border-radius: 4px; font: inherit;
+}
+header .meta { color: var(--fg-dim); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+#sidebar {
+  background: var(--panel); border-right: 1px solid var(--grid);
+  overflow-y: auto;
+}
+#trials { padding: 8px; }
+.trial {
+  padding: 8px 10px; margin-bottom: 2px; border-radius: 4px;
+  cursor: pointer; user-select: none;
+  font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.trial:hover { background: var(--panel-2); }
+.trial.active { background: var(--panel-2); border-left: 2px solid var(--accent); padding-left: 8px; }
+.trial .site { font-weight: 600; color: var(--fg); }
+.trial .meta { color: var(--fg-dim); font-size: 11px; margin-top: 2px; }
+
+#stage {
+  position: relative; overflow: hidden; background: #000;
+  display: flex; align-items: center; justify-content: center;
+}
+#stage-wrap { position: relative; }
+#stage img { display: block; max-width: 100%; max-height: calc(100vh - 56px - 8px); }
+#overlay { position: absolute; top: 0; left: 0; pointer-events: none; }
+
+#detail {
+  background: var(--panel); border-left: 1px solid var(--grid);
+  padding: 12px; overflow-y: auto;
+}
+#detail h2 { font-size: 13px; margin: 0 0 6px 0; letter-spacing: 0.02em; }
+#detail .kv { font-size: 12px; color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+#detail .kv b { color: var(--fg); font-weight: 600; }
+#detail .section { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--grid); }
+.legend { display: flex; align-items: center; gap: 12px; font-size: 11px; }
+.legend .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+
+.no-trial { color: var(--fg-dim); padding: 16px; font-size: 12px; font-style: italic; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Mind2Web foveation study</h1>
+  <div class="controls">
+    <label>Mode <select id="sel-mode"></select></label>
+    <label>Foveal radius <select id="sel-radius"></select></label>
+    <label><input type="checkbox" id="show-overlay" checked> overlay</label>
+    <span class="meta" id="meta-summary">loading…</span>
+  </div>
+</header>
+
+<aside id="sidebar"><div id="trials"></div></aside>
+
+<main id="stage">
+  <div id="stage-wrap">
+    <img id="stage-img" alt="">
+    <canvas id="overlay"></canvas>
+  </div>
+</main>
+
+<aside id="detail"><div class="no-trial">pick a trial ←</div></aside>
+
+<script>
+let manifest = null;
+let activeTrial = null;
+let activeMode = null;
+let activeRadius = null;
+
+function el(id) { return document.getElementById(id); }
+
+function buildSelectors() {
+  const m = el("sel-mode");
+  m.innerHTML = "";
+  for (const mode of manifest.modes) {
+    const o = document.createElement("option");
+    o.value = mode.id;
+    o.textContent = mode.label;
+    o.title = mode.desc;
+    m.appendChild(o);
+  }
+  activeMode = manifest.modes[0].id;
+  m.value = activeMode;
+  m.addEventListener("change", () => { activeMode = parseInt(m.value, 10); refreshImage(); });
+
+  const r = el("sel-radius");
+  r.innerHTML = "";
+  for (const rad of manifest.radii) {
+    const o = document.createElement("option");
+    o.value = rad.px;
+    o.textContent = `${rad.px}px (~${rad.deg}°)`;
+    r.appendChild(o);
+  }
+  // Default to a middle radius if available.
+  const mid = manifest.radii[Math.floor(manifest.radii.length / 2)];
+  activeRadius = mid.px;
+  r.value = activeRadius;
+  r.addEventListener("change", () => { activeRadius = parseInt(r.value, 10); refreshImage(); });
+
+  el("show-overlay").addEventListener("change", () => {
+    if (activeTrial) drawOverlay(activeTrial);
+  });
+}
+
+function buildTrialList() {
+  const root = el("trials");
+  root.innerHTML = "";
+  for (const t of manifest.trials) {
+    const div = document.createElement("div");
+    div.className = "trial";
+    div.dataset.key = t.annotation_id + "/" + t.action_idx;
+    div.innerHTML = `
+      <div class="site">${t.website} <span style="color:var(--fg-dim);font-weight:400;">/${t.action_idx}</span></div>
+      <div class="meta">${t.target_primitive || ''} · ${t.action_repr ? truncate(t.action_repr, 38) : ''}</div>`;
+    div.addEventListener("click", () => selectTrial(t));
+    root.appendChild(div);
+  }
+}
+
+function truncate(s, n) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+
+function selectTrial(t) {
+  activeTrial = t;
+  const k = t.annotation_id + "/" + t.action_idx;
+  for (const e of document.querySelectorAll(".trial")) {
+    e.classList.toggle("active", e.dataset.key === k);
+  }
+  refreshImage();
+  drawDetail(t);
+}
+
+function refreshImage() {
+  if (!activeTrial) return;
+  const img = el("stage-img");
+  img.onload = () => drawOverlay(activeTrial);
+  img.src = `${activeTrial.base_url}m${activeMode}-r${activeRadius}.png`;
+}
+
+function drawOverlay(t) {
+  const canvas = el("overlay");
+  const img = el("stage-img");
+  const ctx = canvas.getContext("2d");
+  if (!el("show-overlay").checked) {
+    canvas.width = canvas.height = 0;
+    return;
+  }
+  canvas.width = img.clientWidth;
+  canvas.height = img.clientHeight;
+  canvas.style.left = img.offsetLeft + "px";
+  canvas.style.top = img.offsetTop + "px";
+  const sx = img.clientWidth / t.viewport.w;
+  const sy = img.clientHeight / t.viewport.h;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Distractors (thin grey)
+  ctx.strokeStyle = "rgba(160,160,170,0.55)";
+  ctx.lineWidth = 1;
+  for (const d of t.same_type_distractors || []) {
+    drawBox(ctx, d.bbox, sx, sy);
+  }
+  // Prior click element — Mind2Web records WHICH element was clicked, not
+  // where on it. Show as filled element to communicate that uncertainty.
+  if (t.prior_target_bbox) {
+    const b = t.prior_target_bbox;
+    ctx.fillStyle = "rgba(255,0,170,0.18)";
+    ctx.fillRect(b.x * sx, b.y * sy, b.w * sx, b.h * sy);
+    ctx.strokeStyle = "rgba(255,0,170,0.85)";
+    ctx.lineWidth = 1.5;
+    drawBox(ctx, b, sx, sy);
+  }
+  // Target (gold, thick)
+  ctx.strokeStyle = "#fbbf24";
+  ctx.lineWidth = 2.5;
+  drawBox(ctx, t.target_bbox, sx, sy);
+  // Modeled fixation point (bbox center) — small dot, not a dramatic
+  // crosshair. The crosshair would imply a pixel-precise gaze fix that the
+  // data does not provide.
+  if (t.fovea_screen) {
+    const fx = t.fovea_screen.x * sx;
+    const fy = t.fovea_screen.y * sy;
+    // Eccentricity reference rings (5°, 20°) — meaningful relative to the
+    // modeled fixation, with the same uncertainty as the dot.
+    const r5 = 5 * 29 * sx;
+    const r20 = 20 * 29 * sx;
+    ctx.strokeStyle = "rgba(255,0,170,0.30)"; ctx.lineWidth = 1.0;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.arc(fx, fy, r5, 0, 2 * Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.arc(fx, fy, r20, 0, 2 * Math.PI); ctx.stroke();
+    ctx.setLineDash([]);
+    // Tiny dot with halo so it's visible against any background
+    ctx.fillStyle = "rgba(0,0,0,0.85)";
+    ctx.beginPath(); ctx.arc(fx, fy, 4, 0, 2 * Math.PI); ctx.fill();
+    ctx.fillStyle = "#ff00aa";
+    ctx.beginPath(); ctx.arc(fx, fy, 2.5, 0, 2 * Math.PI); ctx.fill();
+  }
+}
+
+function drawBox(ctx, bbox, sx, sy) {
+  if (!bbox) return;
+  ctx.strokeRect(bbox.x * sx, bbox.y * sy, bbox.w * sx, bbox.h * sy);
+}
+
+function drawCrosshair(ctx, x, y, r, arm) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x - arm, y); ctx.lineTo(x + arm, y);
+  ctx.moveTo(x, y - arm); ctx.lineTo(x, y + arm);
+  ctx.stroke();
+}
+
+function drawDetail(t) {
+  const dist = t.same_type_distractors || [];
+  el("detail").innerHTML = `
+    <h2>${t.website} · ${t.target_primitive || '?'}</h2>
+    <div class="kv">
+      <div><b>action</b>: ${t.action_repr || '—'}</div>
+      <div><b>action_idx</b>: ${t.action_idx}</div>
+      <div><b>target tag</b>: ${t.target_tag || '?'}</div>
+      <div><b>distractors</b>: ${dist.length}</div>
+      <div><b>fovea</b>: (${Math.round(t.fovea_screen.x)}, ${Math.round(t.fovea_screen.y)}) of ${t.viewport.w}×${t.viewport.h}</div>
+    </div>
+    <div class="section">
+      <div class="legend">
+        <span><span class="swatch" style="background:#fbbf24"></span>target (next click)</span>
+        <span><span class="swatch" style="background:rgba(255,0,170,0.4)"></span>prior click element</span>
+        <span><span class="swatch" style="background:#a0a0aa"></span>distractor</span>
+      </div>
+      <div class="kv" style="font-size:11px;margin-top:6px;">
+        Pink dot = modeled fixation (bbox center). Mind2Web records WHICH element
+        was clicked, not where on it — the dot is a model assumption, not measured
+        gaze. Dashed rings = 5° and 20° eccentricity around that point.
+      </div>
+    </div>
+    <div class="section">
+      <div class="kv">
+        <b>annotation_id</b><br>${t.annotation_id}
+      </div>
+    </div>
+    <div class="section">
+      <div class="kv" style="font-size:11px;">
+        Toggle <b>Mode</b> and <b>Foveal radius</b> in the header to see the same UI through different peripheral models. Same fovea position in every variant.
+      </div>
+    </div>`;
+}
+
+window.addEventListener("resize", () => { if (activeTrial) drawOverlay(activeTrial); });
+
+fetch("manifest.json").then(r => r.json()).then(m => {
+  manifest = m;
+  el("meta-summary").textContent =
+    `${m.n_trials} trials · ${m.modes.length} modes × ${m.radii.length} radii`;
+  buildSelectors();
+  buildTrialList();
+  if (m.trials.length) selectTrial(m.trials[0]);
+});
+</script>
+</body>
+</html>
