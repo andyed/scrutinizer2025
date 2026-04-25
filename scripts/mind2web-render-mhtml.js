@@ -181,12 +181,17 @@ async function main() {
     const jsonPath = path.join(cacheDir, `${action.action_idx}-v3.json`);
 
     const MACOS_TITLEBAR_PX = 28;
+    // capture-runner expects fractional fixation (`targetX = width *
+    // shot.fixationX`). Passing pixel values puts the fovea off-screen.
+    // Bug found via Gabor-card characterization 2026-04-24 — earlier renders
+    // in this cache had fixation in pixel units and were effectively
+    // unfoveated at the intended location.
     const spec = {
         filename: pngFilename,
         url: `file://${absMhtml}`,
         mode: String(cfg.mode_id),
-        fixationX: String(Math.round(foveaScreen.x)),
-        fixationY: String(Math.round(foveaScreen.y)),
+        fixationX: foveaScreen.x / viewport.w,
+        fixationY: foveaScreen.y / viewport.h,
         width: String(viewport.w),
         height: String(viewport.h + MACOS_TITLEBAR_PX),
         radius: String(cfg.viewing.px_per_deg),
