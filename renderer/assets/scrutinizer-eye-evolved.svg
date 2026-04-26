@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"
+     width="512" height="512" shape-rendering="geometricPrecision">
+  <defs>
+    <!-- Almond as clip path so the iris can be animated WITHOUT
+         escaping the eye bounds. Aspiration: translate #iris to make
+         the eyeball "look around"; the clip keeps it anatomical. -->
+    <clipPath id="almond-clip">
+      <path d="M 56.3 307.2 Q 256.0 169.0, 455.7 307.2 Q 256.0 445.4, 56.3 307.2 Z"/>
+    </clipPath>
+    <!-- Iris orb gradient — the dimensional "alive" quality from the
+         2008 original. Light cream-orange in upper-left → brand orange
+         → deeper orange at the edge. -->
+    <radialGradient id="iris-orb" cx="40%" cy="36%" r="68%">
+      <stop offset="0%"   stop-color="#ffd9ad"/>
+      <stop offset="40%"  stop-color="#ff9933"/>
+      <stop offset="100%" stop-color="#e07d20"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Almond eye outline (flat, single stroke weight) -->
+  <path d="M 56.3 307.2 Q 256.0 169.0, 455.7 307.2 Q 256.0 445.4, 56.3 307.2 Z" fill="none" stroke="#ff9933"
+        stroke-width="15.4" stroke-linejoin="round"/>
+
+  <!-- Iris group (clipped to almond — animatable) -->
+  <g id="iris" clip-path="url(#almond-clip)">
+    <!-- Iris orb: dimensional gradient (preserves the original's
+         3D-ish "attention sphere" quality). -->
+    <circle cx="256.0" cy="307.2" r="53.8" fill="url(#iris-orb)"/>
+    <!-- Catchlight in upper-left (sits at the gradient's brightest
+         point, completing the orb illusion). Translates around iris
+         under future animation to suggest gaze direction. -->
+    <circle cx="237.7" cy="288.9"
+            r="16.1" fill="#ffffff" opacity="0.95"/>
+  </g>
+
+  <!-- Three symmetric arrows above — extramission (attention OUT) -->
+  <path d="M 136.2 212.5 Q 131.4 175.9, 117.0 145.9" fill="none" stroke="#ff9933" stroke-width="12.3" stroke-linecap="round"/><path d="M 136.9 158.1 L 117.0 145.9 L 114.1 169.1" fill="none" stroke="#ff9933" stroke-width="12.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M 256.0 212.5 Q 256.0 175.9, 256.0 145.9" fill="none" stroke="#ff9933" stroke-width="12.3" stroke-linecap="round"/><path d="M 268.7 165.5 L 256.0 145.9 L 243.3 165.5" fill="none" stroke="#ff9933" stroke-width="12.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M 375.8 212.5 Q 380.6 175.9, 395.0 145.9" fill="none" stroke="#ff9933" stroke-width="12.3" stroke-linecap="round"/><path d="M 397.9 169.1 L 395.0 145.9 L 375.1 158.1" fill="none" stroke="#ff9933" stroke-width="12.3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

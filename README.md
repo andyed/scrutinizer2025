@@ -1,4 +1,8 @@
-# <img src="renderer/assets/scrutinizer_128x128_icon.png" width="48" height="48" align="middle"> Scrutinizer — Foveated Vision Simulator
+<p align="left">
+  <img src="renderer/assets/scrutinizer-wordmark-orange.svg" alt="Scrutinizer" height="64">
+</p>
+
+# Foveated Vision Simulator
 
 [![Electron](https://img.shields.io/badge/Electron-28.0-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![WebGL](https://img.shields.io/badge/WebGL-2.0-990000?style=flat-square&logo=webgl&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API)

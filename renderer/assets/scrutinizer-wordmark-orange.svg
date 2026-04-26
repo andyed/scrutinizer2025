@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 160"
+     width="800" height="160" font-family="-apple-system, 'Inter', 'Segoe UI', system-ui, sans-serif">
+  <g transform="translate(20, 10)">
+    <defs>
+    <!-- Almond as clip path so the iris can be animated WITHOUT
+         escaping the eye bounds. Aspiration: translate #iris to make
+         the eyeball "look around"; the clip keeps it anatomical. -->
+    <clipPath id="almond-clip">
+      <path d="M 15.4 84.0 Q 70.0 46.2, 124.6 84.0 Q 70.0 121.8, 15.4 84.0 Z"/>
+    </clipPath>
+    <!-- Iris orb gradient — the dimensional "alive" quality from the
+         2008 original. Light cream-orange in upper-left → brand orange
+         → deeper orange at the edge. -->
+    <radialGradient id="iris-orb" cx="40%" cy="36%" r="68%">
+      <stop offset="0%"   stop-color="#ffd9ad"/>
+      <stop offset="40%"  stop-color="#ff9933"/>
+      <stop offset="100%" stop-color="#e07d20"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Almond eye outline (flat, single stroke weight) -->
+  <path d="M 15.4 84.0 Q 70.0 46.2, 124.6 84.0 Q 70.0 121.8, 15.4 84.0 Z" fill="none" stroke="#ff9933"
+        stroke-width="4.2" stroke-linejoin="round"/>
+
+  <!-- Iris group (clipped to almond — animatable) -->
+  <g id="iris" clip-path="url(#almond-clip)">
+    <!-- Iris orb: dimensional gradient (preserves the original's
+         3D-ish "attention sphere" quality). -->
+    <circle cx="70.0" cy="84.0" r="14.7" fill="url(#iris-orb)"/>
+    <!-- Catchlight in upper-left (sits at the gradient's brightest
+         point, completing the orb illusion). Translates around iris
+         under future animation to suggest gaze direction. -->
+    <circle cx="65.0" cy="79.0"
+            r="4.4" fill="#ffffff" opacity="0.95"/>
+  </g>
+
+  <!-- Three symmetric arrows above — extramission (attention OUT) -->
+  <path d="M 37.2 58.1 Q 35.9 48.1, 32.0 39.9" fill="none" stroke="#ff9933" stroke-width="3.4" stroke-linecap="round"/><path d="M 37.4 43.2 L 32.0 39.9 L 31.2 46.2" fill="none" stroke="#ff9933" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M 70.0 58.1 Q 70.0 48.1, 70.0 39.9" fill="none" stroke="#ff9933" stroke-width="3.4" stroke-linecap="round"/><path d="M 73.5 45.3 L 70.0 39.9 L 66.5 45.3" fill="none" stroke="#ff9933" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M 102.8 58.1 Q 104.1 48.1, 108.0 39.9" fill="none" stroke="#ff9933" stroke-width="3.4" stroke-linecap="round"/><path d="M 108.8 46.2 L 108.0 39.9 L 102.6 43.2" fill="none" stroke="#ff9933" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="188" y="104" fill="#ff9933"
+        font-size="80" font-weight="800"
+        letter-spacing="-1.5">Scrutinizer</text>
+</svg>
