@@ -14,6 +14,7 @@ Migrated from master backlog on 2026-03-25. Detailed tasks for the Scrutinizer f
 
 ## Validation & Science
 
+- [ ] **Restore peripheral-OCR validation gate** -- `scripts/validate-peripheral-ocr.js` is currently unusable: tesseract.js returns 0 words on captures because the integration test pipeline now produces images at DPR 1 (1920×984), but the original baseline was DPR 2 (3840×1888) where text is large enough for reliable OCR. Two paths: (a) force the integration capture pipeline back to DPR 2, or (b) add a 2× upscale pre-OCR step in the validator. Either restores the only validation gate that meaningfully discriminates "text readable in periphery" from "no text anywhere" — the gap that allowed a regression to slip through smoke + temporal-variance + unit tests during v2.7.3 development. v2.7.3 release notes call this out as the next big bit.
 - [ ] **Update eccentricity peripheral overlay to isotropic cortical grid** -- Current overlay uses simple concentric rings. Should render the FOVI isotropic grid (adaptive spoke count per ring, square cells in cortical space). Match `computeCorticalSector()` geometry from peripheral.frag / Blauch et al. 2026.
 - [ ] **RFV usability testing recommendations doc** -- Practical guide for using Scrutinizer as Reduced Functional Field of View tool.
 - [ ] **MIP chain explainer post update** -- Three sampling paths, DoG isotropy, box vs Gaussian tradeoff, v2.5 Jacobian fix.

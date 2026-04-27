@@ -326,25 +326,37 @@ describe('Parameter sanity (modes.json regression guard)', function () {
 // ─── Mode 16: Text Baseline freeze ──────────────────────────────────────────
 //
 // text_baseline_m16 is the DOM-aware-perception-plan's baseline comparison arm
-// for 2IFC psychophysics validation. It must remain a byte-identical clone of
-// mode 0's pipeline (with distinct top-level metadata) until intentional
-// divergence. Any unintended drift breaks the psychophysics comparison.
+// for 2IFC psychophysics validation. Originally a byte-identical clone of
+// mode 0's pipeline; v2.7.3 introduced the acuity_loss / cortical_pooling
+// taxonomy (next-steps-2026-04.md:38–42), authorizing divergence on tuning
+// knobs that differ per pooling_family. dog_e2 is the first such knob.
 //
-// See docs/dom-aware-perception-plan.md.
+// See docs/dom-aware-perception-plan.md and docs/next-steps-2026-04.md.
 
 describe('Mode 16 (text_baseline_m16) baseline freeze', function () {
     const baseline = modes.modes['text_baseline_m16'];
+
+    // Knobs authorized to diverge between mode 0 (no pooling_family) and
+    // mode 16 (pooling_family: acuity_loss). All other pipeline fields must
+    // remain byte-identical so the psychophysics comparison stays meaningful.
+    const ACUITY_LOSS_TUNING_KNOBS = ['dog_e2'];
 
     it('exists in modes.json', function () {
         expect(baseline).toBeDefined();
         expect(baseline.id).toBe(16);
     });
 
-    it('pipeline is byte-identical to mode 0 (highkey)', function () {
-        // Deep equality on the pipeline object. If this fails, either mode 0
-        // changed (propagate to mode 16 intentionally) or mode 16 drifted
-        // (revert to mode 0 unless the plan doc authorizes divergence).
-        expect(baseline.pipeline).toEqual(pipeline);
+    it('pipeline matches mode 0 except acuity_loss tuning knobs', function () {
+        const stripped = (p) => {
+            const copy = { ...p };
+            for (const k of ACUITY_LOSS_TUNING_KNOBS) delete copy[k];
+            return copy;
+        };
+        expect(stripped(baseline.pipeline)).toEqual(stripped(pipeline));
+    });
+
+    it('declares pooling_family = acuity_loss', function () {
+        expect(baseline.pooling_family).toBe('acuity_loss');
     });
 
     it('category is "research" (not user-facing default)', function () {

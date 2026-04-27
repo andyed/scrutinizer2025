@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.7.3] - 2026-04-26
+
+### Honesty pass — `acuity_loss` / `cortical_pooling` mode taxonomy
+
+Per `docs/next-steps-2026-04.md:38–42`, modes that claim peripheral pooling fidelity now carry an explicit `pooling_family` field separating the two regimes.
+
+- **Mode 15 ("TTM Synthesis (Tier 3)") relabeled** to "TTM Cortical Pooling (Tier 3 — research)". Description updated to acknowledge that on hardware where WebGPU's default `maxStorageBuffersPerShaderStage` cap (8) is below pyramid-synth's requirement (9), mode 15 silently runs MIP/DoG fallback rather than its published cortical-sector pipeline. Any prior demo or validation run citing mode 15 as cortical-peripheral-pooling output should be re-checked against this caveat.
+- **`pooling_family` field added** to modes 10, 14, 15, 16:
+  - `acuity_loss` — modes 10, 14, 16. MIP/DoG real-time pooling, RFV-safe by design.
+  - `cortical_pooling` — mode 15. Aspirational sector-based geometry; research-only; falls back to acuity_loss behavior below the storage-buffer cap.
+
+### Tuned
+
+- **`dog_e2` lowered 0.15 → 0.10 in the `acuity_loss` family** (modes 10, 14, 16). Sharper acuity falloff with eccentricity — modes in this family now produce visibly stronger peripheral degradation, especially in the parafovea and near periphery, while the foveal core stays preserved. Single existing knob, no new piecewise law; the M-scaling curve `s_min(e) = s₀ × (1 + e/E₂)` is unchanged in form. Mode 0 (no pooling_family), mode 15 (cortical_pooling), and modes 1/6/7/9/12/20 are untouched.
+
 ## [2.7.2] - 2026-04-06
 
 ### Fixed

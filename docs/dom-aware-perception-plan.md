@@ -149,6 +149,8 @@ Wire both textures into `webgl-renderer.js` alongside the existing structure map
 
 New function `sampleDomAwarePrimitive(uv, eccentricity)` in `peripheral.frag`, sibling to `sampleDoGReconstructed` (~line 184). Reads `u_primitiveMap`, looks up atlas layers, executes the four-term composite. Dispatch: if `primitive_type_id == 0` (ui_surface/none), return baseline-arm output unchanged.
 
+**Precondition (added 2026-04-26 after PR-A diagnosis):** any peripheral-respect or boundary-snap mechanism layered on top of the residual texture path must be **DOM-independent in its primary signal**. The canonical dashboard's `<div class="sidebar">` emits no DOM block (Bootstrap/Tailwind class-only landmarks are common); a peripheral mechanism that gates on `u_primitiveMap` or `u_structureMap` alone collapses to zero protection across the bulk of those macro features. Pixel-derived signals (luminance-gradient on `u_texture` MIPs, saliency/congestion workers) are the load-bearing primary; DOM signal is enhancement layered on top. Mode 16 baseline arm and canvas/WebGL content stay coherent only if this precondition holds. See `simulation-limitations.md §6` for the full diagnosis.
+
 **Tests:** Mode 16 output must remain pixel-identical to pre-plan output on all golden fixtures (baseline arm preserved end-to-end).
 
 **Risks:** Three extra texture samples per peripheral fragment. Profile on lowest-tier target (M1 MacBook iGPU) before merging. If too costly, gate behind `dom_aware_enabled` uniform that compiles out the branch when off.

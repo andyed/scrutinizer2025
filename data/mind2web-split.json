@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "created": "2026-04-22",
-  "config_hash_prefix": "594c5636cbcd",
+  "config_hash_prefix": "5c0bf5e009b8",
   "seed": 42,
   "method": "website_hash_stratified",
   "frozen": false,

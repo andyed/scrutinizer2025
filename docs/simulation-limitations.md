@@ -118,6 +118,19 @@ Hardware mipmaps use box/bilinear filtering, not true Gaussian decomposition. Th
 
 ---
 
+## 6. DOM Coverage Gap on Styled-Div Macro Features
+
+**Status**: Known gap; pixel-derived structure prior is the principled defense, DOM signal is enhancement.
+**Surfaced by**: canonical dashboard fixture (`tests/reference-pages/dashboard.html`), 2026-04-26 PR-A diagnosis.
+
+The renderer's structure map is populated by four DOM-scan passes in `renderer/preload.js` (text, media, interactive, landmarks). A dark sidebar implemented as `<div class="sidebar">` — no `<nav>`, no `<aside>`, no `role`, no `aria-*` — emits no block from any pass; only the text rows *inside* it reach the structure map. The sidebar's solid dark mass between/around the text is structure-map-zero. Pages built with Bootstrap, Tailwind, or other class-based design systems frequently fall into this category.
+
+**Implication for any peripheral-respect mechanism**: any signal that gates synthesis based on DOM structure (saliency-from-DOM, softDensity, primitive map) will fail to fire across the bulk of these macro features. The principled defense is a *pixel-derived* structure prior — luminance gradient on `u_texture` MIPs, local contrast normalization, or surround-inhibition equivalent — that fires on luminance edges regardless of DOM markup. DOM signal is enhancement layered on top of pixel-derived primary, not a substitute.
+
+**This was the diagnosis behind PR-A's reverted approach**: an early formulation used DOM-derived signals (saliency/edgeDensity/softDensity) and collapsed to zero protection across the dashboard sidebar interior. The pixel-derived (luminance-gradient) variant fixed coverage but created a new failure mode (bleed into text content) that prompted full revert. Both lessons stay: DOM coverage is genuinely incomplete on common UI patterns, AND any pixel-derived signal must distinguish macro-feature-scale luminance transitions from text-scale content variation.
+
+---
+
 ## Reference Pages as Diagnostic Tools
 
 | Reference Page | Tests | Expected Behavior (When Model Is Accurate) |

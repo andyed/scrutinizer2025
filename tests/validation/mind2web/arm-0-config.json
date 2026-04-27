@@ -28,7 +28,7 @@
     "v1_animate": false,
     "v4_style_id": 0,
     "dog_enabled": true,
-    "dog_e2": 0.15,
+    "dog_e2": 0.10,
     "dog_sharpness": 0.0,
     "dog_oriented": true,
     "dog_orient_bias": 1.0,
@@ -61,7 +61,7 @@
 
   "modes_json_drift_pin": {
     "file": "shared/modes.json",
-    "file_blob_sha": "36398402debf8d49ad2ed95d08bab9c6702cd0a1",
+    "file_blob_sha": "fa9e54c374dc0de04837301583786c94b93c473b",
     "note": "Blob SHA of shared/modes.json at freeze. validateLive() re-reads the file and compares. Catches the mode-15-style silent drift where pipeline knobs are edited without updating the Arm-0 snapshot."
   },
 
