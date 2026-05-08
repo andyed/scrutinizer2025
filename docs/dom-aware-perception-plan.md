@@ -78,7 +78,7 @@ col = identityFidelity                        × L_canonical
 
 ## What already exists in the codebase
 
-- `renderer/preload.js:15–47, 131–236` — DOM scan, role classification (load-bearing).
+- `renderer/preload.js:15–47, 131–236` — DOM scan, role classification (primary).
 - `renderer/structure-map.js:53–77` — RGBA8 packing of rhythm/density/type/aria. All four channels survive to the GPU; only `.b/.g/.r` consumed by simulation today.
 - `renderer/content-analysis.js:400–424` — single funnel from raw DOM blocks to structure map.
 - `renderer/gestalt-processor.js:155–174` — clusters destroy text-ness when interactive children present (latent bug; PR-2 fix).
@@ -287,7 +287,7 @@ PR-4 (calibration module) can also land in week 1 since it's pure JS with no cod
 
 ## Research framing
 
-This plan implements the position argued in the (drafted) blog post "Top-down vision for screens: why peripheral perception models need the DOM." The publishable claim is that screen content's structured symbolic nature makes pure feedforward pixel pooling an incomplete model, and that DOM-aware peripheral rendering is the simulation-side analogue of the recurrent top-down priors documented in 50+ years of reading research (Reicher 1969; McClelland & Rumelhart 1981; Plaut et al. 1996; Dehaene & Cohen 2011) and pre-attentive UI perception (Treisman 1985; Wolfe 2021; Rosenholtz 2016).
+This plan implements the position argued in the (drafted) blog post "Top-down vision for screens: why peripheral perception models need the DOM." The publishable claim has two parts. First, screen content's structured symbolic nature makes pure feedforward pixel pooling an incomplete model. Second, DOM-aware peripheral rendering is the simulation-side analogue of the recurrent top-down priors documented in 50+ years of reading research (Reicher 1969; McClelland & Rumelhart 1981; Plaut et al. 1996; Dehaene & Cohen 2011) and pre-attentive UI perception (Treisman 1985; Wolfe 2021; Rosenholtz 2016).
 
 The Wallis-analogue 2IFC psychophysics study (separate workstream) tests this claim: does DOM-aware rendering produce screen metamers indistinguishable from the original under brief presentation, where pure pixel-pooling models fail?
 

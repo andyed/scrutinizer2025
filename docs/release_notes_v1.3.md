@@ -25,7 +25,7 @@ Upgraded peripheral vision color processing from RGB to **Oklab**, a perceptuall
 - More natural peripheral vision simulation
 - No more muddy brown/green artifacts in desaturated regions
 - Improved biological plausibility
-- Seamless visual quality across all aesthetic modes
+- Consistent visual quality across all aesthetic modes
 
 **Reference:** Ottosson, B. (2020). "A perceptual color space for image processing." https://bottosson.github.io/posts/oklab/
 

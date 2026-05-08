@@ -91,7 +91,7 @@ Golden captures provide visual regression testing. After shader changes, compare
 
 ## Code Style
 
-- Extensive inline comments explaining "why" not just "what"
+- Extensive inline comments explaining "why," not "what"
 - Defensive: `isFinite()` checks, NaN guards in shader math
 - Biological terminology in module/variable names where it aids clarity
 - No unnecessary bundlers — direct ES6 modules via Electron

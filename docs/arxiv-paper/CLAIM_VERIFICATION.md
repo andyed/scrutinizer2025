@@ -59,7 +59,7 @@ Generated 2026-03-19. Every claim below attributes a specific finding or number 
 
 ### McAlonan (2008) LGN gain (Architecture)
 - [ ] "spatial attention enhances LGN gain at attended locations"
-- **Risk:** McAlonan et al. 2008 studied attentional modulation in macaque LGN. "Enhances gain" is one interpretation — the paper may show suppression of unattended rather than (or in addition to) enhancement.
+- **Risk:** McAlonan et al. 2008 studied attentional modulation in macaque LGN. "Enhances gain" is one reading — the paper may show suppression of unattended rather than (or in addition to) attended-location gain.
 
 ### Bouma (1970) proportionality constant
 - [ ] "critical spacing scales linearly with eccentricity at ~0.5x"

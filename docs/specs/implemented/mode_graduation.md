@@ -23,7 +23,7 @@ Mode 12's graduation broke OCR validation (0% foveal recognition) because the OC
 
 2. **Graduation is a checklist, not a flag.** Changing the default is the last step, after all baselines are recalibrated and documentation is updated.
 
-3. **Every graduation adds a toggle.** The specific upgrade that the new mode brings should be expressible as an independent pipeline toggle, not just a mode switch. This matters for:
+3. **Every graduation adds a toggle.** The specific upgrade that the new mode brings should be expressible as an independent pipeline toggle in addition to a mode switch. This matters for:
    - **RFV practitioners** who want comfort (stability) over fidelity
    - **Researchers** who want to isolate one variable
    - **Regression testing** — toggle the upgrade off to verify the delta

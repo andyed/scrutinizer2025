@@ -53,7 +53,7 @@ Decouple the degradation pipeline from V1 displacement:
    noise (which looks like the original), but actual spatial pooling that
    destroys letter identity. This means:
    - Larger effective pooling regions in far periphery (not fixed 8x8)
-   - Actual Gaussian blur within the pooling region (not just mean)
+   - Actual Gaussian blur within the pooling region (rather than tile mean alone)
    - The tile-mean approach preserves too much structure
 
 ### Option B: Compute-side blur (simpler)

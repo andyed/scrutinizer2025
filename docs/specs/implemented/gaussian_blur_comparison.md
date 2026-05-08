@@ -88,7 +88,7 @@ The comparison succeeds if:
 
 **Root cause**: The MIP chain is itself a Gaussian pyramid. `sampleMIPPooled()` (Gaussian mode) and `sampleDoGReconstructed()` (DoG mode) both sample from the same MIP levels — the band decomposition and reconstruction produces effectively the same total attenuation as a single MIP sample at the same eccentricity-scaled level. The difference between them is one of pathway (8 weighted bands vs 1 MIP sample) not of information content on single-frequency stimuli.
 
-**Implication**: The differentiation argument cannot rest on spatial frequency selectivity alone. It must include the dimensions where the full Scrutinizer pipeline structurally differs from pure Gaussian blur:
+**Implication**: The differentiation argument cannot rest on spatial frequency selectivity alone. It must include the dimensions where the full Scrutinizer pipeline differs from pure Gaussian blur:
 
 1. **Chromatic channel separation** — per-band RG/YV decay rates (castleCSF) that Gaussian blur cannot reproduce
 2. **Saliency protection** — eccentricity modulated by saliency map, reducing degradation at salient regions
@@ -133,7 +133,7 @@ Deviation from unfiltered baseline, measured as mean absolute pixel difference a
 | Control | — | 4.9 | 15.5 | 0.318 | 3.2× better |
 | Background (center) | — | 0.0 | 0.0 | N/A | Both preserve fovea |
 
-**Key finding**: The full Scrutinizer pipeline preserves salient content 5–10× better than eccentricity-matched Gaussian blur. This is not a tuning difference — Gaussian blur has no saliency signal, so it structurally cannot modulate degradation by content importance.
+**Key finding**: The full Scrutinizer pipeline preserves salient content 5–10× better than eccentricity-matched Gaussian blur. This is not a tuning difference — Gaussian blur has no saliency signal, so it cannot modulate degradation by content importance.
 
 The control region also shows a 3.2× advantage, which is expected: the control region sits in the periphery where mode 0's V1 distortion and chromatic pooling produce less total deviation than Gaussian's uniform MIP blur at the same eccentricity. The control advantage is smaller than the high-saliency advantage, confirming the saliency gating is doing differential work.
 
@@ -221,7 +221,7 @@ pipeline stages that Gaussian blur lacks entirely.
 - If the MIP chain's discrete bands make DoG effectively Gaussian between band boundaries, the difference may be smaller than claimed — **CONFIRMED on spatial frequency stimuli**
 - If "matched total information loss" is hard to define, the comparison becomes apples-to-oranges
 - If Gaussian with eccentricity-scaled radius already produces decent frequency selectivity (large Gaussian kernels naturally attenuate high frequencies more), the difference may be one of degree rather than kind — **CONFIRMED: both use MIP chain, so both are inherently Gaussian**
-- The multi-dimensional comparison avoids these failure modes because saliency gating, chromatic separation, density-gated crowding, and orientation selectivity (v2.2) are architectural features that Gaussian blur structurally lacks
+- The multi-dimensional comparison avoids these failure modes because saliency gating, chromatic separation, density-gated crowding, and orientation selectivity (v2.2) are architectural features that Gaussian blur lacks by design
 
 ## References
 

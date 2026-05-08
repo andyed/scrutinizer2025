@@ -562,7 +562,7 @@ OCR measures letter recognition, which is content-dependent (dense body text vs 
 - OCR is binary (word recognized or not) and content-dependent (text layout matters)
 - SE is continuous and measures the spatial frequency cascade directly
 - SE detects both over-degradation (fog, SE → 0) and under-degradation (SE stays flat)
-- SE works on any content (images, charts, nav bars) not just text
+- SE works on any content (images, charts, nav bars), not text alone
 - The FC→SE correlation (6.6) validates that clutter drives degradation — biologically correct
 
 **Implementation:** `scripts/validate-subband-entropy.js` — Node.js, uses sharp for image cropping, custom steerable pyramid (port from visual-clutter's pyrtools approach or a JS wavelet library).

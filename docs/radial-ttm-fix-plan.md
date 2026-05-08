@@ -98,7 +98,7 @@ Plus `isPipelineHealthy()` exposed to the renderer. `scrutinizer.js:637` calls i
 
 ## 2. Workstream 1 — Fix mode 15 radial TTM
 
-Five phases. Only Phase 1A and 1B are load-bearing for unblocking the pipeline; Phases 2 and 3 address the noise-wedge shippability problem independently.
+Five phases. Only Phase 1A and 1B are on the critical path for unblocking the pipeline; Phases 2 and 3 address the noise-wedge shippability problem independently.
 
 ### Phase 1A — Diagnostic surface (prerequisite)
 
@@ -221,8 +221,8 @@ Phase 1A (diagnostic)  ─┬─▶ Phase 1B (buffer limit)  ──▶ Phase 2 (
 Phase 3 (oriented stats) — deferred. Only start after Phase 2 proves L4 was the bottleneck.
 ```
 
-- Phase 1A is load-bearing for everything
-- Phase 1B is load-bearing for the pipeline to actually run
+- Phase 1A is the critical path for everything
+- Phase 1B is required for the pipeline to actually run
 - Phase 2 WGSL can be drafted and code-reviewed in parallel with 1B; visual validation blocks on 1B
 - If Phase 2 alone produces shippable output, Phase 3 is a research extension, not a blocker
 
