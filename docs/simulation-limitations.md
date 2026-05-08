@@ -86,7 +86,7 @@ A simpler approximation: use local contrast/variance in the MIP chain. Regions w
 ## 3. No Transsaccadic Integration
 
 **Status**: Fundamental design constraint
-**Documented in**: `Founding - Foveal Vision Simulation Assessment.md`
+**Documented in**: `ai-source/Founding - Foveal Vision Simulation Assessment.md` (Gemini Deep Research output; treat as raw input, not canonical prose)
 **Severity**: Medium — causes the simulation to overestimate peripheral disruption.
 
 The simulation presents a continuously degraded periphery that updates every frame. Real vision integrates information across saccades — the brain builds a stable scene representation by sampling different locations over time. This means:
