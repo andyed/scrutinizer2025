@@ -39,7 +39,11 @@ function buildSpecs() {
     for (const page of pages) {
         for (const modeConfig of MODES) {
             specs.push({
-                filename: `${page}_center_${modeConfig.id}.png`,
+                // _overlay suffix declares the intentional debug overlay
+                // (eccentricity-ring visualization for blog comparison images).
+                // See CODEBASE_MAP.md gotcha #15 and the hygiene test at
+                // tests/unit/capture-debug-overlay-hygiene.test.js.
+                filename: `${page}_center_${modeConfig.id}_overlay.png`,
                 url: `${BASE_URL}/${page}.html`,
                 mode: modeConfig.mode,
                 fixationX: 0.5,
