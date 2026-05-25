@@ -1,0 +1,81 @@
+# .understandignore — patterns for files/dirs to exclude from analysis
+# Syntax: same as .gitignore (globs, # comments, ! negation, trailing / for dirs)
+# Lines below are suggestions — uncomment to activate.
+# Use ! prefix to force-include something excluded by defaults.
+#
+# Built-in defaults (always excluded unless negated):
+#   node_modules/, .git/, dist/, build/, obj/, *.lock, *.min.js, etc.
+#
+# --- From .gitignore (uncomment to exclude) ---
+
+# .DS_Store
+# *.pyc
+# .env
+# .env.local
+# .env.*.local
+# .AppleDouble
+# .LSOverride
+# *.dmg
+# *.blockmap
+# test_*.png
+# tests/screenshots/
+# tests/golden/*Z.png
+# tests/reference-pages/screenshots/
+# tests/validation/rosenholtz-maps/
+# tests/validation/results/
+# tests/validation/results-*/
+# tests/golden-captures/
+# tests/smoke-captures/
+# tests/compute-captures/
+# tests/figma-store-captures/
+# scripts/capture-figma-store.js
+# tests/mind2web-experiment/
+# data/mind2web/
+# data/mind2web-cache-*/
+# data/mind2web-multimodal/
+# data/mind2web-mhtml/
+# data/mind2web-replay/
+# !data/mind2web-split.json
+# !data/mind2web-summaries.json
+# tmp/
+# data/coco-search18/images/
+# output/
+# tests/temporal-variance/
+# tests/validation/pyramid-reference/
+# docs/golden/isotropic-comparison/
+# .capture-manifest.json
+# *.traineddata
+# tests/validation/ocr-accuracy-curve.json
+# data/coco-search18/*.zip
+# data/coco-search18/coco_search18_*.json
+# data/coco-search18/readme.txt
+# data/ueyes/
+# docs/research/
+# docs/meeting-prep-*.md
+# docs/meeting-questions-*.md
+# docs/transcripts/
+# docs/arxiv-paper/*.aux
+# docs/arxiv-paper/*.bbl
+# docs/arxiv-paper/*.blg
+# docs/arxiv-paper/*.out
+# .claude/
+# **/CLAUDE.md
+# !/CLAUDE.md
+# build/certs/
+# build_error.txt
+# build_error.txt
+# docs/drafts/
+# comms/
+# scripts/burn-tooltips.sh
+
+# --- Detected directories (uncomment to exclude) ---
+
+# tests/
+# docs/
+# scripts/
+
+# --- Test file patterns (uncomment to exclude) ---
+
+# *.test.*
+# *.spec.*
+# *.snap

@@ -267,6 +267,8 @@ The current Gaussian blur implies the periphery is just "out of focus." Biologic
 
 ### Recommendation for blur-worker.js
 
+> **Historical note (2026-05-25):** `renderer/blur-worker.js` and `renderer/image-processor.js` were removed as dead code. The recommendation below was implemented in shader form in `renderer/shaders/peripheral.frag` (Bender + Cutter distortions, MIP-based pooling) and in WebGPU compute (Tier 2.5 `crowding-synth` + Tier 2.75 `pyramid-synth`).
+
 Don't try to implement a true Gaussian blur in JS for the whole screen—it's too slow. Instead, implement a "Box Sampling with Noise":
 
 - **Fovea**: 1:1 pixel copy
