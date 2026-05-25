@@ -1,6 +1,33 @@
 #version 300 es
 precision mediump float;
 
+// ===========================================================================
+// CHANNEL-ORDER CONTRACT — read this before touching luminance weights.
+// ---------------------------------------------------------------------------
+// `u_texture` is uploaded from Electron's captured frame buffer in **BGRA**
+// byte order. A naive `textureLod(u_texture, uv).rgb` therefore returns
+// channels in the order **(B, G, R)** — NOT (R, G, B).
+//
+//   The three helpers below — sampleSource, sampleSourceGrad, sampleSourceLod
+//   — internally swap r↔b and return TRUE RGBA. Downstream V4 code that
+//   reads from these helpers should treat samples as semantic RGB.
+//
+// Two regimes coexist in this shader:
+//
+//   PRE-SWAP  (raw `textureLod(u_texture, ...).rgb`)        → channels are (B, G, R)
+//             Use swapped luma weights:  vec3(0.114, 0.587, 0.299)
+//             so the dot product evaluates  0.114·B + 0.587·G + 0.299·R
+//             — i.e. ITU-R BT.601 luminance with channels in their semantic roles.
+//
+//   POST-SWAP (via sampleSource* helpers, or downstream of the .bgra swizzle
+//              at the end of applyChromaticDecay / V4 reconstruction)
+//             Use STANDARD luma weights:  vec3(0.299, 0.587, 0.114)
+//
+// If you "fix" pre-swap weights to look standard, you will silently swap
+// the perceptual roles of red and blue. Test against a red-on-white page
+// and a blue-on-white page — they should produce comparable luma readouts.
+// ===========================================================================
+
 // === UNIFORMS ===
 uniform sampler2D u_texture;      // Captured browser frame (Live)
 uniform sampler2D u_maskTexture;  // Visual memory mask
@@ -202,8 +229,8 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     float orientBonus = 0.0;
     if (u_dog_oriented > 0.5) {
         vec2 px = 2.0 / u_resolution;  // MIP 1 texel size
-        // Luminance from BGRA-ordered texture: .b=Red, .g=Green, .r=Blue
-        // Correct luma weights: 0.299*R(.b) + 0.587*G(.g) + 0.114*B(.r)
+        // PRE-SWAP regime: raw u_texture reads return (B, G, R). Swapped weights
+        // are required — see the channel-order contract at the top of the file.
         vec3 lumaW = vec3(0.114, 0.587, 0.299);
         float lum_r = dot(textureLod(u_texture, undistortedUV + vec2(px.x, 0.0), 1.0).rgb, lumaW);
         float lum_l = dot(textureLod(u_texture, undistortedUV - vec2(px.x, 0.0), 1.0).rgb, lumaW);
@@ -1981,7 +2008,13 @@ vec3 sampleDomAwarePrimitive(vec3 L_background, vec2 uv) {
         int id_w = int(texture(u_primitiveMap, uv - vec2(ts.x, 0.0)).r * 255.0 + 0.5);
         bool isEdge = (id_n != typeId) || (id_s != typeId) ||
                       (id_e != typeId) || (id_w != typeId);
-        vec3 pooledCol = textureLod(u_texture, uv, 3.0).rgb;
+        // sampleSourceLod returns true RGBA (BGRA→RGBA swap applied) so both
+        // meanLum and the applyChromaticEccentricityDecay/Oklab path below see
+        // correct channel order. Fixes the channel-swap that was biasing
+        // pooled chromatic primitive interiors red↔blue. See channel-order
+        // contract at top of file. Capture verification: 0.30% pixels shift
+        // by up to 11/765 channel-sum on ecommerce.html at fixation (0.5,0.15).
+        vec3 pooledCol = sampleSourceLod(uv, 3.0).rgb;
         float meanLum = dot(pooledCol, vec3(0.299, 0.587, 0.114));
         if (isEdge) {
             // Outline: darker than local mean — visible against interior.
@@ -2017,7 +2050,10 @@ vec3 sampleDomAwarePrimitive(vec3 L_background, vec2 uv) {
         float envelope = 0.5 + 0.5 * sign(sin(yPx * 3.14159265 / xHeightPx));
         float strokePeriod = max(xHeightPx / 3.0, 1.0);
         float stroke = 0.5 + 0.5 * sign(sin(xPx * 3.14159265 / strokePeriod));
-        vec3 pooledCol = textureLod(u_texture, uv, 3.0).rgb;
+        // sampleSourceLod returns true RGBA — meanLum reflects perceptual luma
+        // of the local pool (was biased on chromatic text backgrounds before
+        // the BGRA-aware switch). See channel-order contract at top of file.
+        vec3 pooledCol = sampleSourceLod(uv, 3.0).rgb;
         float meanLum = dot(pooledCol, vec3(0.299, 0.587, 0.114));
         vec3 ink = vec3(clamp(meanLum - 0.35, 0.0, 1.0));
         vec3 paper = vec3(clamp(meanLum + 0.35, 0.0, 1.0));

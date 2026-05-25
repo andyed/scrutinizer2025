@@ -19,7 +19,7 @@ const CONFIG_PATH = path.join(REPO_ROOT, 'tests/validation/mind2web/arm-0-config
 const MODES_PATH = path.join(REPO_ROOT, 'shared/modes.json');
 const FRAG_PATH = path.join(REPO_ROOT, 'renderer/shaders/peripheral.frag');
 
-const EXPECTED_HASH_PREFIX = '5c0bf5e009b8';
+const EXPECTED_HASH_PREFIX = '2d7c3f242af8';
 
 describe('Mind2Web Arm-0 config hash', () => {
     let cfg;
