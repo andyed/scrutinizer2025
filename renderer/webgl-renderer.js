@@ -11,6 +11,7 @@
         ipcRenderer.send('log:renderer', '[WebGLRenderer] Script execution started');
 
         const Logger = require('./logger');
+        const { FOVEA_ASPECT_RATIO_DEFAULT } = require('./config');
 
         // Load mode registry from shared/modes.json
         let modesRegistry = null;
@@ -764,7 +765,7 @@
                 gl.clearColor(0.0, 0.0, 0.0, 0.0);
                 gl.clear(gl.COLOR_BUFFER_BIT);
             }
-            render(width, height, mouseX, mouseY, foveaRadius, foveaAspectRatio = 1.33, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, debugStructure = 0.0, useMask = 0.0, mongrelMode = 1.0, aestheticMode = 0.0, velocity = 0.0, stableMouseX = 0.0, stableMouseY = 0.0, hasStructure = 0.0, enableSaliencyModulation = 1.0, time = 0.0, scrollbarWidth = 17.0, velocityDirX = 0.0, velocityDirY = 0.0) {
+            render(width, height, mouseX, mouseY, foveaRadius, foveaAspectRatio = FOVEA_ASPECT_RATIO_DEFAULT, intensity = 0.6, caStrength = 1.0, debugBoundary = 0.0, debugStructure = 0.0, useMask = 0.0, mongrelMode = 1.0, aestheticMode = 0.0, velocity = 0.0, stableMouseX = 0.0, stableMouseY = 0.0, hasStructure = 0.0, enableSaliencyModulation = 1.0, time = 0.0, scrollbarWidth = 17.0, velocityDirX = 0.0, velocityDirY = 0.0) {
                 if (!this.program) {
                     console.error('[WebGLRenderer] render() called but program is null!');
                     return;
@@ -781,13 +782,10 @@
                 }
 
                 // Safety check for aspect ratio to prevent division by zero in shader.
-                // TODO(biology): the 1.33 default has no inline citation. Plausible
-                // post-hoc as horizontal-raphe asymmetry or Rayner reading-span
-                // collapsed to a symmetric ellipse, but neither is derived in source.
-                // Sync with webgpu-crowding-compute.js:173 and crowding-stats.wgsl:27
-                // and scripts/compare-brown-metamers.js (FOVEA_ASPECT_RATIO).
+                // Default sourced from FOVEA_ASPECT_RATIO_DEFAULT in renderer/config.js
+                // (single source of truth — see citation TODO there).
                 if (!foveaAspectRatio || foveaAspectRatio < 0.1) {
-                    foveaAspectRatio = 1.33;
+                    foveaAspectRatio = FOVEA_ASPECT_RATIO_DEFAULT;
                 }
 
                 const gl = this.gl;
@@ -876,7 +874,6 @@
                 }
 
                 gl.uniform1f(this.velocityLocation, velocity);
-                gl.uniform1f(this.mongrelModeLocation, mongrelMode);
                 gl.uniform1f(this.mongrelModeLocation, mongrelMode);
                 gl.uniform1f(this.timeLocation, time);
                 gl.uniform1f(this.scrollbarWidthLocation, scrollbarWidth);

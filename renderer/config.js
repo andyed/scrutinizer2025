@@ -1,8 +1,18 @@
 // Configuration constants for Scrutinizer effect
+
+// Single source of truth for the elliptical foveal aspect ratio (w:h).
+// TODO(biology): 1.33 has no inline citation. Plausible post-hoc as horizontal-raphe
+// asymmetry or Rayner reading-span collapsed to a symmetric ellipse, but neither is
+// derived in source. When the constant is grounded, edit it HERE — all consumers
+// (renderer/scrutinizer.js, renderer/webgl-renderer.js, renderer/webgpu-crowding-compute.js,
+// scripts/compare-brown-metamers.js, renderer/shaders/crowding-stats.wgsl) read from
+// CONFIG.fovealAspectRatio or the FOVEA_ASPECT_RATIO_DEFAULT export below.
+const FOVEA_ASPECT_RATIO_DEFAULT = 1.33;
+
 const CONFIG = {
     // Foveal region settings
     fovealRadius: 45, // pixels - ~1° foveal radius (2° diameter) on MBP Retina @ 20" (see docs/foveal-calibration-logic.md §7)
-    fovealAspectRatio: 1.33, // width/height ratio of foveal shape (4:3 default)
+    fovealAspectRatio: FOVEA_ASPECT_RATIO_DEFAULT, // width/height ratio of foveal shape (4:3 default)
 
     // Image processing settings
     blurRadius: 10, // pixels - amount of blur for peripheral vision (higher = more severe)
@@ -17,6 +27,21 @@ const CONFIG = {
     // Performance settings
     scrollDebounce: 150, // ms - delay before recapturing after scroll
     mutationDebounce: 200, // ms - delay before recapturing after DOM change
+    congestionRecomputeCooldownMs: 5000, // ms - min gap between Feature Congestion
+                                         // recomputes on DOM mutation. Prevents thrashing
+                                         // the congestion worker on rapid DOM churn.
+                                         // Trade-off: lower = fresher heatmap, higher worker
+                                         // load; higher = staler heatmap, less CPU/GPU.
+    metamerContentRefreshMs: 100,        // ms - max staleness for WebGPU metamer during
+                                         // stationary gaze. Saccade landing + drift > 5°
+                                         // still trigger immediate resynth; this is the
+                                         // time-based floor that catches CSS animations
+                                         // and hover effects (which don't fire DOM mutation
+                                         // events). 100ms ≈ 10Hz peripheral refresh, close
+                                         // to peripheral flicker-fusion threshold. Trade-off:
+                                         // lower = fresher periphery on animated content +
+                                         // more compute; higher = better freeze fidelity +
+                                         // staler animations.
 
     // Capture settings
     captureScale: 1.0, // scale factor for capture (lower = faster but less quality)
@@ -57,7 +82,7 @@ if (typeof module !== 'undefined' && module.exports) {
 
     module.exports = {
         DEFAULT_SETTINGS: CONFIG,
+        FOVEA_ASPECT_RATIO_DEFAULT,
         CALIBRATION_URL,
-        // ... possibly other exports
     };
 }

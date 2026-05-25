@@ -30,4 +30,16 @@ describe('Config', () => {
         expect(typeof configModule.CALIBRATION_URL).toBe('string');
         expect(configModule.CALIBRATION_URL).toContain('foveal-calibration.html');
     });
+
+    it('exports FOVEA_ASPECT_RATIO_DEFAULT as the single source of truth', () => {
+        // This is the only place the foveal-ellipse default literal should live.
+        // Consumers (scrutinizer.js, webgl-renderer.js, webgpu-crowding-compute.js,
+        // scripts/compare-brown-metamers.js) read from this named export.
+        expect(configModule).toHaveProperty('FOVEA_ASPECT_RATIO_DEFAULT');
+        expect(typeof configModule.FOVEA_ASPECT_RATIO_DEFAULT).toBe('number');
+        expect(configModule.FOVEA_ASPECT_RATIO_DEFAULT).toBeGreaterThan(0.1);
+        // CONFIG must reflect the exported constant, not a duplicated literal.
+        expect(configModule.DEFAULT_SETTINGS.fovealAspectRatio)
+            .toBe(configModule.FOVEA_ASPECT_RATIO_DEFAULT);
+    });
 });

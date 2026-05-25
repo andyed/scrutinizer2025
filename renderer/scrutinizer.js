@@ -26,6 +26,9 @@
     const { WebGPUSafetyHarness } = require('./webgpu-safety');
     const { WebGPUCrowdingCompute } = require('./webgpu-crowding-compute');
     const { WebGPUPyramidCompute } = require('./webgpu-pyramid-compute');
+    const { FOVEA_ASPECT_RATIO_DEFAULT, DEFAULT_SETTINGS } = require('./config');
+    const CONGESTION_COOLDOWN_MS = DEFAULT_SETTINGS.congestionRecomputeCooldownMs;
+    const METAMER_CONTENT_REFRESH_MS = DEFAULT_SETTINGS.metamerContentRefreshMs;
 
     // Architecture: Explicit require for optional dependencies
     let SVGOverlay;
@@ -120,6 +123,11 @@
             this._metamerInitialized = false;
             this._lastSynthGazeX = 0;
             this._lastSynthGazeY = 0;
+            // Timestamp of the most recent resynth dispatch. Drives the
+            // time-throttled periodic refresh that catches CSS animations /
+            // hover effects on stationary gaze (which don't fire DOM mutation
+            // events). See `metamerContentRefreshMs` in config.js.
+            this._lastSynthTimestamp = 0;
             this._initWebGPU();
 
             // ── SVG Overlay (debug visualization) ────────────────────
@@ -271,15 +279,16 @@
                     } else {
                         // DOM mutation = content changed but viewport didn't move.
                         // Current score is mostly valid — gentle fade only.
-                        // Enforce 5s cooldown: don't recompute if we just did.
-                        if (timeSinceLastResult < 5000) {
+                        // Enforce cooldown: don't recompute if we just did.
+                        // Duration sourced from CONFIG.congestionRecomputeCooldownMs.
+                        if (timeSinceLastResult < CONGESTION_COOLDOWN_MS) {
                             // Within cooldown — just show gentle staleness indicator.
                             // Queue a recompute for when cooldown expires.
                             if (this.complexityHud) {
                                 this.complexityHud.setPending(true, true); // gentle mode
                             }
                             clearTimeout(this._congestionMutationTimer);
-                            const remaining = 5000 - timeSinceLastResult;
+                            const remaining = CONGESTION_COOLDOWN_MS - timeSinceLastResult;
                             this._congestionMutationTimer = setTimeout(() => {
                                 this._submitCongestionFrame(true); // DOM changed
                             }, remaining + 300); // +300ms settle time after cooldown
@@ -547,7 +556,9 @@
             if (this.frameTimer) this.frameTimer.mark('saliency');
 
             // 5. Compose render state
-            const aspectRatio = this.config.fovealAspectRatio || 1.33;
+            // fovealAspectRatio falls back to FOVEA_ASPECT_RATIO_DEFAULT —
+            // the single source of truth lives in renderer/config.js.
+            const aspectRatio = this.config.fovealAspectRatio ?? FOVEA_ASPECT_RATIO_DEFAULT;
 
             // Auto-reduce intensity when visual memory is active to avoid heavy ghosting
             const effectiveIntensity = useMask
@@ -671,7 +682,17 @@
                 const maxDrift = this.config.fovealRadius * 2.0; // ~5° at default radius
                 const driftExceeded = synthDist > maxDrift;
 
-                const shouldResynth = saccadeLanded || driftExceeded || !this._metamerInitialized;
+                // Time-throttled content refresh: catches CSS animations and hover
+                // effects that change visual output without firing DOM mutation events.
+                // During stationary gaze without saccade/drift, the metamer is otherwise
+                // frozen indefinitely — this floor caps staleness at METAMER_CONTENT_REFRESH_MS.
+                // The freeze (which IS the intended behaviour during fixation/pursuit on
+                // static content) is preserved between refresh ticks. See CODEBASE_MAP
+                // gotcha #3 for the history of why this isn't a blanket per-upload reset.
+                const nowMs = Date.now();
+                const refreshTimeout = (nowMs - this._lastSynthTimestamp) > METAMER_CONTENT_REFRESH_MS;
+
+                const shouldResynth = saccadeLanded || driftExceeded || !this._metamerInitialized || refreshTimeout;
 
                 // Both tiers use shouldCompute() for frame-skip (every 2nd frame)
                 const canCompute = this.webgpuCompute?.shouldCompute() && this.webgpuCompute && shouldResynth;
@@ -715,15 +736,23 @@
                         console.debug('[Scrutinizer] Metamer resynth: reason=saccade');
                     } else if (driftExceeded) {
                         console.debug('[Scrutinizer] Metamer resynth: reason=drift (%dpx)', Math.round(synthDist));
+                    } else if (refreshTimeout) {
+                        console.debug('[Scrutinizer] Metamer resynth: reason=refresh (%dms)', nowMs - this._lastSynthTimestamp);
                     } else {
                         console.debug('[Scrutinizer] Metamer resynth: reason=init');
                     }
                     this._lastSynthGazeX = gazeFrameX / 2;
                     this._lastSynthGazeY = gazeFrameY / 2;
+                    this._lastSynthTimestamp = nowMs;
                     this._metamerInitialized = true;
 
                     // Async readback — non-blocking, result arrives next frame.
                     // Detect pipeline type dynamically to handle mode-switch races.
+                    // NOTE: We do NOT reset _metamerInitialized after upload. The
+                    // freeze during fixation/pursuit is intentional — it preserves
+                    // peripheral representation stability (Sperry 1950, Burr 1994).
+                    // Periodic refresh on stationary gaze is driven by the
+                    // refreshTimeout gate above, not by blanket per-upload reset.
                     const cw = this.canvas.width, ch = this.canvas.height;
                     const isPyramidCompute = typeof this.webgpuCompute.readbackOutput === 'function';
                     const readbackFn = isPyramidCompute
@@ -732,10 +761,6 @@
                     readbackFn.then((data) => {
                         if (data && this.renderer) {
                             this.renderer.uploadComputeTexture(data, halfW, halfH, cw, ch);
-                            // Always invalidate after upload so next content change triggers resynth.
-                            // Without this, hover effects / CSS animations / dynamic content
-                            // show stale tiles until the next saccade or drift threshold.
-                            this._metamerInitialized = false;
                         }
                     });
                 }

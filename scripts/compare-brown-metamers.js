@@ -42,12 +42,12 @@ const DEFAULT_MANIFEST = path.join(ROOT, 'tests', 'golden-captures', 'brown-meta
 const manifestArg = process.argv.find(a => a.startsWith('--manifest='));
 const MANIFEST_PATH = manifestArg ? manifestArg.split('=')[1] : DEFAULT_MANIFEST;
 
-// Elliptical fovea shape — must match the shader's u_fovea_aspect_ratio default.
-// Sources of truth: renderer/webgl-renderer.js:732, renderer/webgpu-crowding-compute.js:173,
-// renderer/shaders/crowding-stats.wgsl:27. If those drift, this drifts.
-// TODO(biology): the 1.33 default has no inline citation in source; keep this in
-// sync with whatever the shader settles on, and revisit when the constant is grounded.
-const FOVEA_ASPECT_RATIO = 1.33;
+// Elliptical fovea shape — single source of truth lives in renderer/config.js.
+// All JS consumers (scrutinizer.js, webgl-renderer.js, webgpu-crowding-compute.js,
+// this script) read from FOVEA_ASPECT_RATIO_DEFAULT. The WGSL shaders receive it
+// at upload time via uploadAndConfigure(). When the citation TODO in config.js
+// is resolved, edit it there — nothing else needs to change.
+const { FOVEA_ASPECT_RATIO_DEFAULT: FOVEA_ASPECT_RATIO } = require('../renderer/config.js');
 
 // Eccentricity bands in pixels (from gaze center)
 // Base eccentricity bands at 45 px/deg (1x resolution, fovea radius = 45px).

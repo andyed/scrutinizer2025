@@ -12,6 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { FOVEA_ASPECT_RATIO_DEFAULT } = require('./config');
 
 const TILE_SIZE = 8;           // 8x8 workgroup = 1 tile
 const FRAME_INTERVAL = 2;     // Run every 2nd frame
@@ -168,12 +169,11 @@ class WebGPUCrowdingCompute {
      * @param {number} foveaRadius - foveal radius in half-res pixels
      * @param {{ cmf_a: number, ecc_scaling: number }} cmfConfig
      * @param {number} corticalMax - precomputed ln(r_max/a + 1)
-     * @param {number} foveaAspectRatio - elliptical fovea shape (default 1.33)
-     *   TODO(biology): 1.33 has no inline citation. Sync with
-     *   webgl-renderer.js:732, crowding-stats.wgsl:27, and
-     *   scripts/compare-brown-metamers.js (FOVEA_ASPECT_RATIO).
+     * @param {number} foveaAspectRatio - elliptical fovea shape; defaults to
+     *   FOVEA_ASPECT_RATIO_DEFAULT from renderer/config.js (the single source
+     *   of truth — see citation TODO there).
      */
-    uploadAndConfigure(rgba, foveaX, foveaY, foveaRadius, cmfConfig, corticalMax, foveaAspectRatio = 1.33) {
+    uploadAndConfigure(rgba, foveaX, foveaY, foveaRadius, cmfConfig, corticalMax, foveaAspectRatio = FOVEA_ASPECT_RATIO_DEFAULT) {
         if (this._destroyed) return;
 
         // Upload source texture
