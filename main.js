@@ -1300,12 +1300,16 @@ ipcMain.on('export:citation-screenshot', async (event, options = {}) => {
         };
 
         const metadata = {
-            modeId: options.modeId || currentAestheticMode || 0,
+            // Nullish coalescing (??) preserves explicit 0 values for params where
+            // 0 is a valid user choice (mode 0 = High-Key Ghosting default,
+            // intensity 0 = no degradation, caStrength 0 = no chromatic aberration).
+            // The v2.7.2 visualMemory bug taught us not to use || on mode-like ids.
+            modeId: options.modeId ?? currentAestheticMode ?? 0,
             modeName: options.modeName || null,
             foveaRadius: options.foveaRadius || currentRadius || 180,
             foveaAspect: options.foveaAspect || 1.33,
-            degradationStrength: options.degradationStrength || options.intensity || currentIntensity || 0.6,
-            caStrength: options.caStrength || 1.0,
+            degradationStrength: options.degradationStrength ?? options.intensity ?? currentIntensity ?? 0.6,
+            caStrength: options.caStrength ?? 1.0,
             url: options.url || '',
             pipeline: options.pipeline || autoPipeline,
             customFields: options.customFields || {}
