@@ -19,9 +19,13 @@
   html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, sans-serif; color: #111; background: #fff; }
   .page { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
 
-  /* Page-tall sidebar — THE primary suppression target. 1 px solid border, full viewport height. */
+  /* Page-tall sidebar — THE primary suppression target. Match the divider
+     styling (2 px, #333) so the vertical-edge probe sees the same gradient
+     magnitude as the horizontal-edge probe. The original 1 px #999 fell
+     below the Phase-2 edgeGate threshold at MIP 1, masking the suppression
+     as a false-positive H/V asymmetry. */
   .sidebar {
-    border-right: 1px solid #999;       /* the long vertical edge */
+    border-right: 2px solid #333;       /* the long vertical edge */
     padding: 24px 16px;
     background: #f7f7f7;
   }
