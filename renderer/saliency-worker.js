@@ -190,6 +190,86 @@ function generateStructureMasks(blocks, targetW, targetH, sourceW, sourceH, dpr)
 /**
  * Draw a Gaussian blob for a detected face
  */
+// ── V1 length-tuning / end-stopping (Hubel-Wiesel 1965, Cavanaugh-Bair-Movshon 2002)
+// ─────────────────────────────────────────────────────────────────────────────
+// Production hook for the algorithm whose shader reference implementation lives
+// at peripheral.frag:281-339. See docs/specs/length_tuned_edge_suppression.md D4.
+//
+// Walks tangent over the SOURCE LUMINANCE (Oklab L of the captured frame at
+// saliency resolution), computes per-pixel persistence, and sigmoid-suppresses
+// the saliency value at that pixel. The result propagates through every
+// downstream consumer of the saliency map (LGN gating, V1 strength, V4 chroma,
+// pyramid synth weight), giving the mechanism the visual reach P1's shader-
+// only orientBonus hook couldn't deliver.
+//
+// Cost: ~1ms once per saliency cycle at 256-512 px (vs 32 texture reads per
+// edge fragment per frame in the shader path). Pure JS, runs on this worker
+// thread off the main thread.
+function suppressLongEdges(saliency, sourceL, width, height, params) {
+    const { K_STEPS, midpoint, steepness, strength } = params;
+    // Gate threshold on saliency-map gradient. Saliency values are normalised
+    // to roughly [0, 1] so 0.003 is "noticeable orientation energy here."
+    const EDGE_GATE_SQ = 0.0001;
+
+    // Snapshot the source luminance so the probe reads a fixed map even as we
+    // mutate saliency in place. Source is small (256-512 px) so the copy cost
+    // is negligible vs the per-pixel probe.
+    const L = sourceL;  // already a Float32Array we don't mutate
+
+    for (let y = 2; y < height - 2; y++) {
+        const rowBase = y * width;
+        for (let x = 2; x < width - 2; x++) {
+            const i = rowBase + x;
+            // Center luminance gradient via 4-neighbour difference (matches
+            // the shader's gradient construction at peripheral.frag:244-250).
+            const gx = L[i + 1] - L[i - 1];
+            const gy = L[i + width] - L[i - width];
+            const g2 = gx * gx + gy * gy;
+            if (g2 < EDGE_GATE_SQ) continue;
+
+            const gMag = Math.sqrt(g2);
+            // Tangent = perpendicular to gradient. Walk this direction.
+            const tx = -gy / gMag;
+            const ty = gx / gMag;
+
+            let persistSum = 0;
+            let validSamples = 0;
+            for (let k = 1; k <= K_STEPS; k++) {
+                // +k and -k tangent steps. Math.round picks the nearest integer
+                // pixel position — fine at saliency-map resolution where each
+                // pixel already represents ~4-8 native pixels.
+                for (let sign = -1; sign <= 1; sign += 2) {
+                    const sx = x + tx * k * sign;
+                    const sy = y + ty * k * sign;
+                    const px = Math.round(sx);
+                    const py = Math.round(sy);
+                    if (px < 1 || px >= width - 1 || py < 1 || py >= height - 1) continue;
+                    const ix = py * width + px;
+                    const gxp = L[ix + 1] - L[ix - 1];
+                    const gyp = L[ix + width] - L[ix - width];
+                    const g2p = gxp * gxp + gyp * gyp;
+                    if (g2p < 1e-8) continue;
+                    // Cosine alignment with center gradient. Same-polarity edge
+                    // continuation gives align ≈ 1; opposite-polarity gives -1
+                    // which is clamped to 0. Different orientations decay.
+                    const align = (gx * gxp + gy * gyp) / Math.sqrt(g2 * g2p);
+                    if (align > 0) persistSum += align;
+                    validSamples++;
+                }
+            }
+            if (validSamples === 0) continue;
+            const persist = persistSum / validSamples;
+
+            // Same sigmoid as the shader. midpoint, steepness, strength all
+            // tunable from the mode config — defaults match mode 17 in
+            // shared/modes.json (0.75 / 10.0 / 0.7).
+            const sig = 1.0 / (1.0 + Math.exp(-steepness * (persist - midpoint)));
+            const lengthSuppress = 1.0 - strength * sig;
+            saliency[i] *= lengthSuppress;
+        }
+    }
+}
+
 function drawFaceBlob(faceMap, width, height, box) {
     // Box is { x, y, width, height } in canvas coords
     const cx = box.x + box.width / 2;
@@ -224,7 +304,7 @@ function drawFaceBlob(faceMap, width, height, box) {
 }
 
 self.onmessage = async function (e) {
-    const { imageBitmap, id, maxDimension } = e.data;
+    const { imageBitmap, id, maxDimension, lengthTuning } = e.data;
 
     if (!imageBitmap) return;
 
@@ -449,6 +529,27 @@ self.onmessage = async function (e) {
 
         saliency[i] = val;
         if (val > maxVal) maxVal = val;
+    }
+
+    // PASS 4.5: V1 length-tuning / end-stopping suppression.
+    // Production hook for the algorithm whose shader reference lives at
+    // peripheral.frag:281-339. Walks tangent over source luminance (I),
+    // sigmoid-suppresses saliency for long-edge regions. See spec §D4.
+    // Mutating saliency in place; re-derive maxVal in PASS 5's normalize.
+    if (lengthTuning && lengthTuning.enabled) {
+        suppressLongEdges(saliency, I, width, height, {
+            K_STEPS: lengthTuning.K_STEPS || 8,
+            midpoint: lengthTuning.midpoint ?? 0.75,
+            steepness: lengthTuning.steepness ?? 10.0,
+            strength: lengthTuning.strength ?? 0.7,
+        });
+        // Recompute maxVal because suppression may have changed which pixel
+        // is the brightest (unlikely — suppression only lowers — but if the
+        // OLD max was on a long edge, it's now smaller).
+        maxVal = 0;
+        for (let i = 0; i < len; i++) {
+            if (saliency[i] > maxVal) maxVal = saliency[i];
+        }
     }
 
     // PASS 5: Normalize & Write Output

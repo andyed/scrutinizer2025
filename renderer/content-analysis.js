@@ -62,6 +62,11 @@
             this.saliencyFrameCounter = 0;
             this.saliencyWorker = null;
             this.saliencyMaxDimension = 256; // Configurable: 256/512
+            // V1 length-tuning / end-stopping params. Off by default; mode 17
+            // turns it on via setLengthTuning() driven from the renderer's
+            // config block (which mirrors shared/modes.json pipeline values).
+            // See docs/specs/length_tuned_edge_suppression.md §D4.
+            this.lengthTuning = { enabled: false, midpoint: 0.75, steepness: 10.0, strength: 0.7, K_STEPS: 8 };
 
             this._initSaliencyWorker();
 
@@ -302,6 +307,23 @@
         }
 
         /**
+         * Set V1 length-tuning / end-stopping params for the saliency-side
+         * production hook. Toggled by mode 17 via the renderer's config block
+         * (which mirrors shared/modes.json). See docs/specs/length_tuned_edge_suppression.md §D4.
+         * @param {{enabled:boolean, midpoint?:number, steepness?:number, strength?:number, K_STEPS?:number}} params
+         */
+        setLengthTuning(params) {
+            this.lengthTuning = {
+                enabled: !!params.enabled,
+                midpoint: params.midpoint ?? 0.75,
+                steepness: params.steepness ?? 10.0,
+                strength: params.strength ?? 0.7,
+                K_STEPS: params.K_STEPS ?? 8,
+            };
+            this._lastSaliencyChecksum = -1; // Force recompute so the change shows immediately
+        }
+
+        /**
          * Set congestion worker resolution.
          * @param {number} maxDim - Maximum dimension (256, 512, 1024, or 2048)
          */
@@ -358,7 +380,8 @@
                     id: this.saliencyFrameCounter,
                     structureData: this.lastGroupedBlocks || this.lastBlocks,
                     dpr: window.devicePixelRatio || 1,
-                    maxDimension: this.saliencyMaxDimension
+                    maxDimension: this.saliencyMaxDimension,
+                    lengthTuning: this.lengthTuning,
                 }, [bitmap]);
             });
         }

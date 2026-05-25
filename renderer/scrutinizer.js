@@ -1062,6 +1062,19 @@
             const newModeEntry = Object.values(modesRegistry.modes).find(m => m.id === this.aestheticMode);
             const newTier = newModeEntry?.pipeline?.compute_tier || 0;
 
+            // Sync V1 length-tuning params from mode pipeline → contentAnalysis
+            // → saliency-worker. The shader version (peripheral.frag:281-339)
+            // remains as the per-pixel ground-truth reference; the worker
+            // version is the production hook with visual reach via
+            // u_saliencyMap propagation. See spec §D4.
+            const p = newModeEntry?.pipeline || {};
+            this.contentAnalysis.setLengthTuning({
+                enabled: !!p.length_tuning_enabled,
+                midpoint: p.length_tuning_midpoint,
+                steepness: p.length_tuning_steepness,
+                strength: p.length_tuning_strength,
+            });
+
             // Destroy compute pipeline if tier changed (Pyramid vs Crowding use different APIs)
             const prevIsPyramid = prevTier >= 2.75;
             const newIsPyramid = newTier >= 2.75;

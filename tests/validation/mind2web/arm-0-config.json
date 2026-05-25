@@ -61,7 +61,7 @@
 
   "modes_json_drift_pin": {
     "file": "shared/modes.json",
-    "file_blob_sha": "0f92e6d5f5d7cd187cdb4914332fd95e9265d96d",
+    "file_blob_sha": "9844ec4b387461b4870aafe7f2112b41f032e2e3",
     "note": "Blob SHA of shared/modes.json at freeze. validateLive() re-reads the file and compares. Catches the mode-15-style silent drift where pipeline knobs are edited without updating the Arm-0 snapshot."
   },
 

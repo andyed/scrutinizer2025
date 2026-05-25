@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Photo Page Edges — direct probe for the length-tuning suppression target Andy observed</title>
+<!--
+  Matches the layout Andy was looking at when he observed "the long vertical
+  edges of the photo (where it meets the white page background) should be
+  less fringe-y in peripheral vision but aren't." This page exposes those
+  long photo-to-background vertical edges directly so we can A/B them.
+
+  The "photo" is a solid dark rectangle (worst case for the suppression — the
+  contrast is at the rectangle's boundary, which is exactly where the long
+  edge lives). Real photos have noisy luminance near their edges; that's a
+  weaker stimulus than a hard rectangle. If suppression shows on this page
+  it'll show on real photos too; if it doesn't show here, it doesn't show
+  anywhere.
+-->
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; font-family: -apple-system, sans-serif; color: #111; background: #fff; }
+  .page { max-width: 900px; margin: 0 auto; padding: 40px 80px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  .lede { color: #666; font-size: 14px; margin: 0 0 32px; }
+  ul { padding-left: 22px; }
+  li { line-height: 1.7; font-size: 15px; }
+  li b { color: #000; }
+
+  /* The "photo" — solid dark rectangle on the white page background. Its
+     left and right edges are the long high-contrast vertical strokes the
+     spec targets. ~700 px tall, ~740 px wide. Sits in the page's content
+     column with white margins to either side. */
+  .photo {
+    width: 740px;
+    height: 700px;
+    margin: 32px 0;
+    background: #161616;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <h1>Key Components of a Design System</h1>
+    <p class="lede">Every successful design system includes these foundational elements:</p>
+    <ul>
+      <li><b>Design Tokens:</b> The visual atoms of the system — colors, spacing, typography scales</li>
+      <li><b>Component Library:</b> Reusable UI components with clear APIs</li>
+      <li><b>Documentation:</b> Guidelines for usage, accessibility, and implementation</li>
+      <li><b>Design Assets:</b> Figma/Sketch files that mirror the coded components</li>
+    </ul>
+    <div class="photo"></div>
+  </div>
+</body>
+</html>
