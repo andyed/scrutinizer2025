@@ -7,10 +7,8 @@
 console.log('[SaliencyWorker] Worker starting. Location:', self.location.href);
 try {
     importScripts('./congestion-core.js');
-    importScripts('./lib/face-api.min.js');
-    console.log('[SaliencyWorker] face-api.js loaded.');
 } catch (e) {
-    console.error('[SaliencyWorker] Import failed:', e);
+    console.error('[SaliencyWorker] congestion-core import failed:', e);
 }
 
 let canvas;
@@ -22,30 +20,52 @@ let height = 0;
 let tempBuffer1;
 let tempBuffer2;
 
-// Face Detection State
+// Face Detection State — lazy-loaded on first saliency frame.
+// Three states: importing the 1.3MB face-api.min.js library, fetching the
+// 192KB tiny-face-detector weights, and ready. Per-frame code gates on
+// faceModelLoaded so saliency works (DoG + Oklab opponency) before any of
+// these complete and continues working if either step fails. Boot path:
+// worker spawn → ensureFaceApi() fires on first onmessage frame → import
+// face-api in the background → load model in the background → on completion
+// face channel joins the saliency composite. No user-visible boot blocking.
+let faceApiImported = false;
 let faceModelLoaded = false;
 let faceOptions;
+let faceLoadInFlight = false;
 
-// Initialize Face API
-async function loadModels() {
-    try {
-        console.log('[SaliencyWorker] Loading Face Model...');
-        // Load model from relative path (resolving from root apparently)
-        await faceapi.nets.tinyFaceDetector.loadFromUri('./assets/models');
-
-        // Configure options for real-time speed
-        // inputSize: 224 is a good balance for our ~256px canvas
-        faceOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 });
-
-        faceModelLoaded = true;
-        console.log('[SaliencyWorker] Face model loaded successfully.');
-    } catch (e) {
-        console.error('[SaliencyWorker] Face model load failed:', e);
+function ensureFaceApi() {
+    if (faceModelLoaded || faceLoadInFlight) return;
+    faceLoadInFlight = true;
+    // 1. Import the face-api.min.js library (synchronous from this point, but
+    //    runs off the worker spawn path so saliency frames already started).
+    if (!faceApiImported) {
+        try {
+            const t0 = performance.now();
+            importScripts('./lib/face-api.min.js');
+            faceApiImported = true;
+            console.log(`[SaliencyWorker] face-api.js loaded in ${(performance.now() - t0).toFixed(1)}ms.`);
+        } catch (e) {
+            console.error('[SaliencyWorker] face-api.js import failed — saliency continues without face channel:', e);
+            return; // leave faceLoadInFlight=true to avoid retry storms
+        }
     }
+    // 2. Fetch the model weights. Fire-and-forget; per-frame code gates on
+    //    faceModelLoaded.
+    (async () => {
+        try {
+            console.log('[SaliencyWorker] Loading Face Model...');
+            await faceapi.nets.tinyFaceDetector.loadFromUri('./assets/models');
+            // inputSize: 224 is a good balance for our ~256px canvas.
+            faceOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 });
+            faceModelLoaded = true;
+            console.log('[SaliencyWorker] Face model loaded successfully.');
+        } catch (e) {
+            console.error('[SaliencyWorker] Face model load failed — saliency continues without face channel:', e);
+            // Leave faceLoadInFlight=true; retrying a fundamentally-broken
+            // model fetch on every frame would just spam errors.
+        }
+    })();
 }
-
-// Start loading immediately
-loadModels();
 
 
 // ── Color conversion (kept inline — not part of congestion-core) ────────
@@ -207,6 +227,11 @@ self.onmessage = async function (e) {
     const { imageBitmap, id, maxDimension } = e.data;
 
     if (!imageBitmap) return;
+
+    // Kick off face-api import + model load on first frame. Fire-and-forget.
+    // Per-frame code below gates on faceModelLoaded — saliency works
+    // immediately with DoG + Oklab opponency; face channel joins when ready.
+    ensureFaceApi();
 
     // Adaptive Resolution Scaling — configurable via ContentAnalysis.setSaliencyResolution()
     const SALIENCY_MAX_DIM = maxDimension || 256;
