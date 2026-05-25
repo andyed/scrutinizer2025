@@ -207,14 +207,25 @@ function generateStructureMasks(blocks, targetW, targetH, sourceW, sourceH, dpr)
 // thread off the main thread.
 function suppressLongEdges(saliency, sourceL, width, height, params) {
     const { K_STEPS, midpoint, steepness, strength } = params;
-    // Gate threshold on saliency-map gradient. Saliency values are normalised
-    // to roughly [0, 1] so 0.003 is "noticeable orientation energy here."
+    // Gate threshold on luminance gradient at saliency-map resolution.
     const EDGE_GATE_SQ = 0.0001;
 
     // Snapshot the source luminance so the probe reads a fixed map even as we
-    // mutate saliency in place. Source is small (256-512 px) so the copy cost
-    // is negligible vs the per-pixel probe.
-    const L = sourceL;  // already a Float32Array we don't mutate
+    // mutate saliency in place.
+    const L = sourceL;
+
+    // STRIDE — the critical scaling that keeps the probe meaningful across
+    // saliency-map resolutions (256 / 512 / 1024 are all menu options).
+    // K_STEPS by itself walks K saliency-pixels each side. At 256 res that's
+    // ~K × 7.5 native px ≈ 60 native px for K=8 — a reasonable "long edge"
+    // probe span. At 1024 res the same K=8 walks only ±15 native px, far too
+    // short to discriminate a page-tall border from a paragraph baseline.
+    // Scale stride so the absolute probe span stays roughly constant in
+    // native-pixel terms: stride = round(width / 256). At 256 res stride=1
+    // (60 native-px span); at 512 res stride=2 (60 native-px); at 1024 res
+    // stride=4 (60 native-px). Per-sample cost is fixed, total samples are
+    // fixed — only the spacing between samples changes.
+    const stride = Math.max(1, Math.round(width / 256));
 
     for (let y = 2; y < height - 2; y++) {
         const rowBase = y * width;
@@ -228,19 +239,19 @@ function suppressLongEdges(saliency, sourceL, width, height, params) {
             if (g2 < EDGE_GATE_SQ) continue;
 
             const gMag = Math.sqrt(g2);
-            // Tangent = perpendicular to gradient. Walk this direction.
+            // Tangent = perpendicular to gradient. Walk this direction at
+            // the resolution-adapted stride.
             const tx = -gy / gMag;
             const ty = gx / gMag;
 
             let persistSum = 0;
             let validSamples = 0;
             for (let k = 1; k <= K_STEPS; k++) {
-                // +k and -k tangent steps. Math.round picks the nearest integer
-                // pixel position — fine at saliency-map resolution where each
-                // pixel already represents ~4-8 native pixels.
                 for (let sign = -1; sign <= 1; sign += 2) {
-                    const sx = x + tx * k * sign;
-                    const sy = y + ty * k * sign;
+                    // stride multiplier — the only difference from the
+                    // shader's per-MIP-1-texel walk. See block comment above.
+                    const sx = x + tx * k * sign * stride;
+                    const sy = y + ty * k * sign * stride;
                     const px = Math.round(sx);
                     const py = Math.round(sy);
                     if (px < 1 || px >= width - 1 || py < 1 || py >= height - 1) continue;
@@ -249,9 +260,6 @@ function suppressLongEdges(saliency, sourceL, width, height, params) {
                     const gyp = L[ix + width] - L[ix - width];
                     const g2p = gxp * gxp + gyp * gyp;
                     if (g2p < 1e-8) continue;
-                    // Cosine alignment with center gradient. Same-polarity edge
-                    // continuation gives align ≈ 1; opposite-polarity gives -1
-                    // which is clamped to 0. Different orientations decay.
                     const align = (gx * gxp + gy * gyp) / Math.sqrt(g2 * g2p);
                     if (align > 0) persistSum += align;
                     validSamples++;
@@ -260,9 +268,6 @@ function suppressLongEdges(saliency, sourceL, width, height, params) {
             if (validSamples === 0) continue;
             const persist = persistSum / validSamples;
 
-            // Same sigmoid as the shader. midpoint, steepness, strength all
-            // tunable from the mode config — defaults match mode 17 in
-            // shared/modes.json (0.75 / 10.0 / 0.7).
             const sig = 1.0 / (1.0 + Math.exp(-steepness * (persist - midpoint)));
             const lengthSuppress = 1.0 - strength * sig;
             saliency[i] *= lengthSuppress;
