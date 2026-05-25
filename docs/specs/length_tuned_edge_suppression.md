@@ -184,13 +184,14 @@ Reproduce CBM 2002 Fig 4 (response vs stimulus length) using a synthetic Gabor p
 
 | Phase | Effort | Risk | Target version |
 |---|---|---|---|
-| P1: Shader implementation + uniforms + mode 17 | 4-6 hrs | Low — additive on top of existing Phase 2 code | v2.8 (research-only) |
-| P2: Reference page + smoke captures | 1-2 hrs | None | v2.8 |
+| P1: Shader implementation + uniforms + mode 17 | 4-6 hrs | Low — additive on top of existing Phase 2 code | v2.8 (research-only) ✓ shipped |
+| P2: Reference page + smoke captures | 1-2 hrs | None | v2.8 ✓ shipped |
 | P3: Quantitative validation against CBM 2002 | 2-3 hrs | Medium — may reveal tuning gaps | v2.8 |
 | P4: Menu UX (toggle, intensity knob) | 1-2 hrs | None | v2.9 |
-| P5: Enable by default in production modes if validation passes | 1 hr + screenshot review | Medium — visual change to all default renders | v3.0 |
+| **P5: Relocate production hook to `saliency-worker.js`** (see D4 below) | 3-5 hrs | Medium — moves the suppression earlier in the pipeline; bigger downstream propagation | v2.9 |
+| P6: Enable by default in production modes if validation passes | 1 hr + screenshot review | Medium — visual change to all default renders | v3.0 |
 
-Estimated end-to-end: 1-2 working sessions of focused effort to land P1-P3.
+Estimated end-to-end: 1-2 working sessions of focused effort to land P1-P3; P5 adds ~half a session and is the architectural payoff for the visual reach the empirics (open question #3) showed P1 didn't get on its own.
 
 ## Decisions
 
@@ -234,6 +235,71 @@ This means parameter count is unchanged (no new uniform) — the scaling is deri
 ### D3. Diagonal / curved borders accepted as graceful-degradation case
 
 `border-image`, `clip-path`, CSS-rounded corners, and SVG-derived borders can produce curved or diagonal long edges. The tangent probe captures persistence on straight portions but loses persistence at the curvature. **This is accepted as a known limitation** — it's not a regression vs current behavior (which over-weights these too), the suppression just doesn't fire maximally at the curve. The straight runs between curves still benefit. In a real visual system V2 contour integration handles curves; Scrutinizer doesn't model V2.
+
+### D4. Production hook relocates from `peripheral.frag` to `saliency-worker.js` (post-P3)
+
+Resolved 2026-05-25 as an amendment after P1+P2 empirics. The shader implementation we just landed is biologically correct (V1 hypercomplex cells modulate at the per-cell level) but is plumbed into the **wrong layer of the pipeline** for the visual outcome we want.
+
+**The architectural finding.** P1+P2's A/B (mode 14 vs mode 17 at center fixation on `border-suppression.html`) produced 0.072% pixel diff with max channel-sum delta of 17/765 — the mechanism IS firing, the discrimination IS correct (sidebar suppression > content text after the test-page contrast fix at commit 86c4ce5), but the visual effect on the final composite is bounded by the only place `orientBonus` is consumed:
+
+```glsl
+// peripheral.frag:477
+float boost = 1.0 + orientBonus * effectiveEccFade * mix(0.5, 0.1, float(k) / 11.0);
+```
+
+`orientBonus` is a small *additive boost* on per-band DoG cutoffs. Suppressing it removes a small boost — that's a precision change, not a saliency change. The downstream pipeline (LGN gating, V1 strength, V4 pooling, structure-mask weighting) never learns that the long edge "should be quiet."
+
+**The bio argument for relocation.** V1 hypercomplex cells don't operate in isolation. Their length-tuned output feeds the saliency network (Itti & Koch 1998; Borji & Itti 2013). The bio-correct architectural placement is *as early as possible in the analysis chain, then propagated everywhere downstream*. That maps to Scrutinizer's pipeline cleanly:
+
+```
+V1 cell-level length-tuning   ⇄   saliency-worker per-pixel orientation energy
+       ↓                                  ↓
+attention / saccade guidance     LGN mask + structure-mask + V4 pooling
+```
+
+The shader location matches the bio analog of the cell; the right *Scrutinizer hook* is the saliency map, because that's where the cortex propagates V1 modulation to everything downstream.
+
+**Concretely.** In `renderer/saliency-worker.js`, after the saliency map is computed (~line 400, before `postMessage`), run a JS port of the tangent-probe walk at the saliency-map resolution (256-512 px instead of native 1920×1080), and multiply the saliency map by `(1 - length_suppress)` in long-edge regions:
+
+```js
+// after computing the saliency map
+if (lengthTuningEnabled) {
+    suppressLongEdges(saliencyMap, width, height, {
+        K_STEPS: 8,
+        midpoint: 0.75,
+        steepness: 10.0,
+        strength: 0.7,
+    });
+}
+```
+
+The downstream effects then propagate via `u_saliencyMap`:
+- LGN gating dims long-edge regions (`u_enable_saliency_modulation`)
+- V1 distortion strength drops there (saliency-aware crowding)
+- V4 color preservation weakens (high-saliency regions retain more chroma; long edges lose it)
+- Tier 2.75 pyramid synth weight allocation deprioritizes long-edge tiles
+
+That's the "borders fade into the periphery" outcome the spec set out to achieve, with no additional shader fragment cost.
+
+**The shader implementation does not get deleted.** It becomes the **ground-truth comparator for P3 validation**:
+- The shader version runs at native res with exact bio replication for CBM 2002 Fig 4 curve fitting
+- The worker version runs at 256-512 px with the same algorithm at lower precision, for production
+- Mode 17 stays on as the per-pixel reference; a new debug uniform `u_length_tuning_debug` makes the shader visualization togglable for direct inspection
+- The two implementations agree within tolerance on the synthetic Gabor stimuli used for CBM 2002 validation
+
+**Tradeoffs of the relocation:**
+
+| | Shader (current P1) | Worker (P5 target) |
+|---|---|---|
+| Resolution | Native (1920×1080) | 256-512 px |
+| Cost | ~32 texture reads per edge fragment | ~1ms once per saliency cycle (~3 Hz) |
+| Thread | GPU fragment | CPU worker (off main thread) |
+| Visual reach | `orientBonus` only — small bounded change | `u_saliencyMap` everywhere — propagates through 4+ downstream stages |
+| Precision | Exact at every pixel | Coarse at low res, sharp downstream after eccentricity scaling |
+| When it fires | Every fragment, every frame, on edges | Once per saliency cycle (already 100-300 ms latency) |
+| Bio analog | Single-cell V1 modulation | Per-cell modulation propagating to saliency map (the *whole* mechanism) |
+
+**P5 is not P1's correction** — it's P1's bio-completeness. P1 models the cell, P5 models the network the cell feeds.
 
 ## Risks and open questions
 
