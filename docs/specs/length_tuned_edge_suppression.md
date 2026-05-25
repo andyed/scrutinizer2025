@@ -191,17 +191,54 @@ Reproduce CBM 2002 Fig 4 (response vs stimulus length) using a synthetic Gabor p
 
 Estimated end-to-end: 1-2 working sessions of focused effort to land P1-P3.
 
+## Decisions
+
+These were open questions in the first draft of this spec; resolved 2026-05-25.
+
+### D1. Composition order with Phase-3 radial-tangential anisotropy
+
+Both Phase-3 (Toet & Levi 1992 crowding anisotropy) and length-tuning modify `orientBonus`. **Length-tuning runs first, then radial-tangential.** Rationale: length-tuning is a single-cell mechanism (V1 CRF length response), radial-tangential is a population-level effect (foveation-relative crowding). The single-cell modulation should apply before the population-level reweighting — same order the cortical layers compose them in. Concretely the shader code becomes:
+
+```glsl
+// (Phase 2 produces) float orientBonus = cardinalFrac * edgeGate * u_dog_orient_bias;
+// D1: length-tuning suppression — cell-level
+if (u_length_tuning_enabled > 0.5 && g2 > EDGE_GATE) {
+    /* persist probe + sigmoid suppression — see code sketch in "Approach" */
+    orientBonus *= length_suppress;
+}
+// (Phase 3) radial-tangential anisotropy — population-level
+if (u_dog_radial_bias > 0.001) {
+    orientBonus *= radialTangentialFactor;
+}
+```
+
+### D2. Probe span scales with local cortical magnification
+
+Length-tuning probe step is in physical pixels; without scaling, the same probe span covers a vanishing slice of the cortical visual field as eccentricity grows. **The probe scales with local CMF MIP level so it stays biologically meaningful at all eccentricities** — a "long" edge means "long relative to the local pooling region" at every retinal location, which is how a real cortical neuron sees it.
+
+Concrete formulation: keep `K_STEPS` constant; scale the per-step tangent magnitude by a factor derived from the existing `computeMipLevel(eccentricity, fovea_radius)` helper at `peripheral.frag:578`. Half-octave per MIP level matches the existing cortical-distance scaling already used by the DoG band cutoffs:
+
+```glsl
+float mipForProbe = computeMipLevel(eccentricity, fovea_radius);
+// Probe span doubles every 2 MIP levels (1.41× per level — half octave).
+// At mip=0 (fovea): unchanged. mip=2: 2×. mip=4: 4×. mip=6: 8×.
+float probeScale = pow(2.0, mipForProbe * 0.5);
+vec2 tan = normalize(vec2(-gy, gx)) * px * probeScale;
+```
+
+The exact exponent (0.5 here = half-octave per MIP) becomes a validation knob: tune against the CBM 2002 curve replicated at multiple eccentricities. If the published length-tuning shoulder shifts cleanly with eccentricity in their data (it does — receptive field size scales with eccentricity), the half-octave default should match. Otherwise validation will return a corrected exponent.
+
+This means parameter count is unchanged (no new uniform) — the scaling is derived. The cost is still bounded since `K_STEPS` stays fixed; only the texture-sample positions move.
+
+### D3. Diagonal / curved borders accepted as graceful-degradation case
+
+`border-image`, `clip-path`, CSS-rounded corners, and SVG-derived borders can produce curved or diagonal long edges. The tangent probe captures persistence on straight portions but loses persistence at the curvature. **This is accepted as a known limitation** — it's not a regression vs current behavior (which over-weights these too), the suppression just doesn't fire maximally at the curve. The straight runs between curves still benefit. In a real visual system V2 contour integration handles curves; Scrutinizer doesn't model V2.
+
 ## Risks and open questions
 
-1. **Compute cost in mid-periphery.** 8 extra texture reads per edge fragment, gated by `g2 > EDGE_GATE`. Most fragments don't hit the gate but page-tall sidebars are EXACTLY the worst case. Mitigation: cap K_STEPS adaptively by eccentricity (no benefit to a long-edge probe in the fovea anyway, since saliency is supposed to be sharp there).
+1. **Compute cost in mid-periphery.** 8 extra texture reads per edge fragment, gated by `g2 > EDGE_GATE`. Most fragments don't hit the gate but page-tall sidebars are EXACTLY the worst case. Mitigation if profiling reveals an issue: cap probe activation by eccentricity (no benefit to a long-edge probe in the fovea anyway, since saliency is supposed to be sharp there) and/or reduce `K_STEPS` adaptively at high MIP levels where each sample already covers more area.
 
-2. **Interaction with Phase-3 radial-tangential anisotropy.** Both modify `orientBonus`. Order matters mathematically but probably not perceptually. Decision: apply length-tuning *first* (cell-level), then radial-tangential bias (population-level). This mirrors the layer ordering in cortex.
-
-3. **Interaction with cortical magnification.** Length-tuning probe step is in physical pixels. At high eccentricity, cortical neurons "see" larger angular regions, so the K_STEPS probe span effectively shrinks in cortical-space. May want to scale K_STEPS by CMF level to keep the probe biologically meaningful at all eccentricities.
-
-4. **The diagonal-sidebar problem.** Borders rendered with `border-image` or `clip-path` can have curved or diagonal portions. Our probe along the tangent picks them up correctly within a small radius but loses persistence on the curve. Not a regression vs current behavior (which over-weights them); just not maximally helpful.
-
-5. **User expectation calibration.** Some users may have built mental models of "Scrutinizer makes borders visible." Removing border saliency changes the qualitative feel of the periphery. Worth a brief screenshot-comparison in the v3.0 release notes if this graduates to default.
+2. **User expectation calibration.** Some users may have built mental models of "Scrutinizer makes borders visible." Removing border saliency changes the qualitative feel of the periphery. Worth a brief screenshot-comparison in the v3.0 release notes if this graduates to default.
 
 ## References
 
