@@ -42,6 +42,16 @@ const CONFIG = {
                                          // lower = fresher periphery on animated content +
                                          // more compute; higher = better freeze fidelity +
                                          // staler animations.
+    congestionHeatmapStuckTimeoutMs: 10000, // ms - safety timeout for restoring the
+                                            // congestion heatmap after scroll/nav hid it.
+                                            // Normal restore fires when the congestion
+                                            // worker emits fresh data (generation counter
+                                            // advances). If the worker hangs or the page
+                                            // never lets congestion compute (broken DOM,
+                                            // permission denied), the heatmap would stay
+                                            // hidden forever — this is the worst-case
+                                            // fallback that re-asserts visibility with
+                                            // possibly-stale data after the timeout.
 
     // Capture settings
     captureScale: 1.0, // scale factor for capture (lower = faster but less quality)

@@ -29,6 +29,7 @@
     const { FOVEA_ASPECT_RATIO_DEFAULT, DEFAULT_SETTINGS } = require('./config');
     const CONGESTION_COOLDOWN_MS = DEFAULT_SETTINGS.congestionRecomputeCooldownMs;
     const METAMER_CONTENT_REFRESH_MS = DEFAULT_SETTINGS.metamerContentRefreshMs;
+    const HEATMAP_STUCK_TIMEOUT_MS = DEFAULT_SETTINGS.congestionHeatmapStuckTimeoutMs;
 
     // Architecture: Explicit require for optional dependencies
     let SVGOverlay;
@@ -108,6 +109,8 @@
             this.aestheticMode = 14; // Pyramid Mongrel (Tier 2.75): multi-scale cross-correlation synthesis
             this.dpr = window.devicePixelRatio || 1;
             this._congestionReportMode = 0;
+            this._heatmapHiddenAt = 0;     // timestamp of last hide; drives the
+                                           // stuck-timeout fallback restore.
             this._lastCongestionGeneration = 0;
             this._lastCongestionResultTime = 0;
             this._heatmapPendingRestore = false;
@@ -267,10 +270,12 @@
                         if (this.complexityHud) {
                             this.complexityHud.setPending(true);
                         }
-                        // Hide heatmap during scroll — stale overlay at any opacity is misleading
+                        // Hide heatmap during scroll — stale overlay at any opacity is misleading.
+                        // _heatmapHiddenAt drives the stuck-timeout safety in the restore block.
                         if (this._congestionReportMode >= 2 && this.renderer) {
                             this.renderer.config.show_congestion = 0;
                             this._heatmapPendingRestore = true;
+                            this._heatmapHiddenAt = performance.now();
                         }
                         clearTimeout(this._congestionScrollTimer);
                         this._congestionScrollTimer = setTimeout(() => {
@@ -340,11 +345,13 @@
                 }
 
                 if (this._congestionReportMode > 0 || this.renderer?.config.congestion_pooling) {
-                    // Clear stale heatmap immediately — old page's overlay shouldn't linger
+                    // Clear stale heatmap immediately — old page's overlay shouldn't linger.
+                    // _heatmapHiddenAt drives the stuck-timeout safety in the restore block.
                     if (this._congestionReportMode >= 2 && this.renderer) {
                         this.contentAnalysis.clearCongestionData(this.renderer);
                         this.renderer.config.show_congestion = 0;
                         this._heatmapPendingRestore = true;
+                        this._heatmapHiddenAt = performance.now();
                     }
                     // Delay to let the page render before capturing
                     clearTimeout(this._congestionNavTimer);
@@ -604,19 +611,32 @@
 
             // 7b. Detect fresh congestion data via generation counter
             const gen = this.contentAnalysis.congestionGeneration;
-            if (gen !== this._lastCongestionGeneration) {
+            const genAdvanced = gen !== this._lastCongestionGeneration;
+            if (genAdvanced) {
                 this._lastCongestionGeneration = gen;
                 this._lastCongestionResultTime = performance.now();
                 if (this.complexityHud) {
                     this.complexityHud.setPending(false);
                 }
-                // Restore heatmap overlay after scroll/navigation hid it
-                if (this._heatmapPendingRestore && this._congestionReportMode >= 2 && this.renderer) {
+                ipcRenderer.send('overlay:congestion-processing', false);
+            }
+
+            // Restore heatmap overlay after scroll/navigation hid it. Fires on
+            // either fresh data (preferred) or the stuck-timeout fallback (catches
+            // the edge case where the congestion worker hangs or the page never
+            // lets congestion compute — heatmap would otherwise stay hidden forever).
+            // See CODEBASE_MAP gotcha #8.
+            if (this._heatmapPendingRestore && this._congestionReportMode >= 2 && this.renderer) {
+                const hiddenFor = performance.now() - (this._heatmapHiddenAt || 0);
+                const timedOut = hiddenFor > HEATMAP_STUCK_TIMEOUT_MS;
+                if (genAdvanced || timedOut) {
                     // Restore correct shader mode: 2=side-by-side, 1=heatmap
                     this.renderer.config.show_congestion = this._congestionReportMode >= 3 ? 2 : 1;
                     this._heatmapPendingRestore = false;
+                    if (timedOut && !genAdvanced) {
+                        console.warn(`[Scrutinizer] Heatmap restore forced after ${Math.round(hiddenFor)}ms — congestion worker not advancing generation. Overlay may show stale data.`);
+                    }
                 }
-                ipcRenderer.send('overlay:congestion-processing', false);
             }
             if (this.complexityHud) {
                 const perfStats = this.frameTimer ? this.frameTimer.getStats() : null;
