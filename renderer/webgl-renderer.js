@@ -162,6 +162,10 @@
                     dog_oriented: false,
                     dog_orient_bias: 1.0,
                     dog_radial_bias: 0.0,
+                    length_tuning_enabled: false,
+                    length_tuning_strength: 0.7,
+                    length_tuning_midpoint: 0.5,
+                    length_tuning_steepness: 8.0,
                     gaussian_blur_mode: false,
                     cmf_enabled: false,
                     cmf_a: 2.78,
@@ -273,6 +277,13 @@
                 this.dogOrientedLocation = gl.getUniformLocation(this.program, "u_dog_oriented");
                 this.dogOrientBiasLocation = gl.getUniformLocation(this.program, "u_dog_orient_bias");
                 this.dogRadialBiasLocation = gl.getUniformLocation(this.program, "u_dog_radial_bias");
+
+                // V1 length-tuning / end-stopping (Hubel-Wiesel 1965, CBM 2002).
+                // See docs/specs/length_tuned_edge_suppression.md.
+                this.lengthTuningEnabledLocation = gl.getUniformLocation(this.program, "u_length_tuning_enabled");
+                this.lengthTuningStrengthLocation = gl.getUniformLocation(this.program, "u_length_tuning_strength");
+                this.lengthTuningMidpointLocation = gl.getUniformLocation(this.program, "u_length_tuning_midpoint");
+                this.lengthTuningSteepnessLocation = gl.getUniformLocation(this.program, "u_length_tuning_steepness");
 
                 // Gaussian blur comparison mode
                 this.gaussianBlurModeLocation = gl.getUniformLocation(this.program, "u_gaussian_blur_mode");
@@ -645,6 +656,10 @@
                     dog_oriented: false,
                     dog_orient_bias: 1.0,
                     dog_radial_bias: 0.0,
+                    length_tuning_enabled: false,
+                    length_tuning_strength: 0.7,
+                    length_tuning_midpoint: 0.5,
+                    length_tuning_steepness: 8.0,
                     gaussian_blur_mode: false,
                     cmf_enabled: false,
                     cmf_a: 2.78,
@@ -684,6 +699,10 @@
                         this.config.dog_oriented = p.dog_oriented ?? defaults.dog_oriented;
                         this.config.dog_orient_bias = p.dog_orient_bias ?? defaults.dog_orient_bias;
                         this.config.dog_radial_bias = p.dog_radial_bias ?? defaults.dog_radial_bias;
+                        this.config.length_tuning_enabled = p.length_tuning_enabled ?? defaults.length_tuning_enabled;
+                        this.config.length_tuning_strength = p.length_tuning_strength ?? defaults.length_tuning_strength;
+                        this.config.length_tuning_midpoint = p.length_tuning_midpoint ?? defaults.length_tuning_midpoint;
+                        this.config.length_tuning_steepness = p.length_tuning_steepness ?? defaults.length_tuning_steepness;
                         this.config.gaussian_blur_mode = p.gaussian_blur_mode ?? defaults.gaussian_blur_mode;
                         this.config.cmf_enabled = p.cmf_enabled ?? defaults.cmf_enabled;
                         this.config.cmf_a = p.cmf_a ?? defaults.cmf_a;
@@ -915,6 +934,11 @@
                 gl.uniform1f(this.dogOrientedLocation, this.config.dog_oriented ? 1.0 : 0.0);
                 gl.uniform1f(this.dogOrientBiasLocation, this.config.dog_orient_bias);
                 gl.uniform1f(this.dogRadialBiasLocation, this.config.dog_radial_bias);
+                // Length-tuning suppression for structural chrome.
+                gl.uniform1f(this.lengthTuningEnabledLocation, this.config.length_tuning_enabled ? 1.0 : 0.0);
+                gl.uniform1f(this.lengthTuningStrengthLocation, this.config.length_tuning_strength ?? 0.7);
+                gl.uniform1f(this.lengthTuningMidpointLocation, this.config.length_tuning_midpoint ?? 0.5);
+                gl.uniform1f(this.lengthTuningSteepnessLocation, this.config.length_tuning_steepness ?? 8.0);
                 gl.uniform1f(this.gaussianBlurModeLocation, this.config.gaussian_blur_mode ? 1.0 : 0.0);
                 gl.uniform1f(this.cmfEnabledLocation, this.config.cmf_enabled ? 1.0 : 0.0);
                 gl.uniform1f(this.cmfALocation, this.config.cmf_a);

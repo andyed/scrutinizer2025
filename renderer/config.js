@@ -78,6 +78,19 @@ const CONFIG = {
     dogE2: 0.5,             // M-scaling E2 parameter (calibrated to normEcc range ~0-0.8)
     dogSharpness: 0.0,      // Band rolloff sharpness (0=biological/gradual, 1=sharp/crisp)
 
+    // V1 length-tuning / end-stopping — suppresses long edges (page-tall borders,
+    // table column rules, dividers) so structural chrome stops dominating saliency.
+    // Bio mechanism: hypercomplex cell endzone inhibition (Hubel & Wiesel 1965;
+    // Cavanaugh, Bair & Movshon 2002). See docs/specs/length_tuned_edge_suppression.md.
+    lengthTuningEnabled: false,    // gated off until validated; enable per-mode via modes.json
+    lengthTuningStrength: 0.7,     // max suppression (0=off, 1=full kill). CBM 2002 reports
+                                   // ~60-80% max surround suppression; 0.7 sits in the middle.
+    lengthTuningMidpoint: 0.5,     // persistence value at half-max suppression. 0.5 = "edge
+                                   // continues ~halfway through the probe window."
+    lengthTuningSteepness: 8.0,    // sigmoid slope. CBM 2002 shoulder shape matches ~6-10.
+    lengthTuningProbeSteps: 8,     // K_STEPS — costs 2 texture reads per step. 8 = ±16 px at
+                                   // MIP 1 ≈ "very long" edge near the 45 px fovea.
+
     // Debug settings
     enableLogger: true, // Enable renderer logs passing through to main process terminal
     debugBoundary: 0.0,

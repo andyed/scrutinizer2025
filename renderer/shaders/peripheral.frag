@@ -76,6 +76,15 @@ uniform float u_dog_oriented;      // 0.0 = isotropic (legacy), 1.0 = oriented
 uniform float u_dog_orient_bias;   // Oblique effect strength (0=none, 1=biological ~50%, 2=exaggerated)
 uniform float u_dog_radial_bias;   // Radial-tangential anisotropy (0=off, Phase 3)
 
+// V1 length-tuning / end-stopping (Hubel & Wiesel 1965, Cavanaugh-Bair-Movshon 2002)
+// Suppresses orientBonus on long edges (page-tall borders, table column rules,
+// divider lines). Probe spans CMF-scaled with eccentricity (D2 in spec).
+// See docs/specs/length_tuned_edge_suppression.md.
+uniform float u_length_tuning_enabled;     // 0=off, 1=on
+uniform float u_length_tuning_strength;    // 0=no suppression, 1=full suppression at saturation
+uniform float u_length_tuning_midpoint;    // sigmoid midpoint on persistence axis [0..1]
+uniform float u_length_tuning_steepness;   // sigmoid slope
+
 // Gaussian blur comparison mode — eccentricity-scaled MIP blur without band decomposition
 uniform float u_gaussian_blur_mode; // 0.0 = normal, 1.0 = comparison Gaussian
 
@@ -203,6 +212,7 @@ vec4 sampleBlurred(vec2 uv, float radius) {
 // Forward declarations — defined after Oklab conversion functions
 vec3 rgbToOklab(vec3 srgb);
 vec4 chromaticAttenuate(vec4 color, float rg_atten, float yv_atten);
+float computeMipLevel(float eccentricity, float fovea_radius);
 
 // === DoG PERIPHERAL RECONSTRUCTION ===
 // Decomposes the hardware MIP chain into an approximate Laplacian pyramid.
@@ -267,6 +277,65 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         float edgeGate = smoothstep(0.005, 0.03, gradMag);
 
         orientBonus = cardinalFrac * edgeGate * u_dog_orient_bias;
+
+        // --- V1 length-tuning / end-stopping (Hubel-Wiesel 1965, CBM 2002) ---
+        // Probe along the edge's tangent (perpendicular to gradient) for K_STEPS
+        // samples per side. Each sample re-computes a local gradient and checks
+        // alignment with the center gradient (same orientation AND same polarity).
+        // High mean alignment = long edge → sigmoid-suppress orientBonus. Page-tall
+        // borders, table column rules, divider lines: all get knocked down.
+        // Probe span scales with local CMF MIP level so a "long" edge means
+        // "long relative to the local pooling region" at every eccentricity
+        // (D2 in docs/specs/length_tuned_edge_suppression.md).
+        if (u_length_tuning_enabled > 0.5 && edgeGate > 0.01) {
+            // Tangent direction in UV space. px is MIP-1 texel size.
+            vec2 tan_dir = normalize(vec2(-gy, gx));
+            // CMF scaling: probe span doubles every 2 MIP levels (half-octave per
+            // level) — same scaling the DoG band cutoffs use.
+            float mipForProbe = computeMipLevel(eccentricity, fovea_radius);
+            float probeScale = pow(2.0, mipForProbe * 0.5);
+            vec2 tan_step = tan_dir * px * probeScale;
+            // K_STEPS = 8 fixed at shader-compile time. Keeping it a literal lets
+            // GLSL unroll the loop; the suppression parameters are uniforms.
+            const int K_STEPS = 8;
+            float persist_sum = 0.0;
+            for (int k = 1; k <= K_STEPS; k++) {
+                float fk = float(k);
+                // Sample +k and -k along the tangent, recompute the local
+                // gradient at each, dot with the center gradient.
+                vec2 off_p = tan_step * fk;
+                vec2 off_n = -tan_step * fk;
+                // +k local gradient
+                float lp_r = dot(textureLod(u_texture, undistortedUV + off_p + vec2(px.x, 0.0), 1.0).rgb, lumaW);
+                float lp_l = dot(textureLod(u_texture, undistortedUV + off_p - vec2(px.x, 0.0), 1.0).rgb, lumaW);
+                float lp_t = dot(textureLod(u_texture, undistortedUV + off_p + vec2(0.0, px.y), 1.0).rgb, lumaW);
+                float lp_b = dot(textureLod(u_texture, undistortedUV + off_p - vec2(0.0, px.y), 1.0).rgb, lumaW);
+                float gxp = lp_r - lp_l;
+                float gyp = lp_t - lp_b;
+                float g2p = gxp * gxp + gyp * gyp;
+                // -k local gradient
+                float ln_r = dot(textureLod(u_texture, undistortedUV + off_n + vec2(px.x, 0.0), 1.0).rgb, lumaW);
+                float ln_l = dot(textureLod(u_texture, undistortedUV + off_n - vec2(px.x, 0.0), 1.0).rgb, lumaW);
+                float ln_t = dot(textureLod(u_texture, undistortedUV + off_n + vec2(0.0, px.y), 1.0).rgb, lumaW);
+                float ln_b = dot(textureLod(u_texture, undistortedUV + off_n - vec2(0.0, px.y), 1.0).rgb, lumaW);
+                float gxn = ln_r - ln_l;
+                float gyn = ln_t - ln_b;
+                float g2n = gxn * gxn + gyn * gyn;
+                // Alignment of each side's gradient with the center gradient.
+                // Cosine in gradient space, scaled by [0,1]. Negative alignment
+                // (opposite polarity edge) is clamped to 0 — we only count same-
+                // polarity continuation as "edge persisting."
+                float align_p = max(0.0, (gx * gxp + gy * gyp) / max(sqrt(g2 * g2p), 1e-6));
+                float align_n = max(0.0, (gx * gxn + gy * gyn) / max(sqrt(g2 * g2n), 1e-6));
+                persist_sum += align_p + align_n;
+            }
+            float persist = persist_sum / float(K_STEPS * 2);  // normalised 0..1
+            // Sigmoid suppression. CBM 2002 length-tuning curve shape: sharp
+            // shoulder around the preferred-length break, plateau in surround.
+            float sig = 1.0 / (1.0 + exp(-u_length_tuning_steepness * (persist - u_length_tuning_midpoint)));
+            float length_suppress = 1.0 - u_length_tuning_strength * sig;
+            orientBonus *= length_suppress;
+        }
 
         // --- Phase 3: Radial-tangential anisotropy (Toet & Levi 1992) ---
         // Crowding is ~2x stronger along the radial axis (toward/away from fovea).

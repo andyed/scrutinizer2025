@@ -576,6 +576,59 @@
                 "biological_basis": "Rod-dominated peripheral vision, Eigengrau tint"
             }
         },
+        "structural_chrome_suppression": {
+            "id": 17,
+            "label": "Structural Chrome Suppression (V1 length-tuning)",
+            "shortLabel": "ChromeSuppress",
+            "category": "research",
+            "pooling_family": "acuity_loss",
+            "description": "Mode 14 (Pyramid Mongrel) baseline + V1 length-tuning / end-stopping enabled. Probes along the local edge tangent; long edges (page-tall sidebars, table column rules, dividers) get sigmoid-suppressed in the oriented-DoG orientBonus. Short edges (word baselines, button labels) unaffected. Goal: reduce visual noise from structural chrome in real web layouts. Probe span scales with CMF MIP level so 'long' means 'long relative to local pooling region' at every eccentricity. See docs/specs/length_tuned_edge_suppression.md.",
+            "pipeline": {
+                "lgn_use_structure_mask": true,
+                "lgn_use_saliency_gate": true,
+                "lgn_ramp_end_mult": 2.0,
+                "v1_distortion_type": 1,
+                "v1_strength_mult": 1.0,
+                "v1_animate": false,
+                "v4_style_id": 0,
+                "dog_enabled": true,
+                "dog_e2": 0.10,
+                "dog_sharpness": 0.0,
+                "dog_oriented": true,
+                "dog_orient_bias": 1.0,
+                "dog_radial_bias": 0.0,
+                "length_tuning_enabled": true,
+                "length_tuning_strength": 0.7,
+                "length_tuning_midpoint": 0.5,
+                "length_tuning_steepness": 8.0,
+                "cmf_enabled": true,
+                "cmf_a": 2.78,
+                "ecc_scaling": 0.75,
+                "chromatic_pooling": true,
+                "rg_decay": 0.085,
+                "rg_freq_decay": 0.003,
+                "yv_decay": 0.014,
+                "yv_freq_decay": 0.008,
+                "supra_exponent": 0.5,
+                "congestion_pooling": true,
+                "crowding_density_threshold": 0.3,
+                "crowding_density_steepness": 20.0,
+                "compute_tier": 2.75,
+                "num_cortical_rings": 50,
+                "reading_span": true,
+                "reading_span_strength": 1.0
+            },
+            "tests": [
+                "length_tuning_long_edge_suppression",
+                "length_tuning_short_edge_preserved",
+                "length_tuning_cmf_scaling_invariant_across_eccentricity"
+            ],
+            "architectural_purpose": "First research mode for V1 length-tuning. Comparison arm vs mode 14 quantifies how much of the current peripheral saliency budget is being spent on structural-chrome edges. If validation passes (CBM 2002 curve replication + visual A/B on real web pages), parameters graduate into default modes in a future release.",
+            "citations": {
+                "technique": "V1 hypercomplex cell endzone inhibition + iso-orientation surround suppression",
+                "biological_basis": "Hubel & Wiesel 1965 hypercomplex cells; Knierim & Van Essen 1992 surround orientation tuning; Cavanaugh, Bair & Movshon 2002 quantitative length-tuning curves; Field, Hayes & Hess 1993 V2/V4 contour integration coexists at higher levels"
+            }
+        },
         "dom_aware_text": {
             "id": 20,
             "label": "DOM-Aware Text (Procedural)",

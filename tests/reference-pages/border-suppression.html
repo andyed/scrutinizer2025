@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Border Suppression Probe — Scrutinizer V1 Length-Tuning</title>
+<!--
+  Diagnostic page for docs/specs/length_tuned_edge_suppression.md.
+  Layout:
+    * Page-tall vertical sidebar rail on the left (1 px stroke, full viewport height)
+    * Horizontal divider stack at 5 lengths (50/100/200/400/800 px)
+    * Text paragraph (the control — short baselines should NOT be suppressed)
+    * Simple table grid (column rules — varying lengths)
+
+  With Mode 17 (Structural Chrome Suppression) the long edges should darken
+  in the periphery; the text paragraph should remain unchanged.
+-->
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, sans-serif; color: #111; background: #fff; }
+  .page { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+
+  /* Page-tall sidebar — THE primary suppression target. 1 px solid border, full viewport height. */
+  .sidebar {
+    border-right: 1px solid #999;       /* the long vertical edge */
+    padding: 24px 16px;
+    background: #f7f7f7;
+  }
+  .sidebar h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em; color: #555; margin: 0 0 12px; }
+  .sidebar ul { list-style: none; padding: 0; margin: 0; }
+  .sidebar li { padding: 6px 0; border-bottom: 1px solid #e0e0e0; font-size: 13px; }
+
+  .content { padding: 32px 48px; max-width: 900px; }
+
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .subtitle { color: #666; font-size: 14px; margin: 0 0 32px; }
+
+  /* Divider stack — varied lengths, fixed 4 px thickness so they're visible. */
+  .divider-stack { margin: 0 0 32px; }
+  .divider-stack p { font-size: 12px; color: #888; margin: 0 0 4px; }
+  .divider-stack .div { border-top: 2px solid #333; margin: 14px 0; }
+  .div50  { width:  50px; }
+  .div100 { width: 100px; }
+  .div200 { width: 200px; }
+  .div400 { width: 400px; }
+  .div800 { width: 800px; }
+
+  /* Text paragraph — control. Word baselines should remain salient. */
+  .control-text {
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 32px 0;
+    max-width: 640px;
+  }
+
+  /* Table grid — column rules at table-row lengths. */
+  table {
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 13px;
+  }
+  th, td { padding: 8px 14px; border: 1px solid #888; }
+  th { background: #f0f0f0; text-align: left; font-weight: 600; }
+
+  /* Bottom row of dividers to give the bottom of the periphery something
+     to do too — eccentricity matters. */
+  .bottom-rule { border-top: 1px solid #999; margin: 64px 0 0; padding-top: 16px; color: #666; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ===== Sidebar: full-height vertical border ===== -->
+  <aside class="sidebar">
+    <h2>Navigation</h2>
+    <ul>
+      <li>Overview</li>
+      <li>Architecture</li>
+      <li>Vision Model</li>
+      <li>Capture Pipeline</li>
+      <li>Validation</li>
+      <li>Calibration</li>
+      <li>Modes</li>
+      <li>Specs</li>
+    </ul>
+  </aside>
+
+  <!-- ===== Main content ===== -->
+  <main class="content">
+    <h1>Border Suppression Probe</h1>
+    <p class="subtitle">Diagnostic for V1 length-tuning (Mode 17). See <code>docs/specs/length_tuned_edge_suppression.md</code>.</p>
+
+    <!-- Horizontal divider stack — varied lengths -->
+    <section class="divider-stack">
+      <p>50 px divider — should remain visible (short edge, no suppression expected)</p>
+      <div class="div div50"></div>
+
+      <p>100 px divider — transitional</p>
+      <div class="div div100"></div>
+
+      <p>200 px divider — transitional</p>
+      <div class="div div200"></div>
+
+      <p>400 px divider — suppression should be noticeable</p>
+      <div class="div div400"></div>
+
+      <p>800 px divider — full suppression expected (long edge)</p>
+      <div class="div div800"></div>
+    </section>
+
+    <!-- Control: text paragraph. Word baselines and inter-letter strokes are
+         short edges that SHOULD remain salient even with length-tuning on. -->
+    <p class="control-text">
+      This paragraph is the control. Word baselines, ascenders, and inter-letter
+      strokes are short oriented edges that should remain salient in the
+      peripheral saliency map even when V1 length-tuning is enabled. If text
+      readability degrades when this mode toggles, length-tuning is over-firing
+      and the steepness or midpoint parameter needs tuning. If the long
+      horizontal dividers above and the page-tall sidebar to the left remain
+      bright relative to text, length-tuning is under-firing and the strength
+      parameter needs to be increased.
+    </p>
+
+    <!-- Table grid — column rules are medium-length edges (~table height). -->
+    <table>
+      <thead>
+        <tr><th>Mode</th><th>Description</th><th>Length-tuning</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0</td><td>High-Key Ghosting (default)</td><td>off</td></tr>
+        <tr><td>14</td><td>Pyramid Mongrel</td><td>off</td></tr>
+        <tr><td>15</td><td>TTM Cortical Pooling</td><td>off</td></tr>
+        <tr><td>16</td><td>Text Baseline (Pre-DOM-Aware)</td><td>off</td></tr>
+        <tr><td>17</td><td>Structural Chrome Suppression</td><td>on</td></tr>
+        <tr><td>20</td><td>DOM-Aware Text (Procedural)</td><td>off</td></tr>
+      </tbody>
+    </table>
+
+    <div class="bottom-rule">
+      bottom rule — full content-width long edge, suppression target
+    </div>
+  </main>
+</div>
+</body>
+</html>
