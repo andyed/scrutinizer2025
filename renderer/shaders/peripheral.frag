@@ -214,6 +214,65 @@ vec3 rgbToOklab(vec3 srgb);
 vec4 chromaticAttenuate(vec4 color, float rg_atten, float yv_atten);
 float computeMipLevel(float eccentricity, float fovea_radius);
 
+// ── V1 length-tuning helper ───────────────────────────────────────────────
+// Returns the suppression factor `length_suppress ∈ [1-strength, 1]` for the
+// given UV. 1.0 = no suppression (short edge or flat); (1 - strength) = full
+// suppression (long edge with high persistence). Hoisted to a function so
+// the same probe can gate both orientBonus (DoG band reconstruction, modest
+// visual effect) AND V1 strength at processV4 line ~1053 (the actual driver
+// of the peripheral fringe pattern Andy was observing on photo borders).
+//
+// Probe span scales with local CMF MIP level (D2 in spec). Per-step samples
+// in screen-space tangent direction; alignment-weighted persistence accumulated
+// over K_STEPS=8 each side; sigmoid applied at length_tuning_midpoint /
+// _steepness. See docs/specs/length_tuned_edge_suppression.md.
+float computeLengthSuppress(vec2 uv, float eccentricity, float fovea_radius) {
+    if (u_length_tuning_enabled < 0.5) return 1.0;
+    vec2 px = 2.0 / u_resolution;
+    // PRE-SWAP luma weights per the channel-order contract at the top of file.
+    vec3 lumaW = vec3(0.114, 0.587, 0.299);
+    float lum_r = dot(textureLod(u_texture, uv + vec2(px.x, 0.0), 1.0).rgb, lumaW);
+    float lum_l = dot(textureLod(u_texture, uv - vec2(px.x, 0.0), 1.0).rgb, lumaW);
+    float lum_t = dot(textureLod(u_texture, uv + vec2(0.0, px.y), 1.0).rgb, lumaW);
+    float lum_b = dot(textureLod(u_texture, uv - vec2(0.0, px.y), 1.0).rgb, lumaW);
+    float gx = lum_r - lum_l;
+    float gy = lum_t - lum_b;
+    float g2 = gx * gx + gy * gy;
+    if (g2 < 0.0001) return 1.0;
+
+    vec2 tan_dir = normalize(vec2(-gy, gx));
+    float mipForProbe = computeMipLevel(eccentricity, fovea_radius);
+    float probeScale = pow(2.0, mipForProbe * 0.5);
+    vec2 tan_step = tan_dir * px * probeScale;
+    const int K_STEPS = 8;
+    float persist_sum = 0.0;
+    for (int k = 1; k <= K_STEPS; k++) {
+        float fk = float(k);
+        vec2 off_p = tan_step * fk;
+        vec2 off_n = -tan_step * fk;
+        float lp_r = dot(textureLod(u_texture, uv + off_p + vec2(px.x, 0.0), 1.0).rgb, lumaW);
+        float lp_l = dot(textureLod(u_texture, uv + off_p - vec2(px.x, 0.0), 1.0).rgb, lumaW);
+        float lp_t = dot(textureLod(u_texture, uv + off_p + vec2(0.0, px.y), 1.0).rgb, lumaW);
+        float lp_b = dot(textureLod(u_texture, uv + off_p - vec2(0.0, px.y), 1.0).rgb, lumaW);
+        float gxp = lp_r - lp_l;
+        float gyp = lp_t - lp_b;
+        float g2p = gxp * gxp + gyp * gyp;
+        float ln_r = dot(textureLod(u_texture, uv + off_n + vec2(px.x, 0.0), 1.0).rgb, lumaW);
+        float ln_l = dot(textureLod(u_texture, uv + off_n - vec2(px.x, 0.0), 1.0).rgb, lumaW);
+        float ln_t = dot(textureLod(u_texture, uv + off_n + vec2(0.0, px.y), 1.0).rgb, lumaW);
+        float ln_b = dot(textureLod(u_texture, uv + off_n - vec2(0.0, px.y), 1.0).rgb, lumaW);
+        float gxn = ln_r - ln_l;
+        float gyn = ln_t - ln_b;
+        float g2n = gxn * gxn + gyn * gyn;
+        float align_p = max(0.0, (gx * gxp + gy * gyp) / max(sqrt(g2 * g2p), 1e-6));
+        float align_n = max(0.0, (gx * gxn + gy * gyn) / max(sqrt(g2 * g2n), 1e-6));
+        persist_sum += align_p + align_n;
+    }
+    float persist = persist_sum / float(K_STEPS * 2);
+    float sig = 1.0 / (1.0 + exp(-u_length_tuning_steepness * (persist - u_length_tuning_midpoint)));
+    return 1.0 - u_length_tuning_strength * sig;
+}
+
 // === DoG PERIPHERAL RECONSTRUCTION ===
 // Decomposes the hardware MIP chain into an approximate Laplacian pyramid.
 // Hardware mipmaps use box/bilinear filtering (not Gaussian convolution), so band
@@ -1051,6 +1110,18 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
     }
     
     float strength = lgn.suppressionFactor * config.v1_strength_mult * eccentricityScale;
+
+    // V1 length-tuning: long structural edges get reduced V1 displacement so
+    // peripheral fringe quiets. Externally gated on u_length_tuning_enabled so
+    // the ~32 texture reads inside computeLengthSuppress are entirely skipped
+    // for the 16+ modes that don't enable it (mode 17 is the only one that does).
+    // The processV1 site's `uv` is already source-space (called from main with
+    // the original uv, not the V1-distorted one), so the probe walks the right
+    // signal. The helper internally uses `eccentricity` for CMF-scaled probe
+    // span — match the same variable used for V1 strength itself.
+    if (u_length_tuning_enabled > 0.5) {
+        strength *= computeLengthSuppress(uv, dist, fovea_radius);
+    }
 
     // V1 crowding gate: DOM density determines whether V1 displacement fires.
     // Text regions (density ≥ 0.3) get full V1 distortion; sparse/isolated elements

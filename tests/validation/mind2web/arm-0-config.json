@@ -54,8 +54,8 @@
     "file": "renderer/shaders/peripheral.frag",
     "function": "sampleDoGReconstructed",
     "signature_prefix": "vec4 sampleDoGReconstructed(",
-    "line": 224,
-    "file_blob_sha": "c8201aab3d132aa8677abe5a4463209c6095f1cc",
+    "line": 283,
+    "file_blob_sha": "f9587ea6b4e836c3473121598487368ef90c6cb7",
     "note": "DoG-reconstructed sampling path. Not the MIP fallback (sampleMIPPooled at line 628). file_blob_sha is the git blob SHA (git hash-object) — any edit to the file invalidates it. signature_prefix is grepped from the live file at the pinned line to catch function renames and signature changes. Step 3 wires the capability-detect branch to throw if MIP fallback is silently substituted at runtime."
   },
 
@@ -115,7 +115,7 @@
     "note": "7-D vector. RGBA sampled at candidate screen-space bbox center on the peripheral-rendered PNG. Three FC channels computed over the full 1280x768 rendered frame with sigma=2.5, then normalized to [0,1] by per-frame max. surround(c) = annulus-mean over all 7 dims at the retinotopic pool radius."
   },
 
-  "pool_constants_note": "Schwartz CMF e0 and Rosenholtz pool-size constants are not separate knobs — both are encoded in pipeline.cmf_a (2.78) and pipeline.ecc_scaling (0.75). Schwartz M(e) = log(1 + e/cmf_a); pool-radius schedule c[k] = cmf_a * (exp(k*0.5*scale) - 1) / fovea_deg with scale = cortical_max / maxMipLevel / (ecc_scaling / 0.75). See peripheral.frag lines 415-431, 651-654.",
+  "pool_constants_note": "Schwartz CMF e0 and Rosenholtz pool-size constants are not separate knobs — both are encoded in pipeline.cmf_a (2.78) and pipeline.ecc_scaling (0.75). Schwartz M(e) = log(1 + e/cmf_a); pool-radius schedule c[k] = cmf_a * (exp(k*0.5*scale) - 1) / fovea_deg with scale = cortical_max / maxMipLevel / (ecc_scaling / 0.75). See peripheral.frag lines 474-493, 710-714.",
 
   "surround": {
     "definition": "rosenholtz_pool_at_retinotopic_location",
