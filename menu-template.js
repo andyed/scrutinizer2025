@@ -632,6 +632,12 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                             click: () => { sendToOverlays('menu:set-aesthetic-mode', 16); app.emit('aesthetic-mode-changed', 16); }
                         },
                         {
+                            label: 'Structural Chrome Suppression (V1 length-tuning)',
+                            type: 'radio',
+                            checked: currentAestheticMode === 17,
+                            click: () => { sendToOverlays('menu:set-aesthetic-mode', 17); app.emit('aesthetic-mode-changed', 17); }
+                        },
+                        {
                             label: 'DOM-Aware Text (Procedural)',
                             type: 'radio',
                             checked: currentAestheticMode === 20,
