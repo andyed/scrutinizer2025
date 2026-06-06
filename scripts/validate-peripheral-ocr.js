@@ -483,6 +483,28 @@ async function main() {
         }
     }
 
+    // RC-2.6: deep-periphery monotonicity / spurious-structure detector. Recognition must
+    // keep DECLINING into the deep periphery; if the FAR ring reads more than the NEAR ring,
+    // the model is emitting spurious readable structure — phantom features (displacement
+    // modes) or glyph-like texture artifacts (synthesis/pooling modes). A faithful periphery
+    // of either family should not OCR as *more* text further out. The far-count >= 10 guard
+    // keeps tiny-count OCR noise from tripping it. (Added 2026-06-06: mode 15 cortical pooling
+    // tripped this — far 3.2% > near 2.4%, 46 far chars — while emitting visible radial
+    // synthesis wedges; the displacement default mode 12 passes, far 0.8% < near 1.1%.)
+    const nearRing = ringResults[2];
+    const farRing = ringResults[3];
+    if (nearRing.recognitionRate !== null && farRing.recognitionRate !== null
+        && nearRing.baselineChars >= 5 && farRing.baselineChars >= 5) {
+        const nearPct = (nearRing.recognitionRate * 100).toFixed(1);
+        const farPct2 = (farRing.recognitionRate * 100).toFixed(1);
+        if (farRing.recognitionRate > nearRing.recognitionRate && farRing.scrambledChars >= 10) {
+            console.error(`  ✗ RC-2.6 Spurious peripheral structure: far ${farPct2}% > near ${nearPct}% (${farRing.scrambledChars} far chars — phantom features / glyph-like synthesis artifacts).`);
+            pass = false;
+        } else {
+            console.log(`  ✓ RC-2.6 No spurious deep-periphery structure (far ${farPct2}%, near ${nearPct}%)`);
+        }
+    }
+
     console.log('');
     if (pass) {
         console.log('PASS: OCR recognition rate validates foveal preservation + peripheral degradation.');
