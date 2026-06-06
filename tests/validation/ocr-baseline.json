@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-06T06:52:16.677Z",
-  "screenshot": "site__mode_disabled_2026-06-06T06-52-14-295Z.png",
+  "timestamp": "2026-06-06T13:17:08.084Z",
+  "screenshot": "site__mode_disabled_2026-06-06T13-17-03-207Z.png",
   "viewport": {
     "width": 1920,
     "height": 1012
@@ -9,41 +9,41 @@
     "x": 0.5,
     "y": 0.5
   },
-  "foveaRadiusPx": 44,
+  "foveaRadiusPx": 88,
   "imageSize": {
-    "width": 1920,
-    "height": 984
+    "width": 3840,
+    "height": 1968
   },
-  "dpr": 1,
+  "dpr": 2,
   "mode": "disabled",
-  "totalChars": 2486,
+  "totalChars": 2511,
   "rings": [
     {
       "name": "fovea",
       "rMin": 0,
       "rMax": 2,
-      "charCount": 138,
-      "wordCount": 24
+      "charCount": 131,
+      "wordCount": 23
     },
     {
       "name": "parafovea",
       "rMin": 2,
       "rMax": 5,
-      "charCount": 271,
-      "wordCount": 43
+      "charCount": 287,
+      "wordCount": 45
     },
     {
       "name": "near_periph",
       "rMin": 5,
       "rMax": 10,
-      "charCount": 658,
-      "wordCount": 102
+      "charCount": 664,
+      "wordCount": 104
     },
     {
       "name": "far_periph",
       "rMin": 10,
       "rMax": 30,
-      "charCount": 1419,
+      "charCount": 1429,
       "wordCount": 233
     }
   ]
