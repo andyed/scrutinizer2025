@@ -19,7 +19,10 @@ const CONFIG_PATH = path.join(REPO_ROOT, 'tests/validation/mind2web/arm-0-config
 const MODES_PATH = path.join(REPO_ROOT, 'shared/modes.json');
 const FRAG_PATH = path.join(REPO_ROOT, 'renderer/shaders/peripheral.frag');
 
-const EXPECTED_HASH_PREFIX = 'f4ab3b725db7';
+// Refreshed 2026-06-05: modes.json category relabel (modes 12/14/15) for the default-restore
+// audit shifted the modes_json_drift_pin blob SHA. Arm-0 mode-16 pipeline is byte-unchanged.
+// See docs/assessments/2026-06-05-post-isotropic-release-audit.md (B1).
+const EXPECTED_HASH_PREFIX = 'da03c24ccf41';
 
 describe('Mind2Web Arm-0 config hash', () => {
     let cfg;

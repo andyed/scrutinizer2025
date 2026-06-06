@@ -25,7 +25,7 @@ let currentStartPage;
 
 let currentVisualMemory;
 let currentMobileEmulation;
-let currentAestheticMode = 14;
+let currentAestheticMode = 12; // FOVI Cortical Grid (Blauch) — isotropic cortical sampling, the v2.6.0 scientific anchor. Restored as default (was 14/Pyramid Mongrel); see docs/assessments/2026-06-05-post-isotropic-release-audit.md (B1).
 
 // Tier 1 keyboard shortcut state (cycling modes)
 let currentCongestionMode = 0;   // 0=Off, 1=Stats, 2=Heatmap, 3=Saliency vs Congestion
@@ -1430,6 +1430,15 @@ function createWindow() {
 app.commandLine.appendSwitch('ignore-gpu-blacklist');
 app.commandLine.appendSwitch('enable-transparent-visuals');
 
+// Pin device pixel ratio for TEST_MODE captures so OCR/golden baselines and processed
+// runs share geometry regardless of the host display's DPR. Without this the OCR gate's
+// baseline (DPR-2) and processed (DPR-1 on a non-retina host) diverged and read 0 chars.
+// force-device-scale-factor is OS-level, so it governs capturePage() output directly.
+// (audit 2026-06-05, OCR L2)
+if (process.env.TEST_MODE === 'true') {
+    app.commandLine.appendSwitch('force-device-scale-factor', process.env.TEST_DPR || '2');
+}
+
 // Test Mode Handler
 function runTestMode() {
     console.log('[Main] Running in TEST MODE');
@@ -1637,9 +1646,19 @@ function runIntegrationTest() {
                 const screenTargetX = winBounds.x + targetX;
                 const screenTargetY = winBounds.y + targetY;
 
-                // Simulate mouse move to target (static fixation unless trajectory is set)
+                // Simulate mouse move to target (static fixation unless trajectory is set).
+                // Pulse the SAME position to converge GazeModel smoothing and drop velocity to
+                // ~0 — a single move leaves velocity frozen in the saccadic band (>4 px/ms), so
+                // velocity-gated foveal stabilization (mode 12 / cortical modes) never engages and
+                // the fovea renders scrambled, while mode 0's hard foveal bypass stays sharp. This
+                // mirrors the scanpath dwell loop below; without it the OCR gate read 0 foveal
+                // chars for mode 12 from a capture artifact, not a real defect. (audit 2026-06-06)
                 if (!testTrajectory) {
-                    mainWindow.scrutinizerHud.webContents.send('browser:mousemove', screenTargetX, screenTargetY, 1.0);
+                    for (let pulse = 0; pulse < 10; pulse++) {
+                        mainWindow.scrutinizerHud.webContents.send('browser:mousemove', screenTargetX, screenTargetY, 1.0);
+                        await new Promise(resolve => setTimeout(resolve, 16)); // ~60fps
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 200)); // dwell so velocity settles to ~0
                 }
 
                 // Apply overrides if present
