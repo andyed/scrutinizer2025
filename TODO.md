@@ -40,6 +40,24 @@ A hard revert to v2.6.1 cures only B1 (default = shatter mode 14) — which B1 f
 
 ---
 
+## Biological-plausibility roadmap — 2026-06-06
+
+**Where it stands after the post-isotropic session:** the bio-anchored isotropic model (mode 12) is the default again AND empirically validated for the first time (foveal recognition **82.4%**, declining periphery — a real foveation profile, not the old prose fiction). Cortical pooling no longer silently degrades (B2). There is now a working measurement instrument (the peripheral-OCR gate) producing regenerable per-eccentricity curves. Net: bio-plausibility moved from the audit's **MIXED-leaning-regress** toward **MIXED-leaning-advance**. Next, in priority order:
+
+1. **Calibrate the foveation profile against human psychophysics — not OCR readability.** The OCR curve (mode 12 @ DPR-2: fovea 82% / para 15% / near 1% / far 1%) is a machine-readability *proxy*. Compare it to human text-recognition-by-eccentricity (acuity falloff, Bouma crowding b≈0.4–0.5×ecc, reading span) to learn whether each ring over/under-degrades vs human vision, and to convert the gate's thresholds (currently **guessed** — see the RC-2.5 calibration episode) into psychophysics-anchored targets. **The single biggest bio lever now that the instrument exists.**
+2. **Settle the L1 cortical-geometry gap honestly** (`docs/next-steps-2026-04.md`, L1–L4). B2 lets mode 15's sector pipeline actually run on capable GPUs again — so test whether sector pooling is salvageable (partition-of-unity / Gaussian-weighted sector overlap per Freeman-Simoncelli, killing the dithered-wedge artifacts) or whether to formally retire it and frame the shipped model as "acuity-graded isotropic displacement." Don't calibrate L2/L3/L4 until L1 is decided.
+3. **Validate the unvalidated bio claims.** (a) Mode 17 length-tuning — build the Cavanaugh-Bair-Movshon 2002 synthetic-Gabor curve-replication harness or downgrade "replicates" → "inspired by" (see M3). (b) Re-run the Brown-metamer per-eccentricity SSIM now that mode 12 is the default and captures are DPR-2 (the old numbers measured the broken fallback path).
+4. **Deterministic DPR pin (prerequisite).** Without CDP `Emulation.setDeviceMetricsOverride` the bio-validation curves aren't reproducible across machines — this gates the trustworthiness of #1 and #3.
+5. **(After L1) Extend per-sector statistics (L2)** toward 4-orientation steerable pyramids — only once L1 is correct.
+
+**Session learnings worth carrying forward:**
+- **OCR readability ≠ biological plausibility** — the gate is a proxy; anchor its thresholds in human psychophysics, not round numbers.
+- **Captures are display-DPR-dependent and cortical-mode foveation is velocity-gated** — any capture-based validation must pin DPR (DPR-2) and dwell gaze to zero velocity, or it measures artifacts.
+- **Recurring "prose vs. artifact" failure mode** (84/60/62/52, mode-15 cortical pooling, Brown SSIM): every bio claim needs a *regenerable artifact* plus a gate that exercises it — prose drifts, data doesn't.
+- **Mode 12's first real foveation profile (DPR-2): 82 / 15 / 1 / 1** — the empirical anchor for future bio comparison.
+
+---
+
 ## Codebase Cleanup
 
 - [ ] **Rename `mongrelMode` -> `poolingMode`** -- "Mongrel" is academic; "pooling" describes the shader. ~42 files.
