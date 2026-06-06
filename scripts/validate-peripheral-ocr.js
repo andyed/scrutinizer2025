@@ -7,9 +7,13 @@
  *
  * Metric: recognition_rate = scrambled_chars / baseline_chars per ring.
  * A working simulation should produce:
- *   - Fovea: rate >= 85% (text preserved)
- *   - Monotonically declining rate toward periphery
- *   - Far-periph rate <= 55%
+ *   - Fovea: rate >= foveal threshold (text preserved; RC-2.1)
+ *   - A declining recognition trend toward the periphery (RC-2.2; crowding is
+ *     content-dependent, so a strict per-ring monotone is NOT required)
+ *   - Far-periph rate <= 55% (RC-2.3): periphery degraded — far-peripheral text is
+ *     correctly near-unreadable (humans cannot read at 10-30 deg eccentricity)
+ *   - Parafovea >= 10% (RC-2.5): the near-fovea transition is not obliterated
+ *     (gracefully degraded, not an immediate cliff to ~0)
  *
  * The baseline is frozen: OCR'd once from a disabled-mode capture at a pinned
  * viewport (1920x1012), saved to tests/validation/ocr-baseline.json. This
@@ -25,7 +29,9 @@
  *
  * Exit codes:
  *   0 = all criteria pass
- *   1 = validation failed
+ *   1 = validation FAILED (a real preservation/degradation criterion not met)
+ *   2 = INVALID measurement (DPR/mode mismatch, zero read, or unreadable fovea —
+ *       the gate refuses to score it rather than emit a bogus 0% curve)
  */
 
 'use strict';
@@ -56,6 +62,27 @@ const VIEWPORT_HEIGHT = 1012;
 const OCR_TEST_PAGE = path.join(__dirname, '..', 'tests', 'ocr-test-page.html');
 const BASELINE_PATH = path.join(__dirname, '..', 'tests', 'validation', 'ocr-baseline.json');
 
+// eng.traineddata ships at the repo root, so the gate reads text offline and
+// reproducibly instead of fetching the model from a CDN on every run.
+const TESSERACT_LANG_PATH = path.join(__dirname, '..');
+
+/**
+ * Create a Tesseract worker that loads the repo-local eng.traineddata (no network)
+ * and reads sparse, scattered text. The foveated page is not a clean column — words
+ * survive wherever the shader left them legible — so PSM.SPARSE_TEXT fits better than
+ * the default page-segmentation mode.
+ */
+async function createOcrWorker() {
+    const Tesseract = require('tesseract.js');
+    const worker = await Tesseract.createWorker('eng', 1 /* OEM.LSTM_ONLY */, {
+        langPath: TESSERACT_LANG_PATH,
+        gzip: false,           // repo ships uncompressed eng.traineddata, not .gz
+        cacheMethod: 'none',
+    });
+    await worker.setParameters({ tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT });
+    return worker;
+}
+
 /**
  * Find the most recent golden capture matching a mode pattern.
  */
@@ -84,6 +111,7 @@ function captureMode(captureDir, mode) {
         TEST_FIXATION_Y: '0.5',
         TEST_WIDTH: String(VIEWPORT_WIDTH),
         TEST_HEIGHT: String(VIEWPORT_HEIGHT),
+        TEST_DPR: process.env.TEST_DPR || '2', // pin DPR-2 so captures match the DPR-2 baseline (audit 2026-06-05)
     };
 
     try {
@@ -114,14 +142,30 @@ function captureMode(captureDir, mode) {
  * Run OCR and partition recognized characters into annular rings.
  */
 async function ocrByRing(worker, screenshotPath, fixPxX, fixPxY, foveaRadiusPx) {
-    const { data } = await worker.recognize(screenshotPath);
+    // tesseract.js v7: per-word data lives in data.blocks[].paragraphs[].lines[].words[];
+    // there is NO flat data.words (the v6 shape), and blocks are only populated when the
+    // recognize() call explicitly requests them. The old `worker.recognize(path)` returned
+    // data.words === undefined, so this read 0 chars for EVERY image — including a perfect
+    // baseline. That, not the DPR mismatch, was the gate's structural killer. (audit 2026-06-05)
+    const { data } = await worker.recognize(screenshotPath, {}, { blocks: true });
 
-    const rings = RING_DEFS.map(r => ({ ...r, charCount: 0, wordCount: 0, words: [] }));
+    const rings = RING_DEFS.map(r => ({ ...r, charCount: 0, wordCount: 0, words: [], confSum: 0 }));
 
-    if (!data.words) return { totalChars: 0, rings };
+    // Flatten the v7 block tree to a flat word list (each word carries bbox + confidence).
+    const words = [];
+    for (const block of (data.blocks || []))
+        for (const para of (block.paragraphs || []))
+            for (const line of (para.lines || []))
+                for (const word of (line.words || [])) words.push(word);
+    if (!words.length) return { totalChars: 0, rings };
 
+    // Drop low-confidence tokens: shader-scrambled periphery yields garbage "words" that
+    // must not count as readable text, and a confident foveal read is exactly what we
+    // measure. Absence of a confident read is degradation — never a free pass.
+    const CONF_FLOOR = 60;
     let totalChars = 0;
-    for (const word of data.words) {
+    for (const word of words) {
+        if ((word.confidence ?? 0) < CONF_FLOOR) continue;
         const cx = (word.bbox.x0 + word.bbox.x1) / 2;
         const cy = (word.bbox.y0 + word.bbox.y1) / 2;
         const dist = Math.sqrt((cx - fixPxX) ** 2 + (cy - fixPxY) ** 2);
@@ -133,6 +177,7 @@ async function ocrByRing(worker, screenshotPath, fixPxX, fixPxY, foveaRadiusPx) 
             if (normDist >= ring.rMin && normDist < ring.rMax) {
                 ring.charCount += chars;
                 ring.wordCount++;
+                ring.confSum += word.confidence;
                 ring.words.push(word.text);
                 break;
             }
@@ -157,8 +202,7 @@ async function freezeBaseline(captureDir, fixationX, fixationY) {
 
     console.log(`  Image: ${png.width}x${png.height}px, fovea radius: ${foveaRadiusPx}px`);
 
-    const Tesseract = require('tesseract.js');
-    const worker = await Tesseract.createWorker('eng');
+    const worker = await createOcrWorker();
     const result = await ocrByRing(worker, baselineScreenshot, fixPxX, fixPxY, foveaRadiusPx);
     await worker.terminate();
 
@@ -169,6 +213,8 @@ async function freezeBaseline(captureDir, fixationX, fixationY) {
         fixation: { x: fixationX, y: fixationY },
         foveaRadiusPx,
         imageSize: { width: png.width, height: png.height },
+        dpr: +(png.width / VIEWPORT_WIDTH).toFixed(2),
+        mode: 'disabled',
         totalChars: result.totalChars,
         rings: result.rings.map(r => ({
             name: r.name, rMin: r.rMin, rMax: r.rMax,
@@ -196,6 +242,7 @@ async function main() {
     let fixationY = 0.5;
     let forceCapture = false;
     let doFreezeBaseline = false;
+    let mode = '0'; // render mode to capture/validate; 0 is the reference, 12 is the restored default
 
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--screenshot' && args[i + 1]) screenshotPath = args[++i];
@@ -203,6 +250,7 @@ async function main() {
         else if (args[i] === '--fixation-y' && args[i + 1]) fixationY = parseFloat(args[++i]);
         else if (args[i] === '--capture') forceCapture = true;
         else if (args[i] === '--freeze-baseline') doFreezeBaseline = true;
+        else if (args[i] === '--mode' && args[i + 1]) mode = args[++i];
     }
 
     const packageVersion = require('../package.json').version.replace(/\.\d+$/, '');
@@ -236,10 +284,10 @@ async function main() {
 
     // Get or capture processed screenshot
     if (!screenshotPath) {
-        screenshotPath = forceCapture ? null : findCapture(captureDir, 'mode_0');
+        screenshotPath = forceCapture ? null : findCapture(captureDir, `mode_${mode}`);
         if (!screenshotPath) {
             console.log('Capturing processed screenshot...');
-            screenshotPath = captureMode(captureDir, '0');
+            screenshotPath = captureMode(captureDir, mode);
         } else {
             console.log(`Processed: ${path.basename(screenshotPath)}`);
         }
@@ -261,17 +309,38 @@ async function main() {
 
     console.log(`\nImage: ${imgW}x${imgH}px  Fixation: (${fixPxX.toFixed(0)}, ${fixPxY.toFixed(0)})  Fovea: ${foveaRadiusPx}px`);
 
-    // Warn if image size doesn't match baseline (DPR mismatch)
+    // HARD-FAIL on DPR/size mismatch (audit 2026-06-05, B4). Scoring a half-size (DPR-1)
+    // capture against a DPR-2 baseline is exactly what zeroed this gate out for weeks:
+    // glyphs drop below Tesseract's resolution floor, every ring reads 0, and the old
+    // code recorded that 0 as a "measurement" instead of refusing. Exit 2 = INVALID.
     if (baseline.imageSize && (imgW !== baseline.imageSize.width || imgH !== baseline.imageSize.height)) {
-        console.warn(`  ⚠ Image size differs from baseline: ${imgW}x${imgH} vs ${baseline.imageSize.width}x${baseline.imageSize.height}`);
-        console.warn('    Fovea radius scaled proportionally. Ring char counts are comparable if viewport CSS size matches.');
+        console.error(`  ✗ INVALID: capture DPR/size mismatch.`);
+        console.error(`    processed: ${imgW}x${imgH}   baseline: ${baseline.imageSize.width}x${baseline.imageSize.height}`);
+        console.error(`    Re-capture at TEST_DPR=2 (force-device-scale-factor=2); the gate refuses to score half-size text.`);
+        process.exit(2);
     }
 
     console.log('\nLoading OCR engine...');
-    const worker = await Tesseract.createWorker('eng');
+    const worker = await createOcrWorker();
     console.log('OCR processed...');
     const scrambled = await ocrByRing(worker, screenshotPath, fixPxX, fixPxY, foveaRadiusPx);
     await worker.terminate();
+
+    // INVALID guards (audit 2026-06-05, B4): a zero read, or a fovea that lost most of its
+    // text, means the MEASUREMENT failed (scale / mode / contrast) — it is not evidence of
+    // peripheral degradation. Refuse rather than emit a bogus all-zeros curve.
+    if (scrambled.totalChars === 0) {
+        console.error('  ✗ INVALID: OCR read zero characters from the processed capture (suspect DPR / mode / contrast).');
+        process.exit(2);
+    }
+    {
+        const foveaBaseChars = baseline.rings[0].charCount;
+        const foveaReadChars = scrambled.rings[0].charCount;
+        if (foveaBaseChars >= 5 && foveaReadChars < 0.5 * foveaBaseChars) {
+            console.error(`  ✗ INVALID: foveal text unreadable (${foveaReadChars}/${foveaBaseChars} chars) — suspect scale/mode mismatch, not degradation.`);
+            process.exit(2);
+        }
+    }
 
     // Compute per-ring recognition rate against frozen baseline
     console.log('\n═══ Peripheral OCR Recognition Rate ═══\n');
@@ -315,6 +384,8 @@ async function main() {
         baselineFrozen: baseline.timestamp,
         fixation: baseline.fixation,
         foveaRadiusPx,
+        dpr: +(imgW / VIEWPORT_WIDTH).toFixed(2),
+        mode,
         baselineFoveaRadiusPx: baseline.foveaRadiusPx,
         baselineTotalChars: baseline.totalChars,
         processedTotalChars: scrambled.totalChars,
@@ -342,23 +413,28 @@ async function main() {
         console.warn(`  ? RC-2.1 Foveal recognition: insufficient baseline chars in fovea (${foveaResult.baselineChars})`);
     }
 
-    // Monotonic decline
+    // RC-2.2: declining recognition TREND toward the periphery. Crowding is
+    // content-dependent (Bouma), so a strict per-ring monotone is the wrong test — the
+    // old +0.05-tolerant check let the prose profile's 60→62 rise pass while still
+    // printing "monotonically declines". Fit a line over the populated rings and require
+    // a negative slope.
     const populated = ringResults.filter(r => r.recognitionRate !== null && r.baselineChars >= 5);
-    if (populated.length >= 2) {
-        let monotonic = true;
-        for (let i = 1; i < populated.length; i++) {
-            if (populated[i].recognitionRate > populated[i - 1].recognitionRate + 0.05) {
-                console.error(`  ✗ Non-monotonic: ${populated[i].ring} (${(populated[i].recognitionRate * 100).toFixed(1)}%) > ${populated[i - 1].ring} (${(populated[i - 1].recognitionRate * 100).toFixed(1)}%)`);
-                monotonic = false;
-            }
-        }
-        if (monotonic) {
-            console.log('  ✓ Recognition rate monotonically declines from fovea to periphery');
+    if (populated.length >= 3) {
+        const ys = populated.map(r => r.recognitionRate);
+        const n = ys.length;
+        const sx = (n - 1) * n / 2;
+        const sxx = (n - 1) * n * (2 * n - 1) / 6;
+        const sy = ys.reduce((a, b) => a + b, 0);
+        const sxy = ys.reduce((a, y, i) => a + i * y, 0);
+        const slope = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+        if (slope < 0) {
+            console.log(`  ✓ RC-2.2 Declining recognition trend (slope ${slope.toFixed(3)} per ring)`);
         } else {
+            console.error(`  ✗ RC-2.2 No declining trend (slope ${slope.toFixed(3)} per ring)`);
             pass = false;
         }
     } else {
-        console.warn(`  ? Monotonic check: only ${populated.length} ring(s) with >= 5 baseline chars`);
+        console.warn(`  ? RC-2.2 Trend check: only ${populated.length} ring(s) with >= 5 baseline chars`);
     }
 
     // Far peripheral degradation
@@ -369,6 +445,27 @@ async function main() {
             console.log(`  ✓ RC-2.3 Far-periph degradation: ${farPct}% (threshold: <= 55%)`);
         } else {
             console.error(`  ✗ RC-2.3 Far-periph degradation: ${farPct}% (threshold: <= 55%)`);
+            pass = false;
+        }
+    }
+
+    // RC-2.5: the PARAFOVEA (near-fovea transition) must not be totally destroyed —
+    // degradation there should be graceful, not a cliff to zero. Scoped to the parafovea
+    // on purpose: near/far-peripheral text being near-unreadable is biologically correct
+    // (humans cannot read at 10-30 deg eccentricity), so a floor out there would wrongly
+    // fail every faithful foveation model. (Calibrated 2026-06-06 against the first real
+    // OCR curves — both mode 0 and mode 12 correctly read ~0% in the far periphery.)
+    // The floor is 10%, NOT a precise parafoveal target: the parafovea is a noisy,
+    // borderline ring (the validated mode-12 default measured 15-24% across DPR-1/DPR-2
+    // captures), so a higher floor would flip pass/fail on capture noise. 10% cleanly
+    // separates graceful degradation (15%+) from obliteration (near/far sit at ~0-1%).
+    const parafoveaResult = ringResults[1];
+    if (parafoveaResult.recognitionRate !== null && parafoveaResult.baselineChars >= 5) {
+        const paraPct = (parafoveaResult.recognitionRate * 100).toFixed(1);
+        if (parafoveaResult.recognitionRate >= 0.10) {
+            console.log(`  ✓ RC-2.5 Parafovea not obliterated: ${paraPct}% (floor: >= 10%)`);
+        } else {
+            console.error(`  ✗ RC-2.5 Over-degraded: parafovea ${paraPct}% < 10% floor (cliff to ~0 immediately outside the fovea).`);
             pass = false;
         }
     }

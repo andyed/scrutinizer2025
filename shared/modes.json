@@ -388,7 +388,7 @@
             "id": 12,
             "label": "FOVI Cortical Grid (Blauch)",
             "shortLabel": "FOVI Iso",
-            "category": "research",
+            "category": "default",
             "description": "Sector-parameterized displacement derived from Blauch, Alvarez & Konkle (2026). Noise frequency and scramble cell size scale with cortical sector extent (w = log(r + a)). Sector geometry drives transition rate, not rendering mechanism. 12px cell cap prevents grid artifacts.",
             "pipeline": {
                 "lgn_use_structure_mask": true,
@@ -432,7 +432,7 @@
             "id": 14,
             "label": "Pyramid Mongrel (Tier 2.75)",
             "shortLabel": "Pyramid",
-            "category": "default",
+            "category": "research",
             "pooling_family": "acuity_loss",
             "description": "Multi-scale Laplacian pyramid decomposition + cross-scale magnitude correlation matching. Tier 2.75: pyramid synthesis replaces Tier 2.5 oriented noise as the compute texture, composited with standard V1 displacement + MIP blur pipeline.",
             "pipeline": {
@@ -482,7 +482,7 @@
             "id": 15,
             "label": "TTM Cortical Pooling (Tier 3 — research)",
             "shortLabel": "TTM (research)",
-            "category": "default",
+            "category": "research",
             "pooling_family": "cortical_pooling",
             "description": "Aspirational pure summary-statistic pooling via eccentricity-scaled sectors. RESEARCH MODE — artifacts expected and not RFV-safe. Requires WebGPU storage-buffer ≥9 (default cap is 8). On hardware below the cap, createBindGroupLayout fails silently and peripheral.frag falls back to sampleDoGReconstructed/sampleMIPPooled — i.e. acuity_loss behavior under a cortical_pooling label. See docs/next-steps-2026-04.md for the 2026-04-17 discovery and the acuity_loss / cortical_pooling honesty split.",
             "pipeline": {

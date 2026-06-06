@@ -124,7 +124,8 @@
     "dotenv": "^17.2.3",
     "electron": "^30.5.1",
     "electron-builder": "^26.0.12",
-    "jest": "^30.3.0"
+    "jest": "^30.3.0",
+    "tesseract.js": "7.0.0"
   },
   "dependencies": {
     "electron-log": "^5.4.3",

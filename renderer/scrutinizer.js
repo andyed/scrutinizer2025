@@ -106,7 +106,7 @@
 
             // ── Frame state ──────────────────────────────────────────
             this.lastFrameBitmap = null;
-            this.aestheticMode = 14; // Pyramid Mongrel (Tier 2.75): multi-scale cross-correlation synthesis
+            this.aestheticMode = 12; // FOVI Cortical Grid (Blauch): isotropic cortical sampling — restored default (was 14/Pyramid Mongrel); see audit 2026-06-05 B1
             this.dpr = window.devicePixelRatio || 1;
             this._congestionReportMode = 0;
             this._heatmapHiddenAt = 0;     // timestamp of last hide; drives the
@@ -118,6 +118,7 @@
 
             // ── WebGPU Compute (Tier 2.5) ──────────────────────────────
             this.webgpuCompute = null;
+            this.corticalPoolingAvailable = true; // set false by the probe when the GPU caps maxStorageBuffersPerShaderStage < 9 (modes 14/15 cortical pooling). See audit 2026-06-05 B2.
             this.webgpuSafety = null;
             this.webgpuDevice = null;
             this.webgpuTier = 0;
@@ -178,6 +179,10 @@
                     return;
                 }
                 this.webgpuDevice = result.device;
+                this.corticalPoolingAvailable = result.corticalPoolingAvailable !== false;
+                if (result.corticalPoolingAvailable === false) {
+                    console.warn('[Scrutinizer] Cortical pooling (modes 14/15) unavailable on this GPU: maxStorageBuffersPerShaderStage < 9. Periphery renders as acuity-loss MIP/DoG blur, NOT sector cortical pooling.');
+                }
 
                 // Safety harness with auto-fallback callback
                 this.webgpuSafety = new WebGPUSafetyHarness(result.device, {
@@ -674,7 +679,10 @@
                             this.renderer.setComputeTier(2.5);
                         }
                     } catch (e) {
-                        console.warn('[Scrutinizer] WebGPU compute init failed:', e.message);
+                        console.warn('[Scrutinizer] WebGPU compute init failed:', e.message,
+                            this.corticalPoolingAvailable === false
+                                ? '— GPU lacks the 9 storage buffers cortical pooling needs; using acuity-loss fallback.'
+                                : '');
                         this._fallbackToTier16();
                     }
                 } else if (halfW !== this.webgpuCompute.width || halfH !== this.webgpuCompute.height) {

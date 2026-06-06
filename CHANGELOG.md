@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed — default model restored to isotropic cortical sampling (audit 2026-06-05, B1)
+
+- **Default mode 14 (Pyramid Mongrel) → 12 (FOVI Cortical Grid).** The isotropic cortical-sampling geometry (Blauch, Alvarez & Konkle 2026) that v2.6.0 shipped as the default was displaced by mode 14 in v2.7.0 with no comparative validation, leaving the shipped model (acuity-loss shatter + DoG/MIP) out of step with the project's stated scientific anchor. Mode 12 is restored as the runtime default (`main.js`, `renderer/scrutinizer.js`). Its parameters are unchanged from v2.6.0 (verified: `v1_distortion_type:5`, `num_cortical_rings:50`, `dog_e2:0.15`). Modes 14 and 15 re-categorized `default → research` in `shared/modes.json`; stale "(Default)" suffix removed from mode 0 in the menu.
+
+### Fixed — cortical pooling silently degraded on common GPUs (audit 2026-06-05, B2)
+
+- **`maxStorageBuffersPerShaderStage` is now requested from the adapter.** The Tier 2.75/3 pyramid reconstruct bind group (`reconBGL`) binds 9 storage buffers per compute stage, but `renderer/webgpu-probe.js` requested only buffer *size* limits — so the device was created with the WebGPU default cap of 8 even on GPUs that support 9+, causing modes 14/15 to silently fall back to MIP/DoG acuity blur while still labeled "Pyramid Mongrel." The probe now requests the adapter's full storage-buffer count, and when a GPU genuinely caps at 8 it surfaces a loud `corticalPoolingAvailable:false` warning instead of pretending to pool. (Mode 15's fallback was disclosed in v2.7.3; the identical defect on the then-default mode 14 was not.)
+
+### Fixed — peripheral-OCR readability gate revived (audit 2026-06-05, B4)
+
+- **The peripheral-OCR gate read zero characters from every image; now repaired.** This is the only validation that distinguishes "text readable in the periphery" from "no text anywhere", and three independent defects had silently zeroed it: (1) `scripts/validate-peripheral-ocr.js` called `worker.recognize()` the tesseract.js-v6 way — reading a flat `data.words` that no longer exists in v7 — so it returned 0 chars even for a perfect baseline; (2) device pixel ratio was never pinned, so a DPR-1 capture got scored against the DPR-2 baseline (half-size glyphs below the OCR floor); (3) the validator recorded a 0-char read as a `0%` datum and only `console.warn`ed on size mismatch. Fixes: v7 block-tree reader + confidence floor; offline repo-local `eng.traineddata` loading; **hard-fail (exit 2 = INVALID)** on DPR/size mismatch, zero read, or unreadable fovea; an RC-2.5 over-degradation floor; a declining-trend predicate replacing the broken strict-monotonic check (which let the false "monotonically declining" 84/60/62/52 prose pass); `force-device-scale-factor` pinned under `TEST_MODE`; and `tesseract.js@7.0.0` declared in `devDependencies`. The baseline + mode-0/mode-12 curves were regenerated as real data (baseline 2486 chars; mode-12 foveal recognition **79.7%**).
+
+- **Static golden captures now dwell to zero gaze velocity (`main.js`).** The capture path injected a *single* synthetic mousemove, leaving gaze velocity frozen in the saccadic-suppression band (>4 px/ms) — so velocity-gated foveal stabilization (mode 12 and the other cortical modes) never engaged and the fovea rendered scrambled, while mode 0's velocity-independent hard foveal bypass stayed sharp. The static fixation now pulses the position 10× and dwells (mirroring the scanpath path), establishing a stable post-saccade fixation. Verified through the revived OCR gate: mode-12 foveal recognition went **0% → 79.7%**, matching the live app. Corrects every prior static golden capture of a cortical mode (12/14/15). Baseline + curves were then re-captured at **DPR-2** (the science's native resolution; baseline 2511 chars), and **RC-2.5 was rescoped from the far periphery to the parafovea and calibrated to a 10% obliteration floor** — far-peripheral text being near-unreadable is biologically correct (you cannot read at 10-30 deg), and the parafovea is a noisy borderline ring (15-24% across captures). Both **mode 0 (fovea 80.9%)** and **mode 12 (fovea 82.4%)** now PASS the full gate at DPR-2. _Remaining: DPR is not deterministically pinned — `force-device-scale-factor` floats with the host display (captures have ranged DPR-1 to DPR-2), so the size hard-fail is the guard and reliable cross-display pinning (CDP `setDeviceMetricsOverride`) is a follow-up._
+
 ## [2.7.3] - 2026-04-26
 
 ### Honesty pass — `acuity_loss` / `cortical_pooling` mode taxonomy
@@ -103,7 +119,7 @@ Per `docs/next-steps-2026-04.md:38–42`, modes that claim peripheral pooling fi
 - **OCR Baseline Stale**: Re-frozen OCR baseline at 1x DPR (1920×944) after mode 12 graduation changed capture geometry. Previous baseline was frozen at 2x DPR (3840×1888), causing foveal radius mismatch.
 
 ### Validation
-- **OCR Profile (Mode 12)**: Fovea 84% | Parafovea 60% | Near 62% | Far 52%. Monotonically declining. Overall 57% recognition (mode 0 baseline: 40%). Far-peripheral degradation passes ≤55% threshold. Foveal preservation passes ≥70% threshold.
+- **OCR Profile (Mode 12)**: _[Corrected 2026-06-05]_ The figures previously stated here (Fovea 84% / Parafovea 60% / Near 62% / Far 52%, "monotonically declining") were never machine-generated and were inaccurate — parafovea→near rises (60→62), so the profile is not monotonic. The peripheral-OCR gate that should have produced these numbers was in fact dead (see [Unreleased]); it has been revived to emit real per-eccentricity curves as data to `tests/validation/ocr-accuracy-curve.json` under a declining-trend predicate.
 - **OCR Profile (Mode 0, reference)**: Fovea 100% | Parafovea 67% | Near 44% | Far 31%. Overall 40%.
 
 ## [2.5.0] - 2026-03-16

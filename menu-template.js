@@ -804,7 +804,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     label: 'Utility',
                     submenu: [
                         {
-                            label: 'High-Key Ghosting (Default)',
+                            label: 'High-Key Ghosting',
                             type: 'radio',
                             checked: currentAestheticMode === 0,
                             click: () => { sendToOverlays('menu:set-aesthetic-mode', 0); app.emit('aesthetic-mode-changed', 0); }
