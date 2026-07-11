@@ -26,11 +26,44 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { PNG } = require('pngjs');
 const { annularStdDev } = require('./lib/image-analysis');
 
 const FOVEA_RADIUS_NORM = 45 / 1012;  // fovealRadius / CSS viewport height
 const BASELINE_PATH = path.join(__dirname, '..', 'tests', 'validation', 'radial-profile-baseline.json');
+
+/**
+ * The canonical default aesthetic mode, resolved from the app's own hardcoded
+ * constant (main.js) rather than modes.json — modes.json currently tags TWO
+ * modes (10 and 12) as category:"default" and doesn't even declare "default"
+ * as a category, so it is not a reliable source (see TODO.md m1). main.js is
+ * what actually ships. Returns a number, or null if it can't be parsed.
+ */
+function resolveDefaultMode() {
+    try {
+        const mainJs = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+        const m = mainJs.match(/currentAestheticMode\s*=\s*(\d+)/);
+        return m ? parseInt(m[1], 10) : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+/** Parse the mode id encoded in a smoke-capture filename, e.g. smoke_dashboard_mode12.png -> 12. */
+function modeFromFilename(p) {
+    const m = path.basename(p).match(/_mode(\d+)/);
+    return m ? parseInt(m[1], 10) : null;
+}
+
+/** Short content hash of a PNG file, so we can detect "comparing an image to itself". */
+function fileHash(p) {
+    try {
+        return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex').slice(0, 16);
+    } catch (_) {
+        return null;
+    }
+}
 
 function computeProfile(pngPath, fixationX, fixationY, numRings, maxR) {
     const png = PNG.sync.read(fs.readFileSync(pngPath));
@@ -74,20 +107,28 @@ async function main() {
     let maxR = 12.0;
     let fixationX = 0.5;
     let fixationY = 0.5;
+    let modeArg = null;
 
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--screenshot' && args[i + 1]) screenshotPath = args[++i];
         else if (args[i] === '--freeze-baseline') freezeBaseline = true;
+        else if (args[i] === '--mode' && args[i + 1]) modeArg = parseInt(args[++i], 10);
         else if (args[i] === '--num-rings' && args[i + 1]) numRings = parseInt(args[++i], 10);
         else if (args[i] === '--max-r' && args[i + 1]) maxR = parseFloat(args[++i]);
         else if (args[i] === '--fixation-x' && args[i + 1]) fixationX = parseFloat(args[++i]);
         else if (args[i] === '--fixation-y' && args[i + 1]) fixationY = parseFloat(args[++i]);
     }
 
-    // Find screenshot
+    const defaultMode = resolveDefaultMode();
+
+    // Find screenshot — default to the current DEFAULT mode (12), not mode 0.
+    // The old default here was smoke_dashboard_mode0.png, so the regression
+    // guard watched mode 0 while the app shipped mode 12 (see TODO.md M2).
     if (!screenshotPath) {
         const smokeDir = path.join(__dirname, '..', 'tests', 'smoke-captures');
-        const smokeFile = 'smoke_dashboard_mode0.png';
+        const smokeFile = defaultMode != null
+            ? `smoke_dashboard_mode${defaultMode}.png`
+            : 'smoke_dashboard_mode12.png';
         screenshotPath = path.join(smokeDir, smokeFile);
         if (!fs.existsSync(screenshotPath)) {
             console.error(`No smoke capture found at ${screenshotPath}`);
@@ -96,21 +137,41 @@ async function main() {
         }
     }
 
-    console.log(`Screenshot: ${path.basename(screenshotPath)}`);
+    // Which mode did we actually profile? Explicit --mode wins; else parse the
+    // filename; else fall back to the resolved app default.
+    const profiledMode = modeArg != null ? modeArg
+        : (modeFromFilename(screenshotPath) != null ? modeFromFilename(screenshotPath) : defaultMode);
 
-    // Compute radial profile
+    console.log(`Screenshot: ${path.basename(screenshotPath)}  (mode ${profiledMode == null ? '?' : profiledMode}, app default ${defaultMode == null ? '?' : defaultMode})`);
+
+    // Compute radial profile — stamp the source mode + a content hash so the
+    // baseline records WHAT it was frozen from and drift can never be 0 "by
+    // construction" without it being visible that the same image was reused.
     const profile = computeProfile(screenshotPath, fixationX, fixationY, numRings, maxR);
+    profile.mode = profiledMode;
+    profile.sourceHash = fileHash(screenshotPath);
     console.log(`Image: ${profile.imageSize.width}x${profile.imageSize.height}px  Fovea: ${profile.foveaRadiusPx}px`);
 
-    // Freeze baseline if requested
+    // Freeze baseline if requested — REFUSE to freeze from a non-default mode
+    // (that was the M2 bug: a mode-0 baseline silently compared against itself),
+    // and EXIT after writing so a single invocation can't emit both the baseline
+    // and the comparison file from one in-memory object.
     if (freezeBaseline) {
+        if (defaultMode != null && profiledMode !== defaultMode) {
+            console.error(`\n✗ Refusing to freeze baseline from mode ${profiledMode}: app default is mode ${defaultMode}.`);
+            console.error(`  Re-freeze from the default, e.g.:`);
+            console.error(`    node scripts/validate-radial-profile.js --screenshot tests/smoke-captures/smoke_dashboard_mode${defaultMode}.png --mode ${defaultMode} --freeze-baseline`);
+            process.exit(1);
+        }
         const dir = path.dirname(BASELINE_PATH);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(BASELINE_PATH, JSON.stringify({
             ...profile,
             timestamp: new Date().toISOString(),
         }, null, 2));
-        console.log(`\nBaseline frozen to: ${BASELINE_PATH}`);
+        console.log(`\nBaseline frozen to: ${BASELINE_PATH} (mode ${profiledMode})`);
+        console.log('Baseline-only run complete. Run again WITHOUT --freeze-baseline to compare a capture against it.');
+        process.exit(0);
     }
 
     // Display profile
@@ -163,7 +224,20 @@ async function main() {
     // Compare to frozen baseline if available
     if (fs.existsSync(BASELINE_PATH)) {
         const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
-        console.log(`\n  Baseline comparison (frozen ${baseline.timestamp.split('T')[0]}):`);
+        console.log(`\n  Baseline comparison (frozen ${baseline.timestamp.split('T')[0]}, mode ${baseline.mode ?? '?'}):`);
+
+        // Guard 1: the baseline must be from the current app default. A baseline
+        // frozen on a different mode makes drift meaningless (M2).
+        if (defaultMode != null && baseline.mode !== defaultMode) {
+            console.error(`  ✗ Baseline mode ${baseline.mode ?? '?'} != app default ${defaultMode} — re-freeze required (see TODO.md M2 / P0-2).`);
+            pass = false;
+        }
+        // Guard 2: comparing the *same* image against itself yields 0 drift "by
+        // construction" — surface it rather than reporting a vacuous pass.
+        if (baseline.sourceHash && profile.sourceHash && baseline.sourceHash === profile.sourceHash) {
+            console.log(`  ⚠ Current screenshot is byte-identical to the baseline's source (hash ${profile.sourceHash}); drift below is a self-consistency check, not regression detection. Compare a freshly captured screenshot to detect real drift.`);
+        }
+
         let maxDrift = 0;
         let driftCount = 0;
         for (let i = 0; i < Math.min(profile.rings.length, baseline.rings.length); i++) {
