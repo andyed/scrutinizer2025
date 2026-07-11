@@ -21,7 +21,7 @@ npm run capture-smoke 2>&1 | tail -5
 ```
 **Done when:** `electron` resolves and `capture-smoke` runs (or fails on a real capture reason, not module-not-found).
 
-- [ ] P1-1 complete
+- [x] **P1-1 complete** — 2026-07-11. `npm install` run at root (electron + all deps present). Added a preflight to `scripts/run-electron.js`: the `require('electron')` is wrapped in try/catch and on `MODULE_NOT_FOUND` prints "electron is not installed — run `npm install` at the scrutinizer2025 repo root" and exits 1, instead of a raw stack trace. Verified: with electron hidden, the message prints and node exits 1; restored cleanly.
 
 ---
 
@@ -43,7 +43,7 @@ npx jest --selectProjects unit 2>&1 | tail -5   # or: npm run test:unit
 ```
 **Done when:** the workflow file exists, and the unit-only jest invocation is green locally (555 tests, 0 failed once P1-3 lands).
 
-- [ ] P1-2 complete
+- [x] **P1-2 complete** — 2026-07-11. Added `.github/workflows/test.yml`: on push + pull_request, Node 20, `npm ci`, `npm run test:unit`. Sets `ELECTRON_SKIP_BINARY_DOWNLOAD=1` so CI skips electron's ~100MB postinstall (the unit suite is electron-free after P1-3). `test:visual` / `test:memory` / `test:integration` stay local-only (they launch a GUI). Verified the exact CI command (`npm run test:unit`) is green locally: 27 suites, 562 passed, 1 todo, 0 failed.
 
 ---
 
@@ -64,7 +64,7 @@ npx jest tests/unit/logger.test.js 2>&1 | tail -5
 ```
 **Done when:** `logger.test.js` passes, and `npx jest --selectProjects unit` reports `1 failed` → `0 failed` (26/27 → 27/27 suites).
 
-- [ ] P1-3 complete
+- [x] **P1-3 complete** — 2026-07-11. Added `{ virtual: true }` to the `jest.mock('electron', …)` in `tests/unit/logger.test.js` (it uses a factory but still tried to resolve the real module). Verified by hiding `node_modules/electron`: `logger.test.js` passes (5/5) and the **full** unit suite passes (27 suites, 562 tests) with electron absent — the whole unit layer is now clean-clone / lean-CI safe. (`menu-template.test.js` also references electron but was already safe.)
 
 ---
 

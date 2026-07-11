@@ -6,12 +6,17 @@
 
 const path = require('path');
 
-// Mock electron before requiring Logger
+// Mock electron before requiring Logger.
+// `virtual: true` lets this run when the electron *binary module* isn't
+// installed (clean clone / lean CI that skips electron's postinstall). Without
+// it, jest tries to resolve the real 'electron' module to register the mock and
+// throws "Cannot find module 'electron'". renderer/logger.js only needs
+// ipcRenderer.send, so the virtual stub is sufficient.
 jest.mock('electron', () => ({
     ipcRenderer: {
         send: jest.fn()
     }
-}));
+}), { virtual: true });
 
 const Logger = require(path.resolve(__dirname, '../../renderer/logger.js'));
 const { ipcRenderer } = require('electron');

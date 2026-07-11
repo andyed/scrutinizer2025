@@ -1,0 +1,26 @@
+name: unit tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    env:
+      # The unit suite is fully headless and does NOT need the electron binary
+      # (renderer/logger's electron import is virtually mocked — see
+      # tests/unit/logger.test.js). Skip electron's ~100MB postinstall download
+      # so CI stays fast. The electron-dependent suites (test:visual /
+      # test:memory / test:integration) launch a real GUI and stay local-only.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install deps (skip electron binary)
+        run: npm ci
+      - name: Run unit + validation-guard tests
+        run: npm run test:unit
