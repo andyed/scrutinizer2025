@@ -35,6 +35,8 @@
     "validate:se": "node scripts/validate-subband-entropy.js",
     "validate:se:article": "node scripts/validate-subband-entropy.js tests/smoke-captures/smoke_article_scrolled.png",
     "validate:ocr": "node scripts/validate-peripheral-ocr.js",
+    "validate:radial": "node scripts/validate-radial-profile.js && node scripts/validate-radial-profile.js --screenshot tests/smoke-captures/smoke_noise_mode12.png --mode 12",
+    "validate:radial:injection": "node scripts/validate-radial-profile.js --screenshot tests/smoke-captures/smoke_flatgray_mode12.png --mode 12",
     "wave6:download": "node scripts/download-coco-periph.js",
     "wave6:capture": "node scripts/capture-coco-periph.js",
     "wave6:analyze": "node scripts/analyze-coco-periph.js",

@@ -81,6 +81,28 @@ const SMOKE_SPECS = [
         radius: '45', width: '1920', height: '1080', mobile: 'false',
     },
 
+    // Batch 1b: controlled radial-profile substrates at the DEFAULT mode (12).
+    // These have KNOWN radial statistics so validate-radial-profile.js can assert
+    // renderer behavior independent of page content (see that script's P0-2 notes):
+    //   - noise: radially-uniform texture → monotonic decline is asserted.
+    //   - flatgray: solid field → peripheral-injection check (RC-2.6).
+    {
+        filename: 'smoke_noise_mode12.png',
+        url: `${REF_PAGES}/uniform-noise.html?cell=3&amp=0.5&seed=12345`,
+        mode: '12',
+        fixationX: 0.5, fixationY: 0.5,
+        selector: '', overlay: false,
+        radius: '45', width: '1920', height: '1080', mobile: 'false',
+    },
+    {
+        filename: 'smoke_flatgray_mode12.png',
+        url: `${REF_PAGES}/chroma-uniform.html?color=gray`,
+        mode: '12',
+        fixationX: 0.5, fixationY: 0.5,
+        selector: '', overlay: false,
+        radius: '45', width: '1920', height: '1080', mobile: 'false',
+    },
+
     // Batch 2: article — scroll position
     {
         filename: 'smoke_article_scrolled.png',

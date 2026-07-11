@@ -9,7 +9,14 @@
  *
  * Usage:
  *   node scripts/validate-radial-profile.js [options]
- *     --screenshot <path>   Processed screenshot (default: latest smoke_dashboard_mode0)
+ *     --screenshot <path>   Processed screenshot (default: latest smoke_dashboard_mode<default>)
+ *     --stimulus <class>    'flat' | 'uniform' | 'content'. Overrides filename
+ *                           auto-detect. Selects which assertions are well-posed:
+ *                           'uniform' asserts monotonic decline; 'content' runs
+ *                           monotonic as a non-fatal diagnostic + baseline drift;
+ *                           'flat' asserts no spurious peripheral injection.
+ *                           Each class has its own frozen baseline. See
+ *                           classifyStimulus (P0-2).
  *     --baseline <path>     Unfiltered reference (default: latest mode_disabled capture)
  *     --freeze-baseline     Capture and freeze a new radial profile baseline
  *     --num-rings <N>       Number of annular rings (default: 20)
@@ -31,7 +38,20 @@ const { PNG } = require('pngjs');
 const { annularStdDev } = require('./lib/image-analysis');
 
 const FOVEA_RADIUS_NORM = 45 / 1012;  // fovealRadius / CSS viewport height
-const BASELINE_PATH = path.join(__dirname, '..', 'tests', 'validation', 'radial-profile-baseline.json');
+const VALIDATION_DIR = path.join(__dirname, '..', 'tests', 'validation');
+
+/**
+ * Per-stimulus-class baseline path. Each stimulus class has its OWN frozen
+ * baseline so drift is only ever compared like-for-like: the 'content' baseline
+ * is the dashboard (legacy filename, kept for back-compat), 'uniform' is the
+ * noise field, 'flat' is the achromatic control. Freezing from a uniform capture
+ * can no longer clobber the content baseline.
+ */
+function baselinePathFor(cls) {
+    return cls === 'content'
+        ? path.join(VALIDATION_DIR, 'radial-profile-baseline.json')
+        : path.join(VALIDATION_DIR, `radial-profile-baseline.${cls}.json`);
+}
 
 /**
  * The canonical default aesthetic mode, resolved from the app's own hardcoded
@@ -54,6 +74,40 @@ function resolveDefaultMode() {
 function modeFromFilename(p) {
     const m = path.basename(p).match(/_mode(\d+)/);
     return m ? parseInt(m[1], 10) : null;
+}
+
+/**
+ * Classify a capture as 'flat', 'uniform', or 'content' — this drives which
+ * assertions are well-posed (the P0-2 correction).
+ *
+ * Absolute monotonicity of annular Oklab-L stdDev is only meaningful when the
+ * stimulus has radially-uniform spatial statistics. On a real page (dashboard)
+ * it is NOT — the UI puts high-contrast elements (stat-card row, table columns)
+ * in a peripheral eccentricity band with blank space below fixation, so annular
+ * stdDev legitimately rises at ~8° with zero relation to foveation quality.
+ * Verified: mode 12 over uniform-noise declines monotonically through 8°, while
+ * the dashboard's 8° contrast is anisotropic (E/W/NE loud, S silent) — a content
+ * fingerprint, not a peripheral.frag defect.
+ *
+ *   'flat'    — a solid achromatic field (no content anywhere). Correct output is
+ *               ~0 stdDev everywhere; the meaningful check is that the renderer
+ *               does NOT inject peripheral structure (stdDev rising with
+ *               eccentricity). Monotonic/fog assertions are N/A here.
+ *   'uniform' — radially-uniform texture (noise, grid). Monotonic decline IS
+ *               asserted; fog check applies.
+ *   'content' — a real page. Monotonic is a non-fatal diagnostic; regressions
+ *               are caught by drift vs the frozen content baseline.
+ *
+ * Auto-detect from filename; overridable with --stimulus flat|uniform|content.
+ */
+function classifyStimulus(p, override) {
+    if (override === 'flat' || override === 'uniform' || override === 'content') return override;
+    const name = path.basename(p).toLowerCase();
+    // Solid achromatic control fields — zero content by construction.
+    if (/flatgray|chroma-uniform|gray_chromatic/.test(name)) return 'flat';
+    // Controlled radially-uniform textures (see capture-controlled-radial.js).
+    if (/ctrl_|noise|uniform|_grid/.test(name)) return 'uniform';
+    return 'content';
 }
 
 /** Short content hash of a PNG file, so we can detect "comparing an image to itself". */
@@ -108,11 +162,13 @@ async function main() {
     let fixationX = 0.5;
     let fixationY = 0.5;
     let modeArg = null;
+    let stimulusArg = null;  // 'uniform' | 'content' — overrides filename auto-detect
 
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--screenshot' && args[i + 1]) screenshotPath = args[++i];
         else if (args[i] === '--freeze-baseline') freezeBaseline = true;
         else if (args[i] === '--mode' && args[i + 1]) modeArg = parseInt(args[++i], 10);
+        else if (args[i] === '--stimulus' && args[i + 1]) stimulusArg = args[++i].toLowerCase();
         else if (args[i] === '--num-rings' && args[i + 1]) numRings = parseInt(args[++i], 10);
         else if (args[i] === '--max-r' && args[i + 1]) maxR = parseFloat(args[++i]);
         else if (args[i] === '--fixation-x' && args[i + 1]) fixationX = parseFloat(args[++i]);
@@ -142,13 +198,16 @@ async function main() {
     const profiledMode = modeArg != null ? modeArg
         : (modeFromFilename(screenshotPath) != null ? modeFromFilename(screenshotPath) : defaultMode);
 
-    console.log(`Screenshot: ${path.basename(screenshotPath)}  (mode ${profiledMode == null ? '?' : profiledMode}, app default ${defaultMode == null ? '?' : defaultMode})`);
+    const stimulusClass = classifyStimulus(screenshotPath, stimulusArg);
+
+    console.log(`Screenshot: ${path.basename(screenshotPath)}  (mode ${profiledMode == null ? '?' : profiledMode}, app default ${defaultMode == null ? '?' : defaultMode}, stimulus ${stimulusClass})`);
 
     // Compute radial profile — stamp the source mode + a content hash so the
     // baseline records WHAT it was frozen from and drift can never be 0 "by
     // construction" without it being visible that the same image was reused.
     const profile = computeProfile(screenshotPath, fixationX, fixationY, numRings, maxR);
     profile.mode = profiledMode;
+    profile.stimulus = stimulusClass;
     profile.sourceHash = fileHash(screenshotPath);
     console.log(`Image: ${profile.imageSize.width}x${profile.imageSize.height}px  Fovea: ${profile.foveaRadiusPx}px`);
 
@@ -163,13 +222,14 @@ async function main() {
             console.error(`    node scripts/validate-radial-profile.js --screenshot tests/smoke-captures/smoke_dashboard_mode${defaultMode}.png --mode ${defaultMode} --freeze-baseline`);
             process.exit(1);
         }
-        const dir = path.dirname(BASELINE_PATH);
+        const baselinePath = baselinePathFor(stimulusClass);
+        const dir = path.dirname(baselinePath);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(BASELINE_PATH, JSON.stringify({
+        fs.writeFileSync(baselinePath, JSON.stringify({
             ...profile,
             timestamp: new Date().toISOString(),
         }, null, 2));
-        console.log(`\nBaseline frozen to: ${BASELINE_PATH} (mode ${profiledMode})`);
+        console.log(`\nBaseline frozen to: ${baselinePath} (mode ${profiledMode}, stimulus ${stimulusClass})`);
         console.log('Baseline-only run complete. Run again WITHOUT --freeze-baseline to compare a capture against it.');
         process.exit(0);
     }
@@ -189,39 +249,87 @@ async function main() {
     console.log('\n═══ Validation ═══\n');
     let pass = true;
 
-    // Check monotonic decline (with tolerance for content variation)
+    // Check monotonic decline (with tolerance for content variation).
+    //
+    // ASSERTED only on 'uniform' stimuli, where radially-uniform statistics make
+    // monotonic decline a genuine property of correct foveation. On 'content'
+    // captures it runs as a NON-FATAL diagnostic — a real page's layout can put
+    // contrast in a peripheral band, so a rise there is content, not a defect
+    // (see classifyStimulus). Content regressions are caught by baseline drift.
+    const assertMonotonic = stimulusClass === 'uniform';
     const populated = profile.rings.filter(r => r.sampleCount >= 50);
-    if (populated.length >= 4) {
+    // Monotonic + fog are N/A on a flat field (no content to degrade — near-zero
+    // stdDev everywhere is CORRECT, and would false-trip the fog check). The flat
+    // field is validated by the peripheral-injection check below instead.
+    if (stimulusClass !== 'flat' && populated.length >= 4) {
         let monotonic = true;
         // Use 3-ring moving average to smooth content variation
         for (let i = 3; i < populated.length; i++) {
             const avgPrev = (populated[i - 3].stdDevL + populated[i - 2].stdDevL + populated[i - 1].stdDevL) / 3;
             const avgCurr = (populated[i - 2].stdDevL + populated[i - 1].stdDevL + populated[i].stdDevL) / 3;
             if (avgCurr > avgPrev + 0.01) {
-                console.error(`  ✗ Non-monotonic (smoothed): ring ${populated[i].rMin.toFixed(1)}° avg ${avgCurr.toFixed(4)} > ${avgPrev.toFixed(4)}`);
+                const tag = assertMonotonic ? '✗' : '·';
+                console.error(`  ${tag} Non-monotonic (smoothed): ring ${populated[i].rMin.toFixed(1)}° avg ${avgCurr.toFixed(4)} > ${avgPrev.toFixed(4)}`);
                 monotonic = false;
             }
         }
         if (monotonic) {
             console.log('  ✓ Luminance contrast declines monotonically (3-ring smoothed)');
-        } else {
+        } else if (assertMonotonic) {
             pass = false;
+        } else {
+            console.log('  ℹ Non-monotonicity above is content-driven (stimulus=content); not asserted. Regressions are caught by baseline drift below.');
         }
     }
 
-    // Check no fog rings (stdDevL < 0.001 indicates grey averaging)
-    const fogRings = populated.filter(r => r.stdDevL < 0.001 && r.rMidDeg > 1.0);
-    if (fogRings.length > 0) {
-        console.error(`  ✗ Fog detected: ${fogRings.length} ring(s) with stdDevL < 0.001`);
-        for (const r of fogRings) {
-            console.error(`    Ring ${r.rMin.toFixed(1)}-${r.rMax.toFixed(1)}° stdDevL=${r.stdDevL.toFixed(5)}`);
+    // Check no fog rings (stdDevL < 0.001 indicates grey averaging) — content/uniform only.
+    if (stimulusClass !== 'flat') {
+        const fogRings = populated.filter(r => r.stdDevL < 0.001 && r.rMidDeg > 1.0);
+        if (fogRings.length > 0) {
+            console.error(`  ✗ Fog detected: ${fogRings.length} ring(s) with stdDevL < 0.001`);
+            for (const r of fogRings) {
+                console.error(`    Ring ${r.rMin.toFixed(1)}-${r.rMax.toFixed(1)}° stdDevL=${r.stdDevL.toFixed(5)}`);
+            }
+            pass = false;
+        } else {
+            console.log('  ✓ No fog rings (all stdDevL >= 0.001)');
         }
-        pass = false;
-    } else {
-        console.log('  ✓ No fog rings (all stdDevL >= 0.001)');
     }
 
-    // Compare to frozen baseline if available
+    // ── Peripheral-injection check (flat field only) ──
+    //
+    // On a solid achromatic field the correct output is ~0 contrast everywhere.
+    // A renderer that HALLUCINATES peripheral structure (Portilla-Simoncelli
+    // synthesis / large-scale DoG firing on a zero-variance input) shows stdDev
+    // that RISES with eccentricity — the "spurious peripheral structure" RC-2.6
+    // targets. We measure it as the rise from the inner periphery to the outer
+    // periphery, excluding the foveal region (<2°, which holds the fixation cross).
+    if (stimulusClass === 'flat') {
+        const periph = populated.filter(r => r.rMidDeg >= 2.0);
+        if (periph.length >= 6) {
+            const third = Math.floor(periph.length / 3);
+            const mean = a => a.reduce((s, r) => s + r.stdDevL, 0) / a.length;
+            const inner = mean(periph.slice(0, third));
+            const outer = mean(periph.slice(-third));
+            const rise = outer - inner;
+            // Tolerance: an ideal flat render sits at ~0; allow a small floor for
+            // dithering/compression. A rise beyond this is injected structure.
+            const RISE_TOL = 0.0010;
+            console.log(`  Peripheral injection: inner(${periph[0].rMidDeg.toFixed(1)}–${periph[third - 1].rMidDeg.toFixed(1)}°)=${inner.toFixed(4)}  outer(${periph[periph.length - third].rMidDeg.toFixed(1)}–${periph[periph.length - 1].rMidDeg.toFixed(1)}°)=${outer.toFixed(4)}  rise=${rise.toFixed(4)}`);
+            if (rise > RISE_TOL) {
+                console.error(`  ✗ Spurious peripheral structure: contrast RISES ${rise.toFixed(4)} (> ${RISE_TOL}) toward the periphery on a flat field (renderer injecting structure — RC-2.6).`);
+                pass = false;
+            } else {
+                console.log(`  ✓ No peripheral injection (rise ${rise.toFixed(4)} <= ${RISE_TOL})`);
+            }
+        }
+    }
+
+    // Compare to the frozen baseline FOR THIS STIMULUS CLASS, if one exists. Each
+    // class has its own baseline (baselinePathFor) so drift is always like-for-like
+    // — the content baseline is the dashboard, uniform is the noise field, etc. A
+    // capture with no matching baseline is validated by the assertions above only.
+    const BASELINE_PATH = baselinePathFor(stimulusClass);
     if (fs.existsSync(BASELINE_PATH)) {
         const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
         console.log(`\n  Baseline comparison (frozen ${baseline.timestamp.split('T')[0]}, mode ${baseline.mode ?? '?'}):`);
@@ -268,8 +376,13 @@ async function main() {
     console.log(`\nResults saved to: ${resultsPath}`);
 
     console.log('');
+    const summary = {
+        flat: 'no spurious peripheral injection (flat field).',
+        uniform: 'monotonic decline, no fog (uniform field).',
+        content: 'no fog, within baseline drift (content — monotonicity diagnostic only).',
+    }[stimulusClass];
     if (pass) {
-        console.log('PASS: Radial contrast profile validates monotonic decline, no fog.');
+        console.log(`PASS: Radial contrast profile validates ${summary}`);
         process.exit(0);
     } else {
         console.error('FAIL: Radial contrast profile validation failed.');
