@@ -126,3 +126,6 @@ comms/
 
 # Unrelated to this repo (video project tooling)
 scripts/burn-tooltips.sh
+
+# Jest coverage output — regenerated on demand (jest.config.js), never committed
+coverage/

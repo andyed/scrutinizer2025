@@ -150,7 +150,7 @@ git ls-files coverage/ | head; ls *.png 2>/dev/null | grep test_ | head; git -C 
 ```
 **Done when:** `coverage/` is untracked+ignored, root `test_*.png`/`texput.log` gone, figma zips resolved, sibling shader edits committed-or-reverted.
 
-- [ ] P1-7 complete
+- [~] **P1-7 mostly complete** — 2026-07-11. Done (safe, in-repo): `git rm -r --cached coverage/` (39 stale files, 4-mo-old report claiming wrong %) + added `coverage/` to `.gitignore`; deleted the 13 gitignored root `test_*.png` + `texput.log`; deleted 61 gitignored one-off debug captures from a single 2025-12-11 `site_www_figma` session in `tests/golden/` (all untracked — 0 tracked golden files touched; suite still green 562/0). **Flagged for the maintainer, NOT actioned (destructive / cross-repo / unclear provenance):** (a) the two 34 MB `scrutinizer-figma-v0{1,2}.zip` at the family root (Nov 24/25 2025 snapshots, not tracked in the figma git repo — likely pre-git backups; delete or archive is your call); (b) `scrutinizer-figma`'s 3 uncommitted files incl. `peripheral.figma.frag` (unversioned shader edits in a sibling repo — commit-or-revert is a decision for that repo's owner, out of scope for an autonomous edit here).
 
 ---
 
