@@ -1,41 +1,49 @@
 {
-  "timestamp": "2026-03-27T02:20:00.364Z",
+  "timestamp": "2026-07-11T12:58:43.576Z",
+  "status": "known-failing-diagnostic",
+  "note": "Isolated-letter OCR baseline was unreadable, so crowding/asymmetry checks are unscorable (marked valid:false). A low flanked-confidence here does NOT demonstrate crowding — it is indistinguishable from a blank capture. Do not cite crowding as a validated claim until this run reaches status:passing. See docs/sprucing/phase-0-science-verification.md P0-1.",
   "checks": [
     {
       "name": "mode14_isolated_recognized",
       "tier": 1,
       "pass": false,
+      "valid": true,
       "detail": "confidence 0.00 >= 0.5"
     },
     {
       "name": "mode14_flanked_crowded",
       "tier": 1,
       "pass": false,
-      "detail": "confidence 1.00 < 0.5"
+      "valid": false,
+      "detail": "invalid: isolated letter unreadable (conf 0.00) — cannot score crowding"
     },
     {
       "name": "mode14_asymmetry_ratio",
       "tier": 2,
       "pass": false,
-      "detail": "ratio 0.00 > 2.0"
+      "valid": false,
+      "detail": "invalid: isolated letter unreadable (conf 0.00) — asymmetry undefined"
     },
     {
       "name": "mode15_isolated_recognized",
       "tier": 1,
       "pass": false,
+      "valid": true,
       "detail": "confidence 0.00 >= 0.5"
     },
     {
       "name": "mode15_flanked_crowded",
       "tier": 1,
-      "pass": true,
-      "detail": "confidence 0.00 < 0.5"
+      "pass": false,
+      "valid": false,
+      "detail": "invalid: isolated letter unreadable (conf 0.00) — cannot score crowding"
     },
     {
       "name": "mode15_asymmetry_ratio",
       "tier": 2,
       "pass": false,
-      "detail": "ratio 1.00 > 2.0"
+      "valid": false,
+      "detail": "invalid: isolated letter unreadable (conf 0.00) — asymmetry undefined"
     }
   ],
   "modeResults": {
@@ -78,8 +86,8 @@
   },
   "summary": {
     "tier1": {
-      "pass": 1,
-      "fail": 3
+      "pass": 0,
+      "fail": 4
     },
     "tier2": {
       "pass": 0,
@@ -88,6 +96,7 @@
     "tier3": {
       "pass": 0,
       "fail": 0
-    }
+    },
+    "invalid": 4
   }
 }

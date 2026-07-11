@@ -386,7 +386,7 @@ The `scripts/` directory is a research pipeline orchestrating capture → analys
 | 7a: Pyramid Fidelity | WGSL vs JS vs pyrtools | (synthetic) | (numerical) | `validate-pyramid.js` | — | Python pyrtools |
 | 7c: Crowding Asymmetry | Emergent vs forced | `capture-crowding-tier3.js` | (Tesseract OCR) | `validate-crowding-tier3.js` | — | Comparison: Mode 12 (displacement) vs Mode 14 (synthesis/tiles) vs Mode 15 (synthesis/sectors) |
 
-**Wave 7c is the scientific milestone:** Mode 12 should *fail* and Mode 14/15 should *pass* — proving that pooling-not-displacement causes crowding asymmetry.
+**Wave 7c is the *intended* scientific milestone:** Mode 12 should *fail* and Mode 14/15 should *pass* — which would prove that pooling-not-displacement causes crowding asymmetry. ⚠️ **Not yet achieved (2026-07-11):** the synthesis modes' isolated-letter OCR baseline is currently unreadable, so `wave7c-crowding.json` reports `status:"known-failing-diagnostic"` and the checks are unscorable — do not cite crowding as validated. See `docs/sprucing/phase-0-science-verification.md` P0-1.
 
 **Supporting validators not tied to a single wave:**
 - `validate-isotropic-rendering.js` — angular isotropy (luminance stddev CV < 0.5 across quadrants)

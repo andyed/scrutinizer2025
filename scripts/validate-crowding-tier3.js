@@ -2,7 +2,14 @@
 /**
  * Wave 7c: Crowding Asymmetry Validation
  *
- * THE SCIENTIFIC MILESTONE for Tier 3.
+ * Intended to be THE SCIENTIFIC MILESTONE for Tier 3 — but CURRENTLY A
+ * KNOWN-FAILING DIAGNOSTIC, not a validated claim. As of 2026-07-11 the
+ * synthesis modes' (14/15) *isolated*-letter OCR baseline is unreadable, so
+ * the crowding/asymmetry checks are unscorable (see status:"known-failing-
+ * diagnostic" in the output JSON). A low flanked-confidence with an unreadable
+ * isolated baseline does NOT demonstrate crowding — it is indistinguishable
+ * from a blank capture. Do not cite crowding as validated until a run reaches
+ * status:"passing". Tracking: docs/sprucing/phase-0-science-verification.md P0-1.
  *
  * Tests whether synthesis-based peripheral rendering produces crowding
  * asymmetry as an emergent property of statistical pooling:
@@ -182,9 +189,18 @@ function main() {
     let tier2Pass = 0, tier2Fail = 0;
     let tier3Pass = 0, tier3Fail = 0;
 
-    function check(name, tier, pass, detail) {
-        checks.push({ name, tier, pass, detail });
-        const tag = pass ? 'PASS' : 'FAIL';
+    // A check may be `valid: false` — meaning it could not be scored at all
+    // (e.g. the isolated-letter baseline was unreadable, so "did crowding
+    // destroy the flanked letter?" is unanswerable). An invalid check is NEVER
+    // a pass, and is tallied as a failure so the run cannot exit green on it.
+    // This is the guard against the historic "OCR read nothing → counted as
+    // crowding" defect (a 0.00-confidence flanked read used to pass by itself).
+    let invalidCount = 0;
+    function check(name, tier, pass, detail, valid = true) {
+        if (!valid) pass = false;
+        checks.push({ name, tier, pass, valid, detail });
+        const tag = !valid ? 'INVALID' : pass ? 'PASS' : 'FAIL';
+        if (!valid) invalidCount++;
         if (tier === 1) pass ? tier1Pass++ : tier1Fail++;
         else if (tier === 2) pass ? tier2Pass++ : tier2Fail++;
         else pass ? tier3Pass++ : tier3Fail++;
@@ -219,24 +235,41 @@ function main() {
 
         // Validate mode14 (tiles) and mode15 (sectors) — both pooling pipelines
         if (mode === 'mode14' || mode === 'mode15') {
-            const isoConf = results.isolated?.confidence ?? 0;
-            const flkConf = results.flanked?.confidence ?? 0;
+            const isoConf = Number.isFinite(results.isolated?.confidence) ? results.isolated.confidence : 0;
+            const flkConf = Number.isFinite(results.flanked?.confidence) ? results.flanked.confidence : 0;
 
-            // Tier 1: Isolated letter recognized
+            // Readability precondition: crowding can only be scored if the
+            // ISOLATED letter was actually read. Without a legible baseline,
+            // a low flanked confidence is indistinguishable from a blank/broken
+            // capture — so we must not credit it as "crowding".
+            const isolatedReadable = isoConf >= 0.5;
+
+            // Tier 1: Isolated letter recognized (the precondition itself)
             check(`${mode}_isolated_recognized`, 1,
-                isoConf >= 0.5,
+                isolatedReadable,
                 `confidence ${isoConf.toFixed(2)} >= 0.5`);
 
-            // Tier 1: Flanked letter NOT recognized (crowding)
-            check(`${mode}_flanked_crowded`, 1,
-                flkConf < 0.5,
-                `confidence ${flkConf.toFixed(2)} < 0.5`);
+            if (!isolatedReadable) {
+                // Baseline unreadable → the crowding and asymmetry checks are
+                // UNSCORABLE, not passing. Mark invalid (counts as failure).
+                check(`${mode}_flanked_crowded`, 1, false,
+                    `invalid: isolated letter unreadable (conf ${isoConf.toFixed(2)}) — cannot score crowding`,
+                    /* valid */ false);
+                check(`${mode}_asymmetry_ratio`, 2, false,
+                    `invalid: isolated letter unreadable (conf ${isoConf.toFixed(2)}) — asymmetry undefined`,
+                    /* valid */ false);
+            } else {
+                // Tier 1: Flanked letter NOT recognized (crowding) — now meaningful
+                check(`${mode}_flanked_crowded`, 1,
+                    flkConf < 0.5,
+                    `confidence ${flkConf.toFixed(2)} < 0.5 (isolated readable at ${isoConf.toFixed(2)})`);
 
-            // Tier 2: Asymmetry ratio > 2×
-            const ratio = flkConf > 0 ? isoConf / flkConf : (isoConf > 0 ? Infinity : 1);
-            check(`${mode}_asymmetry_ratio`, 2,
-                ratio > 2.0,
-                `ratio ${isFinite(ratio) ? ratio.toFixed(2) : '∞'} > 2.0`);
+                // Tier 2: Asymmetry ratio > 2×
+                const ratio = flkConf > 0 ? isoConf / flkConf : Infinity;
+                check(`${mode}_asymmetry_ratio`, 2,
+                    ratio > 2.0,
+                    `ratio ${isFinite(ratio) ? ratio.toFixed(2) : '∞'} > 2.0`);
+            }
         }
     }
 
@@ -269,25 +302,52 @@ function main() {
     console.log(`  Tier 1 (must):   ${tier1Pass} pass, ${tier1Fail} fail`);
     console.log(`  Tier 2 (should): ${tier2Pass} pass, ${tier2Fail} fail`);
     console.log(`  Tier 3 (nice):   ${tier3Pass} pass, ${tier3Fail} fail`);
+    if (invalidCount > 0) {
+        console.log(`  Invalid (unscorable): ${invalidCount} — isolated-letter baseline unreadable`);
+    }
 
-    if (tier1Pass > 0 && tier1Fail === 0) {
+    // Top-level status the rest of the project can trust:
+    //   passing                    — Tier-1 checks all scored and passed (the milestone)
+    //   known-failing-diagnostic   — at least one check was unscorable (baseline
+    //                                unreadable); this file is a diagnostic, NOT a
+    //                                validated claim. Do not cite crowding as validated.
+    //   failing                    — checks scored but did not pass
+    let status;
+    if (invalidCount > 0) {
+        status = 'known-failing-diagnostic';
+    } else if (tier1Pass > 0 && tier1Fail === 0) {
+        status = 'passing';
+    } else {
+        status = 'failing';
+    }
+
+    if (status === 'passing') {
         console.log('\n  *** SCIENTIFIC MILESTONE: Crowding asymmetry from pooling confirmed. ***');
+    } else if (status === 'known-failing-diagnostic') {
+        console.log('\n  ⚠ DIAGNOSTIC ONLY: isolated-letter baseline unreadable — crowding is NOT validated by this run.');
     }
 
     fs.mkdirSync(path.dirname(RESULTS_FILE), { recursive: true });
     fs.writeFileSync(RESULTS_FILE, JSON.stringify({
         timestamp: new Date().toISOString(),
+        status,
+        note: status === 'known-failing-diagnostic'
+            ? 'Isolated-letter OCR baseline was unreadable, so crowding/asymmetry checks are unscorable (marked valid:false). A low flanked-confidence here does NOT demonstrate crowding — it is indistinguishable from a blank capture. Do not cite crowding as a validated claim until this run reaches status:passing. See docs/sprucing/phase-0-science-verification.md P0-1.'
+            : undefined,
         checks,
         modeResults,
         summary: {
             tier1: { pass: tier1Pass, fail: tier1Fail },
             tier2: { pass: tier2Pass, fail: tier2Fail },
             tier3: { pass: tier3Pass, fail: tier3Fail },
+            invalid: invalidCount,
         },
     }, null, 2));
     console.log(`\nResults: ${RESULTS_FILE}`);
 
-    process.exit(tier1Fail > 0 ? 1 : 0);
+    // Exit non-zero on any Tier-1 failure OR any unscorable check — a run that
+    // could not even read its baseline must never report success.
+    process.exit((tier1Fail > 0 || invalidCount > 0) ? 1 : 0);
 }
 
 main();
