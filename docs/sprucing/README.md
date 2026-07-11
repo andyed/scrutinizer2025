@@ -43,6 +43,6 @@ Phase 3's controlled studies need Phase 2's per-trial condition-toggle API → c
 Check boxes in each phase file as tickets land. When a whole phase is green, add a dated line here:
 
 - [~] Phase 0 — 2026-07-11: P0-1..P0-4 done, P0-5 done except the held v2.8.0/v2.6.1 release-tag decision. Unit suite green (562 pass). Two honest gate failures now visible by design (crowding diagnostic; mode-12 radial non-monotonicity, chip spawned).
-- [~] Phase 1 — 2026-07-11: P1-1..P1-4, P1-6, P1-7 done (CI workflow, clean-clone-safe suite, tessdata provenance, validator exit codes, hygiene). **P1-5 deferred** (compute-tier stamping) — it edits the capture scripts the concurrent radial-investigation session is modifying, and needs the running app to verify; pick up once that session lands. Unit suite green (562 pass).
+- [x] Phase 1 — 2026-07-11: all 7 tickets. CI workflow, clean-clone-safe suite, tessdata provenance, validator exit codes, hygiene, and compute-tier stamping + `--require-tier` (P1-5, verified with a real capture). Two small deferrals noted in-ticket (OCR RC-2.x warnings→failures; HUD pooling badge). Unit suite green (562 pass). P1-5 surfaced a real finding — the default mode 12 renders Tier 2.5 while requesting 2.75 on this GPU (chip spawned).
 - [ ] Phase 2 complete —
 - [ ] Phase 3 complete —
