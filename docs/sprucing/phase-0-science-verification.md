@@ -156,3 +156,18 @@ All five tickets checked, and this command is clean:
 npm run wave7c:validate; node scripts/validate-radial-profile.js; npx jest tests/unit/release-version-tag-sync.test.js
 ```
 No gate passes by reading nothing; no baseline is a clone of itself; no phantom validation script names remain; version==tag holds. **Only then is "the science is at a stable point" a provable statement, not a hopeful one.**
+
+---
+
+### Phase 0 status — 2026-07-11
+
+**Substantively complete.** P0-1, P0-2, P0-3, P0-4 done; P0-5 done except the held release decision. Verified:
+
+- Crowding gate exits 1 with `status: known-failing-diagnostic` — no longer passes by reading nothing.
+- Radial baseline stamped `mode: 12` (the real default); exits 1 on the genuine non-monotonicity it now surfaces (was hidden while watching mode 0).
+- No phantom test names remain; phantom `summary-2.8.0.json` deleted.
+- Release guard: 3/3 pass (version==tag, CHANGELOG heading, no no-op summaries). Full unit suite green (562 pass, 0 fail).
+
+Two honest failures are now *visible by design* (crowding baseline unreadable on synthesis modes; mode-12 radial non-monotonicity at 7–9°) — both flagged for follow-up rather than papered over. The mind2web Arm-0 drift pins were refreshed after the P0-3 metadata edit (pipeline byte-unchanged).
+
+**One item held for the maintainer:** whether to cut/tag **v2.8.0** at HEAD and tag the untagged **v2.6.1** (P0-5). Mechanical hygiene is done; only the release judgment call remains.
