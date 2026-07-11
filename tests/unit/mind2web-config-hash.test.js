@@ -22,7 +22,11 @@ const FRAG_PATH = path.join(REPO_ROOT, 'renderer/shaders/peripheral.frag');
 // Refreshed 2026-06-05: modes.json category relabel (modes 12/14/15) for the default-restore
 // audit shifted the modes_json_drift_pin blob SHA. Arm-0 mode-16 pipeline is byte-unchanged.
 // See docs/assessments/2026-06-05-post-isotropic-release-audit.md (B1).
-const EXPECTED_HASH_PREFIX = 'da03c24ccf41';
+// Refreshed 2026-07-11 (P0-3): mode 17 metadata edit (emptied phantom `tests` array, reworded
+// architectural_purpose) shifted modes.json's blob SHA -> the modes_json_drift_pin in
+// arm-0-config.json was refreshed -> the config's own hash moved. Arm-0 mode-16 pipeline,
+// pixel source, and all knobs are byte-unchanged. See docs/sprucing/phase-0-science-verification.md P0-3.
+const EXPECTED_HASH_PREFIX = '75df206d232d';
 
 describe('Mind2Web Arm-0 config hash', () => {
     let cfg;

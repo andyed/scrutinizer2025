@@ -61,8 +61,8 @@
 
   "modes_json_drift_pin": {
     "file": "shared/modes.json",
-    "file_blob_sha": "e2d91081358ad9b0e737e5048f19e951f069175f",
-    "note": "Blob SHA of shared/modes.json at freeze. validateLive() re-reads the file and compares. Catches the mode-15-style silent drift where pipeline knobs are edited without updating the Arm-0 snapshot."
+    "file_blob_sha": "5e518bab22b46fc948868921180cb0922faab84d",
+    "note": "Blob SHA of shared/modes.json at freeze. validateLive() re-reads the file and compares. Catches the mode-15-style silent drift where pipeline knobs are edited without updating the Arm-0 snapshot. Refreshed 2026-07-11 (P0-3): the only change since the prior pin (e2d9108…) was mode 17 METADATA — emptied a phantom `tests` array and reworded `architectural_purpose`; no pipeline knob and nothing in mode 16 / the mind2web Arm-0 path changed."
   },
 
   "pixel_source": {
