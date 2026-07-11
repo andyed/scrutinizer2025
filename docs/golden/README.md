@@ -2,6 +2,16 @@
 
 Storage and workflow for browser ↔ Figma visual parity checks.
 
+> **Current status (2026-07-11):** parity is run **manually** via the steps
+> below — it is **not** computed in CI, and there is no summary for the current
+> HEAD. The only real metrics on disk are `summary-1.4.3.json` (11 pairs);
+> `summary-2.6.0.json` has empty `results`. A phantom `summary-2.8.0.json`
+> (`results:[]`, `maxPixelDiff:255` — a no-op gate that could never fail) and an
+> empty `figma/v2.8.0/` were removed (P0-5); a unit guard now fails the build if
+> a no-op summary reappears (`tests/unit/release-version-tag-sync.test.js`). Do
+> not treat a golden summary as a passing parity check unless it has non-empty
+> `results` and a real `maxPixelDiff` threshold (< 255).
+
 ## Structure
 - browser/<version>/ : captures from Electron/browser build
 - figma/<version>/ : captures exported from the Figma plugin with matching filenames

@@ -13,6 +13,7 @@
  */
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -37,5 +38,34 @@ describe('release version/tag sync (B3)', () => {
 
     (haveTags ? it : it.skip)('package.json version has a matching v<version> git tag', () => {
         expect(tags).toContain(`v${pkg.version}`);
+    });
+});
+
+describe('release hygiene (P0-5)', () => {
+    it('CHANGELOG.md has a heading for the current package.json version', () => {
+        const changelog = fs.readFileSync(path.join(REPO_ROOT, 'CHANGELOG.md'), 'utf8');
+        // Keep-a-Changelog style: `## [2.7.3] ...`
+        expect(changelog).toMatch(new RegExp(`^##\\s*\\[${pkg.version.replace(/\./g, '\\.')}\\]`, 'm'));
+    });
+
+    it('no golden summary is a no-op phantom (empty results + maxPixelDiff >= 255)', () => {
+        const goldenDir = path.join(REPO_ROOT, 'docs', 'golden');
+        const summaries = fs.existsSync(goldenDir)
+            ? fs.readdirSync(goldenDir).filter((f) => /^summary-.*\.json$/.test(f))
+            : [];
+        const phantoms = summaries.filter((f) => {
+            let j;
+            try {
+                j = JSON.parse(fs.readFileSync(path.join(goldenDir, f), 'utf8'));
+            } catch {
+                return false;
+            }
+            const emptyResults = Array.isArray(j.results) && j.results.length === 0;
+            const noOpGate = j.thresholds && Number(j.thresholds.maxPixelDiff) >= 255;
+            return emptyResults && noOpGate;
+        });
+        // A summary with zero results AND a maxPixelDiff of 255 can never fail —
+        // it is a placeholder masquerading as a passing parity gate. See P0-5.
+        expect(phantoms).toEqual([]);
     });
 });
