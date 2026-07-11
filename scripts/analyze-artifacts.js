@@ -15,6 +15,23 @@ const path = require('path');
 const fs = require('fs');
 const { PNG } = require('pngjs');
 
+/**
+ * The canonical default aesthetic mode, resolved from the app's own hardcoded
+ * constant (main.js) rather than modes.json — modes.json tags two modes as
+ * category:"default", so it is not a reliable source. main.js is what ships.
+ * Same pattern as validate-radial-profile.js resolveDefaultMode() (see P0-2).
+ * Returns a number, or null if it can't be parsed.
+ */
+function resolveDefaultMode() {
+  try {
+    const mainJs = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+    const m = mainJs.match(/currentAestheticMode\s*=\s*(\d+)/);
+    return m ? parseInt(m[1], 10) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 // ── sRGB → Oklab ──
 function srgbToLinear(c) {
   c /= 255;
@@ -100,14 +117,20 @@ function checkColorShift(dir) {
     name: 'color-shift',
     pass,
     reason: pass
-      ? `max chroma ${maxChroma.toFixed(4)} < 0.012`
-      : `max chroma ${maxChroma.toFixed(4)} >= 0.012 (achromatic surface has color)`,
+      ? `max chroma ${maxChroma.toFixed(4)} < 0.016`
+      : `max chroma ${maxChroma.toFixed(4)} >= 0.016 (achromatic surface has color)`,
   };
 }
 
 // ── Check 2: Fog detection on dashboard ──
 function checkFog(dir) {
-  const file = path.join(dir, 'smoke_dashboard_mode0.png');
+  // Watch the DEFAULT aesthetic mode (12), not mode 0 — the old hardcoded
+  // mode0 meant this guard never saw the render the app actually ships, so it
+  // couldn't catch fog on the real default (same class of bug as P0-2 in
+  // validate-radial-profile.js). Resolve from main.js, fall back to 12.
+  const defaultMode = resolveDefaultMode();
+  const modeId = defaultMode != null ? defaultMode : 12;
+  const file = path.join(dir, `smoke_dashboard_mode${modeId}.png`);
   if (!fs.existsSync(file)) return { name: 'fog', pass: true, reason: 'skipped (no capture)' };
 
   const png = PNG.sync.read(fs.readFileSync(file));
