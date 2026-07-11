@@ -38,6 +38,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { execSync } = require('child_process');
 
 // Annular ring definitions (in fovea-radius units)
@@ -62,9 +63,36 @@ const VIEWPORT_HEIGHT = 1012;
 const OCR_TEST_PAGE = path.join(__dirname, '..', 'tests', 'ocr-test-page.html');
 const BASELINE_PATH = path.join(__dirname, '..', 'tests', 'validation', 'ocr-baseline.json');
 
-// eng.traineddata ships at the repo root, so the gate reads text offline and
-// reproducibly instead of fetching the model from a CDN on every run.
+// eng.traineddata lives at the repo root (gitignored), so the gate reads text
+// offline instead of fetching the model from a CDN on every run. It is NOT in a
+// clean clone — scripts/download-tessdata.sh installs a pinned, sha-verified
+// model. See docs/sprucing/phase-1-robustness-floor.md P1-4.
 const TESSERACT_LANG_PATH = path.join(__dirname, '..');
+const TRAINEDDATA_PATH = path.join(TESSERACT_LANG_PATH, 'eng.traineddata');
+
+/**
+ * Fail early with an actionable message if the OCR model is missing, and warn
+ * if the installed model does not match the one the baseline was scored with
+ * (so a model swap never silently changes the numbers). P1-4.
+ */
+function preflightModel() {
+    if (!fs.existsSync(TRAINEDDATA_PATH)) {
+        console.error('[ocr] eng.traineddata not found at repo root.');
+        console.error('[ocr] Run: bash scripts/download-tessdata.sh');
+        process.exit(2);
+    }
+    try {
+        const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
+        const scoredSha = baseline.model && baseline.model.scored_with && baseline.model.scored_with.sha256;
+        if (scoredSha) {
+            const actual = crypto.createHash('sha256').update(fs.readFileSync(TRAINEDDATA_PATH)).digest('hex');
+            if (actual !== scoredSha) {
+                console.warn(`[ocr] ⚠ model mismatch: installed eng.traineddata sha ${actual.slice(0, 16)}… != baseline's scored_with ${String(scoredSha).slice(0, 16)}….`);
+                console.warn('[ocr]   Scores may differ from the committed baseline until it is re-frozen against the installed model (P1-4 follow-up).');
+            }
+        }
+    } catch (_) { /* baseline unreadable — the main gate will report it */ }
+}
 
 /**
  * Create a Tesseract worker that loads the repo-local eng.traineddata (no network)
@@ -236,6 +264,7 @@ async function freezeBaseline(captureDir, fixationX, fixationY) {
 }
 
 async function main() {
+    preflightModel();
     const args = process.argv.slice(2);
     let screenshotPath = null;
     let fixationX = 0.5;

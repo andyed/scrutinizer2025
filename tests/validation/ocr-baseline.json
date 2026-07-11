@@ -1,5 +1,19 @@
 {
   "timestamp": "2026-06-06T13:17:08.084Z",
+  "model": {
+    "note": "OCR model provenance (P1-4). scored_with = the eng.traineddata that produced this baseline; its upstream is UNCONFIRMED (matches no standard tessdata_best/tessdata/tessdata_fast/legacy model). pinned = the reproducible model scripts/download-tessdata.sh installs going forward. These differ, so the baseline should be re-frozen against `pinned` on the next Electron OCR run; until then validate-peripheral-ocr.js warns on model mismatch.",
+    "scored_with": {
+      "sha256": "5dc5d8d640a212c9d6184921ba103b186f50e0fed9ee716c53e6b312b400d747",
+      "bytes": 5199098,
+      "source": "unconfirmed"
+    },
+    "pinned": {
+      "sha256": "8280aed0782fe27257a68ea10fe7ef324ca0f8d85bd2fd145d1c2b560bcb66ba",
+      "bytes": 15400601,
+      "source": "https://tessdata.projectnaptha.com/4.0.0_best/eng.traineddata.gz",
+      "name": "tesseract.js v7 canonical 4.0.0_best English LSTM"
+    }
+  },
   "screenshot": "site__mode_disabled_2026-06-06T13-17-03-207Z.png",
   "viewport": {
     "width": 1920,

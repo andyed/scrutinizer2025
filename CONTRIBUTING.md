@@ -83,11 +83,20 @@ The biological grounding matters. If you're adding or modifying a pipeline stage
 ## Testing
 
 ```bash
-npm test              # Run 258 unit tests across 11 suites
+npm run test:unit     # Headless Jest suite (also what CI runs) — no display needed
+npm test              # Full suite: unit + visual + memory + integration (launches the app)
 npm start             # Visual verification — check golden captures in tests/golden-captures/
 ```
 
-Golden captures provide visual regression testing. After shader changes, compare against `tests/golden-captures/v1.6.0/` screenshots.
+Golden captures provide visual regression testing. After shader changes, compare against `tests/golden-captures/` screenshots.
+
+The peripheral-OCR gate (`npm run validate:ocr`) needs the Tesseract English model, which is `.gitignore`d. On a fresh clone, install a pinned, sha-verified model first:
+
+```bash
+bash scripts/download-tessdata.sh   # installs eng.traineddata at the repo root
+```
+
+Model provenance is recorded in `tests/validation/ocr-baseline.json` (`model` block); the gate warns if the installed model differs from the one the baseline was scored with.
 
 ## Code Style
 
