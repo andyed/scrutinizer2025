@@ -2,6 +2,8 @@
 
 Migrated from master backlog on 2026-03-25. Detailed tasks for the Scrutinizer foveated vision simulator.
 
+> **Active roadmap:** the remediation tail below (M1–M4, B3) plus robustness, automation, and the usability-testing pivot are now tracked as executable, low-complexity-runnable tickets in [`docs/sprucing/`](docs/sprucing/README.md) (5-agent broad audit, 2026-07-11). Phase 0 there is the verification-gate fix; do it before building on the default. This TODO section is superseded once Phase 0 lands.
+
 ---
 
 ## ⚠️ Post-Isotropic Audit Remediation — 2026-06-05
