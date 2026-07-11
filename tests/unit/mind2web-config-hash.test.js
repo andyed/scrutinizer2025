@@ -26,7 +26,12 @@ const FRAG_PATH = path.join(REPO_ROOT, 'renderer/shaders/peripheral.frag');
 // architectural_purpose) shifted modes.json's blob SHA -> the modes_json_drift_pin in
 // arm-0-config.json was refreshed -> the config's own hash moved. Arm-0 mode-16 pipeline,
 // pixel source, and all knobs are byte-unchanged. See docs/sprucing/phase-0-science-verification.md P0-3.
-const EXPECTED_HASH_PREFIX = '75df206d232d';
+// Refreshed 2026-07-11 (deep-periphery phantom-glyph suppression): peripheral.frag gained a
+// far-periphery wash toward the local mean (RC-2.6 OCR fix) -> its blob SHA moved -> the
+// pooled_stat_path.file_blob_sha pin in arm-0-config.json was refreshed -> the config's own hash
+// moved. sampleDoGReconstructed still lives at the pinned line 283; Arm-0 mode-16 pipeline and all
+// knobs are byte-unchanged.
+const EXPECTED_HASH_PREFIX = '15d837133857';
 
 describe('Mind2Web Arm-0 config hash', () => {
     let cfg;

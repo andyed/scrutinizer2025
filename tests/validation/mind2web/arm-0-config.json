@@ -55,7 +55,7 @@
     "function": "sampleDoGReconstructed",
     "signature_prefix": "vec4 sampleDoGReconstructed(",
     "line": 283,
-    "file_blob_sha": "f9587ea6b4e836c3473121598487368ef90c6cb7",
+    "file_blob_sha": "51414a41c4ee571c4b8fe906bfc742666c9cdd60",
     "note": "DoG-reconstructed sampling path. Not the MIP fallback (sampleMIPPooled at line 628). file_blob_sha is the git blob SHA (git hash-object) — any edit to the file invalidates it. signature_prefix is grepped from the live file at the pinned line to catch function renames and signature changes. Step 3 wires the capability-detect branch to throw if MIP fallback is silently substituted at runtime."
   },
 

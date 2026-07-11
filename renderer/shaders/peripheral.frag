@@ -1523,6 +1523,50 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         pooledCol = mix(pooledCol, foveaCol, smoothContent);
     }
 
+    // === DEEP-PERIPHERY PHANTOM-GLYPH SUPPRESSION (RC-2.6, OCR) ===
+    // The DoG reconstruction preserves enough ink–paper contrast in the far
+    // periphery that crowded/displaced letter fragments still carry glyph-scale
+    // structure, which OCR mis-reads as spurious peripheral text (far recognition
+    // rate exceeding near — the OCR analog of the flat-field radial injection).
+    // That structure is above the local cortical Nyquist: at 20–60° eccentricity
+    // no sub-glyph spatial frequency is resolvable, so the honest percept is the
+    // local mean. Wash the reconstruction toward a coarse source sample (LOD 6 ≈
+    // DC of the neighbourhood) so residual glyph contrast collapses.
+    //
+    // Gate units: `dist / fovea_radius` is in shader fovea-radius units, so it
+    // tracks the `fovealRadius` setting — the robust formulation. NOTE the shader's
+    // foveal radius and the OCR/radial validators' `foveaRadiusPx` DISAGREE by ~2×,
+    // and it is a units-convention mismatch, NOT a capture artifact: the shader
+    // normalizes u_foveaRadius (= config.fovealRadius = 45, passed straight through
+    // scrutinizer.js:830 → webgl-renderer.js:881; scaleX never reaches the shader,
+    // it only drives the SVG debug overlay) by the PHYSICAL resolution height, so
+    // fovea ≈ 45 physical px ≈ 0.5° on a DPR-2 Retina panel — live and headless
+    // capture identically. The validators treat 45 as CSS px (1°) via
+    // foveaRadiusPx = round(45/1012 · imgH) ≈ 88px. So shader-normEcc ≈ 2×
+    // validator-normEcc, and this 10.5–13.5 gate ramps on at validator-normEcc ~5.4
+    // and is full by ~6.9 — it bites from within the near ring and washes the whole
+    // far ring, NOT the far ring alone. Wider than the label implies but harmless:
+    // the parafovea (validator 2–5×, RC-2.5) sits below the ramp and is untouched,
+    // the fovea→far trend stays monotone because the wash only ever lowers contrast
+    // (RC-2.2), and text this far out is unreadable regardless (RC-2.3). RC gates
+    // pass because their baselines were frozen from real DPR-2 captures and the
+    // thresholds tuned to actual shader output — the ring LABELS just don't match
+    // shader geometry. That 2× convention gap is a known, deferred calibration
+    // decision (task_b645463d, 2026-07-11: ship current state) — do NOT "fix" it by
+    // re-pinning this gate to the validators' fixed 45/1012 fraction.
+    //
+    // Content-agnostic and monotone in eccentricity: on a flat field LOD 6 equals
+    // the field, so it injects nothing (validate:radial:injection still passes);
+    // on text it removes the phantom strokes. Shared by every DoG-based mode
+    // (0/1/12), so it lowers far phantoms uniformly rather than trading one mode's
+    // gate for another's (mode 0 far 16→6 chars; mode 12 stays clean at 7).
+    // Verify: node scripts/validate-peripheral-ocr.js --capture --mode 0.
+    float farWash = smoothstep(10.5, 13.5, dist / max(fovea_radius, 0.001));
+    if (farWash > 0.0) {
+        vec3 localMean = sampleSourceLod(uv, 6.0).rgb;
+        pooledCol = mix(pooledCol, localMean, farWash);
+    }
+
     // === UNIFIED ECCENTRICITY MASTER CURVE (from EccentricityProfile) ===
     // All V4 effects derive from ecc.masterT (computed once at top of processV4):
     //   ecc.masterT     = fovea→pooled spatial blend
@@ -1631,9 +1675,22 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             vec3 finalCol = oklabToRgb(lab);
             
             // Generate clean rod base (Eigengrau-ish)
-            vec3 rodColorLab = vec3(0.96 * lab.x, 0.0, -0.05); 
+            vec3 rodColorLab = vec3(0.96 * lab.x, 0.0, -0.05);
             vec3 rodColor = oklabToRgb(rodColorLab);
-            rodColor += noiseVal * 0.08;
+            // Contrast-gated grain (RC-2.6): the rod shimmer is a consistency
+            // grain, not a scotopic-noise model, and its amplitude rides t³ with
+            // eccentricity. Ungated, it fabricates per-pixel contrast on a
+            // zero-variance field — "spurious peripheral structure" that rises
+            // monotonically toward the periphery on a blank wall (validate:radial:injection).
+            // Suppress it where the source carries no local structure to be noisy
+            // about, measured as fine-vs-coarse MIP luminance energy at this uv
+            // (undistorted). Flat field → ~0 → grain off; text/noise → ≈1 → unchanged,
+            // so the uniform-noise monotonic and OCR gates don't regress.
+            vec3 grainLumaW = vec3(0.114, 0.587, 0.299); // PRE-SWAP (BGRA) weights
+            float srcFine = dot(textureLod(u_texture, uv, 1.0).rgb, grainLumaW);
+            float srcCoarse = dot(textureLod(u_texture, uv, 5.0).rgb, grainLumaW);
+            float grainStructureGate = smoothstep(0.002, 0.02, abs(srcFine - srcCoarse));
+            rodColor += noiseVal * 0.08 * grainStructureGate;
             rodColor = clamp(rodColor, 0.0, 1.0);
             
             return mix(finalCol, rodColor, desaturationFactor * 0.3);

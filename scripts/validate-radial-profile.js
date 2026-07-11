@@ -340,6 +340,19 @@ async function main() {
             console.error(`  ✗ Baseline mode ${baseline.mode ?? '?'} != app default ${defaultMode} — re-freeze required (see TODO.md M2 / P0-2).`);
             pass = false;
         }
+        // Guard 1b: the baseline must be from the same capture resolution (DPR).
+        // Ring radii are measured in fovea-radius units, and foveaRadiusPx scales
+        // with image height — so at 2× DPR the same annulus samples different
+        // spatial frequencies and foveal stdDev shifts wholesale (~0.071 → ~0.192).
+        // That is a pure resolution mismatch, NOT a shader regression, but it
+        // surfaces as a huge vacuous "content drift" (177%) unless caught here.
+        // Fail loudly like the mode guard rather than letting the drift loop lie.
+        const baseSize = baseline.imageSize;
+        if (baseSize && (baseSize.width !== profile.imageSize.width || baseSize.height !== profile.imageSize.height)) {
+            console.error(`  ✗ Baseline resolution ${baseSize.width}x${baseSize.height} (fovea ${baseline.foveaRadiusPx ?? '?'}px) != capture ${profile.imageSize.width}x${profile.imageSize.height} (fovea ${profile.foveaRadiusPx}px) — DPR mismatch makes drift meaningless. Re-freeze from a current capture (see docs/sprucing/phase-0-science-verification.md P0-2):`);
+            console.error(`      node scripts/validate-radial-profile.js --screenshot ${path.relative(path.join(__dirname, '..'), screenshotPath)} --mode ${profiledMode} --freeze-baseline`);
+            pass = false;
+        }
         // Guard 2: comparing the *same* image against itself yields 0 drift "by
         // construction" — surface it rather than reporting a vacuous pass.
         if (baseline.sourceHash && profile.sourceHash && baseline.sourceHash === profile.sourceHash) {
