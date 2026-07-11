@@ -11,7 +11,7 @@
 
 Live site: **[scrutinizer.app](https://andyed.github.io/scrutinizer-www/)** | [Blog](https://andyed.github.io/scrutinizer-www/blog/) | [YouTube](https://www.youtube.com/@scrutinizer-app/playlists)
 
-macOS Installer: **[Download v2.7.2](https://github.com/andyed/scrutinizer2025/releases/tag/v2.7.2)** | [Changelog](CHANGELOG.md)
+macOS Installer: **[Download v2.8.0](https://github.com/andyed/scrutinizer2025/releases/tag/v2.8.0)** | [Changelog](CHANGELOG.md)
 
 **AI agents & CLI users:** See [**CLI & Automation**](cli/README.md) — visual complexity scoring, MCP server, saliency export, headless capture pipeline, and 75+ automation scripts with output schemas and env var reference.
 
@@ -166,11 +166,11 @@ Full gap analysis: [simulation-limitations.md](docs/simulation-limitations.md).
 
 ## Installation
 
-### Download (v2.7.1)
+### Download (v2.8.0)
 
 > Scrutinizer for macOS is **Signed & Notarized** — no security warnings.
 
-*   **macOS (Apple Silicon):** [**Download Scrutinizer-2.7.2.dmg**](https://github.com/andyed/scrutinizer2025/releases/tag/v2.7.1)
+*   **macOS (Apple Silicon):** [**Download Scrutinizer-2.8.0.dmg**](https://github.com/andyed/scrutinizer2025/releases/tag/v2.8.0)
 *   **Windows:** Manual build required (see [Releases Page](https://github.com/andyed/scrutinizer2025/releases))
 
 [**View All Releases & Changelogs**](https://github.com/andyed/scrutinizer2025/releases)

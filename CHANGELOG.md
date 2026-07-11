@@ -1,6 +1,21 @@
 # Changelog
 
-## [Unreleased]
+## [2.8.0] - 2026-07-11
+
+### Added — Mode 17 (Structural Chrome Suppression) + static stimulus foveation
+
+- **Mode 17 applies V1 length-tuning / end-stopping** (Hubel-Wiesel 1965): long edges — page-tall borders, table column rules, divider lines — are recognized relative to the local pooling region and quieted via a sigmoid suppression, while letter-scale edges survive. The length-tuning probe is hoisted into a shared helper and wired through the saliency worker with a resolution-scaled probe stride.
+- **Static stimulus foveation is now first-class** — any captured image can be foveated, not just live pages. The static capture path dwells to zero gaze velocity (10× position pulse) so velocity-gated foveal stabilization engages, correcting every prior static golden capture of a cortical mode (12/14/15).
+
+### Fixed — RC-2.6 spurious peripheral structure (radial + OCR)
+
+- **Rod "eigengrau" grain is contrast-gated by local source structure** (fine-vs-coarse MIP luminance energy at the undistorted uv). The grain is an aesthetic consistency shimmer riding `rodDesat = t³`, ungated by input contrast — on a zero-variance field it fabricated per-pixel structure rising monotonically toward the periphery. Now a flat field switches it off while text/noise leave it unchanged. `validate:radial:injection` rise **0.0020 → 0.0007** (PASS); mid-periphery bands collapse to ~0.
+- **DoG-reconstruction phantom glyphs washed toward the local mean in the far field** (`farWash`, `peripheral.frag`). Crowded/displaced letter fragments retained enough ink–paper contrast to be OCR-misread as spurious peripheral text (the OCR analog of the radial injection). The wash is monotone (only lowers contrast) and content-agnostic; shared by every DoG mode. Mode 0 far-periphery phantom chars **16 → 6**, Mode 12 stays clean at 7; RC-2.1/2.2/2.3/2.5 all still pass on modes 0 and 12. Radial content + uniform baselines re-frozen at DPR-2; the shader-vs-validator foveal-radius units gap is documented at the gate and tracked for a future calibration pass.
+
+### Changed — verification-first validation hardening (Phase 0 / Phase 1)
+
+- **Radial contrast-profile validator** gained stimulus classification (`flat` / `uniform` / `content`, auto-detected) — monotonic decline is asserted only for `uniform`; for `content` it is a non-fatal diagnostic and regressions are caught by drift vs a per-class frozen baseline. Added a DPR-mismatch hard guard so a resolution-mismatched baseline can't produce vacuous "content drift."
+- **Release + CI hygiene** — version/tag sync guard (package.json must have a matching `v<version>` tag), no-op golden-gate guard (empty-results + maxPixelDiff≥255 phantom summaries rejected), compute-tier stamped into captures with a `--require-tier` gate, headless clean-clone-safe unit suite + CI workflow, pinned + provenance-recorded `eng.traineddata`, non-zero exit on Tier-1 failure in three previously-silent validators.
 
 ### Changed — default model restored to isotropic cortical sampling (audit 2026-06-05, B1)
 

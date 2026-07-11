@@ -1,6 +1,6 @@
 # Scrutinizer Roadmap
 
-Last updated: 2026-04-06 (v2.7.2)
+Last updated: 2026-07-11 (v2.8.0)
 
 ## What's implemented
 
@@ -23,6 +23,7 @@ Scrutinizer is a Restricted Focus Viewer that replaces Gaussian blur with a biol
 | Eccentricity congestion | Two-scale Feature Congestion (foveal + peripheral) | Rosenholtz 2007, Pelli & Tillman 2008 | v2.7 |
 | Pyramid synthesis | Laplacian pyramid + cross-scale correlations (Tier 2.75) | Portilla & Simoncelli 2000, Walton 2021 | v2.7 |
 | V4 decouple | Eccentricity-direct V4 effects, independent of V1 displacement | Mullen 1991, Curcio 1990 | v2.7.1 |
+| V1 length-tuning | End-stopping suppression of long edges (structural chrome) | Hubel & Wiesel 1965 | v2.8 |
 
 ### What the pipeline preserves vs Gaussian blur
 
