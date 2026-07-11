@@ -2674,6 +2674,27 @@ function runBatchCapture() {
                     fs.writeFileSync(filePath, buffer);
                     console.log(`[Batch] ✓ ${shot.filename}`);
 
+                    // Stamp compute-tier provenance next to the capture (P1-5):
+                    // record the ACTUAL rendered tier + cortical-pooling status so
+                    // a mode that silently fell back to Tier 1.6 (or lost pooling
+                    // on an 8-buffer GPU) can't be mislabeled as a full-tier figure.
+                    // Enforcement of --require-tier happens on the Node side by
+                    // reading these sidecars after the batch completes.
+                    try {
+                        const tierState = await mainWindow.scrutinizerHud.webContents.executeJavaScript(
+                            'window.__scrutinizerTierState ? window.__scrutinizerTierState() : null'
+                        );
+                        if (tierState) {
+                            const tierFile = p.join(screenshotsDir, shot.filename.replace(/\.png$/, '.tier.json'));
+                            fs.writeFileSync(tierFile, JSON.stringify({ filename: shot.filename, mode: shot.mode, ...tierState }, null, 2));
+                            const degraded = tierState.requestedComputeTier >= 2.5 &&
+                                tierState.activeComputeTier < tierState.requestedComputeTier;
+                            console.log(`[Batch] tier: req ${tierState.requestedComputeTier} / active ${tierState.activeComputeTier} / pooling ${tierState.corticalPoolingAvailable}${degraded ? ' ⚠ DEGRADED (fell back)' : ''}`);
+                        }
+                    } catch (tierErr) {
+                        console.warn(`[Batch] tier stamp failed: ${tierErr.message}`);
+                    }
+
                     // Optional: dump raw compute texture alongside screenshot
                     if (shot.captureCompute) {
                         try {

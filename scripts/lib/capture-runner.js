@@ -164,4 +164,32 @@ async function run(specs, opts) {
     return { captured, skipped, failed };
 }
 
-module.exports = { run, groupKey };
+/**
+ * Enforce a minimum ACTUAL compute tier across a capture dir's `.tier.json`
+ * sidecars (written per-shot by main.js batch capture, P1-5). A shot that
+ * *requested* tier >= requireTier but *rendered* below it silently degraded —
+ * exactly the mislabeled-figure case --require-tier guards against. Shots that
+ * never requested the tier (e.g. mode 0 at tier 0) are not violations.
+ *
+ * @returns {{ ok: boolean, violations: object[], checked: number }}
+ */
+function checkRequiredTier(outputDir, requireTier) {
+    const violations = [];
+    let files;
+    try {
+        files = fs.readdirSync(outputDir).filter(f => f.endsWith('.tier.json'));
+    } catch {
+        return { ok: true, violations, checked: 0 };
+    }
+    for (const f of files) {
+        try {
+            const t = JSON.parse(fs.readFileSync(path.join(outputDir, f), 'utf8'));
+            if (Number(t.requestedComputeTier) >= requireTier && Number(t.activeComputeTier) < requireTier) {
+                violations.push({ file: t.filename || f, requested: t.requestedComputeTier, active: t.activeComputeTier });
+            }
+        } catch { /* unreadable sidecar — skip */ }
+    }
+    return { ok: violations.length === 0, violations, checked: files.length };
+}
+
+module.exports = { run, groupKey, checkRequiredTier };

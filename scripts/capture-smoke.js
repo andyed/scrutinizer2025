@@ -13,12 +13,16 @@
 
 const path = require('path');
 const fs = require('fs');
-const { run } = require('./lib/capture-runner');
+const { run, checkRequiredTier } = require('./lib/capture-runner');
 
 const ROOT = path.join(__dirname, '..');
 const OUTPUT_DIR = path.join(ROOT, 'tests', 'smoke-captures');
 const fullVersion = require('../package.json').version;
 const force = process.argv.includes('--force');
+// --require-tier=N : hard-fail if any shot that requested compute tier >= N
+// rendered below it (silent WebGPU->WebGL fallback). P1-5.
+const requireTierArg = process.argv.find(a => a.startsWith('--require-tier='));
+const requireTier = requireTierArg ? parseFloat(requireTierArg.split('=')[1]) : null;
 
 const REF_PAGES = `file://${path.join(ROOT, 'tests', 'reference-pages')}`;
 
@@ -159,6 +163,19 @@ async function main() {
     if (result.failed > 0) {
         console.error('\n❌ Smoke test FAILED — pipeline is broken.');
         process.exit(1);
+    }
+
+    // ── Compute-tier enforcement (--require-tier) ──
+    if (requireTier != null) {
+        const tierCheck = checkRequiredTier(OUTPUT_DIR, requireTier);
+        if (!tierCheck.ok) {
+            console.error(`\n❌ --require-tier=${requireTier}: ${tierCheck.violations.length} shot(s) silently degraded below the required compute tier:`);
+            for (const v of tierCheck.violations) {
+                console.error(`   ✗ ${v.file}: requested ${v.requested}, rendered ${v.active}`);
+            }
+            process.exit(1);
+        }
+        console.log(`\n🧩 --require-tier=${requireTier}: OK (${tierCheck.checked} sidecar(s) checked, no degradation)`);
     }
 
     // ── Artifact detection pass ──

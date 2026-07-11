@@ -122,6 +122,21 @@
             this.webgpuSafety = null;
             this.webgpuDevice = null;
             this.webgpuTier = 0;
+            // Expose live compute-tier state for capture provenance (P1-5).
+            // Capture scripts read this via executeJavaScript to stamp the
+            // ACTUAL rendered tier (webgpuTier) + corticalPoolingAvailable into
+            // each capture's sidecar — so a mode that silently fell back to
+            // Tier 1.6 (or lost cortical pooling on an 8-buffer GPU) cannot be
+            // mislabeled as a full-tier figure. Evaluated lazily, so this.renderer
+            // is populated by the time a capture calls it.
+            if (typeof window !== 'undefined') {
+                window.__scrutinizerTierState = () => ({
+                    aestheticMode: this.aestheticMode,
+                    requestedComputeTier: (this.renderer && this.renderer.config && this.renderer.config.compute_tier) || 0,
+                    activeComputeTier: this.webgpuTier,
+                    corticalPoolingAvailable: this.corticalPoolingAvailable !== false,
+                });
+            }
             // Velocity-gated metamer freeze state
             this._metamerSaccading = false;
             this._metamerInitialized = false;

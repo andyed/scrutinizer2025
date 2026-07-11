@@ -15,7 +15,7 @@
 
 const path = require('path');
 const fs = require('fs');
-const { run } = require('./lib/capture-runner');
+const { run, checkRequiredTier } = require('./lib/capture-runner');
 
 // Get version from args or package.json (strip patch for folder: 1.9.1 → 1.9)
 const versionArg = process.argv.find(arg => arg.startsWith('v='));
@@ -24,6 +24,10 @@ const fullVersion = versionArg
     : require('../package.json').version;
 const version = fullVersion.replace(/\.\d+$/, '');
 const force = process.argv.includes('--force');
+// --require-tier=N : hard-fail if any shot requesting compute tier >= N rendered
+// below it (silent WebGPU->WebGL fallback) — prevents mislabeled paper figures. P1-5.
+const requireTierArg = process.argv.find(a => a.startsWith('--require-tier='));
+const requireTier = requireTierArg ? parseFloat(requireTierArg.split('=')[1]) : null;
 
 const OUTPUT_DIR = path.join(__dirname, '..', 'tests', 'golden-captures', `v${version}`);
 
@@ -272,6 +276,19 @@ async function main() {
 
     if (result.failed > 0) {
         process.exit(1);
+    }
+
+    // ── Compute-tier enforcement (--require-tier) ──
+    if (requireTier != null) {
+        const tierCheck = checkRequiredTier(OUTPUT_DIR, requireTier);
+        if (!tierCheck.ok) {
+            console.error(`\n❌ --require-tier=${requireTier}: ${tierCheck.violations.length} shot(s) silently degraded below the required compute tier:`);
+            for (const v of tierCheck.violations) {
+                console.error(`   ✗ ${v.file}: requested ${v.requested}, rendered ${v.active}`);
+            }
+            process.exit(1);
+        }
+        console.log(`\n🧩 --require-tier=${requireTier}: OK (${tierCheck.checked} sidecar(s) checked, no degradation)`);
     }
 }
 
