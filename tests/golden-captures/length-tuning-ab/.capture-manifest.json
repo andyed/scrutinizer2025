@@ -1,0 +1,41 @@
+{
+  "appVersion": "2.7.3",
+  "shots": {
+    "border_mode14_baseline.png": {
+      "capturedAt": "2026-05-25T20:52:53.203Z",
+      "specHash": "sha256:6ee7e04bc4bc004d",
+      "spec": {
+        "url": "file:///Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/tests/reference-pages/border-suppression.html",
+        "fixationX": 0.5,
+        "fixationY": 0.5,
+        "selector": "",
+        "overlay": false,
+        "radius": "45",
+        "width": "1920",
+        "height": "1080",
+        "mobile": "false",
+        "filename": "border_mode14_baseline.png",
+        "mode": "14",
+        "outputDir": "/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/tests/golden-captures/length-tuning-ab"
+      }
+    },
+    "border_mode17_lengthtuned.png": {
+      "capturedAt": "2026-05-25T20:52:53.204Z",
+      "specHash": "sha256:be431e482cf3e9a0",
+      "spec": {
+        "url": "file:///Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/tests/reference-pages/border-suppression.html",
+        "fixationX": 0.5,
+        "fixationY": 0.5,
+        "selector": "",
+        "overlay": false,
+        "radius": "45",
+        "width": "1920",
+        "height": "1080",
+        "mobile": "false",
+        "filename": "border_mode17_lengthtuned.png",
+        "mode": "17",
+        "outputDir": "/Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/tests/golden-captures/length-tuning-ab"
+      }
+    }
+  }
+}

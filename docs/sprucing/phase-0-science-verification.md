@@ -92,7 +92,7 @@ grep -rn "replicates" shared/modes.json && echo "STILL CLAIMS replicates — fix
 ```
 **Done when:** (a) the harness exists and runs with a real pass/fail, OR (b) grep finds no phantom test names and no "replicates" claim on mode 17.
 
-- [ ] P0-3 complete
+- [x] **P0-3 complete** — 2026-07-11. Fork (b) downgrade. Emptied mode 17's `tests` array in `shared/modes.json` (the three names `length_tuning_long_edge_suppression` / `_short_edge_preserved` / `_cmf_scaling_invariant_across_eccentricity` were never-written phantoms; no code consumes `mode.tests`, verified). Rewrote `architectural_purpose` from "If validation passes (CBM 2002 curve replication…) parameters graduate" to "INSPIRED BY (not yet quantitatively validated against) Cavanaugh-Bair-Movshon 2002 … validation … is PENDING and not yet built." The design spec `docs/specs/length_tuned_edge_suppression.md` was already honest (marks length-tuning "gated off until validated," CBM 2002 as a forward-looking "target"/"P3"/"becomes `validate-cavanaugh-length-tuning.js`") — left unchanged. Verify: no phantom names remain, no "replicates" claim.
 
 ---
 
@@ -116,7 +116,7 @@ git ls-files tests/golden-captures/length-tuning-ab/ | head
 ```
 **Done when:** a clean clone can either regenerate the numbers (script committed) or inspect them (captures + manifest force-added), and `git ls-files` on that dir is non-empty.
 
-- [ ] P0-4 complete
+- [x] **P0-4 complete** — 2026-07-11. Since P0-3 took the downgrade path (no harness), force-added the two source A/B captures (`border_mode14_baseline.png`, `border_mode17_lengthtuned.png`) plus the already-machine-readable `.capture-manifest.json` (records URL, fixation, radius, dimensions, mode, specHash per shot) from the `.gitignore`d `tests/golden-captures/length-tuning-ab/`. Added a `README.md` there with the regeneration command (both captures derive from the committed `tests/reference-pages/border-suppression.html`) and a status note that these show the *qualitative* A/B effect, not a quantitative CBM-2002 validation. The intermediate `diff_*.png` working artifacts stay untracked. `git ls-files` on the dir now returns 4 files.
 
 ---
 

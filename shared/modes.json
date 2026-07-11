@@ -618,12 +618,8 @@
                 "reading_span": true,
                 "reading_span_strength": 1.0
             },
-            "tests": [
-                "length_tuning_long_edge_suppression",
-                "length_tuning_short_edge_preserved",
-                "length_tuning_cmf_scaling_invariant_across_eccentricity"
-            ],
-            "architectural_purpose": "First research mode for V1 length-tuning. Comparison arm vs mode 14 quantifies how much of the current peripheral saliency budget is being spent on structural-chrome edges. If validation passes (CBM 2002 curve replication + visual A/B on real web pages), parameters graduate into default modes in a future release.",
+            "tests": [],
+            "architectural_purpose": "First research mode for V1 length-tuning, INSPIRED BY (not yet quantitatively validated against) Cavanaugh, Bair & Movshon 2002 length-tuning curves. Comparison arm vs mode 14 quantifies how much of the current peripheral saliency budget is being spent on structural-chrome edges. Quantitative validation — a CBM-2002 synthetic-Gabor curve-replication harness — is PENDING and not yet built (see docs/sprucing/phase-0-science-verification.md P0-3). Parameters would graduate into default modes only after that validation plus visual A/B on real web pages. (The earlier `tests` list named three unit tests that were never written; emptied rather than left phantom.)",
             "citations": {
                 "technique": "V1 hypercomplex cell endzone inhibition + iso-orientation surround suppression",
                 "biological_basis": "Hubel & Wiesel 1965 hypercomplex cells; Knierim & Van Essen 1992 surround orientation tuning; Cavanaugh, Bair & Movshon 2002 quantitative length-tuning curves; Field, Hayes & Hess 1993 V2/V4 contour integration coexists at higher levels"
