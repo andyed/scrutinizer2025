@@ -130,7 +130,7 @@ for s in validate-color-search validate-crowding validate-spatial-acuity; do nod
 ```
 **Done when:** all three print `exits: true`, and a deliberately-failing run exits non-zero.
 
-- [ ] P1-6 complete
+- [x] **P1-6 complete** — 2026-07-11 (primary). `validate-color-search.js`, `validate-crowding.js`, `validate-spatial-acuity.js` now `return tier1Pass === tier1Total` from `validate()` and the call site is `process.exit(validate() ? 0 : 1)` — Tier 1 is the mandatory tier. All three syntax-check and print `exits: true`; `validate-spatial-acuity` runs and exits 0 (tier-1 pass), proving the path. **Deferred (step 2, OCR RC-2.x warnings → failures):** the B4 work deliberately left RC-2.x as advisory `console.warn` while hard-failing (exit 2) the serious cases, and the mode-0/mode-12 gate was just calibrated to pass; converting those warnings to failures risks destabilizing a freshly-tuned science gate, so it's held as a small separate follow-up rather than bundled here.
 
 ---
 

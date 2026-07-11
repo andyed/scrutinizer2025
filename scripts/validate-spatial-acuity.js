@@ -304,6 +304,11 @@ function validate() {
   fs.writeFileSync(reportPath, report);
   console.log(report);
   console.log(`Report written to: ${reportPath}`);
+
+  // Tier 1 is the mandatory tier — return its pass status so the process can
+  // exit non-zero on any Tier-1 failure (previously this script always exited
+  // 0, so CI / && chaining could not detect a failure). P1-6.
+  return tier1Pass === tier1Total;
 }
 
-validate();
+process.exit(validate() ? 0 : 1);
