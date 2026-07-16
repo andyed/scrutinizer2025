@@ -95,3 +95,25 @@ describe('buildMenuTemplate — Visual Memory radio sync', () => {
         expect(off.checked).toBe(false);
     });
 });
+
+describe('buildMenuTemplate — Study mode lock', () => {
+    it('disables navigation and simulation menus while a task is active', () => {
+        const noop = () => {};
+        const template = buildMenuTemplate(
+            noop, noop,
+            45, 10, false, 12, 0, 0, false, false, 256, 512, 5,
+            true
+        );
+
+        const file = template.find((item) => item.label === 'File');
+        const view = template.find((item) => item.label === 'View');
+        const go = template.find((item) => item.label === 'Go');
+        const simulation = template.find((item) => item.label === 'Simulation');
+
+        expect(file.submenu.find((item) => item.label === 'New Window').enabled).toBe(false);
+        expect(file.submenu.find((item) => item.label === 'Open URL...').enabled).toBe(false);
+        expect(view.enabled).toBe(false);
+        expect(go.enabled).toBe(false);
+        expect(simulation.enabled).toBe(false);
+    });
+});

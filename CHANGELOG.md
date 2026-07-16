@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased] — 2.8.1
+
+### Added — usability-study launch workflow
+
+- **Study Links:** Packaged builds register the versioned `scrutinizer://v1/task/start` URL route so a researcher can launch a web task from an ordinary browser instruction sheet with validated, temporary settings such as foveal radius, rendering mode, Comfort Mode, and Visual Memory.
+- **Study toolbar:** During a launched task, the normal URL controls are replaced with persistent task instructions, compressed destination-origin visibility, a read-only full-URL toggle, and a Done action. Study settings do not overwrite the user's saved preferences.
+- **Practitioner guide:** Added a task-oriented guide for preparing, moderating, observing, and interpreting Restricted Focus Viewer usability sessions without presenting mouse position as measured gaze.
+
+### Changed
+
+- Locked navigation and simulation-changing controls while Study mode is active so a task link defines a reproducible condition.
+- Clarified RFV documentation and corrected stale control instructions and over-broad claims about what the simulation predicts.
+
+> macOS implementation and unsigned package metadata have been verified. Signed/notarized browser handoff and the Windows implementation remain release checks for 2.8.1.
+
 ## [2.8.0] - 2026-07-11
 
 ### Added — Mode 17 (Structural Chrome Suppression) + static stimulus foveation

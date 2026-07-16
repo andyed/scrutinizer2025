@@ -964,12 +964,14 @@
             }
         }
 
-        toggleComfortMode(enabled) {
+        toggleComfortMode(enabled, { notifySettings = true } = {}) {
             this._comfortMode = enabled;
             if (this.svgOverlay) {
                 this.svgOverlay.setComfortMode(enabled);
             }
-            ipcRenderer.send('settings:comfort-mode-changed', enabled);
+            if (notifySettings) {
+                ipcRenderer.send('settings:comfort-mode-changed', enabled);
+            }
             ipcRenderer.send('log:renderer', `[Scrutinizer] Comfort mode: ${enabled}`);
         }
 

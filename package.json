@@ -62,6 +62,15 @@
     "appId": "com.scrutinizer.app",
     "productName": "Scrutinizer",
     "executableName": "Scrutinizer",
+    "protocols": [
+      {
+        "name": "Scrutinizer Study Link",
+        "schemes": [
+          "scrutinizer"
+        ],
+        "role": "Viewer"
+      }
+    ],
     "files": [
       "main.js",
       "menu-template.js",

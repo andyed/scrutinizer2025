@@ -11,6 +11,8 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+.hidden { display: none !important; }
+
 html, body {
     height: 100%;
     background-color: var(--bg-color);
@@ -102,6 +104,59 @@ button:disabled {
     display: flex;
     align-items: center;
     flex-shrink: 0;
+}
+
+.study-container {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.study-label {
+    flex-shrink: 0;
+    color: #ffb15a;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+#study-instruction {
+    width: auto;
+    min-width: 0;
+    flex: 1;
+    justify-content: flex-start;
+    padding: 0 10px;
+    background: var(--input-bg);
+    color: var(--text-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#study-origin {
+    width: auto;
+    max-width: 190px;
+    padding: 0 9px;
+    color: #aaa;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#study-done {
+    width: auto;
+    padding: 0 11px;
+    background: var(--accent-color);
+    color: white;
+    font-weight: 600;
+}
+
+#study-done:hover {
+    background: #1688ff;
 }
 
 /* Fovea Toggle Button */

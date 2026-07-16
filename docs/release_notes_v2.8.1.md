@@ -1,0 +1,76 @@
+# Scrutinizer v2.8.1 — Study Links for Usability Testing
+
+**Status:** Draft
+**Release date:** TBD
+**Previous:** [v2.8.0](release_notes_v2.8.0.md)
+
+Scrutinizer 2.8.1 adds a task-focused workflow for moderated usability observation. Researchers can place a Study Link in an ordinary browser instruction sheet; clicking it opens the installed Scrutinizer app at the intended page with a reproducible, temporary simulation condition and persistent task instructions.
+
+## Highlights
+
+### Launch a prepared task from the browser
+
+Packaged builds register the versioned `scrutinizer://v1/task/start` route. A link can specify:
+
+- The HTTP(S) page to open
+- A stable task ID and plain-text instruction
+- Foveal radius and rendering mode
+- Whether the effect and Comfort Mode begin enabled
+- The Visual Memory condition
+
+The complete link is validated before Scrutinizer changes navigation or settings. Unsupported destinations, unknown parameters, duplicate parameters, and invalid setting values are rejected.
+
+### A task-focused Study toolbar
+
+During a launched task, Scrutinizer replaces its normal browsing controls with:
+
+- The task instruction
+- A compact destination origin
+- A read-only full-URL toggle
+- A clear **Done** action
+
+Navigation and simulation-changing controls are locked while the task is active. Choosing Done returns the window to normal browsing and restores the runtime state that existed before the task. Study-provided values are never saved as the user's preferences.
+
+### Practitioner documentation
+
+The new [Usability-Testing Practitioner Guide](tutorials/usability-testing-practitioner-guide.md) covers:
+
+- Choosing and documenting a study condition
+- Writing neutral tasks
+- Generating Study Links for browser instruction sheets
+- Preparing participants for the external-app handoff
+- Moderating without coaching pointer movement
+- Recording outcomes with a reusable observation worksheet
+- Interpreting RFV findings without presenting pointer position as measured gaze
+- Reporting the build, display, calibration, and simulation settings needed for comparison
+
+The existing [RFV Getting Started guide](tutorials/getting-started-rfv.md) has also been corrected and clarified. Scrutinizer is described as a cursor-directed model, not an eye tracker or a literal prediction of what an individual participant sees.
+
+## Example
+
+```text
+scrutinizer://v1/task/start?url=https%3A%2F%2Fexample.com%2Faccount&task_id=billing-address&instructions=You%20have%20moved.%20Change%20the%20billing%20address%20on%20your%20account.&fovea_radius_px=45&mode=12&enabled=true&comfort_mode=false&visual_memory_limit=5
+```
+
+The complete parameter contract and security rules are documented in [Usability Study Deep Links and Study Toolbar](specs/usability-study-deep-links.md).
+
+## Platform status
+
+### macOS
+
+The implementation handles both a cold launch and a Study Link sent to an already-running app. The packaged application metadata registers Scrutinizer as a viewer for the custom URL scheme.
+
+Release verification still requires the signed and notarized build to be installed and tested from Safari and Chrome before publication.
+
+### Windows
+
+Windows NSIS and ZIP packaging are configured. Study Link registration, cold and warm launch behavior, browser prompts, and uninstall cleanup are being verified separately for the 2.8.1 release.
+
+## Release checks still open
+
+- Install the signed and notarized macOS build and test Safari and Chrome handoff
+- Verify macOS cold launch, warm launch, Done restoration, and malformed-link rejection
+- Complete the equivalent Windows installer and browser checks
+- Confirm Windows uninstall removes protocol ownership appropriately
+- Resolve the repository's missing `v2.8.0` tag before the version/tag release guard can pass
+- Bump `package.json` to 2.8.1 only when the release candidate is ready to tag

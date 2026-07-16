@@ -1,6 +1,6 @@
 # Scrutinizer Roadmap
 
-Last updated: 2026-07-11 (v2.8.0)
+Last updated: 2026-07-16 (v2.8.1 in progress)
 
 ## What's implemented
 
@@ -50,6 +50,7 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 | [brown_dataflow_integration.md](docs/specs/brown_dataflow_integration.md) | Reference — Brown et al. 2023 dataflow architecture |
 | [halverson_hornof_validation.md](docs/specs/halverson_hornof_validation.md) | In progress |
 | [continuous_chromatic_mip.md](docs/specs/continuous_chromatic_mip.md) | In progress |
+| [usability-study-deep-links.md](docs/specs/usability-study-deep-links.md) | **macOS implementation complete** (target: v2.8.1); Windows verification in progress |
 
 <details>
 <summary>Completed / shipped specs</summary>
@@ -98,7 +99,7 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 
 **MCP server.** The audit tool exposes an MCP server for Claude Code integration — score pages during design review sessions without launching the Electron renderer. Shipped v1.9.
 
-**Cross-platform builds.** macOS signed. `electron-builder` for Windows (.exe) and Linux (.AppImage) not yet configured. Auto-update via `electron-updater` planned.
+**Cross-platform builds.** macOS signing and packaging are established. Windows NSIS and ZIP packaging are configured; release and Study Link protocol verification are in progress for v2.8.1. Linux packaging is not yet configured. Auto-update via `electron-updater` is planned.
 
 ### Infrastructure
 
@@ -106,7 +107,7 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 
 **Saliency resolution upgrade.** Bottom-up saliency worker at 256px cannot resolve UI elements <60px. Face detection at 640px is the dominant signal. Options: higher worker resolution, dedicated small-element detector, or multi-resolution pass.
 
-**Distribution.** macOS signed. Cross-platform builds (Windows, Linux), notarization, and auto-update not yet implemented.
+**Distribution.** macOS signed distribution is established. Windows packaging is configured and awaiting release verification; Linux packaging and cross-platform auto-update remain open.
 
 ---
 

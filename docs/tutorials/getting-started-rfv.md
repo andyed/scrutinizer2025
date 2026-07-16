@@ -1,6 +1,6 @@
 # Getting Started: Restricted Focus Viewer for Usability Testing
 
-Scrutinizer works as a **Restricted Focus Viewer** (RFV) — a tool that limits visual information to what the eye can actually resolve at the current fixation point. This lets you evaluate peripheral discoverability, visual hierarchy, and information density without eye tracking hardware.
+Scrutinizer works as a **Restricted Focus Viewer** (RFV) — a cursor-directed model of how visual detail and color change with distance from a fixation point. It helps evaluate peripheral discoverability, visual hierarchy, and information density without eye-tracking hardware. The cursor is a chosen viewing location, not measured gaze, and the rendering is a model rather than a prediction of what an individual participant sees.
 
 This guide covers setup, calibration, and the two features that make Scrutinizer practical for design dialogue: **Visual Memory** and **Comfort Mode**.
 
@@ -13,7 +13,7 @@ This guide covers setup, calibration, and the two features that make Scrutinizer
 3. Press **Cmd+E** to toggle the foveated effect on/off
 4. Move your cursor — the clear zone follows it, everything else degrades
 
-The effect is immediate. What you see around the cursor is roughly what a first-time visitor sees at a glance before their eyes move.
+The effect is immediate. Treat the result as a controlled way to inspect what remains available around a chosen fixation—not as a reconstruction of a particular first-time visitor's perception.
 
 ---
 
@@ -46,7 +46,7 @@ The procedure takes about 2 minutes. Follow the on-screen instructions:
 ### Adjusting manually
 
 If you prefer a quick manual adjustment:
-- **Arrow keys** (Up/Down) adjust the foveal radius by 10px per press while the effect is active
+- **Arrow keys** (Left/Right) adjust the foveal radius by 10px per press while the effect is active
 - Watch the boundary ring in the eccentricity overlay (**Simulation > Utility > Eccentricity Overlay**) to see the current extent
 
 For most design review sessions, the default is close enough. Calibration matters more for research or when comparing results across evaluators.
@@ -88,13 +88,13 @@ IOR mode makes the cost of revisitation explicit by degrading previously-seen ar
 
 ### Design dialogue prompt
 
-Show stakeholders the page with Visual Memory set to Limited (5). Move the cursor through a natural scan path (logo, headline, primary CTA, navigation). After 5 fixations, stop and ask: "This is roughly what your user knows after their first scan. Is everything important represented?"
+Show stakeholders the page with Visual Memory set to Limited (5). Move the cursor through a plausible scan path (logo, headline, primary CTA, navigation). After 5 cursor positions, stop and ask: "Which important regions have become available, and which still require deliberate exploration?"
 
 ---
 
 ## 4. Comfort Mode
 
-Strict foveal simulation (1 degree clear zone) is biologically accurate but can feel punishingly small. In practice, microsaccades and tiny eye movements give us near-instant access to content slightly beyond the fovea — without the perceptual cost of a full saccade.
+A strict 1-degree clear zone is anchored to the anatomical fovea but can feel punishingly small in an interactive review. In practice, microsaccades and small eye movements provide rapid access to nearby content beyond that region.
 
 ### What it does
 
@@ -120,7 +120,7 @@ The key boundary: within ~2 degrees, eye movements are fast enough and small eno
 
 The strict mode answers: "What can the anatomical fovea resolve?" Comfort mode answers the more practical question: "What can a user comfortably access from this fixation point without real effort?"
 
-For most design dialogue, Comfort Mode gives a more honest picture. The 1-degree simulation overstates the user's constraint because it ignores microsaccade-mediated refresh. Comfort mode still shows meaningful peripheral degradation beyond 2 degrees — the parafovea and periphery are fully simulated.
+For most design dialogue, Comfort Mode provides a less restrictive working condition. It approximates rapid access around the current location while retaining meaningful degradation farther away. Use the same setting across comparable sessions and report whether it was enabled.
 
 ---
 
@@ -133,7 +133,7 @@ For most design dialogue, Comfort Mode gives a more honest picture. The 1-degree
 4. Set Visual Memory to **Limited (5 fixations)**
 
 ### First pass: orientation scan
-Move the cursor through the page as if you were a first-time visitor. Start at the top-left (where Western readers begin), move through the headline, scan the layout. After 5 fixations, stop.
+Move the cursor through a plausible first-pass path. For a left-to-right interface, one option is to begin near the top-left, then move through the headline and major layout regions. After 5 cursor positions, stop. This is a reviewer-driven walkthrough, not a recorded participant scanpath.
 
 Ask: What do you know about this page? What is it for? Where would you go next?
 
@@ -166,15 +166,18 @@ Turn Visual Memory to **Off**. Park the cursor on the primary content area. With
 
 When evaluating text-heavy pages, keep in mind that reading uses a different spatial strategy than scene viewing. Rayner (1998) established that the perceptual span during reading extends ~14-15 characters to the right of fixation (~5 degrees) but only 3-4 characters to the left. Within this span, useful letter information comes from about 7-8 characters on each side (~2 degrees) — the *visual span* (Legge et al. 2007).
 
-Forward reading saccades average ~7-9 characters (~2 degrees), meaning readers hop through text in roughly foveal-width steps. This has practical implications for RFV evaluation: if you can't read a navigation label or heading at its eccentricity from a natural fixation point, a real user would need to explicitly saccade to it. That's the signal — the label lacks peripheral discoverability and requires a deliberate eye movement to read.
+Forward reading saccades average ~7-9 characters (~2 degrees), meaning readers move through text in roughly foveal-width steps. In an RFV evaluation, a label that cannot be resolved from a nearby chosen fixation would require another viewing location under the model. Treat that as a discoverability hypothesis to investigate with participants, not proof of where their eyes will move.
 
 Scrutinizer has a **Reading Span** overlay (**Simulation > Behavior > Reading Span**) that visualizes this asymmetric perceptual window.
 
 ### What Scrutinizer does NOT simulate
 
 - **Attention and expectation** — real users have goals and experience that guide their eyes. Scrutinizer shows the sensory input, not the cognitive interpretation.
-- **Familiarity** — returning users know where things are. Scrutinizer shows the first-visit constraint.
-- **Motion** — animations and video attract peripheral attention more effectively than static elements. Scrutinizer operates on static snapshots.
+- **Familiarity** — returning users may know where things are. Scrutinizer does not model an individual's learned layout knowledge.
+- **Attention capture from motion** — live pages can contain animation and video, but the RFV model does not establish how strongly those events attract a participant's attention.
+- **Measured gaze** — cursor position is a controlled proxy selected by the user unless an external gaze source is explicitly connected.
+
+For moderated participant sessions and reproducible task setup, continue with the [Usability-Testing Practitioner Guide](usability-testing-practitioner-guide.md).
 
 ---
 

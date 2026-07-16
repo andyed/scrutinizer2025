@@ -3,6 +3,11 @@ const path = require('path');
 const { buildMenuTemplate, RADIUS_OPTIONS } = require('./menu-template');
 const settingsManager = require('./settings-manager');
 const { CALIBRATION_URL } = require('./renderer/config');
+const modesRegistry = require('./shared/modes.json');
+const { STUDY_SCHEME, parseStudyDeepLink } = require('./shared/study-deep-link');
+const { buildStudyRuntimeState } = require('./shared/study-runtime-state');
+
+const STUDY_MODE_IDS = Object.values(modesRegistry.modes).map((mode) => mode.id);
 // Auto-updater: graceful fallback if electron-updater not bundled
 let autoUpdater = null;
 try {
@@ -19,6 +24,7 @@ let currentRadius;
 let currentBlur;
 let currentIntensity;
 let currentEnabled;
+let currentComfortMode;
 let currentShowWelcome;
 let currentStartPage;
 
@@ -37,6 +43,9 @@ let currentCongestionResolution = 512; // 256, 512, 1024, or 2048
 
 let mainWindow;
 let splashWindow;
+let pendingStudyLaunch = null;
+let pendingStudyError = null;
+let activeStudy = null;
 
 // Track modifier keys for screenshot detection (Cmd+Shift+4)
 let isCmdPressed = false;
@@ -53,6 +62,7 @@ process.on('uncaughtException', (err) => {
 });
 
 function sendToRenderer(channel, ...args) {
+    if (activeStudy && channel.startsWith('menu:')) return;
     const win = BrowserWindow.getFocusedWindow();
     if (win) {
         win.webContents.send(channel, ...args);
@@ -60,6 +70,7 @@ function sendToRenderer(channel, ...args) {
 }
 
 const sendToOverlays = (channel, ...args) => {
+    if (activeStudy && channel.startsWith('menu:')) return;
     const windows = BrowserWindow.getAllWindows();
     let sentCount = 0;
     windows.forEach(win => {
@@ -71,11 +82,68 @@ const sendToOverlays = (channel, ...args) => {
     console.log(`[Main] sendToOverlays: Sent '${channel}' to ${sentCount} windows`);
 };
 
+function isStudyWindow(win) {
+    return Boolean(win && !win.isDestroyed() && (win.studyMode === true || (activeStudy && activeStudy.windowId === win.id)));
+}
+
+function isStudySender(sender) {
+    if (!activeStudy || !sender) return false;
+    return BrowserWindow.getAllWindows().some((win) => isStudyWindow(win) && (
+        win.webContents === sender ||
+        (win.toolbarView && win.toolbarView.webContents === sender) ||
+        (win.scrutinizerView && win.scrutinizerView.webContents === sender) ||
+        (win.scrutinizerHud && win.scrutinizerHud.webContents === sender)
+    ));
+}
+
+function showStudyLinkError(error) {
+    const safeError = error || { message: 'The study link is invalid.' };
+    const show = () => {
+        const { dialog } = require('electron');
+        dialog.showMessageBox({
+            type: 'error',
+            title: 'Couldn\'t Open Study Task',
+            message: 'Scrutinizer couldn\'t open this study task.',
+            detail: safeError.message,
+            buttons: ['OK']
+        }).catch((err) => console.error('[Study] Failed to show link error:', err));
+    };
+
+    if (app.isReady()) show();
+    else pendingStudyError = safeError;
+}
+
+function receiveStudyDeepLink(rawUrl) {
+    const result = parseStudyDeepLink(rawUrl, {
+        radiusOptions: RADIUS_OPTIONS,
+        modeIds: STUDY_MODE_IDS
+    });
+
+    if (!result.ok) {
+        console.warn(`[Study] Rejected deep link (${result.error.code})`);
+        showStudyLinkError(result.error);
+        return;
+    }
+
+    console.log(`[Study] Received ${result.value.route} for ${result.value.task.origin}`);
+    if (!app.isReady() || !mainWindow || mainWindow.isDestroyed()) {
+        pendingStudyLaunch = result.value;
+        return;
+    }
+
+    applyStudyLaunch(result.value);
+}
+
+app.on('open-url', (event, url) => {
+    event.preventDefault();
+    receiveStudyDeepLink(url);
+});
+
 function rebuildMenu() {
     // Ensure settings are initialized
     const radius = currentRadius || 180;
     const blur = currentBlur || 10;
-    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur, currentMobileEmulation, currentAestheticMode, currentCongestionMode, currentEccentricityMode, currentSaliencyMapOn, currentStructureMapOn, currentSaliencyResolution, currentCongestionResolution, currentVisualMemory !== undefined ? currentVisualMemory : 0));
+    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur, currentMobileEmulation, currentAestheticMode, currentCongestionMode, currentEccentricityMode, currentSaliencyMapOn, currentStructureMapOn, currentSaliencyResolution, currentCongestionResolution, currentVisualMemory !== undefined ? currentVisualMemory : 0, Boolean(activeStudy)));
     Menu.setApplicationMenu(menu);
 
     // Explicitly set for all non-HUD windows (Windows/Linux)
@@ -90,35 +158,41 @@ function rebuildMenu() {
 
 // Listen for settings changes from renderer to update menu (global listeners)
 ipcMain.on('settings:radius-changed', (event, radius) => {
+    if (isStudySender(event.sender)) return;
     currentRadius = radius;
     settingsManager.set('radius', radius);
     rebuildMenu();
 });
 
 ipcMain.on('settings:blur-changed', (event, blur) => {
+    if (isStudySender(event.sender)) return;
     currentBlur = blur;
     settingsManager.set('blur', blur);
     rebuildMenu();
 });
 
 ipcMain.on('settings:intensity-changed', (event, intensity) => {
+    if (isStudySender(event.sender)) return;
     currentIntensity = intensity;
     settingsManager.set('intensity', intensity);
     // rebuildMenu(); // If menu needs update
 });
 
 ipcMain.on('settings:enabled-changed', (event, enabled) => {
+    if (isStudySender(event.sender)) return;
     currentEnabled = enabled;
     settingsManager.set('enabled', enabled);
     // rebuildMenu(); // If menu had a toggle state, we'd update it here
 });
 
 ipcMain.on('settings:welcome-changed', (event, show) => {
+    if (isStudySender(event.sender)) return;
     currentShowWelcome = show;
     settingsManager.set('showWelcomePopup', show);
 });
 
 ipcMain.on('settings:visual-memory-changed', (event, value) => {
+    if (isStudySender(event.sender)) return;
     currentVisualMemory = value;
     settingsManager.set('visualMemory', value);
     // Sync the Visual Memory radio group — otherwise the menu lies across
@@ -128,10 +202,13 @@ ipcMain.on('settings:visual-memory-changed', (event, value) => {
 });
 
 ipcMain.on('settings:comfort-mode-changed', (event, enabled) => {
+    if (isStudySender(event.sender)) return;
+    currentComfortMode = enabled;
     settingsManager.set('comfortMode', enabled);
 });
 
 ipcMain.on('settings:page-changed', (event, url) => {
+    if (isStudySender(event.sender)) return;
     if (url && url.startsWith('http')) {
         currentStartPage = url;
         settingsManager.set('startPage', url);
@@ -141,6 +218,7 @@ ipcMain.on('settings:page-changed', (event, url) => {
 
 // Aesthetic mode changed — rebuild menu to sync radio buttons across Behavior/Utility submenus
 app.on('aesthetic-mode-changed', (mode) => {
+    if (activeStudy) return;
     currentAestheticMode = mode;
     rebuildMenu();
 });
@@ -316,7 +394,7 @@ app.on('mobile-emulation', async (enabled) => {
 ipcMain.on('navigate:home', (event) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
-    if (!win || !win.scrutinizerView) return;
+    if (!win || isStudyWindow(win) || !win.scrutinizerView) return;
 
     const urlToLoad = currentStartPage || 'https://github.com/andyed/scrutinizer2025?tab=readme-ov-file#what-is-scrutinizer';
     win.scrutinizerView.webContents.loadURL(urlToLoad);
@@ -329,7 +407,12 @@ ipcMain.on('navigate:home', (event) => {
 
 ipcMain.on('window:create', (event, url) => {
     console.log('[Main] Received window:create for:', url);
-    createScrutinizerWindow(url);
+    const sourceWindow = BrowserWindow.getAllWindows().find(w =>
+        (w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender) ||
+        (w.scrutinizerView && w.scrutinizerView.webContents === event.sender)
+    );
+    if (isStudyWindow(sourceWindow)) sourceWindow.scrutinizerView.webContents.loadURL(url);
+    else createScrutinizerWindow(url);
 });
 
 // Navigation debounce to prevent double-firing (e.g., keyboard + button click)
@@ -545,7 +628,12 @@ ipcMain.on('capture:request', async (event) => {
 // Handle new window requests from preload script (target="_blank" links)
 ipcMain.on('open-new-window', (event, url) => {
     console.log('[Main] Received open-new-window request:', url);
-    createScrutinizerWindow(url);
+    const sourceWindow = BrowserWindow.getAllWindows().find(w =>
+        (w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender) ||
+        (w.scrutinizerView && w.scrutinizerView.webContents === event.sender)
+    );
+    if (isStudyWindow(sourceWindow)) sourceWindow.scrutinizerView.webContents.loadURL(url);
+    else createScrutinizerWindow(url);
 });
 
 // Forward browser mouse position to HUD for foveal effect tracking
@@ -622,7 +710,7 @@ ipcMain.on('keydown', (event, keyEvent) => {
 
     // Navigation: Back / Forward (with debouncing)
     if (code === 'ArrowLeft' && (cmdOrCtrl || altKey)) {
-        if (win.scrutinizerView && canNavigate(win.id, 'back')) {
+        if (!isStudyWindow(win) && win.scrutinizerView && canNavigate(win.id, 'back')) {
             console.log('[Main] Navigating back (from keyboard shortcut)');
             win.scrutinizerView.webContents.goBack();
         }
@@ -630,7 +718,7 @@ ipcMain.on('keydown', (event, keyEvent) => {
     }
 
     if (code === 'ArrowRight' && (cmdOrCtrl || altKey)) {
-        if (win.scrutinizerView && canNavigate(win.id, 'forward')) {
+        if (!isStudyWindow(win) && win.scrutinizerView && canNavigate(win.id, 'forward')) {
             console.log('[Main] Navigating forward (from keyboard shortcut)');
             win.scrutinizerView.webContents.goForward();
         }
@@ -657,7 +745,7 @@ ipcMain.on('toolbar:navigate-back', (event) => {
     const windows = BrowserWindow.getAllWindows();
     // Find window where toolbarView is the sender
     const win = windows.find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
-    if (win && win.scrutinizerView && win.scrutinizerView.webContents.canGoBack()) {
+    if (win && !isStudyWindow(win) && win.scrutinizerView && win.scrutinizerView.webContents.canGoBack()) {
         win.scrutinizerView.webContents.goBack();
     }
 });
@@ -665,7 +753,7 @@ ipcMain.on('toolbar:navigate-back', (event) => {
 ipcMain.on('toolbar:navigate-forward', (event) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
-    if (win && win.scrutinizerView && win.scrutinizerView.webContents.canGoForward()) {
+    if (win && !isStudyWindow(win) && win.scrutinizerView && win.scrutinizerView.webContents.canGoForward()) {
         win.scrutinizerView.webContents.goForward();
     }
 });
@@ -673,7 +761,7 @@ ipcMain.on('toolbar:navigate-forward', (event) => {
 ipcMain.on('toolbar:reload', (event) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
-    if (win && win.scrutinizerView) {
+    if (win && !isStudyWindow(win) && win.scrutinizerView) {
         win.scrutinizerView.webContents.reload();
     }
 });
@@ -681,12 +769,14 @@ ipcMain.on('toolbar:reload', (event) => {
 ipcMain.on('toolbar:navigate-to', (event, url) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
-    if (win && win.scrutinizerView) {
+    if (win && !isStudyWindow(win) && win.scrutinizerView) {
         win.scrutinizerView.webContents.loadURL(url);
     }
 });
 
 ipcMain.on('toolbar:toggle-fovea', (event) => {
+    const sourceWindow = BrowserWindow.getAllWindows().find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
+    if (isStudyWindow(sourceWindow)) return;
     currentEnabled = !currentEnabled;
     settingsManager.set('enabled', currentEnabled);
 
@@ -731,6 +821,11 @@ ipcMain.on('toolbar:open-url-dialog', (event) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
 
+    if (win && isStudyWindow(win)) {
+        win.toolbarView.webContents.send('toolbar:show-study-url');
+        return;
+    }
+
     if (win && win.scrutinizerView) {
         const currentURL = win.scrutinizerView.webContents.getURL();
 
@@ -767,8 +862,15 @@ ipcMain.on('toolbar:open-url-dialog', (event) => {
     }
 });
 
-function createScrutinizerWindow(startUrl) {
-    console.log('[Main] Creating new Scrutinizer window (dual-window architecture)', startUrl ? 'with URL: ' + startUrl : '(default URL)');
+ipcMain.on('toolbar:study-done', (event) => {
+    const win = BrowserWindow.getAllWindows().find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
+    if (isStudyWindow(win)) exitStudyMode();
+});
+
+function createScrutinizerWindow(startUrl, options = {}) {
+    const study = options.study || null;
+    const loggedTarget = study ? study.launch.task.origin : startUrl;
+    console.log('[Main] Creating new Scrutinizer window (dual-window architecture)', loggedTarget ? 'with target: ' + loggedTarget : '(default URL)');
 
     const TOOLBAR_HEIGHT = 40;
     const isTestMode = process.env.TEST_MODE === 'true';
@@ -819,6 +921,9 @@ function createScrutinizerWindow(startUrl) {
             contextIsolation: true
         }
     });
+    win.studyMode = Boolean(study);
+    win.toolbarReady = false;
+    win.hudReady = false;
 
     // Explicitly set menu for Windows/Linux
     if (process.platform !== 'darwin') {
@@ -862,6 +967,21 @@ function createScrutinizerWindow(startUrl) {
         }
     });
 
+    contentView.webContents.on('before-input-event', (event, input) => {
+        if (!isStudyWindow(win) || input.type !== 'keyDown') return;
+
+        const commandKey = process.platform === 'darwin' ? input.meta : input.control;
+        const key = String(input.key || '').toLowerCase();
+        const navigationArrow = (commandKey || input.alt) && (key === 'arrowleft' || key === 'arrowright');
+        const lockedCommand = commandKey && ['l', 'n', 'r'].includes(key);
+        if (!navigationArrow && !lockedCommand) return;
+
+        event.preventDefault();
+        if (commandKey && key === 'l' && win.toolbarReady) {
+            win.toolbarView.webContents.send('toolbar:show-study-url');
+        }
+    });
+
     // Create Toolbar WebContentsView
     const toolbarView = new WebContentsView({
         webPreferences: {
@@ -871,7 +991,9 @@ function createScrutinizerWindow(startUrl) {
     });
     toolbarView.webContents.loadFile('renderer/toolbar.html');
     toolbarView.webContents.once('did-finish-load', () => {
+        win.toolbarReady = true;
         toolbarView.webContents.send('toolbar:set-version', app.getVersion());
+        sendStudyToolbarState(win);
     });
 
     // Add views to main window
@@ -1086,7 +1208,11 @@ function createScrutinizerWindow(startUrl) {
     // Intercept target="_blank" links
     contentView.webContents.setWindowOpenHandler(({ url }) => {
         console.log('[Main] Opening new window:', url);
-        createScrutinizerWindow(url);
+        if (isStudyWindow(win)) {
+            contentView.webContents.loadURL(url);
+        } else {
+            createScrutinizerWindow(url);
+        }
         return { action: 'deny' };
     });
 
@@ -1109,6 +1235,7 @@ function createScrutinizerWindow(startUrl) {
 
     // Send init state to HUD once it loads
     hudWindow.webContents.once('did-finish-load', () => {
+        win.hudReady = true;
         if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
             console.log('[Main] HUD loaded. Sending init-state.');
             hudWindow.webContents.send('hud:settings:radius-options', RADIUS_OPTIONS);
@@ -1125,8 +1252,10 @@ function createScrutinizerWindow(startUrl) {
                 intensity: currentIntensity !== undefined ? currentIntensity : 1.0,
                 enabled: currentEnabled !== undefined ? currentEnabled : true,
                 visualMemory: currentVisualMemory !== undefined ? currentVisualMemory : 0,
-                comfortMode: settingsManager.get('comfortMode') || false,
-                showWelcome: currentShowWelcome !== undefined ? currentShowWelcome : true,
+                comfortMode: currentComfortMode !== undefined ? currentComfortMode : false,
+                aestheticMode: currentAestheticMode,
+                studyActive: Boolean(study),
+                showWelcome: study ? false : (currentShowWelcome !== undefined ? currentShowWelcome : true),
                 enableSaliencyModulation: enableSaliency
             };
             // Merge showWelcome into initialState based on isFirstWindow
@@ -1135,6 +1264,7 @@ function createScrutinizerWindow(startUrl) {
             console.log('[Main] Sending state to HUD:', JSON.stringify(initialState));
             hudWindow.webContents.send('hud:settings:init-state', initialState);
             hudWindow.webContents.send('settings:init-state', initialState); // Legacy
+            sendStudyRuntimeState(win, { resetMemory: false });
         }
     });
 
@@ -1387,7 +1517,117 @@ function createSplashWindow() {
     });
 }
 
-function createWindow() {
+function captureRuntimeState() {
+    return {
+        radius: currentRadius,
+        blur: currentBlur,
+        intensity: currentIntensity,
+        enabled: currentEnabled,
+        visualMemory: currentVisualMemory,
+        comfortMode: currentComfortMode,
+        mode: currentAestheticMode
+    };
+}
+
+function applyRuntimeStateToGlobals(state) {
+    currentRadius = state.radius;
+    currentBlur = state.blur;
+    currentIntensity = state.intensity;
+    currentEnabled = state.enabled;
+    currentVisualMemory = state.visualMemory;
+    currentComfortMode = state.comfortMode;
+    currentAestheticMode = state.mode;
+}
+
+function runtimePayload(state) {
+    return {
+        radius: state.radius,
+        intensity: state.intensity,
+        enabled: state.enabled,
+        visualMemory: state.visualMemory,
+        comfortMode: state.comfortMode,
+        aestheticMode: state.mode
+    };
+}
+
+function sendStudyToolbarState(win) {
+    if (!win || win.isDestroyed() || !win.toolbarReady || !activeStudy || !isStudyWindow(win)) return;
+    win.toolbarView.webContents.send('toolbar:enter-study', {
+        taskId: activeStudy.launch.task.id,
+        instructions: activeStudy.launch.task.instructions,
+        currentUrl: win.scrutinizerView.webContents.getURL() || activeStudy.launch.task.targetUrl
+    });
+}
+
+function sendStudyRuntimeState(win, { resetMemory = true } = {}) {
+    if (!win || win.isDestroyed() || !win.hudReady || !activeStudy || !isStudyWindow(win)) return;
+    if (resetMemory) win.scrutinizerHud.webContents.send('study:reset-visual-memory');
+    win.scrutinizerHud.webContents.send('study:apply-runtime-settings', {
+        ...runtimePayload(activeStudy.runtimeState),
+        studyActive: true
+    });
+}
+
+function applyStudyLaunch(launch) {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+        if (app.isReady()) {
+            pendingStudyLaunch = null;
+            createWindow(launch);
+        } else {
+            pendingStudyLaunch = launch;
+        }
+        return;
+    }
+
+    const previousRuntimeState = activeStudy
+        ? activeStudy.previousRuntimeState
+        : captureRuntimeState();
+    const runtimeState = buildStudyRuntimeState(previousRuntimeState, launch.overrides);
+
+    activeStudy = {
+        launch,
+        previousRuntimeState,
+        runtimeState,
+        windowId: mainWindow.id,
+        startedAt: Date.now()
+    };
+    applyRuntimeStateToGlobals(runtimeState);
+    mainWindow.studyMode = true;
+
+    sendStudyRuntimeState(mainWindow);
+    sendStudyToolbarState(mainWindow);
+    mainWindow.scrutinizerView.webContents.loadURL(launch.task.targetUrl);
+    rebuildMenu();
+
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    if (!mainWindow.isVisible()) mainWindow.show();
+    mainWindow.focus();
+}
+
+function exitStudyMode() {
+    if (!activeStudy) return;
+
+    const study = activeStudy;
+    const win = BrowserWindow.getAllWindows().find((candidate) => candidate.id === study.windowId) || mainWindow;
+    applyRuntimeStateToGlobals(study.previousRuntimeState);
+
+    if (win && !win.isDestroyed()) {
+        if (win.hudReady) {
+            win.scrutinizerHud.webContents.send('study:reset-visual-memory');
+            win.scrutinizerHud.webContents.send('study:apply-runtime-settings', {
+                ...runtimePayload(study.previousRuntimeState),
+                studyActive: false
+            });
+        }
+        if (win.toolbarReady) win.toolbarView.webContents.send('toolbar:exit-study');
+        win.studyMode = false;
+    }
+
+    activeStudy = null;
+    rebuildMenu();
+}
+
+function createWindow(studyLaunch = null) {
     // Show splash immediately
     createSplashWindow();
     // Initialize settings manager
@@ -1398,6 +1638,7 @@ function createWindow() {
     currentBlur = settingsManager.get('blur');
     currentIntensity = settingsManager.get('intensity');
     currentVisualMemory = settingsManager.get('visualMemory'); // Load saved visual memory setting
+    currentComfortMode = settingsManager.get('comfortMode') || false;
     currentSaliencyResolution = settingsManager.get('saliencyResolution') || 256;
     currentCongestionResolution = settingsManager.get('congestionResolution') || 512;
     currentMobileEmulation = settingsManager.get('mobileEmulation') || false;
@@ -1406,7 +1647,31 @@ function createWindow() {
     currentShowWelcome = settingsManager.get('showWelcomePopup');
     currentStartPage = settingsManager.get('startPage');
 
-    mainWindow = createScrutinizerWindow(currentStartPage);
+    let study = null;
+    if (studyLaunch) {
+        const previousRuntimeState = activeStudy
+            ? activeStudy.previousRuntimeState
+            : captureRuntimeState();
+        const runtimeState = buildStudyRuntimeState(previousRuntimeState, studyLaunch.overrides);
+        study = {
+            launch: studyLaunch,
+            previousRuntimeState,
+            runtimeState,
+            windowId: null,
+            startedAt: Date.now()
+        };
+        activeStudy = study;
+        applyRuntimeStateToGlobals(runtimeState);
+    }
+
+    mainWindow = createScrutinizerWindow(
+        study ? study.launch.task.targetUrl : currentStartPage,
+        { study }
+    );
+    if (study) {
+        study.windowId = mainWindow.id;
+        mainWindow.studyMode = true;
+    }
 
     // Build and set application menu
     rebuildMenu();
@@ -2767,6 +3032,10 @@ app.whenReady().then(() => {
     globalShortcut.register('CommandOrControl+L', () => {
         const win = BrowserWindow.getFocusedWindow();
         if (win && win.scrutinizerView) {
+            if (isStudyWindow(win)) {
+                if (win.toolbarReady) win.toolbarView.webContents.send('toolbar:show-study-url');
+                return;
+            }
             // Trigger the menu item action
             const currentURL = win.scrutinizerView.webContents.getURL();
 
@@ -2948,7 +3217,19 @@ app.whenReady().then(() => {
     } else if (process.env.TEST_MODE === 'true') {
         runIntegrationTest();
     } else {
-        createWindow();
+        const launch = pendingStudyLaunch;
+        pendingStudyLaunch = null;
+        createWindow(launch);
+    }
+
+    if (app.isPackaged && !app.setAsDefaultProtocolClient(STUDY_SCHEME)) {
+        console.warn(`[Study] Failed to register ${STUDY_SCHEME}:// as the default protocol client`);
+    }
+
+    if (pendingStudyError) {
+        const error = pendingStudyError;
+        pendingStudyError = null;
+        showStudyLinkError(error);
     }
 
     // Initialize auto-updater with persistent event handlers
@@ -2972,7 +3253,7 @@ app.on('will-quit', () => {
 
 app.on('activate', function () {
     if (mainWindow === null) {
-        createWindow();
+        createWindow(activeStudy ? activeStudy.launch : null);
     }
 });
 
@@ -2987,6 +3268,7 @@ app.whenReady().then(() => {
 
 // Handle "New Window" menu action
 app.on('create-new-window', () => {
+    if (activeStudy) return;
     createScrutinizerWindow();
 });
 

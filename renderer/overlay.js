@@ -9,6 +9,7 @@
     let scrutinizer;
     let captureInterval = null;
     let fovealEnabled = false;
+    let studyModeActive = false;
 
     // Helper to forward logs to main process terminal
     const log = (msg) => {
@@ -122,7 +123,7 @@
 
             // ESC is handled in main.js to toggle HUD window visibility
             // Arrow keys to adjust radius (when enabled)
-            if (fovealEnabled) {
+            if (fovealEnabled && !studyModeActive) {
                 if (keyEvent.code === 'ArrowRight') {
                     if (scrutinizer) {
                         scrutinizer.updateFovealRadius(10, true);
@@ -138,15 +139,16 @@
         });
 
         // Toggle foveal effect (called from menu)
-        const toggleFoveal = (forceState = null) => {
+        const toggleFoveal = (forceState = null, { notifySettings = true } = {}) => {
             if (forceState !== null) {
                 fovealEnabled = forceState;
             } else {
                 fovealEnabled = !fovealEnabled;
             }
 
-            // Notify main process
-            ipcRenderer.send('settings:enabled-changed', fovealEnabled);
+            if (notifySettings) {
+                ipcRenderer.send('settings:enabled-changed', fovealEnabled);
+            }
 
             if (fovealEnabled) {
                 scrutinizer.enable();
@@ -173,8 +175,9 @@
         // Listen for init state from main process
         ipcRenderer.on('settings:init-state', (event, state) => {
             log(`[Overlay] Received init-state: ${JSON.stringify(state)}`);
-            if (state.enabled) toggleFoveal(true);
-            if (state.radius) {
+            studyModeActive = state.studyActive === true;
+            if (state.enabled !== undefined) toggleFoveal(state.enabled, { notifySettings: false });
+            if (state.radius !== undefined) {
                 scrutinizer.updateFovealRadius(state.radius, false);
             }
             if (state.visualMemory !== undefined) {
@@ -187,9 +190,26 @@
             if (state.enableSaliencyModulation !== undefined) {
                 if (scrutinizer) scrutinizer.toggleSaliencyModulation(state.enableSaliencyModulation);
             }
-            if (state.comfortMode) {
-                if (scrutinizer) scrutinizer.toggleComfortMode(true);
+            if (state.comfortMode !== undefined) {
+                if (scrutinizer) scrutinizer.toggleComfortMode(state.comfortMode, { notifySettings: false });
             }
+            if (state.aestheticMode !== undefined) {
+                if (scrutinizer) scrutinizer.setAestheticMode(state.aestheticMode);
+            }
+        });
+
+        ipcRenderer.on('study:apply-runtime-settings', (event, state) => {
+            studyModeActive = state.studyActive === true;
+            if (state.enabled !== undefined) toggleFoveal(state.enabled, { notifySettings: false });
+            if (state.radius !== undefined) scrutinizer.updateFovealRadius(state.radius, false);
+            if (state.intensity !== undefined) scrutinizer.updateIntensity(state.intensity);
+            if (state.visualMemory !== undefined) scrutinizer.setVisualMemoryLimit(state.visualMemory);
+            if (state.comfortMode !== undefined) scrutinizer.toggleComfortMode(state.comfortMode, { notifySettings: false });
+            if (state.aestheticMode !== undefined) scrutinizer.setAestheticMode(state.aestheticMode);
+        });
+
+        ipcRenderer.on('study:reset-visual-memory', () => {
+            if (scrutinizer) scrutinizer.resetVisualMemory();
         });
 
         // Menu IPC handlers
@@ -204,7 +224,7 @@
         // Listen for global enable/disable from toolbar or other windows
         ipcRenderer.on('settings:enabled-changed', (event, enabled) => {
             if (fovealEnabled !== enabled) {
-                toggleFoveal(enabled);
+                toggleFoveal(enabled, { notifySettings: false });
             }
         });
 

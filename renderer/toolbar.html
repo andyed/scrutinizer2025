@@ -11,17 +11,24 @@
 
 <body>
     <div class="toolbar">
-        <div class="nav-controls">
+        <div class="nav-controls browse-only">
             <button id="back-btn" title="Back"><i class="fas fa-arrow-left"></i></button>
             <button id="forward-btn" title="Forward"><i class="fas fa-arrow-right"></i></button>
             <button id="reload-btn" title="Reload"><i class="fas fa-rotate-right"></i></button>
         </div>
 
-        <div class="url-container">
+        <div class="url-container browse-only">
             <button id="url-trigger" title="Click to edit URL">Enter URL or search...</button>
         </div>
 
-        <div class="menu-controls">
+        <div id="study-container" class="study-container hidden" aria-live="polite">
+            <span id="study-label" class="study-label">Task</span>
+            <button id="study-instruction" class="study-instruction" type="button"></button>
+            <button id="study-origin" class="study-origin" type="button" aria-label="Show full task URL"></button>
+            <button id="study-done" class="study-done" type="button">Done</button>
+        </div>
+
+        <div class="menu-controls browse-only">
             <span id="app-version"
                 style="display: none;"></span>
             <button id="fovea-toggle-btn" title="Toggle Fovea Effect" class="active">

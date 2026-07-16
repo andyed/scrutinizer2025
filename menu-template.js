@@ -2,7 +2,7 @@ const { app, shell } = require('electron');
 
 const { RADIUS_OPTIONS, ASPECT_OPTIONS, INTENSITY_OPTIONS } = require('./shared/constants.json');
 
-function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10, currentMobileEmulation = false, currentAestheticMode = 0, currentCongestionMode = 0, currentEccentricityMode = 0, currentSaliencyMapOn = false, currentStructureMapOn = false, currentSaliencyResolution = 256, currentCongestionResolution = 512, currentVisualMemory = 0) {
+function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, currentBlur = 10, currentMobileEmulation = false, currentAestheticMode = 0, currentCongestionMode = 0, currentEccentricityMode = 0, currentSaliencyMapOn = false, currentStructureMapOn = false, currentSaliencyResolution = 256, currentCongestionResolution = 512, currentVisualMemory = 0, studyMode = false) {
     const isMac = process.platform === 'darwin';
     const { BrowserWindow } = require('electron');
 
@@ -54,6 +54,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
             submenu: [
                 {
                     label: 'New Window',
+                    enabled: !studyMode,
                     accelerator: 'CmdOrCtrl+N',
                     click: () => {
                         // Update Visual Memory Mask
@@ -66,6 +67,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                 },
                 {
                     label: 'Open URL...',
+                    enabled: !studyMode,
                     accelerator: 'CmdOrCtrl+L',
                     click: () => {
                         const win = BrowserWindow.getFocusedWindow();
@@ -130,6 +132,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
         // View Menu
         {
             label: 'View',
+            enabled: !studyMode,
             submenu: [
                 { role: 'reload' },
                 { role: 'forceReload' },
@@ -168,6 +171,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
         // Go Menu (navigation)
         {
             label: 'Go',
+            enabled: !studyMode,
             submenu: [
                 {
                     label: 'Refresh',
@@ -490,6 +494,7 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
         // Simulation Menu (Custom)
         {
             label: 'Simulation',
+            enabled: !studyMode,
             submenu: [
                 // === BEHAVIOR (cognitive processes being modeled) ===
                 {
