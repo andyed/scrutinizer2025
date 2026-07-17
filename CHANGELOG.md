@@ -13,7 +13,14 @@
 - Locked navigation and simulation-changing controls while Study mode is active so a task link defines a reproducible condition.
 - Clarified RFV documentation and corrected stale control instructions and over-broad claims about what the simulation predicts.
 
-> macOS implementation and unsigned package metadata have been verified. Signed/notarized browser handoff and the Windows implementation remain release checks for 2.8.1.
+### Fixed — post-audit hardening (2026-07-16)
+
+- **Toolbar contrast to the 8:1 floor:** Study Done button 3.98:1 → 11.18:1 (now dark-on-light-blue, also the most salient toolbar element), destination origin 7.01:1 → 8.49:1, browse URL display 4.43:1 → 8.52:1; hover/active states computed and verified.
+- **Exit Study Mode** application-menu command (spec-required escape path when the study toolbar is unusable).
+- **Deep-link launch race:** a valid link arriving after app-ready but before the window existed was silently dropped; window re-activation now also consumes a buffered link instead of relaunching a stale study.
+- **Error-dialog echo capped:** unknown deep-link parameter names truncate at 64 characters before reaching the native dialog.
+
+> macOS implementation and unsigned package metadata have been verified. Signed/notarized browser handoff remains a release check for 2.8.1. Study Links are macOS-only: Windows deep-link delivery (single-instance lock, argv handling) is not yet implemented — tracked as follow-up work, not a pending verification.
 
 ## [2.8.0] - 2026-07-11
 

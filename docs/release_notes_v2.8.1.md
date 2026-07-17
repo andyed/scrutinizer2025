@@ -64,13 +64,20 @@ Release verification still requires the signed and notarized build to be install
 
 ### Windows
 
-Windows NSIS and ZIP packaging are configured. Study Link registration, cold and warm launch behavior, browser prompts, and uninstall cleanup are being verified separately for the 2.8.1 release.
+Study Links are **macOS-only in 2.8.1**. Windows NSIS and ZIP packaging are configured and the installer will register the URL scheme, but the app does not yet implement Windows deep-link delivery (no single-instance lock, no `second-instance` handler, no command-line URL parsing), so a clicked Study Link would never reach a running app. Windows support is tracked as follow-up work, not a pending verification.
+
+## Post-audit hardening (2026-07-16)
+
+A same-day audit of the Study Link work produced these fixes, included in 2.8.1:
+
+- **Study toolbar contrast brought to the project's 8:1 floor.** The Done button was white-on-accent at 3.98:1 (below WCAG AA); it is now dark-on-light-blue at 11.18:1, which also makes the participant's exit control the most salient element on the toolbar. The destination-origin button (the participant's site-identity signal) moved from 7.01:1 to 8.49:1, and the browse-mode URL display from 4.43:1 to 8.52:1, with hover/active states verified.
+- **Exit Study Mode menu command** (File menu, study mode only) — the spec-required researcher escape path when the study toolbar itself is unusable.
+- **Deep-link launch race fixed:** a valid link arriving after app-ready but before the window existed was silently dropped; it now creates the study window. Window re-activation also consumes a buffered link instead of a stale study.
+- **Error-dialog echo capped:** unknown parameter names (attacker-controlled) are truncated to 64 characters before display.
 
 ## Release checks still open
 
 - Install the signed and notarized macOS build and test Safari and Chrome handoff
 - Verify macOS cold launch, warm launch, Done restoration, and malformed-link rejection
-- Complete the equivalent Windows installer and browser checks
-- Confirm Windows uninstall removes protocol ownership appropriately
 - Resolve the repository's missing `v2.8.0` tag before the version/tag release guard can pass
 - Bump `package.json` to 2.8.1 only when the release candidate is ready to tag
