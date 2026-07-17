@@ -1,6 +1,8 @@
 # Getting Started: Restricted Focus Viewer for Usability Testing
 
-Scrutinizer works as a **Restricted Focus Viewer** (RFV) — a cursor-directed model of how visual detail and color change with distance from a fixation point. It helps evaluate peripheral discoverability, visual hierarchy, and information density without eye-tracking hardware. The cursor is a chosen viewing location, not measured gaze, and the rendering is a model rather than a prediction of what an individual participant sees.
+Scrutinizer works as a **Restricted Focus Viewer** (RFV): it controls where detailed visual information is available and makes the participant's functional focus visible through interaction. The clear region follows the pointer, so inspecting another part of the interface requires bringing that region into focus. Participant and researcher see the same restricted stimulus and can examine peripheral discoverability, visual hierarchy, information density, and the sequence of focus decisions without eye-tracking hardware.
+
+This makes “see what your user sees” a practical description of the method: Scrutinizer renders the page the participant actually works from. The narrower caveat is that pointer position is not a measurement of exact eye position or covert attention; it is the participant-controlled locus of detailed visual access.
 
 This guide covers setup, calibration, and the two features that make Scrutinizer practical for design dialogue: **Visual Memory** and **Comfort Mode**.
 
@@ -13,7 +15,7 @@ This guide covers setup, calibration, and the two features that make Scrutinizer
 3. Press **Cmd+E** to toggle the foveated effect on/off
 4. Move your cursor — the clear zone follows it, everything else degrades
 
-The effect is immediate. Treat the result as a controlled way to inspect what remains available around a chosen fixation—not as a reconstruction of a particular first-time visitor's perception.
+The effect is immediate. In a participant-controlled session, you see the same visual information the participant is given and observe where they choose to move the clear region next.
 
 ---
 

@@ -19,10 +19,10 @@ macOS Installer: **[Download v2.8.0](https://github.com/andyed/scrutinizer2025/r
 
 ## What Scrutinizer Does
 
-Fine visual detail is concentrated near fixation; away from it, acuity and color sensitivity fall and crowding increases. Scrutinizer renders live web pages through a cursor-directed model of those changes. Move the cursor to inspect what visual information remains available around a chosen location before moving to another one.
+Scrutinizer lets a researcher **control and reveal visual focus** during a usability task. Fine detail is available around the participant's pointer; away from it, acuity and color sensitivity fall and crowding increases. To inspect another part of the interface, the participant must move there and bring it into focus. The researcher sees the same constrained page and can observe which regions the participant chooses to reveal, in what order, and where the interface fails to guide the next move.
 
 > [!TIP]
-> **For usability practitioners:** Scrutinizer works as a [Restricted Focus Viewer](https://pubmed.ncbi.nlm.nih.gov/12723780/) (Jansen et al. 2003) — evaluate peripheral discoverability, color reliance, and layout hierarchy without eye tracking hardware. Start with the [RFV setup and calibration guide](docs/tutorials/getting-started-rfv.md), then use the [usability-testing practitioner guide](docs/tutorials/usability-testing-practitioner-guide.md) to prepare reproducible Study Links and run moderated observation sessions.
+> **For usability practitioners:** Scrutinizer works as a [Restricted Focus Viewer](https://pubmed.ncbi.nlm.nih.gov/12723780/) (Jansen et al. 2003). It makes “see what your user sees” operational: participant and researcher share the same restricted stimulus, while pointer movement reveals the participant's functional focus. Use it to evaluate peripheral discoverability, color reliance, visual hierarchy, and focus transitions without eye-tracking hardware. Start with the [RFV setup and calibration guide](docs/tutorials/getting-started-rfv.md), then use the [usability-testing practitioner guide](docs/tutorials/usability-testing-practitioner-guide.md) to prepare reproducible Study Links and moderated sessions.
 
 ![Dashboard with foveated rendering](screenshots/v25_dashboard_overlay.png)
 
@@ -158,7 +158,7 @@ Key open specs: oriented DoG bands (1.1), texture synthesis (1.2), calibrated vi
 2. **Approximate spatial pooling** — uses averaged pixel blocks, not the texture-like statistical summaries the brain preserves in peripheral vision. *Fix: [Project 1.2](docs/research-opportunities.md)*
 3. **Sequential color pipeline** — spatial averaging runs before color attenuation, slightly over-degrading mid-peripheral color. *Fix: [ROADMAP](ROADMAP.md)*
 4. **No memory across fixations** — each fixation renders independently; the brain accumulates information across eye movements. Visual Memory modes approximate this. *See: [simulation-limitations.md](docs/simulation-limitations.md)*
-5. **Mouse, not eyes** — cursor tracking (~200ms latency) approximates but doesn't replicate gaze fixation. *Fix: [Project 3.3](docs/research-opportunities.md)*
+5. **Controlled focus, not physiological gaze** — in an RFV session, the pointer defines where detailed information is available and therefore reveals the participant's functional focus. It does not measure covert attention or exact eye position. Eye-tracker integration can add that separate signal. *See: [Project 3.3](docs/research-opportunities.md)*
 
 Full gap analysis: [simulation-limitations.md](docs/simulation-limitations.md).
 

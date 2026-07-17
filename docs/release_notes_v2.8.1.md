@@ -4,7 +4,7 @@
 **Release date:** TBD
 **Previous:** [v2.8.0](release_notes_v2.8.0.md)
 
-Scrutinizer 2.8.1 adds a task-focused workflow for moderated usability observation. Researchers can place a Study Link in an ordinary browser instruction sheet; clicking it opens the installed Scrutinizer app at the intended page with a reproducible, temporary simulation condition and persistent task instructions.
+Scrutinizer 2.8.1 turns Restricted Focus Viewing into a reproducible usability-testing workflow. RFV controls where detailed visual information is available, requiring participants to reveal their functional focus as they work. Researchers can place a Study Link in an ordinary browser instruction sheet; clicking it opens the installed Scrutinizer app at the intended page with a temporary simulation condition and persistent task instructions.
 
 ## Highlights
 
@@ -41,10 +41,10 @@ The new [Usability-Testing Practitioner Guide](tutorials/usability-testing-pract
 - Preparing participants for the external-app handoff
 - Moderating without coaching pointer movement
 - Recording outcomes with a reusable observation worksheet
-- Interpreting RFV findings without presenting pointer position as measured gaze
+- Interpreting pointer movement as revealed functional focus while keeping physiological gaze as a distinct measurement
 - Reporting the build, display, calibration, and simulation settings needed for comparison
 
-The existing [RFV Getting Started guide](tutorials/getting-started-rfv.md) has also been corrected and clarified. Scrutinizer is described as a cursor-directed model, not an eye tracker or a literal prediction of what an individual participant sees.
+The existing [RFV Getting Started guide](tutorials/getting-started-rfv.md) has also been clarified around the method's central value: participant and researcher see the same restricted stimulus, and the participant's movement of the clear region reveals where they choose to acquire detailed information. Eye tracking remains a separate measurement of exact eye position.
 
 ## Example
 

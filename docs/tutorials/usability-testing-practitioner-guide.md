@@ -1,8 +1,21 @@
 # Usability-Testing Practitioner Guide
 
-This guide explains how to use Scrutinizer's **Restricted Focus Viewer** (RFV) in a moderated usability session. It focuses on reproducible task setup, observation practice, and appropriately cautious interpretation.
+This guide explains how to use Scrutinizer's **Restricted Focus Viewer** (RFV) to control and reveal visual focus in a moderated usability session. It covers reproducible task setup, observation practice, and interpretation.
 
 For basic installation, controls, calibration, Visual Memory, and Comfort Mode, begin with [Getting Started: Restricted Focus Viewer](getting-started-rfv.md). For the deep-link implementation contract, see [Usability Study Deep Links and Study Toolbar](../specs/usability-study-deep-links.md).
+
+## The strategic value of RFV
+
+Ordinary usability observation shows clicks, navigation, speech, and task outcomes, but much of the participant's moment-to-moment visual access remains hidden. RFV changes the task environment so that detailed information is available only around a participant-controlled location. To inspect a region, the participant must bring it into focus.
+
+That intervention creates two linked benefits:
+
+1. **Control:** every participant performs the task under the same documented restriction on visual information.
+2. **Revelation:** movement of the clear region exposes the participant's functional focus—the places they choose to inspect in order to understand and act.
+
+“See what your user sees” is therefore meaningful in an RFV session. The participant works from the rendered stimulus, and the researcher sees that same stimulus. The researcher can observe what was available before each move, which region the participant revealed next, and whether the interface provided enough peripheral information to guide that transition.
+
+RFV does not claim that pointer coordinates equal exact physiological gaze. A participant may move their eyes within the display or direct covert attention outside the clear region. The pointer instead has a stronger operational meaning than an ordinary cursor: it controls where task-relevant detail can be acquired. Call this **functional focus** or **revealed focus**, reserving **gaze** for eye-tracker measurements.
 
 ## What this method is for
 
@@ -14,15 +27,13 @@ Scrutinizer is useful when a research question concerns what remains visually av
 - Does color, spacing, size, or grouping make a region distinguishable before it is directly inspected?
 - How easily can a participant recover after choosing the wrong region?
 
-Scrutinizer is not eye tracking. In the standard setup, the mouse cursor controls the clear region; it does not measure the participant's gaze. Results are observations made under a consistent visual constraint, not a literal record of what the participant saw.
-
-Use RFV findings as evidence about interaction behavior and as hypotheses about peripheral discoverability. Combine them with participant comments, task outcomes, and—when the research question requires it—eye-tracking or other measures.
+Use RFV findings as evidence about visual access, functional focus, and interaction behavior under the controlled condition. Combine them with participant comments and task outcomes; add eye tracking when the research question requires exact eye position, saccades, or covert-attention inference.
 
 ## Choose a session format
 
 ### Participant-controlled task
 
-The participant moves the pointer and completes a realistic task while the moderator observes. This is the primary usability-testing format. It reveals how someone explores and acts under the RFV constraint, but pointer location must not be relabeled as gaze.
+The participant moves the pointer and completes a realistic task while the moderator observes. This is the primary usability-testing format. Because the pointer controls access to detail, its movement reveals which regions the participant chooses to bring into functional focus, in what sequence, and for what apparent purpose.
 
 ### Moderator-controlled walkthrough
 
@@ -125,7 +136,7 @@ Tell participants what will happen before they click:
 4. Work as naturally as possible and think aloud only if that is part of the study protocol.
 5. Select **Done** after completing the task or when the moderator asks you to stop.
 
-Do not tell participants that the cursor is tracking their eyes. If pointer movement itself is under study, state exactly what will be observed and obtain any consent required by the research plan.
+Explain that the pointer controls where detail is available and that the moderator will observe how the participant reveals and uses information. Do not describe this as eye tracking unless an eye tracker is actually connected. Obtain any consent required by the research plan.
 
 ## Run the session
 
@@ -177,13 +188,15 @@ Use one row per task. Add timestamps or recordings only when they are covered by
 
 Appropriate conclusions include:
 
+- “The participant never brought the navigation into focused access before abandoning the task.”
+- “The participant revealed the content column first, then moved to global navigation after the page failed to provide a useful peripheral cue.”
 - “Under the 45px, Mode 12, Visual Memory 5 condition, four of six participants explored the content column before finding the account navigation.”
 - “The billing destination was often noticed only after participants moved near the global navigation.”
 - “Increasing separation between the two controls is a design hypothesis for the next iteration.”
 
 Avoid conclusions such as:
 
-- “Participants never looked at the navigation.” Pointer location is not measured gaze.
+- “Participants' eyes never looked at the navigation.” RFV establishes that they did not bring it into focused visual access; exact eye position requires eye tracking.
 - “This is exactly what peripheral vision looks like.” Scrutinizer is a parameterized model.
 - “The interface fails for all users.” Findings apply to the participants, tasks, build, and condition studied.
 - “Five retained cursor locations equal five human fixations.” Visual Memory is an operational simulation setting.
@@ -222,6 +235,6 @@ Include these details in a study report:
 - Task wording and starting URL
 - Participant count, recruitment context, and exclusions
 - Technical incidents and moderator interventions
-- A clear statement that pointer position was not measured gaze
+- A statement that the pointer controlled detailed visual access and revealed functional focus; note separately whether physiological gaze was measured
 
 These details make RFV observations interpretable and make later replications meaningfully comparable.

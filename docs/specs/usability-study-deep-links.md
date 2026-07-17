@@ -38,6 +38,8 @@ Scrutinizer can be configured manually for an RFV walkthrough, but that makes a 
 
 A study link makes the task definition portable while keeping the stimulus inside the installed, calibrated Scrutinizer app.
 
+Strategically, this turns RFV from a reviewer-controlled visualization into a repeatable usability-testing intervention. Detailed visual access is bound to the participant's pointer, so each movement reveals which region they choose to bring into functional focus. The participant and moderator share the same restricted stimulus: the moderator can see what information was available before a move, what the participant revealed next, and where peripheral cues failed to guide the task. This is not a claim that pointer coordinates are physiological gaze; it is a controlled measure of task-relevant visual access.
+
 ## Goals
 
 ### macOS v1
