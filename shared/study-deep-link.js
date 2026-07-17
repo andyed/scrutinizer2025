@@ -60,7 +60,10 @@ function parseStudyDeepLink(rawUrl, { radiusOptions = [], modeIds = [] } = {}) {
     const seen = new Set();
     for (const [key] of parsed.searchParams) {
         if (!ALLOWED_PARAMETERS.has(key)) {
-            return failure('UNKNOWN_PARAMETER', `The study link contains an unsupported setting: ${key}.`);
+            // Cap the echo: the key is attacker-controlled and unbounded, and
+            // this message is rendered in a native dialog.
+            const label = key.length > 64 ? `${key.slice(0, 64)}…` : key;
+            return failure('UNKNOWN_PARAMETER', `The study link contains an unsupported setting: ${label}.`);
         }
         if (seen.has(key)) {
             return failure('DUPLICATE_PARAMETER', `The study link repeats the ${key} setting.`);

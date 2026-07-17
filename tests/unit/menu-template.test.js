@@ -116,4 +116,33 @@ describe('buildMenuTemplate — Study mode lock', () => {
         expect(go.enabled).toBe(false);
         expect(simulation.enabled).toBe(false);
     });
+
+    // Spec (usability-study-deep-links.md:229): the researcher escape path is
+    // Done plus an application-menu Exit Study Mode command.
+    it('offers Exit Study Mode while a task is active', () => {
+        const noop = () => {};
+        const template = buildMenuTemplate(
+            noop, noop,
+            45, 10, false, 12, 0, 0, false, false, 256, 512, 5,
+            true
+        );
+        const file = template.find((item) => item.label === 'File');
+        const exit = file.submenu.find((item) => item.label === 'Exit Study Mode');
+        expect(exit).toBeDefined();
+        expect(exit.visible).toBe(true);
+        expect(exit.enabled).toBe(true);
+    });
+
+    it('hides Exit Study Mode outside study mode', () => {
+        const noop = () => {};
+        const template = buildMenuTemplate(
+            noop, noop,
+            45, 10, false, 12, 0, 0, false, false, 256, 512, 5,
+            false
+        );
+        const file = template.find((item) => item.label === 'File');
+        const exit = file.submenu.find((item) => item.label === 'Exit Study Mode');
+        expect(exit.visible).toBe(false);
+        expect(exit.enabled).toBe(false);
+    });
 });

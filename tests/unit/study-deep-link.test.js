@@ -78,6 +78,14 @@ describe('study deep-link parser', () => {
         expect(parse('url=https%3A%2F%2Fexample.com&mode=12&mode=0')).toMatchObject({ ok: false, error: { code: 'DUPLICATE_PARAMETER' } });
     });
 
+    it('truncates over-length unknown parameter names in the error message', () => {
+        // The key is attacker-controlled and the message reaches a native dialog.
+        const result = parse(`url=https%3A%2F%2Fexample.com&${'k'.repeat(300)}=1`);
+        expect(result).toMatchObject({ ok: false, error: { code: 'UNKNOWN_PARAMETER' } });
+        expect(result.error.message).toContain(`${'k'.repeat(64)}…`);
+        expect(result.error.message).not.toContain('k'.repeat(65));
+    });
+
     test.each([
         ['fovea_radius_px', '44'],
         ['fovea_radius_px', '45.0'],

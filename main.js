@@ -126,11 +126,14 @@ function receiveStudyDeepLink(rawUrl) {
     }
 
     console.log(`[Study] Received ${result.value.route} for ${result.value.task.origin}`);
-    if (!app.isReady() || !mainWindow || mainWindow.isDestroyed()) {
+    if (!app.isReady()) {
         pendingStudyLaunch = result.value;
         return;
     }
 
+    // Once ready, applyStudyLaunch owns the no-window case (it creates the
+    // window itself). Buffering here instead would strand the link: the only
+    // pendingStudyLaunch consumer in whenReady has already run.
     applyStudyLaunch(result.value);
 }
 
@@ -3253,7 +3256,11 @@ app.on('will-quit', () => {
 
 app.on('activate', function () {
     if (mainWindow === null) {
-        createWindow(activeStudy ? activeStudy.launch : null);
+        // A deep link buffered before ready outranks a stale activeStudy —
+        // "latest valid link wins" (spec §launch ordering).
+        const launch = pendingStudyLaunch || (activeStudy ? activeStudy.launch : null);
+        pendingStudyLaunch = null;
+        createWindow(launch);
     }
 });
 
@@ -3270,6 +3277,12 @@ app.whenReady().then(() => {
 app.on('create-new-window', () => {
     if (activeStudy) return;
     createScrutinizerWindow();
+});
+
+// Handle "Exit Study Mode" menu action — the moderator's escape hatch when
+// the study toolbar itself is unusable.
+app.on('exit-study-mode', () => {
+    exitStudyMode();
 });
 
 // Handle "Check for Updates" menu action (delegated from menu-template)

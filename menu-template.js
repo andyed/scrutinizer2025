@@ -102,6 +102,15 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                         win.urlDialog = dialog;
                     }
                 },
+                {
+                    // Spec (usability-study-deep-links.md §Study toolbar) requires a
+                    // menu escape hatch alongside the toolbar Done button, so a wedged
+                    // toolbar view can't strand the moderator in study mode.
+                    label: 'Exit Study Mode',
+                    visible: studyMode,
+                    enabled: studyMode,
+                    click: () => app.emit('exit-study-mode')
+                },
                 { type: 'separator' },
                 { role: 'close' }
             ]
