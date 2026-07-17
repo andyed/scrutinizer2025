@@ -24,11 +24,11 @@ Exit: v2.8.1 release notes updated; release itself gated on Wave 1 verification.
 - [ ] **Signed/notarized DMG handoff verification** — Safari + Chrome, cold + warm
       launch, Browse-toolbar-flash criterion. The release gate; nothing
       study-shaped happens until this passes.
-- [ ] `docs/templates/consent.md` + `debrief.md` (P3-5 partial; referenced by
-      `human_subjects_data_collection.md`)
-- [ ] Study Link builder page on scrutinizer-www (vendor the pure parser from
-      `shared/study-deep-link.js` so builder and app share validation); cookbook
-      doc is the fallback floor
+- [x] `docs/templates/consent.md` + `debrief.md` (P3-5 partial; referenced by
+      `human_subjects_data_collection.md`) — DONE 2026-07-16
+- [x] Study Link builder page on scrutinizer-www (`src/study-link-builder.html`;
+      parser vendored to `src/js/study-deep-link.js`, verified output-identical
+      to the app's) — DONE 2026-07-16; doubles as the parameter cookbook
 - [ ] **Pilot study: 2–3 participants, moderated**, using the practitioner guide
       and worksheet. Findings memo doubles as a case-study blog post.
 

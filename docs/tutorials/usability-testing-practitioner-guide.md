@@ -94,7 +94,7 @@ Supported settings:
 | `comfort_mode` | `false` | Whether Comfort Mode begins enabled |
 | `visual_memory_limit` | `0`, `5`, `10`, `-1`, or `20` | Off, Limited, Extended, Infinite, or IOR |
 
-Query values containing URLs, spaces, punctuation, or other reserved characters must be percent-encoded. To avoid hand-encoding, an instruction-sheet author can generate the complete link with `URLSearchParams` in browser JavaScript:
+Query values containing URLs, spaces, punctuation, or other reserved characters must be percent-encoded. The easiest path is the hosted [Study Link Builder](https://scrutinizer.app/study-link-builder.html), which assembles and percent-encodes the link and validates it with the same parser the installed app runs — a link that passes there will not be rejected on a participant's machine. To generate links programmatically instead, use `URLSearchParams` in browser JavaScript:
 
 ```html
 <a id="start-task" href="#">Start task in Scrutinizer</a>
