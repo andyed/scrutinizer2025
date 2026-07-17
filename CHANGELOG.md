@@ -6,7 +6,7 @@
 
 - **Study Links:** Packaged builds register the versioned `scrutinizer://v1/task/start` URL route so a researcher can launch a web task from an ordinary browser instruction sheet with validated, temporary settings such as foveal radius, rendering mode, Comfort Mode, and Visual Memory.
 - **Study toolbar:** During a launched task, the normal URL controls are replaced with persistent task instructions, compressed destination-origin visibility, a read-only full-URL toggle, and a Done action. Study settings do not overwrite the user's saved preferences.
-- **Practitioner guide:** Added a task-oriented guide for using Restricted Focus Viewing to control visual access and reveal participants' functional focus, while distinguishing that operational signal from physiological gaze measurement.
+- **Practitioner guide:** Added a task-oriented guide for using the scientifically motivated peripheral view to support emulated gaze shifts, control visual access, and reveal participants' functional focus—while distinguishing that operational signal from physiological gaze measurement.
 
 ### Changed
 

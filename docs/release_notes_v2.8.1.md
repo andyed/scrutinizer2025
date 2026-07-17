@@ -4,7 +4,7 @@
 **Release date:** TBD
 **Previous:** [v2.8.0](release_notes_v2.8.0.md)
 
-Scrutinizer 2.8.1 turns Restricted Focus Viewing into a reproducible usability-testing workflow. RFV controls where detailed visual information is available, requiring participants to reveal their functional focus as they work. Researchers can place a Study Link in an ordinary browser instruction sheet; clicking it opens the installed Scrutinizer app at the intended page with a temporary simulation condition and persistent task instructions.
+Scrutinizer 2.8.1 turns Restricted Focus Viewing into a reproducible usability-testing workflow. RFV's scientifically motivated peripheral rendering aims to approximate the visual evidence used to plan the next eye movement; moving the pointer then emulates the change in fixation. This controls where detailed visual information is available and requires participants to reveal their functional focus as they work. Researchers can place a Study Link in an ordinary browser instruction sheet; clicking it opens the installed Scrutinizer app at the intended page with a temporary simulation condition and persistent task instructions.
 
 ## Highlights
 
@@ -44,7 +44,7 @@ The new [Usability-Testing Practitioner Guide](tutorials/usability-testing-pract
 - Interpreting pointer movement as revealed functional focus while keeping physiological gaze as a distinct measurement
 - Reporting the build, display, calibration, and simulation settings needed for comparison
 
-The existing [RFV Getting Started guide](tutorials/getting-started-rfv.md) has also been clarified around the method's central value: participant and researcher see the same restricted stimulus, and the participant's movement of the clear region reveals where they choose to acquire detailed information. Eye tracking remains a separate measurement of exact eye position.
+The existing [RFV Getting Started guide](tutorials/getting-started-rfv.md) has also been clarified around the method's central value: participant and researcher see the same modeled foveal-plus-peripheral stimulus; that peripheral view helps plan the next move; and movement of the clear region emulates a fixation change while revealing where the participant chooses to acquire detailed information. Eye tracking remains a separate measurement of exact eye position.
 
 ## Example
 

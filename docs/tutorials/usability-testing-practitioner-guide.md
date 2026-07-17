@@ -6,7 +6,7 @@ For basic installation, controls, calibration, Visual Memory, and Comfort Mode, 
 
 ## The strategic value of RFV
 
-Ordinary usability observation shows clicks, navigation, speech, and task outcomes, but much of the participant's moment-to-moment visual access remains hidden. RFV changes the task environment so that detailed information is available only around a participant-controlled location. To inspect a region, the participant must bring it into focus.
+Ordinary usability observation shows clicks, navigation, speech, and task outcomes, but much of the participant's moment-to-moment visual access remains hidden. RFV changes the task environment by rendering the foveal-plus-peripheral scene that the participant uses to plan the next move. Its peripheral pipeline is scientifically motivated to approximate the information available outside fixation for eye-movement planning; it is not a simple mask over an otherwise unchanged page. Detailed information remains available only around a participant-controlled location, so inspecting a region requires bringing it into focus.
 
 That intervention creates two linked benefits:
 
@@ -15,7 +15,9 @@ That intervention creates two linked benefits:
 
 “See what your user sees” is therefore meaningful in an RFV session. The participant works from the rendered stimulus, and the researcher sees that same stimulus. The researcher can observe what was available before each move, which region the participant revealed next, and whether the interface provided enough peripheral information to guide that transition.
 
-RFV does not claim that pointer coordinates equal exact physiological gaze. A participant may move their eyes within the display or direct covert attention outside the clear region. The pointer instead has a stronger operational meaning than an ordinary cursor: it controls where task-relevant detail can be acquired. Call this **functional focus** or **revealed focus**, reserving **gaze** for eye-tracker measurements.
+The core loop is: **modeled peripheral view → next target selection → pointer movement as an emulated gaze shift → new foveal information and Visual Memory → next decision**. This is why the quality of the peripheral simulation matters: it shapes the evidence from which the participant chooses the next target.
+
+RFV does not claim that pointer coordinates equal exact physiological gaze. A participant may move their eyes within the display or direct covert attention outside the clear region. The pointer instead has a stronger operational meaning than an ordinary cursor: it is the emulated fixation location and controls where task-relevant detail can be acquired. Call this **functional focus** or **revealed focus**, reserving **gaze** for eye-tracker measurements.
 
 ## What this method is for
 
@@ -33,7 +35,7 @@ Use RFV findings as evidence about visual access, functional focus, and interact
 
 ### Participant-controlled task
 
-The participant moves the pointer and completes a realistic task while the moderator observes. This is the primary usability-testing format. Because the pointer controls access to detail, its movement reveals which regions the participant chooses to bring into functional focus, in what sequence, and for what apparent purpose.
+The participant moves the pointer and completes a realistic task while the moderator observes. This is the primary usability-testing format. The current peripheral rendering supplies the evidence for choosing the next target; the pointer movement then emulates that shift in fixation and reveals which regions the participant chooses to bring into functional focus, in what sequence, and for what apparent purpose.
 
 ### Moderator-controlled walkthrough
 
@@ -189,7 +191,7 @@ Use one row per task. Add timestamps or recordings only when they are covered by
 Appropriate conclusions include:
 
 - “The participant never brought the navigation into focused access before abandoning the task.”
-- “The participant revealed the content column first, then moved to global navigation after the page failed to provide a useful peripheral cue.”
+- “The participant revealed the content column first, then moved to global navigation after the modeled peripheral view failed to provide a useful cue for the billing destination.”
 - “Under the 45px, Mode 12, Visual Memory 5 condition, four of six participants explored the content column before finding the account navigation.”
 - “The billing destination was often noticed only after participants moved near the global navigation.”
 - “Increasing separation between the two controls is a design hypothesis for the next iteration.”
