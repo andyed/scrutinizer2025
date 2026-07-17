@@ -79,7 +79,7 @@ button:disabled {
     background-color: var(--input-bg);
     border: 1px solid transparent;
     border-radius: 4px;
-    color: #999;
+    color: #d4d4d4; /* 8.52:1 on #333 — 8:1 floor on readable text */
     padding: 0 10px;
     font-size: 13px;
     text-align: left;
@@ -91,12 +91,12 @@ button:disabled {
 }
 
 #url-trigger:hover {
-    opacity: 0.9;
-    color: #ccc;
+    color: #ddd; /* 8.37:1 on --hover-bg */
     background-color: var(--hover-bg);
 }
 
 #url-trigger:active {
+    color: #fff; /* 8.86:1 on --active-bg */
     background-color: var(--active-bg);
 }
 
@@ -140,23 +140,36 @@ button:disabled {
     width: auto;
     max-width: 190px;
     padding: 0 9px;
-    color: #aaa;
+    /* Trust-critical text (participant's site-identity signal) — 8:1 floor.
+       8.49:1 on the #202020 toolbar. */
+    color: #bbb;
     border: 1px solid var(--border-color);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
+#study-origin:hover {
+    color: #ddd; /* 8.37:1 on --hover-bg */
+}
+
+#study-origin:active {
+    color: #fff; /* 8.86:1 on --active-bg */
+}
+
 #study-done {
     width: auto;
     padding: 0 11px;
-    background: var(--accent-color);
-    color: white;
+    /* Light-on-dark for salience (participants must find the exit) and
+       contrast: #111 on #99ccff is 11.18:1. The previous white-on-accent
+       pair was 3.98:1, below even WCAG AA. */
+    background: #99ccff;
+    color: #111;
     font-weight: 600;
 }
 
 #study-done:hover {
-    background: #1688ff;
+    background: #b3d9ff; /* 12.85:1 with #111 */
 }
 
 /* Fovea Toggle Button */
