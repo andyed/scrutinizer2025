@@ -23,19 +23,28 @@
  *     stimuli/<pageVisitId>.png
  */
 
+const { SESSION_SUMMARY_SCHEMA } = require('./study-session');
+
 const CAPTURE_SCHEMA = 'scrutinizer-session-capture/1';
-const SUMMARY_SCHEMA = 'scrutinizer-session-summary/1';
+const SUMMARY_SCHEMA = SESSION_SUMMARY_SCHEMA;
 
 /** Canonical name of the envelope inside a session directory. */
 const ENVELOPE_BASENAME = 'envelope.json';
 
-/** Top-level keys the summary schema defines; the envelope must carry them all. */
+/**
+ * Top-level keys the summary schema defines; the envelope must carry them all.
+ * Mirrors buildSessionSummary() in shared/study-session.js — keep in sync.
+ */
 const SUMMARY_KEYS = [
-    'schema', 'sessionId', 'participantId', 'startedAt', 'taskCount', 'defaults', 'tasks'
+    'schema', 'sessionId', 'participantId', 'appVersion', 'platform',
+    'startedAt', 'endedAt', 'endReason', 'taskCount', 'defaults', 'tasks'
 ];
 
-/** Per-task keys the summary schema defines. */
-const SUMMARY_TASK_KEYS = ['taskId', 'settings'];
+/** Per-task keys the summary schema defines (buildSessionSummary task records). */
+const SUMMARY_TASK_KEYS = [
+    'index', 'taskId', 'targetUrl', 'finalUrl', 'startedAt', 'endedAt',
+    'durationMs', 'outcome', 'settings'
+];
 
 /** Task-level CIF events (spec §envelope.json: "Done / Quit / Comment"). */
 const TASK_EVENT_TYPES = ['done', 'quit', 'comment'];
@@ -175,7 +184,15 @@ function normalizeTask(task) {
     const source = isPlainObject(task) ? task : {};
     const events = Array.isArray(source.events) ? source.events.map(normalizeTaskEvent) : [];
     return Object.assign({}, source, {
+        // Summary task-record keys (buildSessionSummary shape) — always present.
+        index: finite(source.index) ? source.index : null,
         taskId: source.taskId !== undefined ? source.taskId : null,
+        targetUrl: source.targetUrl !== undefined ? source.targetUrl : null,
+        finalUrl: source.finalUrl !== undefined ? source.finalUrl : null,
+        startedAt: source.startedAt !== undefined ? source.startedAt : null,
+        endedAt: source.endedAt !== undefined ? source.endedAt : null,
+        durationMs: finite(source.durationMs) ? source.durationMs : null,
+        outcome: source.outcome !== undefined ? source.outcome : null,
         // The deep-link vocabulary snapshot — the foveation config for this task
         // (ISO 25062:2025 §7.4.6 evaluation environment / §7.8.4 independent variables).
         settings: isPlainObject(source.settings) ? source.settings : {},
@@ -220,7 +237,11 @@ function normalizeCapture(capture) {
  * @param {Object} input
  * @param {string} input.sessionId
  * @param {string} [input.participantId]
+ * @param {string} [input.appVersion] - Falls back to capture.appVersion
+ * @param {string} [input.platform] - Falls back to capture.platform
  * @param {string} [input.startedAt] - ISO 8601
+ * @param {string} [input.endedAt] - ISO 8601; null until the session ends
+ * @param {string} [input.endReason] - Summary vocabulary (completed/quit/…); null until end
  * @param {Object} [input.defaults] - Pre-study runtime defaults (summary schema)
  * @param {Object[]} [input.tasks] - Task records; each gains normalized `settings` + `events`
  * @param {Object} [input.capture] - Capture block, e.g. from eventCapture.captureMeta()
@@ -242,7 +263,11 @@ function buildEnvelope(input = {}) {
         schema: CAPTURE_SCHEMA,
         sessionId: input.sessionId !== undefined ? input.sessionId : null,
         participantId: input.participantId !== undefined ? input.participantId : null,
+        appVersion: input.appVersion !== undefined ? input.appVersion : capture.appVersion,
+        platform: input.platform !== undefined ? input.platform : capture.platform,
         startedAt: input.startedAt !== undefined ? input.startedAt : null,
+        endedAt: input.endedAt !== undefined ? input.endedAt : null,
+        endReason: input.endReason !== undefined ? input.endReason : null,
         taskCount: tasks.length,
         defaults: isPlainObject(input.defaults) ? input.defaults : {},
         tasks,
@@ -264,19 +289,22 @@ function buildEnvelope(input = {}) {
 function toSummary(envelope) {
     const source = isPlainObject(envelope) ? envelope : {};
     const tasks = (Array.isArray(source.tasks) ? source.tasks : []).map(task => {
-        const copy = Object.assign({}, task);
-        delete copy.events;  // capture-only addition
+        const record = isPlainObject(task) ? task : {};
+        const copy = {};
+        for (const key of SUMMARY_TASK_KEYS) {
+            copy[key] = record[key] !== undefined ? record[key] : null;
+        }
         return copy;
     });
-    return {
-        schema: SUMMARY_SCHEMA,
-        sessionId: source.sessionId !== undefined ? source.sessionId : null,
-        participantId: source.participantId !== undefined ? source.participantId : null,
-        startedAt: source.startedAt !== undefined ? source.startedAt : null,
-        taskCount: finite(source.taskCount) ? source.taskCount : tasks.length,
-        defaults: isPlainObject(source.defaults) ? source.defaults : {},
-        tasks
-    };
+    const summary = {};
+    for (const key of SUMMARY_KEYS) {
+        summary[key] = source[key] !== undefined ? source[key] : null;
+    }
+    summary.schema = SUMMARY_SCHEMA;
+    summary.taskCount = finite(source.taskCount) ? source.taskCount : tasks.length;
+    summary.defaults = isPlainObject(source.defaults) ? source.defaults : {};
+    summary.tasks = tasks;
+    return summary;
 }
 
 /**
@@ -310,6 +338,10 @@ function validateEnvelope(envelope) {
     }
     if (!nonEmptyString(envelope.startedAt) || isNaN(Date.parse(envelope.startedAt))) {
         push('startedAt: required ISO 8601 timestamp');
+    }
+    if (envelope.endedAt !== null && envelope.endedAt !== undefined &&
+        (!nonEmptyString(envelope.endedAt) || isNaN(Date.parse(envelope.endedAt)))) {
+        push('endedAt: expected null or an ISO 8601 timestamp');
     }
     if (!isPlainObject(envelope.defaults)) push('defaults: expected an object');
 

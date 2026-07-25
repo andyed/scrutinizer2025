@@ -15,7 +15,7 @@
 
 /**
  * @typedef {Object} ScanpathEvent
- * @property {"click"|"scroll"} type
+ * @property {"click"|"scroll"|"key"|"submit"|"change"|"contextmenu"|"copy"|"paste"} type
  * @property {number} timestamp - ms from recording start
  * @property {*} data - Event-specific payload
  */
@@ -37,7 +37,7 @@
 
 /**
  * @typedef {Object} ScanpathMeta
- * @property {string} dataset - "ueyes"|"recgaze"|"mit1003"|"fixatons"|"onestop"|"coco-search18"|"adserp"
+ * @property {string} dataset - "ueyes"|"recgaze"|"mit1003"|"fixatons"|"onestop"|"coco-search18"|"adserp"|"scrutinizer" (live session capture)
  * @property {string} participantId
  * @property {string} stimulusId
  * @property {number} stimulusWidth - Original stimulus pixels

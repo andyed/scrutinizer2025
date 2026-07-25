@@ -379,3 +379,59 @@ describe('coordinateContract', () => {
         expect(contract.fixationSpace).toMatch(/physical canvas px/);
     });
 });
+
+// Reconciliation guard (2026-07-25): the superset contract is checked against
+// the REAL shipped summary builder, not a reproduced key list, so the two
+// modules cannot drift silently. See shared/study-session.js.
+describe('superset contract vs shared/study-session.js', () => {
+    const { buildSessionSummary, SESSION_SUMMARY_SCHEMA } = require('../../shared/study-session');
+    const { SUMMARY_TASK_KEYS } = require('../../shared/session-capture');
+
+    function realSummary() {
+        const startedAtMs = WHEN.getTime();
+        return buildSessionSummary({
+            session: { id: 'sess-2026-07-25-a', participantId: 'p07', defaults: {} },
+            startedAt: startedAtMs,
+            tasks: [{}],
+            taskRecords: [{
+                index: 0,
+                taskId: 'find-price',
+                targetUrl: 'https://example.test/',
+                finalUrl: null,
+                startedAtMs,
+                endedAtMs: startedAtMs + 1000,
+                outcome: 'done',
+                runtimeState: { mode: 12, radius: 100, enabled: true, comfortMode: false, visualMemory: 0 }
+            }]
+        }, { endReason: 'completed', endedAt: startedAtMs + 2000, appVersion: '0.0.0-test', platform: 'test' });
+    }
+
+    test('SUMMARY_SCHEMA is the study-session constant', () => {
+        expect(SUMMARY_SCHEMA).toBe(SESSION_SUMMARY_SCHEMA);
+    });
+
+    test('SUMMARY_KEYS / SUMMARY_TASK_KEYS match the real builder output exactly', () => {
+        const summary = realSummary();
+        expect([...SUMMARY_KEYS].sort()).toEqual(Object.keys(summary).sort());
+        expect([...SUMMARY_TASK_KEYS].sort()).toEqual(Object.keys(summary.tasks[0]).sort());
+    });
+
+    test('a built envelope carries every real summary key, top-level and per-task', () => {
+        const summary = realSummary();
+        const envelope = buildEnvelope(validInput());
+        for (const key of Object.keys(summary)) {
+            expect(Object.prototype.hasOwnProperty.call(envelope, key)).toBe(true);
+        }
+        for (const key of Object.keys(summary.tasks[0])) {
+            expect(Object.prototype.hasOwnProperty.call(envelope.tasks[0], key)).toBe(true);
+        }
+    });
+
+    test('toSummary projects to exactly the real summary key set', () => {
+        const summary = realSummary();
+        const projected = toSummary(buildEnvelope(validInput()));
+        expect(Object.keys(projected).sort()).toEqual(Object.keys(summary).sort());
+        expect(Object.keys(projected.tasks[0]).sort()).toEqual(Object.keys(summary.tasks[0]).sort());
+        expect(projected.schema).toBe(SESSION_SUMMARY_SCHEMA);
+    });
+});
