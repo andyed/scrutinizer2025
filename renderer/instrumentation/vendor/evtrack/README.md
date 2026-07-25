@@ -59,6 +59,21 @@ Nothing else is adapted here. Configuration, coordinate conversion, buffering,
 privacy masking and the `ScanpathData` mapping all live in the adapter,
 `renderer/instrumentation/event-capture.js`.
 
+## How to load it
+
+Inject into the tracked page as classic scripts, `tracklib.js` first:
+
+```html
+<script src=".../vendor/evtrack/tracklib.js"></script>
+<script src=".../vendor/evtrack/trackui.js"></script>
+```
+
+The IIFE binds `window`/`document` when it runs. Under a CommonJS `require()`
+those are the (empty) module exports object, so `TrackLib.Events.add` gets an
+undefined target and silently attaches nothing. That load path exists for tests
+and tooling only — **it cannot capture**. The adapter therefore prefers
+`window.TrackUI` and only falls back to `require`.
+
 ## Upstream gotchas worth knowing
 
 - `pollingMs` is a **throttle on delivered events**, not a timer: a polled event
