@@ -96,8 +96,48 @@ describe('buildEnvelope', () => {
             platform: 'darwin',
             screen: { w: 1512, h: 982 },
             window: { w: 1280, h: 800 },
-            devicePixelRatio: 2
+            devicePixelRatio: 2,
+            health: null
         });
+    });
+
+    it('preserves a serializable capture-readiness snapshot', () => {
+        const envelope = buildEnvelope(validInput({
+            capture: Object.assign({}, validInput().capture, {
+                health: {
+                    status: 'stopped',
+                    code: null,
+                    message: null,
+                    rowCount: 312,
+                    taskId: 'billing-navigation',
+                    pollMs: 16,
+                    trackerSource: 'commonjs-host-bound',
+                    trackerBinding: {
+                        hostBound: true,
+                        attached: true,
+                        documentListeners: 14,
+                        windowListeners: 4
+                    }
+                }
+            })
+        }));
+
+        expect(envelope.capture.health).toEqual({
+            status: 'stopped',
+            code: null,
+            message: null,
+            rowCount: 312,
+            taskId: 'billing-navigation',
+            pollMs: 16,
+            trackerSource: 'commonjs-host-bound',
+            trackerBinding: {
+                hostBound: true,
+                attached: true,
+                documentListeners: 14,
+                windowListeners: 4
+            }
+        });
+        expect(validateEnvelope(envelope).ok).toBe(true);
     });
 
     it('derives the coordinate contract from the capture DPR', () => {
@@ -351,6 +391,22 @@ describe('validateEnvelope', () => {
             capture: Object.assign({}, validInput().capture, { evtrackVersion: undefined })
         }));
         expect(validateEnvelope(envelope).errors.join('\n')).toMatch(/capture\.evtrackVersion/);
+    });
+
+    it('catches malformed capture-health diagnostics', () => {
+        const envelope = buildEnvelope(validInput({
+            capture: Object.assign({}, validInput().capture, {
+                health: {
+                    status: 'probably-fine',
+                    rowCount: -1,
+                    pollMs: -5
+                }
+            })
+        }));
+        const errors = validateEnvelope(envelope).errors.join('\n');
+        expect(errors).toMatch(/capture\.health\.status/);
+        expect(errors).toMatch(/capture\.health\.rowCount/);
+        expect(errors).toMatch(/capture\.health\.pollMs/);
     });
 });
 

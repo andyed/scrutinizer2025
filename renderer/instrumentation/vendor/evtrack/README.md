@@ -46,17 +46,18 @@ target. `flush()` now only detaches listeners.
 ## Other edits
 
 Every deviation from upstream is marked with a `// SCRUTINIZER:` comment. Beyond
-the sink removal there are only load-time adaptations:
+the sink removal there are only load/readiness adaptations:
 
 - `tracklib.js` guards its `window.TrackLib` read with `typeof window` and adds
   a CommonJS export, so the vendor copy can be `require()`d headlessly (Jest).
 - `trackui.js` resolves `TrackLib` via `require('./tracklib.js')` when it is not
-  a browser global. Its upstream `window.TrackUI = TrackUI` export is unchanged
-  and doubles as the CommonJS export (top-level `this` is `module.exports`
-  under CJS, `window` under a classic `<script>`).
+  a browser global. Under CommonJS it now explicitly prefers a real global
+  `window` when one exists (Electron preload), rather than binding its IIFE to
+  `module.exports`. It also exposes `bindingHealth()` so the adapter can reject
+  an object that exists but attached no DOM listeners.
 
-Nothing else is adapted here. Configuration, coordinate conversion, buffering,
-privacy masking and the `ScanpathData` mapping all live in the adapter,
+Configuration, coordinate conversion, buffering, privacy masking, health-state
+interpretation and the `ScanpathData` mapping all live in the adapter,
 `renderer/instrumentation/event-capture.js`.
 
 ## How to load it
@@ -69,10 +70,10 @@ Inject into the tracked page as classic scripts, `tracklib.js` first:
 ```
 
 The IIFE binds `window`/`document` when it runs. Under a CommonJS `require()`
-those are the (empty) module exports object, so `TrackLib.Events.add` gets an
-undefined target and silently attaches nothing. That load path exists for tests
-and tooling only — **it cannot capture**. The adapter therefore prefers
-`window.TrackUI` and only falls back to `require`.
+inside an Electron preload, it binds to the preload's real DOM window and
+attaches the same listeners. A truly headless require still has no DOM host;
+`bindingHealth().attached` is false and the adapter returns an explicit
+`tracker_inert` start failure instead of silently emitting an empty trail.
 
 ## Upstream gotchas worth knowing
 

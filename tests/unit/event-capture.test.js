@@ -146,6 +146,49 @@ describe('start() tracker configuration', () => {
         expect(tracker.flushed).toBe(1);
         expect(capture.isRunning()).toBe(false);
     });
+
+    it('reports awaiting, recording, and stopped health without guessing', () => {
+        const { tracker, capture } = harness();
+        expect(capture.health()).toMatchObject({
+            status: 'idle',
+            code: null,
+            rowCount: 0
+        });
+
+        expect(capture.start({ taskId: 'billing-navigation' })).toBe(true);
+        expect(capture.health()).toMatchObject({
+            status: 'awaiting_first_row',
+            rowCount: 0,
+            taskId: 'billing-navigation',
+            trackerSource: 'injected'
+        });
+
+        tracker.sink(row(), { target: el('div') });
+        expect(capture.health()).toMatchObject({
+            status: 'recording',
+            rowCount: 1
+        });
+
+        capture.stop();
+        expect(capture.health()).toMatchObject({
+            status: 'stopped',
+            rowCount: 1
+        });
+        expect(capture.captureMeta().health.status).toBe('stopped');
+        expect(capture.toScanpathData().meta.captureHealth.rowCount).toBe(1);
+    });
+
+    it('marks a final zero-row trail as an explicit QC failure', () => {
+        const { capture } = harness();
+        capture.start({ taskId: 'find-support' });
+        capture.stop();
+        expect(capture.health()).toMatchObject({
+            status: 'empty',
+            code: 'empty_trail',
+            rowCount: 0,
+            taskId: 'find-support'
+        });
+    });
 });
 
 describe('column mapping → ScanpathData', () => {
@@ -473,6 +516,51 @@ describe('defensive behaviour', () => {
     it('reports start() failure instead of throwing when no tracker is available', () => {
         const capture = createEventCapture({ tracker: {}, window: makeWindow() });
         expect(capture.start()).toBe(false);
+        expect(capture.health()).toMatchObject({
+            status: 'failed',
+            code: 'tracker_unavailable',
+            rowCount: 0
+        });
+    });
+
+    it('rolls back cleanly when tracker.record() throws', () => {
+        const tracker = makeTracker();
+        tracker.record = () => {
+            throw new Error('listener setup exploded');
+        };
+        const capture = createEventCapture({ tracker, window: makeWindow() });
+
+        expect(capture.start({ taskId: 'broken' })).toBe(false);
+        expect(capture.isRunning()).toBe(false);
+        expect(capture.health()).toMatchObject({
+            status: 'failed',
+            code: 'tracker_start_failed',
+            message: 'listener setup exploded',
+            taskId: 'broken'
+        });
+    });
+
+    it('refuses a tracker object that reports no attached DOM listeners', () => {
+        const tracker = makeTracker();
+        tracker.bindingHealth = () => ({
+            hostBound: false,
+            attached: false,
+            documentListeners: 0,
+            windowListeners: 0
+        });
+        const capture = createEventCapture({ tracker, window: makeWindow() });
+
+        expect(capture.start()).toBe(false);
+        expect(capture.isRunning()).toBe(false);
+        expect(capture.health()).toMatchObject({
+            status: 'failed',
+            code: 'tracker_inert',
+            trackerBinding: {
+                hostBound: false,
+                attached: false
+            }
+        });
+        expect(tracker.flushed).toBe(1);
     });
 
     it('survives a row with no DOM event attached', () => {
@@ -481,6 +569,68 @@ describe('defensive behaviour', () => {
         expect(() => tracker.sink(row({ event: 'keydown' }), null)).not.toThrow();
         const [event] = capture.toScanpathData().events;
         expect(event.data.masked).toBe(true);  // unknown target → masked
+    });
+});
+
+describe('vendored TrackUI CommonJS host binding', () => {
+    it('binds require() to a real preload window and passes the readiness handshake', () => {
+        const priorWindow = global.window;
+        const priorDocument = global.document;
+        const documentListeners = new Map();
+        const windowListeners = new Map();
+        const fakeDocument = {
+            body: { scrollLeft: 0, scrollTop: 0 },
+            documentElement: { scrollLeft: 0, scrollTop: 0 },
+            addEventListener(type, listener) {
+                documentListeners.set(type, listener);
+            },
+            removeEventListener(type) {
+                documentListeners.delete(type);
+            }
+        };
+        const fakeWindow = makeWindow({
+            document: fakeDocument,
+            pageXOffset: 0,
+            pageYOffset: 0,
+            addEventListener(type, listener) {
+                windowListeners.set(type, listener);
+            },
+            removeEventListener(type) {
+                windowListeners.delete(type);
+            }
+        });
+
+        global.window = fakeWindow;
+        global.document = fakeDocument;
+        try {
+            jest.isolateModules(() => {
+                const { createEventCapture: createHostCapture } =
+                    require('../../renderer/instrumentation/event-capture');
+                const capture = createHostCapture();
+
+                expect(capture.start({ taskId: 'host-bound' })).toBe(true);
+                expect(capture.health()).toMatchObject({
+                    status: 'awaiting_first_row',
+                    trackerSource: 'commonjs-host-bound',
+                    trackerBinding: {
+                        hostBound: true,
+                        attached: true
+                    }
+                });
+                expect(documentListeners.has('click')).toBe(true);
+                expect(windowListeners.has('resize')).toBe(true);
+                capture.stop();
+                expect(capture.captureMeta().health.trackerBinding).toMatchObject({
+                    hostBound: true,
+                    attached: true
+                });
+            });
+        } finally {
+            if (priorWindow === undefined) delete global.window;
+            else global.window = priorWindow;
+            if (priorDocument === undefined) delete global.document;
+            else global.document = priorDocument;
+        }
     });
 });
 

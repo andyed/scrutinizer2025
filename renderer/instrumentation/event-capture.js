@@ -12,10 +12,11 @@
  * Spec: docs/specs/session-capture-procedural-replay.md
  * Coordinates: docs/adserp-coordinate-system.md
  *
- * Loading: the vendored tracker must be loaded into the tracked page as a
- * classic <script> (tracklib.js then trackui.js) so it binds the real
- * window/document. A CommonJS require() of the vendor yields an inert tracker —
- * fine for tests and tooling, but it will never attach listeners.
+ * Loading: classic <script> tags (tracklib.js then trackui.js) remain supported.
+ * Electron's preload may also require() the vendor: the vendored TrackUI now
+ * binds to the real DOM window when one exists and exposes bindingHealth().
+ * start() refuses an inert/unbound tracker instead of silently producing an
+ * empty trail.
  *
  * Coordinate contract (what this module emits):
  *   mouseTimeline x/y  — client-viewport CSS px (evtrack pageX/pageY minus the
@@ -199,12 +200,16 @@ function createEventCapture(deps = {}) {
     const now = typeof deps.now === 'function' ? deps.now : defaultClock();
 
     let tracker = deps.tracker || null;
+    let trackerSource = tracker ? 'injected' : null;
+    let lastTrackerBinding = null;
     let trackLib = deps.trackLib || null;
     let pristineSettings = null;
     let originalGetXPath = null;
 
     let rows = [];
     let running = false;
+    let lifecycle = 'idle';
+    let failure = null;
     let t0 = 0;
     let startedWallClock = 0;
     let effectivePollMs = DEFAULT_POLL_MS;
@@ -214,17 +219,27 @@ function createEventCapture(deps = {}) {
 
     function resolveTracker() {
         if (tracker) return tracker;
-        // Prefer the browser global. The vendor binds `window`/`document` when
-        // its IIFE runs, so a <script>-tag load is the only one that can attach
-        // listeners; a CommonJS require() yields an inert tracker (useful for
-        // tests and tooling, useless for real capture). See vendor README.
+        // Prefer the browser global produced by classic script injection.
         if (win && win.TrackUI) {
             tracker = win.TrackUI;
+            trackerSource = 'browser-global';
             return tracker;
         }
-        // Lazy: keeps `require`ing this module cheap and side-effect free.
-        // eslint-disable-next-line global-require
-        tracker = require('./vendor/evtrack/trackui.js').TrackUI || null;
+        // Lazy: keeps requiring this module cheap and side-effect free. The
+        // vendor binds a CommonJS preload to the real DOM host when available;
+        // bindingHealth() below rejects a headless/inert instance.
+        try {
+            // eslint-disable-next-line global-require
+            const loaded = require('./vendor/evtrack/trackui.js');
+            tracker = (win && win.TrackUI) || loaded.TrackUI || null;
+            if (tracker) {
+                trackerSource = win && win.TrackUI === tracker
+                    ? 'commonjs-host-bound'
+                    : 'commonjs-headless';
+            }
+        } catch (err) {
+            tracker = null;
+        }
         return tracker;
     }
 
@@ -280,6 +295,61 @@ function createEventCapture(deps = {}) {
             return;
         }
         Object.assign(activeTracker.settings, pristineSettings);
+    }
+
+    function trackerBinding() {
+        if (!tracker || typeof tracker.bindingHealth !== 'function') return null;
+        try {
+            const binding = tracker.bindingHealth();
+            if (!binding || typeof binding !== 'object') return null;
+            return {
+                hostBound: binding.hostBound === true,
+                attached: binding.attached === true,
+                documentListeners: finite(binding.documentListeners)
+                    ? binding.documentListeners : 0,
+                windowListeners: finite(binding.windowListeners)
+                    ? binding.windowListeners : 0
+            };
+        } catch (err) {
+            return {
+                hostBound: false,
+                attached: false,
+                documentListeners: 0,
+                windowListeners: 0
+            };
+        }
+    }
+
+    /**
+     * Serializable capture-readiness snapshot for the DataCollector/envelope.
+     *
+     * `awaiting_first_row` is healthy immediately after listener attachment;
+     * `empty` is only assigned after stop(), when a zero-row trail is a final
+     * QC failure rather than a still-running capture.
+     */
+    function health() {
+        let status = lifecycle;
+        let code = failure ? failure.code : null;
+        let message = failure ? failure.message : null;
+        if (lifecycle === 'running') {
+            status = rows.length > 0 ? 'recording' : 'awaiting_first_row';
+        } else if (lifecycle === 'stopped' && rows.length === 0) {
+            status = 'empty';
+            code = 'empty_trail';
+            message = 'Capture stopped without receiving any tracker rows.';
+        }
+        return {
+            status,
+            code,
+            message,
+            rowCount: rows.length,
+            taskId,
+            pollMs: effectivePollMs,
+            trackerSource,
+            trackerBinding: running
+                ? (trackerBinding() || lastTrackerBinding)
+                : lastTrackerBinding
+        };
     }
 
     /**
@@ -383,17 +453,28 @@ function createEventCapture(deps = {}) {
     function start(opts = {}) {
         if (running) stop();
 
-        const activeTracker = resolveTracker();
-        if (!activeTracker || typeof activeTracker.record !== 'function') return false;
-
         rows = [];
         lastX = null;
         lastY = null;
         taskId = opts.taskId || null;
         effectivePollMs = finite(opts.pollMs) && opts.pollMs >= 0 ? opts.pollMs : DEFAULT_POLL_MS;
+        lastTrackerBinding = null;
+
+        const activeTracker = resolveTracker();
+        if (!activeTracker || typeof activeTracker.record !== 'function') {
+            lifecycle = 'failed';
+            failure = {
+                code: 'tracker_unavailable',
+                message: 'No event tracker with record() is available.'
+            };
+            return false;
+        }
+
         t0 = now();
         startedWallClock = Date.now();
         running = true;
+        lifecycle = 'running';
+        failure = null;
 
         hardenXPath();
         resetTrackerSettings(activeTracker);
@@ -401,16 +482,44 @@ function createEventCapture(deps = {}) {
         const polled = opts.polledEvents || POLLED_EVENTS;
         const discrete = opts.discreteEvents || DISCRETE_EVENTS;
 
-        activeTracker.record({
-            sink: handleRow,
-            regularEvents: discrete.join(' '),
-            pollingEvents: polled.join(' '),
-            pollingMs: effectivePollMs,
-            taskName: taskId || 'scrutinizer-session',
-            saveAttributes: opts.saveAttributes !== false,
-            callback: typeof opts.extras === 'function' ? opts.extras : null,
-            debug: !!opts.debug
-        });
+        try {
+            activeTracker.record({
+                sink: handleRow,
+                regularEvents: discrete.join(' '),
+                pollingEvents: polled.join(' '),
+                pollingMs: effectivePollMs,
+                taskName: taskId || 'scrutinizer-session',
+                saveAttributes: opts.saveAttributes !== false,
+                callback: typeof opts.extras === 'function' ? opts.extras : null,
+                debug: !!opts.debug
+            });
+
+            const binding = trackerBinding();
+            lastTrackerBinding = binding;
+            if (binding && !binding.attached) {
+                const error = new Error(
+                    'Event tracker did not attach listeners to a DOM window.'
+                );
+                error.code = 'tracker_inert';
+                throw error;
+            }
+        } catch (err) {
+            try {
+                if (typeof activeTracker.flush === 'function') activeTracker.flush();
+            } catch (flushErr) {
+                // Preserve the start failure; cleanup is best-effort.
+            }
+            running = false;
+            lifecycle = 'failed';
+            failure = {
+                code: err && err.code === 'tracker_inert'
+                    ? 'tracker_inert' : 'tracker_start_failed',
+                message: err && err.message
+                    ? err.message : 'Event tracker failed during start().'
+            };
+            restoreXPath();
+            return false;
+        }
 
         return true;
     }
@@ -420,6 +529,7 @@ function createEventCapture(deps = {}) {
      * @returns {Object[]} the buffered trail
      */
     function stop() {
+        lastTrackerBinding = trackerBinding() || lastTrackerBinding;
         if (running && tracker && typeof tracker.flush === 'function') {
             try {
                 tracker.flush();
@@ -428,6 +538,7 @@ function createEventCapture(deps = {}) {
             }
         }
         running = false;
+        if (lifecycle !== 'failed') lifecycle = 'stopped';
         restoreXPath();
         return flush();
     }
@@ -453,6 +564,10 @@ function createEventCapture(deps = {}) {
         rows = [];
         lastX = null;
         lastY = null;
+        if (!running) {
+            lifecycle = 'idle';
+            failure = null;
+        }
     }
 
     /**
@@ -491,7 +606,8 @@ function createEventCapture(deps = {}) {
                 (typeof navigator !== 'undefined' && navigator.platform) || null,
             screen: env.screen,
             window: env.window,
-            devicePixelRatio: env.devicePixelRatio
+            devicePixelRatio: env.devicePixelRatio,
+            health: health()
         };
     }
 
@@ -566,7 +682,8 @@ function createEventCapture(deps = {}) {
                 taskId,
                 pollMs: effectivePollMs,
                 devicePixelRatio: env.devicePixelRatio,
-                startedAt: startedWallClock ? new Date(startedWallClock).toISOString() : null
+                startedAt: startedWallClock ? new Date(startedWallClock).toISOString() : null,
+                captureHealth: health()
             }, meta),
             fixations: [],
             events,
@@ -582,6 +699,7 @@ function createEventCapture(deps = {}) {
         reset,
         environment,
         captureMeta,
+        health,
         toScanpathData,
         isRunning: () => running,
         // Exposed for the integration ticket: lets a host feed rows from a

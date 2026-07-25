@@ -41,6 +41,7 @@ subset. Adds:
 
 - `capture`: `{ schema: "scrutinizer-session-capture/1", evtrackVersion,
   pollMs, appVersion, platform, screen: {w,h}, window: {w,h}, devicePixelRatio }`
+  plus an optional final `health` snapshot from the capture adapter.
 - `coordinates`: explicit contract declaration (see below).
 - `settings` per task: the deep-link vocabulary snapshot (already produced by
   `summarySettings()`) — this is the **foveation config snapshot** and maps to
@@ -78,6 +79,21 @@ Cursor fidelity: evtrack polling mode for `mousemove`/`scroll`, default
 `pollMs: 16` (~60 Hz; local disk sink, cost is negligible), configurable per
 study via deep-link/task config; the effective value is recorded in
 `envelope.capture.pollMs`. Discrete events (click, key, submit) are event-driven.
+
+### Capture readiness and failure semantics
+
+Tracker object presence is not capture readiness. `event-capture.start()` must
+confirm that the vendored tracker bound to a real DOM window and attached event
+listeners. It returns `false` with `health().code` set to
+`tracker_unavailable`, `tracker_inert`, or `tracker_start_failed` when that
+handshake fails; callers must not begin an analyzable task in that state.
+
+While capture is running, zero rows is reported as `awaiting_first_row`, not as
+success or failure. After `stop()`, zero rows becomes the explicit QC result
+`status: "empty", code: "empty_trail"`. The serializable health snapshot is
+included in `captureMeta().health` and `ScanpathData.meta.captureHealth`, so the
+DataCollector and Workbench can distinguish setup failure from genuine
+participant behavior without inferring from zeros.
 
 ### Coordinate contract
 

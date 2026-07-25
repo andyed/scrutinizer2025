@@ -60,6 +60,9 @@ const TASK_EVENT_TYPES = ['done', 'quit', 'comment'];
  * a task whose outcome is still done/session_ended/null.
  */
 const TASK_OUTCOMES = ['done', 'session_ended'];
+const CAPTURE_HEALTH_STATUSES = [
+    'idle', 'awaiting_first_row', 'recording', 'stopped', 'empty', 'failed'
+];
 
 const SAFE_NAME = /[^A-Za-z0-9._-]+/g;
 
@@ -227,6 +230,30 @@ function normalizePageVisit(visit) {
     };
 }
 
+function normalizeCaptureHealth(health) {
+    if (!isPlainObject(health)) return null;
+    const binding = isPlainObject(health.trackerBinding)
+        ? {
+            hostBound: health.trackerBinding.hostBound === true,
+            attached: health.trackerBinding.attached === true,
+            documentListeners: finite(health.trackerBinding.documentListeners)
+                ? health.trackerBinding.documentListeners : 0,
+            windowListeners: finite(health.trackerBinding.windowListeners)
+                ? health.trackerBinding.windowListeners : 0
+        }
+        : null;
+    return {
+        status: nonEmptyString(health.status) ? health.status : null,
+        code: nonEmptyString(health.code) ? health.code : null,
+        message: nonEmptyString(health.message) ? health.message : null,
+        rowCount: finite(health.rowCount) ? health.rowCount : 0,
+        taskId: health.taskId !== undefined ? health.taskId : null,
+        pollMs: finite(health.pollMs) ? health.pollMs : null,
+        trackerSource: nonEmptyString(health.trackerSource) ? health.trackerSource : null,
+        trackerBinding: binding
+    };
+}
+
 function normalizeCapture(capture) {
     const source = isPlainObject(capture) ? capture : {};
     const screen = isPlainObject(source.screen) ? source.screen : {};
@@ -239,7 +266,8 @@ function normalizeCapture(capture) {
         platform: source.platform !== undefined ? source.platform : null,
         screen: { w: finite(screen.w) ? screen.w : null, h: finite(screen.h) ? screen.h : null },
         window: { w: finite(win.w) ? win.w : null, h: finite(win.h) ? win.h : null },
-        devicePixelRatio: finite(source.devicePixelRatio) ? source.devicePixelRatio : null
+        devicePixelRatio: finite(source.devicePixelRatio) ? source.devicePixelRatio : null,
+        health: normalizeCaptureHealth(source.health)
     };
 }
 
@@ -432,6 +460,24 @@ function validateEnvelope(envelope) {
                 push(`capture.${field}: expected {w, h} finite numbers`);
             }
         }
+        if (capture.health !== null && capture.health !== undefined) {
+            const health = capture.health;
+            if (!isPlainObject(health)) {
+                push('capture.health: expected an object or null');
+            } else {
+                if (CAPTURE_HEALTH_STATUSES.indexOf(health.status) === -1) {
+                    push(`capture.health.status: expected one of ` +
+                        `${CAPTURE_HEALTH_STATUSES.join('|')}`);
+                }
+                if (!finite(health.rowCount) || health.rowCount < 0) {
+                    push('capture.health.rowCount: expected a finite non-negative number');
+                }
+                if (health.pollMs !== null && health.pollMs !== undefined &&
+                    (!finite(health.pollMs) || health.pollMs < 0)) {
+                    push('capture.health.pollMs: expected null or a finite non-negative number');
+                }
+            }
+        }
     }
 
     // --- coordinate contract -------------------------------------------------
@@ -497,5 +543,6 @@ module.exports = {
     SUMMARY_TASK_KEYS,
     TASK_EVENT_TYPES,
     TASK_OUTCOMES,
+    CAPTURE_HEALTH_STATUSES,
     ENVELOPE_BASENAME
 };

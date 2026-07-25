@@ -31,6 +31,11 @@
     // `settings.sink` synchronously; buffering is the adapter's job.
     // Tracking time, for pollingMs
     var _time = 0;
+    // SCRUTINIZER: attachment counters power the capture adapter's readiness
+    // handshake. A tracker object that exists but has no DOM-bound listeners
+    // is inert and must never be reported as a successful capture start.
+    var _documentListenerCount = 0;
+    var _windowListenerCount = 0;
 
     /**
      * A small lib to track the user activity by listening to browser events.
@@ -92,6 +97,8 @@
          */
         record: function(config) {
             _time = new Date().getTime();
+            _documentListenerCount = 0;
+            _windowListenerCount = 0;
             // Override settings
             for (var prop in TrackUI.settings) {
                 if (config.hasOwnProperty(prop) && config[prop] !== null) {
@@ -139,7 +146,9 @@
                 var ev = eventList[i];
                 if (!ev) continue;
                 if (_docEvents.indexOf(ev) > -1) {
+                    if (!document) continue;
                     TrackLib.Events.add(document, ev, TrackUI.docHandler);
+                    _documentListenerCount++;
                     TrackUI.log('Adding document event:', ev);
                     // This is for IE compatibility, grrr
                     if (document.attachEvent) {
@@ -149,9 +158,24 @@
                     }
                 } else if (_winEvents.indexOf(ev) > -1) {
                     TrackLib.Events.add(window, ev, TrackUI.winHandler);
+                    _windowListenerCount++;
                     TrackUI.log('Adding window event:', ev);
                 }
             }
+        },
+        /**
+         * SCRUTINIZER: report whether this instance is bound to a real host
+         * window and attached listeners. Used immediately after record().
+         * @return {object}
+         */
+        bindingHealth: function() {
+            var hostBound = !!(window && document && window.document === document);
+            return {
+                hostBound: hostBound,
+                attached: hostBound && (_documentListenerCount + _windowListenerCount) > 0,
+                documentListeners: _documentListenerCount,
+                windowListeners: _windowListenerCount
+            };
         },
         // SCRUTINIZER: `initNewData`, `setUserId`, `appendData` and `send` (the
         // XHR/sendBeacon transport to save.php) are deleted. There is no server
@@ -302,6 +326,8 @@
             for (i = 0; i < _winEvents.length; ++i) {
                 TrackLib.Events.remove(window, _winEvents[i], TrackUI.winHandler);
             }
+            _documentListenerCount = 0;
+            _windowListenerCount = 0;
             // SCRUTINIZER: upstream posted the tail of the buffer here. Detaching
             // the listeners is all that remains; the adapter already holds every
             // row it was handed.
@@ -322,4 +348,14 @@
 
     // Expose
     window.TrackUI = TrackUI;
-})(this);
+// SCRUTINIZER: under a CommonJS preload, top-level `this` is module.exports,
+// not the page's window. Prefer the real DOM host when one exists so require()
+// attaches listeners instead of returning a plausible-looking inert tracker.
+})(typeof window !== 'undefined' ? window : this);
+
+// SCRUTINIZER: keep the headless/CommonJS export after binding to the real
+// window. Classic-script loads have no `module` and still expose window.TrackUI.
+if (typeof module !== 'undefined' && module.exports &&
+    typeof window !== 'undefined' && window.TrackUI) {
+    module.exports = { TrackUI: window.TrackUI };
+}
