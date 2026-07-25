@@ -58,7 +58,11 @@ Order deliberately inverts the P3 ticket numbering:
 2. [ ] **P3-1 ExperimentRunner** — multi-task sequencing/counterbalancing via the
        reserved `scrutinizer://v1/study/run?config=<url>` manifest route.
 3. [ ] **P3-3 BubbleView** — flagship no-hardware paradigm; ship WITH its tutorial.
-4. [ ] Docs riding along: known-issues.md rewrite for v2.8.x, practitioner hub
+4. [ ] **P3-6 Study Workbench (WB-1 first)** — browser-based session library +
+       CIF measures in a new `scrutinizer-moderator` sub-repo (www stays
+       marketing/science); no thick client for moderator/analyst work
+       (`docs/specs/study-workbench-webapp.md`). WB-1 can ride the pilot.
+5. [ ] Docs riding along: known-issues.md rewrite for v2.8.x, practitioner hub
        index, release-notes consolidation into CHANGELOG, glossary fix (8→12 bands).
 
 Double payoff: P3-2/P3-3 are also the instrument for the human-subjects

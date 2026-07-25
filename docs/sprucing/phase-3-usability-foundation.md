@@ -132,6 +132,26 @@ test -d docs/templates && ls docs/templates
 
 ---
 
+## P3-6 — Study Workbench: browser-based study management + analysis
+
+**Goal:** Moderator/analyst work must not require the thick client. Build the
+static, fully client-side workbench as a **new sub-repo
+`scrutinizer-repo/scrutinizer-moderator`** (working name; NOT scrutinizer-www,
+which stays marketing/science) per
+[`../specs/study-workbench-webapp.md`](../specs/study-workbench-webapp.md):
+Session Library + CIF measures (WB-1, first — serves the pilot findings memo),
+multi-task Study Designer absorbing the www link builder (WB-2), 2D replay +
+page-space heatmaps (WB-3), ISO 25062:2025 report generator (WB-4),
+approach-retreat episode analytics (WB-5). Session directory = the interchange
+format; computational logic born in this repo (`shared/session-measures.js`,
+Jest-tested) and vendored to the moderator app per the study-deep-link
+precedent; the app ships with zero analytics; no foveated rendering in the
+browser (deep-link back into the instrument instead).
+
+- [ ] P3-6 complete · **WB-1 depends on P3-2a (landed); WB-3 replay depends on P3-2 proper writing trails+screenshots**
+
+---
+
 ## Phase 3 exit criteria
 
 A usability study runs end-to-end from a task-definition JSON: consent → counterbalanced trials with programmatic conditions → unified local session record (behavioral + gaze + pipeline snapshots) → attention heatmap in the gazeplot coordinate frame → debrief. The first shipped paradigm (BubbleView) needs no hardware. Every artifact is reproducible and re-analyzable. **This is the usability-testing foundation, built on a verified instrument.**
