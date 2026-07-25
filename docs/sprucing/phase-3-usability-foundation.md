@@ -15,6 +15,8 @@
 
 ---
 
+> **Partial overlap shipped 2026-07-19:** ordered multi-task sequencing for moderated sessions now exists via `scrutinizer://v1/session/start` (see `docs/specs/usability-study-multi-task-sessions.md`) — Done-advance flow, per-task condition overrides, and a local session-summary JSON with per-task timing. P3-1 still owns conditions × trials expansion and counterbalancing; when built, ExperimentRunner should emit session launches in that format rather than adding a second sequencing path. The summary JSON is a seed of P3-2's DataCollector, keyed by the same session/task IDs.
+
 ## P3-1 — ExperimentRunner: load task JSON, sequence trials, stamp metadata
 
 **Goal:** No `ExperimentRunner`/participant/session module exists (`grep ExperimentRunner|DataCollector|counterbalance renderer/ main.js` → nothing; session/participant is only a typedef field). Build the minimal core brick: load a task-definition JSON, sequence trials/tasks, and stamp each recorded session with participant + task + condition.
@@ -39,9 +41,13 @@ npx jest tests/unit/experiment-runner.test.js   # sequencing + counterbalance ar
 
 ## P3-2 — DataCollector: unified timestamped session record + local export
 
+> **Design decisions locked 2026-07-25** (see [`../specs/session-capture-procedural-replay.md`](../specs/session-capture-procedural-replay.md)): capture is **procedural replay, not video** — session envelope (`scrutinizer-session-capture/1`, a superset of the shipped `scrutinizer-session-summary/1`) + input trail in the **evtrack wire schema** (vendored, no server leg — AdSERP-compatible so approach-retreat/clicksense tooling ingests study output unchanged) mapped into `ScanpathData` timelines + **one full-page screenshot per page-visit** as stimulus anchor. Raw rows at `pollMs: 16`; CIF measures and episode geometry are derived post hoc. Form-field keystrokes masked. Report layer cites **ISO 25062:2025** (config snapshot → §7.4.6 evaluation environment, deep-link params → §7.8.4 independent variables), not NIST CIF 1999.
+>
+> **P3-2a (substrate, farmed out 2026-07-25):** vendor evtrack + capture adapter + envelope writer + Jest tests, on branch `feat/session-capture-evtrack`. P3-2 proper (stream fusion below) builds on it.
+
 **Goal:** No unified event stream fuses behavioral signals with per-frame render/gaze state, and nothing exports locally (`renderer/logger.js` is a console forwarder; the behavioral libs sink to PostHog cloud). Build a `DataCollector` that merges the streams into one timestamped session record and writes local CSV+JSON per the spec's export schema. **This unification is what makes results credible and re-analyzable.**
 
-**Files:** new `renderer/experiment/data-collector.js`; export schema from `human_subjects_data_collection.md` (per-trial CSV + per-fixation Scrutinizer-snapshot JSON).
+**Files:** new `renderer/experiment/data-collector.js`; capture substrate per `session-capture-procedural-replay.md` (`renderer/instrumentation/vendor/evtrack/`, `renderer/instrumentation/event-capture.js`, `shared/session-capture.js`); export schema from `human_subjects_data_collection.md` (per-trial CSV + per-fixation Scrutinizer-snapshot JSON).
 
 **Steps:**
 1. Merge three streams with a common `performance.now()` clock:
