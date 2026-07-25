@@ -49,6 +49,17 @@ const SUMMARY_TASK_KEYS = [
 /** Task-level CIF events (spec §envelope.json: "Done / Quit / Comment"). */
 const TASK_EVENT_TYPES = ['done', 'quit', 'comment'];
 
+/**
+ * Task outcome vocabulary the instrument writes
+ * (docs/specs/usability-study-multi-task-sessions.md): 'done' (Done pressed)
+ * or 'session_ended' (session terminated early during this task). null while
+ * the task record is still open. Note this is distinct from the summary-level
+ * `endReason` vocabulary and from the 'quit' *event* type above — a
+ * participant giving up is a Quit event inside a task whose outcome is still
+ * done/session_ended/null.
+ */
+const TASK_OUTCOMES = ['done', 'session_ended'];
+
 const SAFE_NAME = /[^A-Za-z0-9._-]+/g;
 
 function finite(value) {
@@ -363,6 +374,15 @@ function validateEnvelope(envelope) {
                 }
             }
             if (!nonEmptyString(task.taskId)) push(`tasks[${i}].taskId: required non-empty string`);
+            // Outcome vocabulary: only what closeOpenTaskRecord() ever writes.
+            // Off-vocabulary values (e.g. 'completed', 'quit') would silently
+            // read as "not successful" downstream (session-measures keys
+            // success on outcome === 'done'), so reject them here.
+            if (task.outcome !== null && task.outcome !== undefined &&
+                TASK_OUTCOMES.indexOf(task.outcome) === -1) {
+                push(`tasks[${i}].outcome: expected null or one of ${TASK_OUTCOMES.join('|')}, ` +
+                    `got ${JSON.stringify(task.outcome)}`);
+            }
             if (!isPlainObject(task.settings)) push(`tasks[${i}].settings: expected an object`);
             if (!Array.isArray(task.events)) {
                 push(`tasks[${i}].events: expected an array`);
@@ -474,5 +494,6 @@ module.exports = {
     SUMMARY_KEYS,
     SUMMARY_TASK_KEYS,
     TASK_EVENT_TYPES,
+    TASK_OUTCOMES,
     ENVELOPE_BASENAME
 };

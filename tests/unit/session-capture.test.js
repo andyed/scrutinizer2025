@@ -276,6 +276,31 @@ describe('validateEnvelope', () => {
         expect(errors).toMatch(/events\[1\]\.comment/);
     });
 
+    it('accepts the instrument outcome vocabulary, and null while a task is open', () => {
+        for (const outcome of ['done', 'session_ended', null]) {
+            const envelope = buildEnvelope(validInput({
+                tasks: [{
+                    taskId: 'billing-navigation',
+                    outcome,
+                    settings: {},
+                    events: [{ type: 'done', t: 1000 }]
+                }]
+            }));
+            expect(validateEnvelope(envelope)).toEqual({ ok: true, errors: [] });
+        }
+    });
+
+    it('catches off-vocabulary task outcomes (e.g. "completed", "quit")', () => {
+        // closeOpenTaskRecord() only ever writes done/session_ended; anything
+        // else would silently render as "not successful" in session-measures.
+        for (const outcome of ['completed', 'quit', 'timeout']) {
+            const envelope = buildEnvelope(validInput());
+            envelope.tasks[0].outcome = outcome;
+            const errors = validateEnvelope(envelope).errors.join('\n');
+            expect(errors).toMatch(/tasks\[0\]\.outcome: expected null or one of done\|session_ended/);
+        }
+    });
+
     it('catches a task event with neither t nor at', () => {
         const envelope = buildEnvelope(validInput({
             tasks: [{ taskId: 'x', settings: {}, events: [{ type: 'done' }] }]
