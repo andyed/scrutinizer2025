@@ -53,10 +53,11 @@ const TASK_EVENT_TYPES = ['done', 'quit', 'comment'];
  * Task outcome vocabulary the instrument writes
  * (docs/specs/usability-study-multi-task-sessions.md): 'done' (Done pressed)
  * or 'session_ended' (session terminated early during this task). null while
- * the task record is still open. Note this is distinct from the summary-level
- * `endReason` vocabulary and from the 'quit' *event* type above — a
- * participant giving up is a Quit event inside a task whose outcome is still
- * done/session_ended/null.
+ * the task record is still open. `done` is a procedural completion signal,
+ * not an analyst-adjudicated claim that the task goal was achieved. Note this
+ * is distinct from the summary-level `endReason` vocabulary and from the
+ * 'quit' *event* type above — a participant giving up is a Quit event inside
+ * a task whose outcome is still done/session_ended/null.
  */
 const TASK_OUTCOMES = ['done', 'session_ended'];
 
@@ -375,9 +376,10 @@ function validateEnvelope(envelope) {
             }
             if (!nonEmptyString(task.taskId)) push(`tasks[${i}].taskId: required non-empty string`);
             // Outcome vocabulary: only what closeOpenTaskRecord() ever writes.
-            // Off-vocabulary values (e.g. 'completed', 'quit') would silently
-            // read as "not successful" downstream (session-measures keys
-            // success on outcome === 'done'), so reject them here.
+            // Off-vocabulary values (e.g. 'completed', 'quit') have no defined
+            // procedural meaning downstream, so reject them here. In
+            // particular, do not expand this vocabulary with analyst outcome
+            // labels: `done` records the Done trigger, not task success.
             if (task.outcome !== null && task.outcome !== undefined &&
                 TASK_OUTCOMES.indexOf(task.outcome) === -1) {
                 push(`tasks[${i}].outcome: expected null or one of ${TASK_OUTCOMES.join('|')}, ` +

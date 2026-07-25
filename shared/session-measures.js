@@ -11,11 +11,12 @@
  * (renderer/scanpath/scanpath-types.js).
  *
  * Measure definitions follow the Common Industry Format lineage as revised by
- * ISO 25062:2025 / ISO 9241-11:
- *   - effectiveness  → task success (binary here: outcome === 'done')
- *   - efficiency     → time-on-task, and mouse miles / interaction counts as
- *                      effort proxies (the instrumented-browser argument:
- *                      Edmonds, BRMIC 35(2), 2003)
+ * ISO 25062:2025 / ISO 9241-11. This module derives efficiency measures
+ * (time-on-task, and mouse miles / interaction counts as effort proxies; the
+ * instrumented-browser argument: Edmonds, BRMIC 35(2), 2003). It does not
+ * derive effectiveness: the capture records that Done was pressed, not whether
+ * the participant achieved the task goal. `completionRecorded` / `doneRate`
+ * expose that procedural signal without relabeling it as task success.
  * Derivation happens post hoc, never at capture time — the capture spec stores
  * raw rows precisely so measures like these can be recomputed at will.
  *
@@ -51,7 +52,7 @@ function spanMs(startedAt, endedAt) {
  * Total euclidean path length over a mouse timeline, in the trail's own units
  * (client-viewport CSS px per the coordinate contract). "Mouse miles" is the
  * classic instrumented-browser efficiency proxy: more distance for the same
- * outcome means more motor effort hunting for the target.
+ * task means more motor effort hunting for the target.
  *
  * Rows with non-finite coordinates are skipped, not zeroed: a NaN row is a
  * capture glitch, and bridging the two finite neighbours under-counts less
@@ -129,9 +130,11 @@ function taskMeasures(task, scanpathData, opts = {}) {
     const trail = isPlainObject(scanpathData) ? scanpathData : null;
     const outcome = record.outcome !== undefined ? record.outcome : null;
 
-    // Effectiveness (ISO 9241-11): binary task success. Only an explicit Done
-    // counts — quit, timeout and moderator-skip are all "not achieved".
-    const success = outcome === 'done';
+    // Procedural completion signal, not effectiveness: `done` means the
+    // participant or moderator pressed Done. It does not establish that the
+    // participant achieved the task goal; that requires analyst adjudication
+    // outside this capture-derived module.
+    const completionRecorded = outcome === 'done';
 
     // Efficiency: prefer the recorded durationMs (the instrument computed it at
     // task end); derive from the boundary stamps only as fallback so partially
@@ -158,7 +161,7 @@ function taskMeasures(task, scanpathData, opts = {}) {
     return {
         taskId: record.taskId !== undefined ? record.taskId : null,
         outcome,
-        success,
+        completionRecorded,
         timeOnTaskMs,
         mouseMilesPx,
         mouseMilesDeg,
@@ -199,11 +202,11 @@ function sessionMeasures(envelope, trailsByTaskId, opts = {}) {
     // Totals sum only what exists; null measures (missing trails, unfinished
     // tasks) are excluded rather than treated as zero, matching the
     // exclude-and-count posture of aggregateSessions.
-    let completedCount = 0;
+    let doneCount = 0;
     let totalTimeMs = 0;
     let totalMouseMilesPx = 0;
     for (const task of tasks) {
-        if (task.success) completedCount += 1;
+        if (task.completionRecorded) doneCount += 1;
         if (finite(task.timeOnTaskMs)) totalTimeMs += task.timeOnTaskMs;
         if (finite(task.mouseMilesPx)) totalMouseMilesPx += task.mouseMilesPx;
     }
@@ -214,7 +217,7 @@ function sessionMeasures(envelope, trailsByTaskId, opts = {}) {
         tasks,
         totals: {
             taskCount: tasks.length,
-            completedCount,
+            doneCount,
             totalTimeMs,
             totalMouseMilesPx
         }
@@ -267,7 +270,7 @@ function robustStats(values) {
  *
  * @param {Object[]} sessionMeasuresList - Outputs of sessionMeasures()
  * @returns {Object[]} one record per taskId, in first-seen task order:
- *   {taskId, n, successRate, timeOnTaskMs, mouseMilesPx, clickCount}
+ *   {taskId, n, doneRate, timeOnTaskMs, mouseMilesPx, clickCount}
  */
 function aggregateSessions(sessionMeasuresList) {
     const list = Array.isArray(sessionMeasuresList) ? sessionMeasuresList : [];
@@ -291,17 +294,18 @@ function aggregateSessions(sessionMeasuresList) {
 
     return order.map(taskId => {
         const group = byTaskId.get(taskId);
-        // Success rate over all attempts: success is boolean-known for every
-        // record (outcome null → not done), so the denominator is n, not
-        // n-minus-missing — a task nobody finished must show 0%, not blank.
-        let successCount = 0;
+        // Done rate over all attempts: completionRecorded is boolean-known for
+        // every record (outcome null → Done not recorded), so the denominator
+        // is n, not n-minus-missing. This is a procedural rate, not a task
+        // success/effectiveness rate.
+        let doneCount = 0;
         for (const task of group) {
-            if (task.success === true) successCount += 1;
+            if (task.completionRecorded === true) doneCount += 1;
         }
         return {
             taskId,
             n: group.length,
-            successRate: group.length > 0 ? successCount / group.length : null,
+            doneRate: group.length > 0 ? doneCount / group.length : null,
             timeOnTaskMs: robustStats(group.map(task => task.timeOnTaskMs)),
             mouseMilesPx: robustStats(group.map(task => task.mouseMilesPx)),
             clickCount: robustStats(group.map(task => task.clickCount))

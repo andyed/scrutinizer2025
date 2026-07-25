@@ -223,10 +223,12 @@ Use one row per task. Add timestamps or recordings only when they are covered by
 
 The **Study Workbench** (`scrutinizer-moderator` repo) is a companion browser
 app for the analysis side of a study: it imports captured session data, checks
-it arrived intact, and computes the standard usability measures — task success,
-time on task, pointer path length, and interaction counts — per task and
-aggregated across participants (median and IQR, with honest small-sample
-reporting). Everything runs locally in your browser; session data is never
+it arrived intact, and computes time on task, pointer path length, interaction
+counts, and the rate at which Done was recorded — per task and aggregated
+across participants (median and IQR, with honest small-sample reporting).
+Done is an end-of-task trigger, not evidence that the participant achieved the
+task goal. Record and adjudicate goal achievement separately using the study's
+outcome rubric. Everything runs locally in your browser; session data is never
 uploaded.
 
 Current status: the packaged 2.8.x app records the session summary JSON

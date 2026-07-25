@@ -84,7 +84,7 @@ describe('taskMeasures', () => {
         expect(measures).toEqual({
             taskId: 'billing-navigation',
             outcome: 'done',
-            success: true,
+            completionRecorded: true,
             timeOnTaskMs: 42000,
             mouseMilesPx: 10,        // 3-4-5 legs: 5 + 5
             mouseMilesDeg: null,     // no ppd given
@@ -105,6 +105,18 @@ describe('taskMeasures', () => {
 
         const missing = taskMeasures({ taskId: 't' }, happyTrail());
         expect(missing.timeOnTaskMs).toBeNull();
+    });
+
+    test('Done is exposed only as a recorded completion signal, never task success', () => {
+        const measures = taskMeasures({
+            taskId: 'abandoned-via-done',
+            outcome: 'done',
+            // The capture contract permits a participant giving up to be
+            // recorded as a Quit event inside a task ended with Done.
+            events: [{ type: 'quit', t: 9000 }, { type: 'done', t: 10000 }]
+        }, happyTrail());
+        expect(measures.completionRecorded).toBe(true);
+        expect(measures).not.toHaveProperty('success');
     });
 
     test('empty trail: zero rows yield nulls, never NaN', () => {
@@ -133,7 +145,7 @@ describe('taskMeasures', () => {
         expect(measures.clickCount).toBeNull();
         expect(measures.keyEventCount).toBeNull();
         expect(measures.scrollRangePx).toBeNull();
-        expect(measures.success).toBe(false);
+        expect(measures.completionRecorded).toBe(false);
     });
 
     test('non-finite coordinate rows are skipped, not summed', () => {
@@ -176,10 +188,11 @@ describe('sessionMeasures', () => {
         expect(result.tasks[0].mouseMilesDeg).toBe(0.4);
         expect(result.totals).toEqual({
             taskCount: 2,
-            completedCount: 1,       // only billing-navigation is 'done'
+            doneCount: 1,            // Done was recorded for billing-navigation
             totalTimeMs: 57000,      // 42000 + 15000
             totalMouseMilesPx: 20    // 10 + 10
         });
+        expect(result.totals).not.toHaveProperty('completedCount');
     });
 
     test('task missing from trailsByTaskId gets trailRowCount 0 and null motion — no throw', () => {
@@ -211,7 +224,7 @@ describe('aggregateSessions', () => {
             tasks: [Object.assign({
                 taskId,
                 outcome: 'done',
-                success: true,
+                completionRecorded: true,
                 timeOnTaskMs: null,
                 mouseMilesPx: null,
                 mouseMilesDeg: null,
@@ -220,7 +233,7 @@ describe('aggregateSessions', () => {
                 scrollRangePx: null,
                 trailRowCount: 0
             }, overrides)],
-            totals: { taskCount: 1, completedCount: 1, totalTimeMs: 0, totalMouseMilesPx: 0 }
+            totals: { taskCount: 1, doneCount: 1, totalTimeMs: 0, totalMouseMilesPx: 0 }
         };
     }
 
@@ -235,7 +248,8 @@ describe('aggregateSessions', () => {
         const [agg] = aggregateSessions(sessions);
         expect(agg.taskId).toBe('t1');
         expect(agg.n).toBe(4);
-        expect(agg.successRate).toBe(1);
+        expect(agg.doneRate).toBe(1);
+        expect(agg).not.toHaveProperty('successRate');
         expect(agg.timeOnTaskMs).toEqual({ median: 25, iqr: 15, n: 4, nExcluded: 0 });
         // Odd n after scaling: mouseMilesPx = [20, 40, 60, 80] → same shape, ×2.
         expect(agg.mouseMilesPx).toEqual({ median: 50, iqr: 30, n: 4, nExcluded: 0 });
@@ -244,13 +258,18 @@ describe('aggregateSessions', () => {
 
     test('excludes nulls from stats and reports nExcluded', () => {
         const sessions = [
-            sessionWith('t1', { timeOnTaskMs: 100, clickCount: 2, success: true }),
-            sessionWith('t1', { timeOnTaskMs: 300, clickCount: null, success: false, outcome: 'session_ended' }),
-            sessionWith('t1', { timeOnTaskMs: null, clickCount: 4, success: true })
+            sessionWith('t1', { timeOnTaskMs: 100, clickCount: 2, completionRecorded: true }),
+            sessionWith('t1', {
+                timeOnTaskMs: 300,
+                clickCount: null,
+                completionRecorded: false,
+                outcome: 'session_ended'
+            }),
+            sessionWith('t1', { timeOnTaskMs: null, clickCount: 4, completionRecorded: true })
         ];
         const [agg] = aggregateSessions(sessions);
         expect(agg.n).toBe(3);
-        expect(agg.successRate).toBeCloseTo(2 / 3, 12);
+        expect(agg.doneRate).toBeCloseTo(2 / 3, 12);
         // Nulls excluded from the order statistics, counted in nExcluded.
         expect(agg.timeOnTaskMs).toEqual({ median: 200, iqr: 100, n: 2, nExcluded: 1 });
         expect(agg.clickCount).toEqual({ median: 3, iqr: 1, n: 2, nExcluded: 1 });

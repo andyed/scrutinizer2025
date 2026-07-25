@@ -292,7 +292,7 @@ describe('validateEnvelope', () => {
 
     it('catches off-vocabulary task outcomes (e.g. "completed", "quit")', () => {
         // closeOpenTaskRecord() only ever writes done/session_ended; anything
-        // else would silently render as "not successful" in session-measures.
+        // else has no defined procedural meaning in session-measures.
         for (const outcome of ['completed', 'quit', 'timeout']) {
             const envelope = buildEnvelope(validInput());
             envelope.tasks[0].outcome = outcome;

@@ -139,7 +139,7 @@ New error codes: `LINK_TOO_LONG`, `TOO_FEW_TASKS`, `TOO_MANY_TASKS`, `NON_CONTIG
 }
 ```
 
-`outcome` is `'done'` (participant/moderator pressed Done) or `'session_ended'` (session terminated early from the menu during this task). Timestamps are wall-clock ISO strings plus `performance.now()`-style monotonic offsets so later tooling can compute durations without timezone hazards.
+`outcome` is `'done'` (participant/moderator pressed Done) or `'session_ended'` (session terminated early from the menu during this task). `'done'` records a procedural end trigger, not whether the participant achieved the task goal; effectiveness requires a separate outcome rubric and analyst adjudication. Timestamps are wall-clock ISO strings plus `performance.now()`-style monotonic offsets so later tooling can compute durations without timezone hazards.
 
 ### Lifecycle
 

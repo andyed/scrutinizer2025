@@ -56,10 +56,12 @@ truth; the vendored copies carry a header pointing back.
   misconfigured" — this is where the inert-tracker footgun (script-tag
   injection) becomes visible instead of silent.
 - Roster table: participant × task, outcome, duration, link status.
-- New pure module `shared/session-measures.js`: task success rate,
+- New pure module `shared/session-measures.js`: Done-recorded rate,
   time-on-task, mouse miles (px and, when `ppd` is present, degrees), click
   count, per-task and aggregated across participants (median + IQR; small-n
-  displayed honestly, no bare means for n<5). Jest-tested in the engine repo,
+  displayed honestly, no bare means for n<5). `outcome: 'done'` means the
+  participant or moderator pressed Done; it is not an effectiveness measure or
+  an analyst-adjudicated task-success claim. Jest-tested in the engine repo,
   vendored to the moderator app.
 
 ### WB-2 — Study Designer (extends the link builder)

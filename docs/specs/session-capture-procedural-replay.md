@@ -108,9 +108,11 @@ and falls back to the screenshot through the static-stimulus path
 ## Derived views (post hoc, never at capture time)
 
 Compression at capture time is the one unrecoverable mistake — store raw rows;
-derive: CIF measures (task success, time-on-task, mouse miles, click count),
-approach-retreat episode geometry (P3-4), gazeplot/attention maps. Report layer
-follows **ISO 25062:2025** (Annex B outline; cite it, not NIST CIF 1999).
+derive: time-on-task, mouse miles, click count, and the procedural Done-recorded
+rate; approach-retreat episode geometry (P3-4); gazeplot/attention maps.
+Effectiveness/task success requires a separately defined analyst adjudication
+and must not be inferred from `outcome: 'done'`. Report layer follows **ISO
+25062:2025** (Annex B outline; cite it, not NIST CIF 1999).
 
 ## Out of scope
 
