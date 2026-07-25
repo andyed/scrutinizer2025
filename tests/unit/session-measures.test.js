@@ -60,7 +60,7 @@ function testEnvelope() {
             {
                 taskId: 'find-support',
                 durationMs: 15000,
-                outcome: 'quit',
+                outcome: 'session_ended',
                 settings: {},
                 events: [{ type: 'quit', t: 15000 }]
             }
@@ -116,8 +116,10 @@ describe('taskMeasures', () => {
         expect(measures.mouseMilesPx).toBeNull();
         expect(measures.mouseMilesDeg).toBeNull();
         expect(measures.scrollRangePx).toBeNull();
-        expect(measures.clickCount).toBe(0); // events array present and empty
-        expect(measures.keyEventCount).toBe(0);
+        // Zero-row trail = tracker never ran (QC gate): counts are unknown,
+        // not zero — a fabricated 0 would leak into aggregate medians.
+        expect(measures.clickCount).toBeNull();
+        expect(measures.keyEventCount).toBeNull();
         // Explicitly assert nothing leaked NaN into the record.
         for (const value of Object.values(measures)) {
             if (typeof value === 'number') expect(isFinite(value)).toBe(true);
@@ -125,7 +127,7 @@ describe('taskMeasures', () => {
     });
 
     test('missing trail entirely: counts are null (unknown), not zero', () => {
-        const measures = taskMeasures({ taskId: 't', outcome: 'quit' }, undefined);
+        const measures = taskMeasures({ taskId: 't', outcome: 'session_ended' }, undefined);
         expect(measures.trailRowCount).toBe(0);
         expect(measures.mouseMilesPx).toBeNull();
         expect(measures.clickCount).toBeNull();
@@ -243,7 +245,7 @@ describe('aggregateSessions', () => {
     test('excludes nulls from stats and reports nExcluded', () => {
         const sessions = [
             sessionWith('t1', { timeOnTaskMs: 100, clickCount: 2, success: true }),
-            sessionWith('t1', { timeOnTaskMs: 300, clickCount: null, success: false, outcome: 'quit' }),
+            sessionWith('t1', { timeOnTaskMs: 300, clickCount: null, success: false, outcome: 'session_ended' }),
             sessionWith('t1', { timeOnTaskMs: null, clickCount: 4, success: true })
         ];
         const [agg] = aggregateSessions(sessions);

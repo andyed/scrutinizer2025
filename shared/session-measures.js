@@ -79,7 +79,7 @@ function mousePathLengthPx(mouseTimeline) {
     return sawFinite ? sum : null;
 }
 
-/** Count trail events of one ScanpathEvent type; null when there is no trail at all. */
+/** Count trail events of one ScanpathEvent type (only called for trails that ran). */
 function countEvents(events, type) {
     if (!Array.isArray(events)) return 0;
     let count = 0;
@@ -109,11 +109,13 @@ function scrollRange(scrollTimeline) {
 /**
  * Per-task CIF measures from one envelope task record + its ScanpathData trail.
  *
- * A missing or empty trail yields trailRowCount 0 and null motion measures —
- * never a throw. That null-not-zero distinction is the WB-1 QC-gate signal:
- * zero rows means the in-page tracker never ran (the inert-tracker footgun),
- * which must surface as "capture misconfigured", not as a participant who sat
- * perfectly still.
+ * A missing or empty trail yields trailRowCount 0 and null motion *and count*
+ * measures — never a throw, never a fabricated zero. That null-not-zero
+ * distinction is the WB-1 QC-gate signal: zero rows means the in-page tracker
+ * never ran (the inert-tracker footgun), which must surface as "capture
+ * misconfigured", not as a participant who sat perfectly still — and nulls,
+ * unlike zeros, are excluded (and counted) by aggregateSessions, so a
+ * misconfigured capture cannot drag cross-session medians toward zero.
  *
  * @param {Object} task - Envelope task record (summary task keys + events)
  * @param {Object} [scanpathData] - ScanpathData trail for this task, if captured
@@ -146,6 +148,13 @@ function taskMeasures(task, scanpathData, opts = {}) {
     const ppd = finite(opts.ppd) && opts.ppd > 0 ? opts.ppd : null;
     const mouseMilesDeg = mouseMilesPx !== null && ppd !== null ? mouseMilesPx / ppd : null;
 
+    // The QC-gate predicate: a trail whose mouse timeline has zero rows is one
+    // the in-page tracker never wrote (inert-tracker footgun) — treat it
+    // exactly like a missing trail for every per-trail measure.
+    const trailRowCount = trail && Array.isArray(trail.mouseTimeline)
+        ? trail.mouseTimeline.length : 0;
+    const trailRan = trailRowCount > 0;
+
     return {
         taskId: record.taskId !== undefined ? record.taskId : null,
         outcome,
@@ -153,12 +162,14 @@ function taskMeasures(task, scanpathData, opts = {}) {
         timeOnTaskMs,
         mouseMilesPx,
         mouseMilesDeg,
-        // Counts are per-trail: with no trail they are null (unknown), because
-        // a fabricated 0 would read as "participant never clicked" in a report.
-        clickCount: trail ? countEvents(trail.events, 'click') : null,
-        keyEventCount: trail ? countEvents(trail.events, 'key') : null,
-        scrollRangePx: trail ? scrollRange(trail.scrollTimeline) : null,
-        trailRowCount: trail && Array.isArray(trail.mouseTimeline) ? trail.mouseTimeline.length : 0
+        // Counts are per-trail: with no trail — or a zero-row trail the
+        // tracker never ran in — they are null (unknown), because a
+        // fabricated 0 would read as "participant never clicked" in a report
+        // and leak into cross-session aggregate medians.
+        clickCount: trailRan ? countEvents(trail.events, 'click') : null,
+        keyEventCount: trailRan ? countEvents(trail.events, 'key') : null,
+        scrollRangePx: trailRan ? scrollRange(trail.scrollTimeline) : null,
+        trailRowCount
     };
 }
 
