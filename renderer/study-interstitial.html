@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Study Task</title>
+    <style>
+        /* All readable text holds the 8:1 contrast floor on #202020:
+           #eeeeee 13.9:1, #bbbbbb 8.49:1, #ffb15a 9.0:1, #111 on #99ccff 11.18:1. */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            height: 100%;
+            background: #202020;
+            color: #eeeeee;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+        }
+
+        .card {
+            max-width: 620px;
+            width: 100%;
+        }
+
+        .counter {
+            color: #ffb15a;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            margin-bottom: 18px;
+        }
+
+        .instructions {
+            font-size: 24px;
+            line-height: 1.45;
+            margin-bottom: 22px;
+            overflow-wrap: break-word;
+        }
+
+        .origin {
+            color: #bbbbbb;
+            font-size: 14px;
+            margin-bottom: 34px;
+        }
+
+        .origin code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            color: #eeeeee;
+        }
+
+        #begin {
+            background: #99ccff;
+            color: #111111;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            padding: 12px 34px;
+            cursor: pointer;
+        }
+
+        #begin:hover { background: #b3d9ff; }
+
+        #begin:focus-visible {
+            outline: 3px solid #ffffff;
+            outline-offset: 2px;
+        }
+
+        .hint {
+            color: #bbbbbb;
+            font-size: 13px;
+            margin-top: 16px;
+        }
+
+        .hidden { display: none; }
+    </style>
+</head>
+
+<body>
+    <main class="card">
+        <div id="counter" class="counter" aria-live="polite"></div>
+        <h1 id="instructions" class="instructions"></h1>
+        <p id="origin-row" class="origin">Task page: <code id="origin"></code></p>
+        <button id="begin" type="button">Begin</button>
+        <p id="hint" class="hint">Press Enter or select Begin when you are ready.</p>
+        <p id="complete-note" class="hint hidden">You can hand the machine back to the moderator.</p>
+    </main>
+
+    <script>
+        // No IPC in the content view (no node integration, no preload). State
+        // arrives via query params; Begin signals main via a sentinel
+        // navigation that main.js intercepts in will-navigate and cancels.
+        // The .invalid TLD guarantees no accidental network resolution.
+        const BEGIN_URL = 'https://begin.study.scrutinizer.invalid/';
+
+        const params = new URLSearchParams(location.search);
+        const state = params.get('state') === 'complete' ? 'complete' : 'next';
+        const number = params.get('number') || '';
+        const count = params.get('count') || '';
+        const instructions = params.get('instructions');
+        const origin = params.get('origin');
+
+        const counterEl = document.getElementById('counter');
+        const instructionsEl = document.getElementById('instructions');
+        const originRow = document.getElementById('origin-row');
+        const beginBtn = document.getElementById('begin');
+
+        if (state === 'complete') {
+            counterEl.textContent = 'Session complete';
+            instructionsEl.textContent = 'All tasks are finished. Thank you.';
+            originRow.classList.add('hidden');
+            beginBtn.classList.add('hidden');
+            document.getElementById('hint').classList.add('hidden');
+            document.getElementById('complete-note').classList.remove('hidden');
+        } else {
+            counterEl.textContent = number && count ? `Task ${number} of ${count}` : 'Study task';
+            // textContent only — instructions are untrusted plain text.
+            instructionsEl.textContent = instructions || 'Explore this page in Scrutinizer.';
+            if (origin) {
+                document.getElementById('origin').textContent = origin;
+            } else {
+                originRow.classList.add('hidden');
+            }
+            beginBtn.addEventListener('click', () => { location.href = BEGIN_URL; });
+            beginBtn.focus();
+        }
+    </script>
+</body>
+
+</html>

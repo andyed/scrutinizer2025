@@ -6,6 +6,13 @@ const { CALIBRATION_URL } = require('./renderer/config');
 const modesRegistry = require('./shared/modes.json');
 const { STUDY_SCHEME, parseStudyDeepLink } = require('./shared/study-deep-link');
 const { buildStudyRuntimeState } = require('./shared/study-runtime-state');
+const { resolveTaskRuntimeState, buildSessionSummary, summaryFileName } = require('./shared/study-session');
+
+// Session interstitial: the content view has no node integration, so the
+// bundled screen signals "Begin" by navigating to a sentinel URL that
+// will-navigate intercepts and cancels. The .invalid TLD never resolves.
+const STUDY_BEGIN_URL = 'https://begin.study.scrutinizer.invalid/';
+const STUDY_INTERSTITIAL_URL = require('url').pathToFileURL(path.join(__dirname, 'renderer', 'study-interstitial.html')).toString();
 
 const STUDY_MODE_IDS = Object.values(modesRegistry.modes).map((mode) => mode.id);
 // Auto-updater: graceful fallback if electron-updater not bundled
@@ -125,7 +132,10 @@ function receiveStudyDeepLink(rawUrl) {
         return;
     }
 
-    console.log(`[Study] Received ${result.value.route} for ${result.value.task.origin}`);
+    const loggedTarget = result.value.route === 'session/start'
+        ? `${result.value.tasks.length} tasks`
+        : result.value.task.origin;
+    console.log(`[Study] Received ${result.value.route} (${loggedTarget})`);
     if (!app.isReady()) {
         pendingStudyLaunch = result.value;
         return;
@@ -142,11 +152,25 @@ app.on('open-url', (event, url) => {
     receiveStudyDeepLink(url);
 });
 
+// Argv intake: Windows cold-launch delivers the deep link as a bare argv
+// entry (per the v1 spec's Windows boundary), and --study-link=<url> gives
+// dev/test launches a protocol-free path (macOS registration only works
+// packaged). Runs before app ready, so the link buffers via pendingStudyLaunch.
+(function receiveArgvStudyLink(argv) {
+    for (const arg of argv.slice(1)) {
+        const raw = arg.startsWith('--study-link=') ? arg.slice('--study-link='.length) : arg;
+        if (raw.startsWith(`${STUDY_SCHEME}://`)) {
+            receiveStudyDeepLink(raw);
+            return; // latest-valid-wins buffering makes >1 argv link moot
+        }
+    }
+})(process.argv);
+
 function rebuildMenu() {
     // Ensure settings are initialized
     const radius = currentRadius || 180;
     const blur = currentBlur || 10;
-    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur, currentMobileEmulation, currentAestheticMode, currentCongestionMode, currentEccentricityMode, currentSaliencyMapOn, currentStructureMapOn, currentSaliencyResolution, currentCongestionResolution, currentVisualMemory !== undefined ? currentVisualMemory : 0, Boolean(activeStudy)));
+    const menu = Menu.buildFromTemplate(buildMenuTemplate(sendToRenderer, sendToOverlays, radius, blur, currentMobileEmulation, currentAestheticMode, currentCongestionMode, currentEccentricityMode, currentSaliencyMapOn, currentStructureMapOn, currentSaliencyResolution, currentCongestionResolution, currentVisualMemory !== undefined ? currentVisualMemory : 0, activeStudy ? activeStudy.kind : false));
     Menu.setApplicationMenu(menu);
 
     // Explicitly set for all non-HUD windows (Windows/Linux)
@@ -867,12 +891,16 @@ ipcMain.on('toolbar:open-url-dialog', (event) => {
 
 ipcMain.on('toolbar:study-done', (event) => {
     const win = BrowserWindow.getAllWindows().find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
-    if (isStudyWindow(win)) exitStudyMode();
+    if (!isStudyWindow(win)) return;
+    if (activeStudy && activeStudy.kind === 'session') advanceStudySession(win);
+    else exitStudyMode();
 });
 
 function createScrutinizerWindow(startUrl, options = {}) {
     const study = options.study || null;
-    const loggedTarget = study ? study.launch.task.origin : startUrl;
+    const loggedTarget = study
+        ? (study.kind === 'session' ? `${study.tasks.length}-task session` : study.launch.task.origin)
+        : startUrl;
     console.log('[Main] Creating new Scrutinizer window (dual-window architecture)', loggedTarget ? 'with target: ' + loggedTarget : '(default URL)');
 
     const TOOLBAR_HEIGHT = 40;
@@ -1180,8 +1208,22 @@ function createScrutinizerWindow(startUrl, options = {}) {
         }
     });
 
+    // The interstitial's Begin button navigates to a sentinel URL because the
+    // content view has no IPC path. Cancel it and start the pending task.
+    // beginCurrentSessionTask guards on phase, so task-page content
+    // navigating to the sentinel cannot skip or restart tasks.
+    contentView.webContents.on('will-navigate', (event, url) => {
+        if (url === STUDY_BEGIN_URL || url.startsWith(STUDY_BEGIN_URL)) {
+            event.preventDefault();
+            beginCurrentSessionTask(win);
+        }
+    });
+
     // Forward navigation events to update HUD URL bar
     const sendUrlUpdate = (url, eventType) => {
+        // The bundled interstitial is app chrome — its file:// URL must never
+        // surface in the toolbar or HUD as if it were the task page.
+        if (url && url.startsWith(STUDY_INTERSTITIAL_URL)) return;
         console.log(`[Main] ${eventType}: ${url}`);
         if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
             hudWindow.webContents.send('hud:browser:did-navigate', url);
@@ -1553,22 +1595,223 @@ function runtimePayload(state) {
     };
 }
 
+function currentStudyTask() {
+    if (!activeStudy) return null;
+    if (activeStudy.kind === 'session') return activeStudy.tasks[activeStudy.taskIndex] || null;
+    return activeStudy.launch.task;
+}
+
+function studyWindow() {
+    if (!activeStudy) return null;
+    return BrowserWindow.getAllWindows().find((win) => win.id === activeStudy.windowId) || mainWindow;
+}
+
 function sendStudyToolbarState(win) {
     if (!win || win.isDestroyed() || !win.toolbarReady || !activeStudy || !isStudyWindow(win)) return;
+    const task = currentStudyTask();
+    if (!task) return;
+    // During an interstitial the content view holds the bundled screen, not
+    // the task page — the toolbar should show the upcoming task's URL.
+    const onTaskPage = activeStudy.kind !== 'session' || activeStudy.phase === 'task';
+    const liveUrl = onTaskPage ? win.scrutinizerView.webContents.getURL() : '';
+    const completed = activeStudy.kind === 'session' && activeStudy.phase === 'complete';
     win.toolbarView.webContents.send('toolbar:enter-study', {
-        taskId: activeStudy.launch.task.id,
-        instructions: activeStudy.launch.task.instructions,
-        currentUrl: win.scrutinizerView.webContents.getURL() || activeStudy.launch.task.targetUrl
+        taskId: task.id,
+        instructions: completed ? 'Session complete — press Done to finish.' : task.instructions,
+        currentUrl: liveUrl || task.targetUrl,
+        taskNumber: activeStudy.kind === 'session' ? activeStudy.taskIndex + 1 : null,
+        taskCount: activeStudy.kind === 'session' ? activeStudy.tasks.length : null
     });
+}
+
+function studyRuntimePayload(study) {
+    const payload = runtimePayload(study.runtimeState);
+    // Interstitial and completion screens are meta-task chrome: their text
+    // must be readable unfoveated regardless of task settings (spec
+    // usability-study-multi-task-sessions.md §Interstitial).
+    if (study.kind === 'session' && study.phase !== 'task') payload.enabled = false;
+    return payload;
 }
 
 function sendStudyRuntimeState(win, { resetMemory = true } = {}) {
     if (!win || win.isDestroyed() || !win.hudReady || !activeStudy || !isStudyWindow(win)) return;
     if (resetMemory) win.scrutinizerHud.webContents.send('study:reset-visual-memory');
     win.scrutinizerHud.webContents.send('study:apply-runtime-settings', {
-        ...runtimePayload(activeStudy.runtimeState),
+        ...studyRuntimePayload(activeStudy),
         studyActive: true
     });
+}
+
+function buildActiveStudy(launch) {
+    const previousRuntimeState = activeStudy
+        ? activeStudy.previousRuntimeState
+        : captureRuntimeState();
+
+    if (launch.route === 'session/start') {
+        return {
+            kind: 'session',
+            launch,
+            session: launch.session,
+            tasks: launch.tasks,
+            taskIndex: 0,
+            phase: 'interstitial',
+            taskRecords: [],
+            summaryWritten: false,
+            previousRuntimeState,
+            runtimeState: resolveTaskRuntimeState(previousRuntimeState, launch.session.defaults, launch.tasks[0].overrides),
+            windowId: null,
+            startedAt: Date.now()
+        };
+    }
+
+    return {
+        kind: 'task',
+        launch,
+        previousRuntimeState,
+        runtimeState: buildStudyRuntimeState(previousRuntimeState, launch.overrides),
+        windowId: null,
+        startedAt: Date.now()
+    };
+}
+
+function studyEntryUrl(study) {
+    if (study.kind !== 'session') return study.launch.task.targetUrl;
+    // Re-created window mid-task resumes the task page; otherwise the
+    // session (re)enters through the current task's interstitial.
+    return study.phase === 'task'
+        ? study.tasks[study.taskIndex].targetUrl
+        : studyInterstitialUrl(study);
+}
+
+function studyInterstitialUrl(study, state = 'next') {
+    const url = new URL(STUDY_INTERSTITIAL_URL);
+    if (state === 'complete') {
+        url.searchParams.set('state', 'complete');
+        return url.toString();
+    }
+    const task = study.tasks[study.taskIndex];
+    url.searchParams.set('state', 'next');
+    url.searchParams.set('number', String(study.taskIndex + 1));
+    url.searchParams.set('count', String(study.tasks.length));
+    if (task.instructions) url.searchParams.set('instructions', task.instructions);
+    url.searchParams.set('origin', task.origin);
+    return url.toString();
+}
+
+// Stamps end data onto the in-flight task record, if any.
+function closeOpenTaskRecord(outcome) {
+    if (!activeStudy || activeStudy.kind !== 'session' || activeStudy.phase !== 'task') return;
+    const record = activeStudy.taskRecords[activeStudy.taskRecords.length - 1];
+    if (!record || record.endedAtMs !== undefined) return;
+    record.endedAtMs = Date.now();
+    record.outcome = outcome;
+    const win = studyWindow();
+    try {
+        record.finalUrl = win && !win.isDestroyed() ? win.scrutinizerView.webContents.getURL() : null;
+    } catch {
+        record.finalUrl = null;
+    }
+}
+
+function writeSessionSummary(study, endReason) {
+    if (study.summaryWritten) return;
+    study.summaryWritten = true;
+    try {
+        const fs = require('fs');
+        const summary = buildSessionSummary(study, {
+            endReason,
+            endedAt: Date.now(),
+            appVersion: app.getVersion(),
+            platform: process.platform
+        });
+        const dir = path.join(app.getPath('userData'), 'study-sessions');
+        fs.mkdirSync(dir, { recursive: true });
+        const file = path.join(dir, summaryFileName(summary));
+        // finalUrl fields can carry sensitive query strings from the
+        // participant's own navigation — restrict to the current user.
+        fs.writeFileSync(file, JSON.stringify(summary, null, 2), { mode: 0o600 });
+        console.log(`[Study] Session summary written: ${file}`);
+    } catch (err) {
+        console.error('[Study] Failed to write session summary:', err);
+    }
+}
+
+// Ensures an interrupted session's timing data is not silently lost when the
+// session is replaced by a new link, or the app quits mid-session.
+function finalizeInterruptedSession(endReason) {
+    if (!activeStudy || activeStudy.kind !== 'session' || activeStudy.summaryWritten) return;
+    closeOpenTaskRecord('session_ended');
+    writeSessionSummary(activeStudy, endReason);
+}
+
+// will-navigate sentinel handler: the interstitial's Begin button.
+function beginCurrentSessionTask(win) {
+    if (!activeStudy || activeStudy.kind !== 'session' || activeStudy.phase !== 'interstitial') return;
+    if (!win || win.isDestroyed() || !isStudyWindow(win)) return;
+    const study = activeStudy;
+    const task = study.tasks[study.taskIndex];
+
+    study.phase = 'task';
+    study.runtimeState = resolveTaskRuntimeState(study.previousRuntimeState, study.session.defaults, task.overrides);
+    applyRuntimeStateToGlobals(study.runtimeState);
+    study.taskRecords.push({
+        index: study.taskIndex + 1,
+        taskId: task.id,
+        targetUrl: task.targetUrl,
+        startedAtMs: Date.now(),
+        outcome: null,
+        runtimeState: study.runtimeState
+    });
+
+    sendStudyRuntimeState(win); // resets Visual Memory + applies the task condition
+    sendStudyToolbarState(win);
+    win.scrutinizerView.webContents.loadURL(task.targetUrl);
+    rebuildMenu();
+}
+
+function finishStudySession(win, endReason) {
+    const study = activeStudy;
+    if (study.phase === 'complete') return;
+    study.phase = 'complete';
+    writeSessionSummary(study, endReason);
+    if (!win || win.isDestroyed()) {
+        exitStudyMode();
+        return;
+    }
+    // Stay in Study mode while the completion screen shows: restoring the
+    // participant's baseline here would re-enable foveation over the
+    // "session complete" text. Done (or the menu escape) performs the
+    // actual restore + exit from the completion screen.
+    sendStudyRuntimeState(win, { resetMemory: false });
+    sendStudyToolbarState(win);
+    win.scrutinizerView.webContents.loadURL(studyInterstitialUrl(study, 'complete'));
+}
+
+// Done during a session: advance, or finish after the last task. Done while
+// an interstitial is showing has no task to complete — skipping isn't
+// supported, so it deliberately ends the session with the records so far.
+// Done on the completion screen performs the deferred restore + exit.
+function advanceStudySession(win) {
+    const study = activeStudy;
+    if (study.phase === 'complete') {
+        exitStudyMode();
+        return;
+    }
+    if (study.phase !== 'task') {
+        finishStudySession(win, 'ended_early');
+        return;
+    }
+    closeOpenTaskRecord('done');
+    if (study.taskIndex < study.tasks.length - 1) {
+        study.taskIndex += 1;
+        study.phase = 'interstitial';
+        // Foveation off on the interstitial; Visual Memory resets at Begin.
+        sendStudyRuntimeState(win, { resetMemory: false });
+        sendStudyToolbarState(win);
+        win.scrutinizerView.webContents.loadURL(studyInterstitialUrl(study));
+        return;
+    }
+    finishStudySession(win, 'completed');
 }
 
 function applyStudyLaunch(launch) {
@@ -1582,24 +1825,19 @@ function applyStudyLaunch(launch) {
         return;
     }
 
-    const previousRuntimeState = activeStudy
-        ? activeStudy.previousRuntimeState
-        : captureRuntimeState();
-    const runtimeState = buildStudyRuntimeState(previousRuntimeState, launch.overrides);
+    // A new link replaces the whole active study; write the interrupted
+    // session's partial summary first so its timing data survives.
+    finalizeInterruptedSession('replaced');
 
-    activeStudy = {
-        launch,
-        previousRuntimeState,
-        runtimeState,
-        windowId: mainWindow.id,
-        startedAt: Date.now()
-    };
-    applyRuntimeStateToGlobals(runtimeState);
+    const study = buildActiveStudy(launch);
+    activeStudy = study;
+    study.windowId = mainWindow.id;
+    applyRuntimeStateToGlobals(study.runtimeState);
     mainWindow.studyMode = true;
 
     sendStudyRuntimeState(mainWindow);
     sendStudyToolbarState(mainWindow);
-    mainWindow.scrutinizerView.webContents.loadURL(launch.task.targetUrl);
+    mainWindow.scrutinizerView.webContents.loadURL(studyEntryUrl(study));
     rebuildMenu();
 
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -1652,23 +1890,20 @@ function createWindow(studyLaunch = null) {
 
     let study = null;
     if (studyLaunch) {
-        const previousRuntimeState = activeStudy
-            ? activeStudy.previousRuntimeState
-            : captureRuntimeState();
-        const runtimeState = buildStudyRuntimeState(previousRuntimeState, studyLaunch.overrides);
-        study = {
-            launch: studyLaunch,
-            previousRuntimeState,
-            runtimeState,
-            windowId: null,
-            startedAt: Date.now()
-        };
-        activeStudy = study;
-        applyRuntimeStateToGlobals(runtimeState);
+        if (activeStudy && activeStudy.launch === studyLaunch) {
+            // Window re-creation for an in-flight study (macOS activate after
+            // the window was closed): keep progress, don't rebuild.
+            study = activeStudy;
+        } else {
+            finalizeInterruptedSession('replaced');
+            study = buildActiveStudy(studyLaunch);
+            activeStudy = study;
+        }
+        applyRuntimeStateToGlobals(study.runtimeState);
     }
 
     mainWindow = createScrutinizerWindow(
-        study ? study.launch.task.targetUrl : currentStartPage,
+        study ? studyEntryUrl(study) : currentStartPage,
         { study }
     );
     if (study) {
@@ -3252,6 +3487,8 @@ app.on('window-all-closed', function () {
 app.on('will-quit', () => {
     // Unregister all global shortcuts
     globalShortcut.unregisterAll();
+    // Quit mid-session: flush the partial summary so timing data survives.
+    finalizeInterruptedSession('quit');
 });
 
 app.on('activate', function () {
@@ -3279,9 +3516,14 @@ app.on('create-new-window', () => {
     createScrutinizerWindow();
 });
 
-// Handle "Exit Study Mode" menu action — the moderator's escape hatch when
-// the study toolbar itself is unusable.
+// Handle "Exit Study Mode" / "End Study Session" menu action — the
+// moderator's escape hatch when the study toolbar itself is unusable.
 app.on('exit-study-mode', () => {
+    if (activeStudy && activeStudy.kind === 'session' && activeStudy.phase !== 'complete') {
+        closeOpenTaskRecord('session_ended');
+        finishStudySession(studyWindow(), 'ended_early');
+        return;
+    }
     exitStudyMode();
 });
 

@@ -27,4 +27,26 @@ describe('Study toolbar contract', () => {
         expect(main).toContain('const TOOLBAR_HEIGHT = 40;');
         expect(css).toContain('height: 100%');
     });
+
+    it('shows session progress and falls back to the static label for single tasks', () => {
+        expect(js).toContain('`Task ${viewState.taskNumber} of ${viewState.taskCount}`');
+        expect(js).toContain("'Task'");
+        expect(js).toContain('taskNumber');
+        expect(js).toContain('taskCount');
+    });
+
+    it('advances sessions from Done instead of always exiting', () => {
+        expect(main).toContain('advanceStudySession(win)');
+        expect(main).toContain("activeStudy.kind === 'session'");
+    });
+
+    it('routes the interstitial Begin sentinel through will-navigate', () => {
+        const interstitial = fs.readFileSync(path.join(ROOT, 'renderer/study-interstitial.html'), 'utf8');
+        expect(interstitial).toContain('https://begin.study.scrutinizer.invalid/');
+        expect(main).toContain("const STUDY_BEGIN_URL = 'https://begin.study.scrutinizer.invalid/'");
+        expect(main).toContain('beginCurrentSessionTask(win)');
+        // Untrusted instruction text must never be rendered as HTML.
+        expect(interstitial).toContain('instructionsEl.textContent');
+        expect(interstitial).not.toContain('innerHTML');
+    });
 });

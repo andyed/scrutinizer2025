@@ -17,7 +17,9 @@ const viewState = {
     taskId: null,
     instructions: null,
     currentUrl: '',
-    showingUrl: false
+    showingUrl: false,
+    taskNumber: null,
+    taskCount: null
 };
 
 function currentOrigin() {
@@ -36,7 +38,10 @@ function renderToolbar() {
 
     const instructions = viewState.instructions || 'Explore this page in Scrutinizer.';
     const centerText = viewState.showingUrl ? viewState.currentUrl : instructions;
-    studyLabel.textContent = 'Task';
+    // Multi-task sessions show real progress; single-task links keep the
+    // static label (spec: usability-study-multi-task-sessions.md §Toolbar).
+    const inSession = Number.isInteger(viewState.taskNumber) && Number.isInteger(viewState.taskCount) && viewState.taskCount > 1;
+    studyLabel.textContent = inSession ? `Task ${viewState.taskNumber} of ${viewState.taskCount}` : 'Task';
     studyLabel.title = viewState.taskId ? `Task ID: ${viewState.taskId}` : 'Study task';
     studyInstruction.textContent = centerText;
     studyInstruction.title = centerText;
@@ -81,6 +86,8 @@ ipcRenderer.on('toolbar:enter-study', (event, state) => {
     viewState.instructions = state.instructions || null;
     viewState.currentUrl = state.currentUrl || '';
     viewState.showingUrl = false;
+    viewState.taskNumber = Number.isInteger(state.taskNumber) ? state.taskNumber : null;
+    viewState.taskCount = Number.isInteger(state.taskCount) ? state.taskCount : null;
     renderToolbar();
 });
 
@@ -95,6 +102,8 @@ ipcRenderer.on('toolbar:exit-study', () => {
     viewState.taskId = null;
     viewState.instructions = null;
     viewState.showingUrl = false;
+    viewState.taskNumber = null;
+    viewState.taskCount = null;
     urlTrigger.textContent = viewState.currentUrl || 'Enter URL or search...';
     urlTrigger.title = viewState.currentUrl || 'Click to edit URL';
     renderToolbar();

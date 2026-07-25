@@ -106,7 +106,9 @@ function buildMenuTemplate(sendToRenderer, sendToOverlays, currentRadius = 180, 
                     // Spec (usability-study-deep-links.md §Study toolbar) requires a
                     // menu escape hatch alongside the toolbar Done button, so a wedged
                     // toolbar view can't strand the moderator in study mode.
-                    label: 'Exit Study Mode',
+                    // studyMode carries the active study's kind ('task' or
+                    // 'session') or false; truthiness gates all study locks.
+                    label: studyMode === 'session' ? 'End Study Session' : 'Exit Study Mode',
                     visible: studyMode,
                     enabled: studyMode,
                     click: () => app.emit('exit-study-mode')

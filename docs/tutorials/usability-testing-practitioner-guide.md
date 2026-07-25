@@ -128,6 +128,39 @@ Query values containing URLs, spaces, punctuation, or other reserved characters 
 
 Scrutinizer rejects unknown, duplicate, or invalid parameters rather than silently running a different condition.
 
+## Run a multi-task session
+
+Most moderated sessions run several tasks in order on the same participant. A **session link** packages 2–8 tasks into one link so the moderator does not hand-fire a separate Study Link between tasks:
+
+```text
+scrutinizer://v1/session/start?session_id=nav-study&participant_id=P04&mode=12&fovea_radius_px=45&t1.url=…&t1.instructions=…&t2.url=…&t2.instructions=…
+```
+
+Build session links in the [Study Link Builder](https://scrutinizer.app/study-link-builder.html) — choose **Multi-task session**, add task rows, and set the shared condition once; any task row can override it. The builder enforces the same limits the app does (2–8 tasks, 8192-character link cap) and validates with the app's own parser. Session links require a Scrutinizer build newer than 2.8.1; single-task links are unchanged.
+
+What the participant experiences:
+
+1. The link opens an **interstitial screen**: "Task 1 of N", the full task instructions at readable size, the task page's origin, and a **Begin** button. Foveation is off on this screen so instructions are read unimpeded. This pause is the moderator's moment to reset site state or answer questions.
+2. **Begin** applies the task's condition, resets Visual Memory, and loads the task page. The toolbar shows "Task 1 of N" with the instruction.
+3. **Done** ends the task and shows the next interstitial. Timing is recorded automatically.
+4. After the final task, a completion screen appears ("Session complete"), still unfoveated. Pressing **Done** on it restores the participant's normal settings and returns to ordinary browsing.
+
+Semantics to know when moderating:
+
+- **Done on an interstitial (before Begin) ends the whole session.** There is no per-task skip; skipping would make outcomes ambiguous. If a task must be abandoned mid-way, press Done (it records as done — note the abandonment on your worksheet) or end the session from the menu.
+- The menu escape is relabeled **End Study Session**; it ends early and records the in-flight task as `session_ended`.
+- Opening another Study Link mid-session replaces the session; the interrupted session's timing data is saved first.
+
+### The session summary
+
+Every session — completed, ended early, replaced, or interrupted by quitting — writes a local JSON summary to the app's data directory (`~/Library/Application Support/scrutinizer-electron/study-sessions/` on macOS), named `<session_id>-<start time>-summary.json`. It records the session and participant IDs, the condition defaults, and per task: start/end timestamps, duration, outcome, final URL, and the resolved settings. This gives you time-on-task per task with no manual timing.
+
+Treat the file as potentially sensitive: `finalUrl` reflects wherever the participant actually navigated and can contain query strings. Keep summaries with the study's other data under its data-handling plan, and use anonymous codes for `participant_id` — never names.
+
+### Counterbalancing task order
+
+Session links present tasks in the order they appear in the link. To counterbalance across participants, use the builder's **Rotate order** button: copy the link for participant 1, rotate, update the participant ID, copy again — a hand-built Latin square. Automated counterbalancing is planned for the experiment-runner phase.
+
 ## Prepare the participant instruction sheet
 
 Tell participants what will happen before they click:
@@ -164,7 +197,7 @@ After the task:
 1. Record completion, abandonment, or moderator termination.
 2. Ask a neutral retrospective question such as, “What were you looking for when you moved there?”
 3. Select **Done** before starting another task.
-4. Use a fresh Study Link for the next condition.
+4. Use a fresh Study Link for the next condition — or use a session link (above) and Done advances to the next task automatically.
 
 ## Observation worksheet
 

@@ -3,7 +3,7 @@
 > **Status:** Initial macOS implementation complete; signed/notarized browser verification pending
 > **Implementation scope:** macOS first
 > **Last updated:** 2026-07-16
-> **Related:** [Usability-Testing Practitioner Guide](../tutorials/usability-testing-practitioner-guide.md), [Human Subjects Data Collection Platform](human_subjects_data_collection.md), [Phase 3 — Usability-testing foundation](../sprucing/phase-3-usability-foundation.md), [RFV Getting Started](../tutorials/getting-started-rfv.md)
+> **Related:** [Usability-Testing Practitioner Guide](../tutorials/usability-testing-practitioner-guide.md), [Multi-Task Study Sessions](usability-study-multi-task-sessions.md), [Human Subjects Data Collection Platform](human_subjects_data_collection.md), [Phase 3 — Usability-testing foundation](../sprucing/phase-3-usability-foundation.md), [RFV Getting Started](../tutorials/getting-started-rfv.md)
 
 ## Summary
 
@@ -58,7 +58,7 @@ Strategically, this turns RFV from a reviewer-controlled visualization into a re
 
 ### Future, not macOS v1
 
-- Multi-task study sequencing.
+- ~~Multi-task study sequencing.~~ **Implemented** — see [Multi-Task Study Sessions](usability-study-multi-task-sessions.md) (`scrutinizer://v1/session/start`).
 - Consent, participant IDs, counterbalancing, and debrief flows.
 - Behavioral or gaze data collection and export.
 - Free-scan, timed, guided-fixation, replayed-scanpath, or preseeded-memory exposure phases.
@@ -116,10 +116,11 @@ Registered scheme:
 scrutinizer
 ```
 
-Implemented route:
+Implemented routes:
 
 ```text
 scrutinizer://v1/task/start
+scrutinizer://v1/session/start   (multi-task; see usability-study-multi-task-sessions.md)
 ```
 
 Reserved, not implemented in v1:
