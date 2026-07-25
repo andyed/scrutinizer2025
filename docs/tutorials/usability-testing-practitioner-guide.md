@@ -219,6 +219,24 @@ Use one row per task. Add timestamps or recordings only when they are covered by
 | Moderator interventions | Record any prompt that could affect behavior |
 | Technical incidents | Loading, authentication, rendering, protocol, or display issues |
 
+## Analyze with the Study Workbench
+
+The **Study Workbench** (`scrutinizer-moderator` repo) is a companion browser
+app for the analysis side of a study: it imports captured session data, checks
+it arrived intact, and computes the standard usability measures — task success,
+time on task, pointer path length, and interaction counts — per task and
+aggregated across participants (median and IQR, with honest small-sample
+reporting). Everything runs locally in your browser; session data is never
+uploaded.
+
+Current status: the packaged 2.8.x app records the session summary JSON
+described above. Full procedural capture — per-task input trails and page
+screenshots, which unlock the Workbench's motion measures and replay — ships
+with the DataCollector milestone. The Workbench and its file formats are ready
+now, and its bundled demo session shows the complete workflow. See the
+Workbench Guide (`scrutinizer-moderator/docs/workbench-guide.md`, sibling repo)
+for the roster, quality-control flags, and measure definitions.
+
 ## Interpret findings carefully
 
 Appropriate conclusions include:
@@ -259,7 +277,12 @@ Windows packaging is configured, but the 2.8.1 Study Link installation and brows
 
 ## Reporting checklist
 
-Include these details in a study report:
+For a full report, the current reporting standard is **ISO 25062:2025** (the
+Common Industry Format for reporting usability evaluations — successor to the
+NIST CIF lineage); the Workbench's findings-memo template
+(`scrutinizer-moderator/docs/findings-memo-template.md`, sibling repo) follows its structure
+so a pilot memo can grow into a standards-shaped report without restructuring.
+Whatever the format, include these details:
 
 - Scrutinizer version and operating system
 - Rendering mode and whether the effect was enabled
