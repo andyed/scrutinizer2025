@@ -145,8 +145,10 @@ page-space heatmaps (WB-3), ISO 25062:2025 report generator (WB-4),
 approach-retreat episode analytics (WB-5). Session directory = the interchange
 format; computational logic born in this repo (`shared/session-measures.js`,
 Jest-tested) and vendored to the moderator app per the study-deep-link
-precedent; the app ships with zero analytics; no foveated rendering in the
-browser (deep-link back into the instrument instead).
+precedent; the app ships with zero analytics; no shader re-implementation in
+the browser — foveated replay is served as pre-rendered frames from the
+engine's headless pipeline, with live foveation via deep-link into the
+instrument.
 
 - [ ] P3-6 complete · **WB-1 depends on P3-2a (landed); WB-3 replay depends on P3-2 proper writing trails+screenshots**
 

@@ -81,9 +81,15 @@ truth; the vendored copies carry a header pointing back.
 - Cursor-dwell heatmaps accumulated in page-space with the **same accumulation
   conventions as the gazeplot pipeline** so workbench maps and instrument maps
   are directly comparable.
-- **Boundary (hard):** the workbench never re-renders foveation — the shader
-  pipeline lives in the engine repo only. For foveated/counterfactual replay it
-  emits an "Open in Scrutinizer" deep link for the selected session/task.
+- **Boundary (revised):** the browser never re-implements the shader pipeline —
+  but foveated replay is still available *functionally* via pre-rendered
+  frames: the engine's headless capture pipeline (`scripts/replay-scanpath.js
+  --image --scanpath`, proven on AdSERP) renders per-fixation foveated frames,
+  which land in the session directory (`foveated/<taskId>/frame-*.png`) and the
+  workbench plays back as ordinary imagery. Counterfactual replay = re-running
+  that CLI with different parameters; each render is stamped with its config.
+  Live/interactive foveation stays in the instrument ("Open in Scrutinizer"
+  deep link).
 
 ### WB-4 — Report generator (ISO 25062:2025)
 
@@ -108,7 +114,9 @@ truth; the vendored copies carry a header pointing back.
 
 - Server/ingest, accounts, hosted anything (seam: the session-dir zip).
 - Surveys (rides with the Designer once a survey schema exists).
-- Foveated rendering in the browser (engine-repo-only, by rule).
+- In-browser foveation *shaders* (engine-repo-only, by rule) — pre-rendered
+  foveated frames from the capture pipeline are in scope as playback imagery
+  (WB-3 boundary note).
 - Browser-run BubbleView participant page — attractive later (would remove the
   thick client for participants in one paradigm) but flagged: CSS/canvas blur is
   **not** the validated peripheral pipeline; if built, it must be labeled a
