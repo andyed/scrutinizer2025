@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, WebContentsView, globalShortcut, nativeImage, session } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, WebContentsView, globalShortcut, session } = require('electron');
 const fs = require('fs');
 const crypto = require('crypto');
 const path = require('path');
@@ -13,7 +13,11 @@ const {
     buildEnvelope,
     stimulusFileName
 } = require('./shared/session-capture');
-const { writeSessionDirectory } = require('./shared/session-directory-writer');
+const { writeSessionDirectory, pngDimensions } = require('./shared/session-directory-writer');
+const {
+    compareStimuli,
+    closeStimulusDiffWorker
+} = require('./shared/stimulus-diff');
 const { rowsToScanpathData } = require('./renderer/instrumentation/event-capture');
 
 // Session interstitial: the content view has no node integration, so the
@@ -23,6 +27,10 @@ const STUDY_BEGIN_URL = 'https://begin.study.scrutinizer.invalid/';
 const STUDY_INTERSTITIAL_URL = require('url').pathToFileURL(path.join(__dirname, 'renderer', 'study-interstitial.html')).toString();
 const STUDY_CAPTURE_WORLD_ID = 1004;
 const STUDY_CAPTURE_GLOBAL = '__scrutinizerStudyEventCapture';
+const STUDY_CAPTURE_QUIET_MS = 500;
+const STUDY_CAPTURE_SETTLE_MAX_MS = 2000;
+const STUDY_CAPTURE_SCREENSHOT_TIMEOUT_MS = 5000;
+const STUDY_STIMULUS_DIFF_TIMEOUT_MS = 2500;
 
 const STUDY_MODE_IDS = Object.values(modesRegistry.modes).map((mode) => mode.id);
 // Auto-updater: graceful fallback if electron-updater not bundled
@@ -1213,6 +1221,16 @@ function createScrutinizerWindow(startUrl, options = {}) {
 
         if (activeStudy && activeStudy.kind === 'session' &&
             activeStudy.phase === 'task' && isStudyWindow(win)) {
+            // A second navigation can start before the prior document's
+            // did-finish-load callback runs. Do not inject a tracker into that
+            // already-unloading document; the newer load owns the next anchor.
+            const record = openTaskRecord();
+            if (record && (record.captureCommittedNavigationSequence !==
+                record.captureNavigationSequence ||
+                record.captureCommittedUrl !== contentView.webContents.getURL())) {
+                console.log('[StudyCapture] Skipped superseded did-finish-load.');
+                return;
+            }
             try {
                 await captureStudyPageVisit(win, { restartTracker: true });
             } catch (err) {
@@ -1240,7 +1258,18 @@ function createScrutinizerWindow(startUrl, options = {}) {
     contentView.webContents.on('did-start-navigation', (event, url, isInPlace, isMainFrame) => {
         if (isMainFrame && !isInPlace) {
             console.log('[Main] Navigation started:', url);
-            if (isStudyWindow(win)) closeOpenPageVisit(openTaskRecord());
+            if (isStudyWindow(win)) {
+                const record = openTaskRecord();
+                closeOpenPageVisit(record);
+                if (record) {
+                    initializeTaskCapture(record);
+                    // Supersede any settle/screenshot work tied to the document
+                    // that navigation just destroyed, before the next page's
+                    // did-finish-load event has a chance to enqueue its anchor.
+                    record.captureRequestSequence += 1;
+                    record.captureNavigationSequence += 1;
+                }
+            }
             if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
                 hudWindow.webContents.send('hud:reset-visual-memory');
             }
@@ -1283,6 +1312,14 @@ function createScrutinizerWindow(startUrl, options = {}) {
     // Only listen to did-navigate for main frame navigations
     // did-navigate-in-page is for hash changes and single-page app navigations
     contentView.webContents.on('did-navigate', (event, url) => {
+        if (isStudyWindow(win)) {
+            const record = openTaskRecord();
+            if (record) {
+                initializeTaskCapture(record);
+                record.captureCommittedNavigationSequence = record.captureNavigationSequence;
+                record.captureCommittedUrl = url;
+            }
+        }
         sendUrlUpdate(url, 'did-navigate');
         // Force structure scan to ensure saliency map updates
         contentView.webContents.send('browser:force-scan');
@@ -1296,6 +1333,13 @@ function createScrutinizerWindow(startUrl, options = {}) {
         sendUrlUpdate(url, 'did-navigate-in-page');
         if (activeStudy && activeStudy.kind === 'session' &&
             activeStudy.phase === 'task' && isStudyWindow(win)) {
+            const record = openTaskRecord();
+            if (record) {
+                initializeTaskCapture(record);
+                record.captureNavigationSequence += 1;
+                record.captureCommittedNavigationSequence = record.captureNavigationSequence;
+                record.captureCommittedUrl = url;
+            }
             void captureStudyPageVisit(win, { restartTracker: false })
                 .catch((err) => failActiveStudyCapture(win, err));
         }
@@ -1784,6 +1828,10 @@ function initializeTaskCapture(record) {
     if (!Number.isFinite(record.captureDeliveryFailureCount)) record.captureDeliveryFailureCount = 0;
     if (!Array.isArray(record.pageVisits)) record.pageVisits = [];
     if (!(record.stimuliByPageVisitId instanceof Map)) record.stimuliByPageVisitId = new Map();
+    if (!Number.isFinite(record.captureRequestSequence)) record.captureRequestSequence = 0;
+    if (!Number.isFinite(record.captureNavigationSequence)) record.captureNavigationSequence = 0;
+    if (!(record.capturePostProcessPromises instanceof Set)) record.capturePostProcessPromises = new Set();
+    if (record.captureClosing !== true) record.captureClosing = false;
     return record;
 }
 
@@ -1924,10 +1972,16 @@ async function injectStudyCapture(win, record) {
     // Electron returns one evaluation result for the call, not one result per
     // WebSource. Keep vendor setup and bootstrap in one source so the returned
     // value is unambiguously the readiness handshake.
-    const result = await wc.executeJavaScriptInIsolatedWorld(
-        STUDY_CAPTURE_WORLD_ID,
-        [{ code: `${sources.trackLib}\n${sources.trackUi}\n${bootstrap}` }]
-    );
+    let result;
+    try {
+        result = await wc.executeJavaScriptInIsolatedWorld(
+            STUDY_CAPTURE_WORLD_ID,
+            [{ code: `${sources.trackLib}\n${sources.trackUi}\n${bootstrap}` }]
+        );
+    } catch (err) {
+        err.captureSegmentId = segmentId;
+        throw err;
+    }
     if (!result || result.started !== true) {
         console.error('[StudyCapture] Readiness handshake returned:', result);
         const health = result && result.health ? result.health : {};
@@ -1959,6 +2013,18 @@ async function stopInjectedStudyCapture(win) {
     );
 }
 
+function withStudyCaptureTimeout(promise, timeoutMs, code, message) {
+    let timer;
+    const timeout = new Promise((resolve, reject) => {
+        timer = setTimeout(() => {
+            const error = new Error(message);
+            error.code = code;
+            reject(error);
+        }, timeoutMs);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function captureFullPageStimulus(webContents, devicePixelRatio) {
     let attachedHere = false;
     if (!webContents.debugger.isAttached()) {
@@ -1966,8 +2032,15 @@ async function captureFullPageStimulus(webContents, devicePixelRatio) {
         attachedHere = true;
     }
     try {
-        await webContents.debugger.sendCommand('Page.enable');
-        const metrics = await webContents.debugger.sendCommand('Page.getLayoutMetrics');
+        const deadline = Date.now() + STUDY_CAPTURE_SCREENSHOT_TIMEOUT_MS;
+        const send = (method, params) => withStudyCaptureTimeout(
+            webContents.debugger.sendCommand(method, params),
+            Math.max(1, deadline - Date.now()),
+            'stimulus_capture_timeout',
+            `Full-page stimulus capture exceeded ${STUDY_CAPTURE_SCREENSHOT_TIMEOUT_MS} ms.`
+        );
+        await send('Page.enable');
+        const metrics = await send('Page.getLayoutMetrics');
         const size = metrics && (metrics.cssContentSize || metrics.contentSize);
         const cssWidth = size && Number.isFinite(size.width) ? Math.ceil(size.width) : 0;
         const cssHeight = size && Number.isFinite(size.height) ? Math.ceil(size.height) : 0;
@@ -1985,15 +2058,19 @@ async function captureFullPageStimulus(webContents, devicePixelRatio) {
             error.code = 'stimulus_too_large';
             throw error;
         }
-        const shot = await webContents.debugger.sendCommand('Page.captureScreenshot', {
+        const shot = await send('Page.captureScreenshot', {
             format: 'png',
             fromSurface: true,
             captureBeyondViewport: true,
             clip: { x: 0, y: 0, width: cssWidth, height: cssHeight, scale: dpr }
         });
         const buffer = Buffer.from(shot.data, 'base64');
-        const image = nativeImage.createFromBuffer(buffer);
-        const imageSize = image.getSize();
+        const imageSize = pngDimensions(buffer);
+        if (!imageSize) {
+            const error = new Error('Chromium returned an invalid PNG stimulus.');
+            error.code = 'stimulus_png_invalid';
+            throw error;
+        }
         const expectedWidth = Math.round(cssWidth * dpr);
         const expectedHeight = Math.round(cssHeight * dpr);
         if (imageSize.width !== expectedWidth || imageSize.height !== expectedHeight) {
@@ -2009,40 +2086,333 @@ async function captureFullPageStimulus(webContents, devicePixelRatio) {
     }
 }
 
+async function waitForStudyCaptureSettle(webContents) {
+    const script = `
+        new Promise(function (resolve) {
+            var startedAt = Date.now();
+            var finished = false;
+            var quietTimer = null;
+            var hardTimer = null;
+            var observer = null;
+            var finish = function (reason) {
+                if (finished) return;
+                finished = true;
+                if (quietTimer !== null) clearTimeout(quietTimer);
+                if (hardTimer !== null) clearTimeout(hardTimer);
+                if (observer) observer.disconnect();
+                resolve({ reason: reason, elapsedMs: Date.now() - startedAt });
+            };
+            var armQuietWindow = function () {
+                if (finished) return;
+                if (quietTimer !== null) clearTimeout(quietTimer);
+                quietTimer = setTimeout(function () {
+                    finish('quiet');
+                }, ${STUDY_CAPTURE_QUIET_MS});
+            };
+            var afterFonts = function () {
+                if (finished) return;
+                requestAnimationFrame(function () {
+                    requestAnimationFrame(function () {
+                        if (finished) return;
+                        observer = new MutationObserver(armQuietWindow);
+                        if (document.documentElement) {
+                            observer.observe(document.documentElement, {
+                                subtree: true,
+                                childList: true,
+                                attributes: true,
+                                characterData: true
+                            });
+                        }
+                        armQuietWindow();
+                    });
+                });
+            };
+            hardTimer = setTimeout(function () {
+                finish('deadline');
+            }, ${STUDY_CAPTURE_SETTLE_MAX_MS});
+            var fontsReady = document.fonts && document.fonts.ready
+                ? document.fonts.ready : Promise.resolve();
+            Promise.resolve(fontsReady).catch(function () {}).then(afterFonts);
+        });
+    `;
+    return withStudyCaptureTimeout(
+        webContents.executeJavaScriptInIsolatedWorld(
+            STUDY_CAPTURE_WORLD_ID,
+            [{ code: script }]
+        ),
+        STUDY_CAPTURE_SETTLE_MAX_MS + 500,
+        'stimulus_settle_timeout',
+        `Stimulus settling exceeded ${STUDY_CAPTURE_SETTLE_MAX_MS + 500} ms.`
+    );
+}
+
+function enqueueStudyCapture(record, operation) {
+    const previous = record.captureQueuePromise || Promise.resolve();
+    const queued = previous.catch(() => null).then(operation);
+    record.captureQueuePromise = queued;
+    queued.then(
+        () => {
+            if (record.captureQueuePromise === queued) record.captureQueuePromise = null;
+        },
+        (err) => {
+            if (!record.captureQueueError) record.captureQueueError = err;
+            if (record.captureQueuePromise === queued) record.captureQueuePromise = null;
+        }
+    );
+    return queued;
+}
+
+function trackStudyCapturePostProcess(record, operation) {
+    const pending = Promise.resolve().then(operation);
+    record.capturePostProcessPromises.add(pending);
+    pending.then(
+        () => record.capturePostProcessPromises.delete(pending),
+        (err) => {
+            if (!record.capturePostProcessError) record.capturePostProcessError = err;
+            record.capturePostProcessPromises.delete(pending);
+        }
+    );
+    return pending;
+}
+
+async function drainStudyCapturePostProcessing(record) {
+    while (record.capturePostProcessPromises.size > 0) {
+        await Promise.allSettled([...record.capturePostProcessPromises]);
+    }
+}
+
+function isActiveStudyCaptureRecord(study, record) {
+    return activeStudy === study && study.phase === 'task' &&
+        openTaskRecord() === record;
+}
+
+function isCurrentStudyCaptureRequest(study, record, requestSequence, { allowClosing = false } = {}) {
+    return isActiveStudyCaptureRecord(study, record) &&
+        (allowClosing || !record.captureClosing) &&
+        requestSequence === record.captureRequestSequence;
+}
+
+function unanchoredSegmentHasRows(record, err) {
+    return Boolean(err && typeof err.captureSegmentId === 'string' &&
+        record.captureRowsBySegment instanceof Map &&
+        (record.captureRowsBySegment.get(err.captureSegmentId) || 0) > 0);
+}
+
+function supersededAnchorError(url) {
+    const error = new Error(`The page changed before its required stimulus anchor completed: ${url}`);
+    error.code = 'stimulus_anchor_superseded';
+    return error;
+}
+
+async function preserveSettledStudyCandidate(study, record, provisionalVisit, candidate) {
+    const provisionalBuffer = record.stimuliByPageVisitId.get(provisionalVisit.pageVisitId);
+    const difference = await compareStimuli(provisionalBuffer, candidate.buffer, {
+        timeoutMs: STUDY_STIMULUS_DIFF_TIMEOUT_MS
+    });
+    if (!difference.material) {
+        console.log(`[StudyCapture] Discarded unchanged settled candidate (${difference.reason}).`);
+        return provisionalVisit;
+    }
+
+    const provisionalIndex = record.pageVisits.indexOf(provisionalVisit);
+    if (provisionalIndex < 0 || !study.taskRecords.includes(record)) {
+        const error = new Error('The provisional visit disappeared before its settled anchor was indexed.');
+        error.code = 'stimulus_settled_anchor_lost';
+        throw error;
+    }
+    const candidateStart = Math.max(
+        provisionalVisit.tStart,
+        taskElapsedMs(record, candidate.capturedAt)
+    );
+    const priorEnd = provisionalVisit.tEnd;
+    const tStart = Number.isFinite(priorEnd)
+        ? Math.min(priorEnd, candidateStart)
+        : candidateStart;
+    const settledVisit = {
+        pageVisitId: candidate.pageVisitId,
+        taskId: record.taskId,
+        url: candidate.url,
+        tStart,
+        tEnd: priorEnd,
+        screenshot: stimulusFileName(candidate.pageVisitId),
+        stimulusWidth: candidate.width,
+        stimulusHeight: candidate.height
+    };
+    provisionalVisit.tEnd = tStart;
+    record.pageVisits.splice(provisionalIndex + 1, 0, settledVisit);
+    record.stimuliByPageVisitId.set(settledVisit.pageVisitId, candidate.buffer);
+    console.log(`[StudyCapture] Preserved changed settled anchor (${difference.reason}).`);
+    return settledVisit;
+}
+
 async function captureStudyPageVisit(win, { restartTracker = true } = {}) {
     const study = activeStudy;
     const record = openTaskRecord();
     if (!study || !record || !win || win.isDestroyed()) return null;
     initializeTaskCapture(record);
-    if (record.captureSetupPromise) return record.captureSetupPromise;
+    if (record.captureClosing) return null;
 
-    record.captureSetupPromise = (async () => {
-        const wc = win.scrutinizerView.webContents;
-        if (restartTracker) await injectStudyCapture(win, record);
-        const url = wc.getURL();
-        const visit = beginPageVisit(study, record, url);
+    const wc = win.scrutinizerView.webContents;
+    const requestedAt = Date.now();
+    const requestedUrl = wc.getURL();
+    const requestSequence = ++record.captureRequestSequence;
+    // Starting the tracker is deliberately outside the screenshot queue: the
+    // live DOM host must begin emitting rows as soon as load completes. Only
+    // PNG work is serialized; settling happens outside the queue so a newer
+    // page can acquire its provisional anchor without waiting for the older
+    // page's quiet window.
+    const trackerReady = restartTracker ? injectStudyCapture(win, record) : Promise.resolve();
+    if (restartTracker) {
+        record.captureTrackerReadyPromise = trackerReady;
+        // The provisional queue may still be draining an older page when a
+        // destroyed document rejects readiness. Its queued await remains the
+        // authoritative handler; this prevents an interim unhandled rejection.
+        void trackerReady.catch(() => null);
+    }
+
+    const provisional = enqueueStudyCapture(record, async () => {
+        try {
+            await trackerReady;
+        } catch (err) {
+            if (!isActiveStudyCaptureRecord(study, record)) return null;
+            if (!isCurrentStudyCaptureRequest(study, record, requestSequence, { allowClosing: true }) &&
+                !unanchoredSegmentHasRows(record, err)) return null;
+            throw err;
+        }
+        if (!isActiveStudyCaptureRecord(study, record)) return null;
+        if (!isCurrentStudyCaptureRequest(study, record, requestSequence, { allowClosing: true })) {
+            throw supersededAnchorError(requestedUrl);
+        }
+        if (wc.isDestroyed() || wc.getURL() !== requestedUrl) throw supersededAnchorError(requestedUrl);
         const meta = record.captureMeta || {};
         const stimulus = await captureFullPageStimulus(wc, meta.devicePixelRatio);
+        if (!isActiveStudyCaptureRecord(study, record)) return null;
+        if (!isCurrentStudyCaptureRequest(study, record, requestSequence, { allowClosing: true }) ||
+            wc.isDestroyed() || wc.getURL() !== requestedUrl) throw supersededAnchorError(requestedUrl);
+        const visit = beginPageVisit(study, record, requestedUrl, requestedAt);
         visit.stimulusWidth = stimulus.width;
         visit.stimulusHeight = stimulus.height;
         record.stimuliByPageVisitId.set(visit.pageVisitId, stimulus.buffer);
         return visit;
-    })();
+    });
+
+    const visit = await provisional;
+    if (!visit || !isCurrentStudyCaptureRequest(study, record, requestSequence)) return visit;
     try {
-        return await record.captureSetupPromise;
-    } finally {
-        record.captureSetupPromise = null;
+        await waitForStudyCaptureSettle(wc);
+    } catch (err) {
+        if (isCurrentStudyCaptureRequest(study, record, requestSequence)) {
+            console.warn('[StudyCapture] Settle refresh unavailable; preserving provisional anchor:',
+                err && err.message ? err.message : err);
+        }
+        return visit;
+    }
+    if (!isCurrentStudyCaptureRequest(study, record, requestSequence) ||
+        wc.isDestroyed() || wc.getURL() !== requestedUrl) return visit;
+
+    const settled = await enqueueStudyCapture(record, async () => {
+        if (!isCurrentStudyCaptureRequest(study, record, requestSequence) ||
+            wc.isDestroyed() || wc.getURL() !== requestedUrl) return null;
+        try {
+            const meta = record.captureMeta || {};
+            const stimulus = await captureFullPageStimulus(wc, meta.devicePixelRatio);
+            if (!isCurrentStudyCaptureRequest(study, record, requestSequence) ||
+                wc.isDestroyed() || wc.getURL() !== requestedUrl) return null;
+            const pageVisitId = `pv-${String(study.nextPageVisitIndex).padStart(3, '0')}`;
+            study.nextPageVisitIndex += 1;
+            const candidate = Object.assign({
+                capturedAt: Date.now(),
+                pageVisitId,
+                url: requestedUrl
+            }, stimulus);
+            candidate.postProcessPromise = trackStudyCapturePostProcess(
+                record,
+                () => preserveSettledStudyCandidate(study, record, visit, candidate)
+            );
+            return candidate;
+        } catch (err) {
+            console.warn('[StudyCapture] Settled PNG unavailable; preserving provisional anchor:',
+                err && err.message ? err.message : err);
+            return null;
+        }
+    });
+    return settled ? settled.postProcessPromise : visit;
+}
+
+async function captureDoneStimulusIfChanged(win, study, record, doneAt) {
+    if (!win || win.isDestroyed() || !win.scrutinizerView ||
+        win.scrutinizerView.webContents.isDestroyed()) return null;
+    const wc = win.scrutinizerView.webContents;
+    const doneUrl = typeof record.doneUrl === 'string' ? record.doneUrl : wc.getURL();
+    const captureSequence = record.captureRequestSequence;
+    if (wc.getURL() !== doneUrl) {
+        console.warn('[StudyCapture] Done anchor skipped because the page navigated after Done.');
+        return null;
+    }
+    const baselineVisit = [...record.pageVisits].reverse().find((visit) =>
+        record.stimuliByPageVisitId.has(visit.pageVisitId)
+    );
+    const baseline = baselineVisit
+        ? record.stimuliByPageVisitId.get(baselineVisit.pageVisitId) : null;
+    try {
+        const meta = record.captureMeta || {};
+        const stimulus = await captureFullPageStimulus(wc, meta.devicePixelRatio);
+        if (wc.isDestroyed() || wc.getURL() !== doneUrl ||
+            record.captureRequestSequence !== captureSequence) {
+            console.warn('[StudyCapture] Done candidate discarded after navigation during capture.');
+            return null;
+        }
+        let difference = { material: true, fallback: true, reason: 'baseline_missing' };
+        if (baseline) {
+            try {
+                difference = await compareStimuli(baseline, stimulus.buffer, {
+                    timeoutMs: STUDY_STIMULUS_DIFF_TIMEOUT_MS
+                });
+            } catch (err) {
+                difference = {
+                    material: true,
+                    fallback: true,
+                    reason: 'comparison_error',
+                    detail: err && err.message ? err.message : String(err)
+                };
+            }
+        }
+        record.doneStimulusDifference = difference;
+        if (!difference.material) {
+            console.log(`[StudyCapture] Discarded unchanged Done candidate (${difference.reason}).`);
+            return null;
+        }
+
+        const visit = beginPageVisit(study, record, doneUrl, doneAt);
+        visit.stimulusWidth = stimulus.width;
+        visit.stimulusHeight = stimulus.height;
+        record.stimuliByPageVisitId.set(visit.pageVisitId, stimulus.buffer);
+        closeOpenPageVisit(record, doneAt);
+        console.log(`[StudyCapture] Preserved changed Done anchor (${difference.reason}).`);
+        return visit;
+    } catch (err) {
+        // The Done anchor is additive evidence. A valid entry/navigation anchor
+        // remains admissible if this best-effort terminal snapshot cannot run.
+        console.warn('[StudyCapture] Done anchor unavailable:', err && err.message ? err.message : err);
+        return null;
     }
 }
 
+function capturedRowsForRecord(record) {
+    const rows = Array.isArray(record.captureRows) ? record.captureRows : [];
+    if (!Number.isFinite(record.captureCutoffMs)) return rows.slice();
+    return rows.filter((row) => Number.isFinite(row.t) && row.t <= record.captureCutoffMs);
+}
+
 function finalCaptureHealth(record, rendererHealth, stopError) {
-    const rows = Array.isArray(record.captureRows) ? record.captureRows.length : 0;
+    const rawRows = Array.isArray(record.captureRows) ? record.captureRows.length : 0;
+    const rows = capturedRowsForRecord(record).length;
     const reportedRows = rendererHealth && Number.isFinite(rendererHealth.rowCount)
         ? rendererHealth.rowCount : null;
     const activeSegmentRows = record.captureRowsBySegment instanceof Map &&
         typeof record.activeCaptureSegmentId === 'string'
         ? (record.captureRowsBySegment.get(record.activeCaptureSegmentId) || 0)
-        : rows;
+        : rawRows;
     const rendererDeliveryFailures = rendererHealth &&
         Number.isFinite(rendererHealth.deliveryFailureCount)
         ? rendererHealth.deliveryFailureCount : 0;
@@ -2053,7 +2423,7 @@ function finalCaptureHealth(record, rendererHealth, stopError) {
     const deliveryFailed = deliveryFailures > 0 || deliveryMismatch;
     const health = Object.assign({}, rendererHealth || record.captureHealth || {}, {
         status: stopError || deliveryFailed ? 'failed' : (rows > 0 ? 'stopped' : 'empty'),
-        code: stopError ? 'capture_stop_failed'
+        code: stopError ? (stopError.code || 'capture_stop_failed')
             : (deliveryFailed ? 'row_delivery_failed' : (rows > 0 ? null : 'empty_trail')),
         message: stopError
             ? stopError.message
@@ -2073,10 +2443,11 @@ function finalCaptureHealth(record, rendererHealth, stopError) {
 
 function buildTaskTrail(study, record) {
     initializeTaskCapture(record);
-    record.captureRows.sort((left, right) => left.t - right.t);
+    const capturedRows = capturedRowsForRecord(record)
+        .sort((left, right) => left.t - right.t);
     const firstVisit = record.pageVisits[0] || {};
     const meta = record.captureMeta || {};
-    record.captureTrail = rowsToScanpathData(record.captureRows, {
+    record.captureTrail = rowsToScanpathData(capturedRows, {
         participantId: study.session.participantId,
         stimulusId: firstVisit.pageVisitId || null,
         stimulusWidth: firstVisit.stimulusWidth || null,
@@ -2094,9 +2465,19 @@ async function finalizeCurrentTaskCapture(win) {
     const study = activeStudy;
     const record = openTaskRecord();
     if (!study || !record) return null;
-    if (record.captureSetupPromise) await record.captureSetupPromise;
+    initializeTaskCapture(record);
+    record.captureClosing = true;
+    const doneAt = Number.isFinite(record.doneAtMs) ? record.doneAtMs : Date.now();
+    record.captureCutoffMs = taskElapsedMs(record, doneAt);
     let result = null;
     let stopError = null;
+    if (record.captureTrackerReadyPromise) {
+        try {
+            await record.captureTrackerReadyPromise;
+        } catch (err) {
+            stopError = err;
+        }
+    }
     try {
         result = await stopInjectedStudyCapture(win);
         if (!result || !result.health) {
@@ -2104,13 +2485,24 @@ async function finalizeCurrentTaskCapture(win) {
             error.code = 'capture_stop_missing';
             throw error;
         }
-        // Let row IPC already emitted by the isolated world drain before the
-        // canonical trail snapshot is assembled.
-        await new Promise((resolve) => setImmediate(resolve));
     } catch (err) {
-        stopError = err;
+        if (!stopError) stopError = err;
     }
-    closeOpenPageVisit(record);
+    // Let row IPC already emitted by the isolated world drain before the
+    // canonical trail snapshot is assembled, including a failed stop path.
+    await new Promise((resolve) => setImmediate(resolve));
+    if (record.captureQueuePromise) {
+        try {
+            await record.captureQueuePromise;
+        } catch (err) {
+            if (!stopError) stopError = err;
+        }
+    }
+    await drainStudyCapturePostProcessing(record);
+    if (!stopError && record.captureQueueError) stopError = record.captureQueueError;
+    if (!stopError && record.capturePostProcessError) stopError = record.capturePostProcessError;
+    await captureDoneStimulusIfChanged(win, study, record, doneAt);
+    closeOpenPageVisit(record, doneAt);
     record.captureHealth = finalCaptureHealth(
         record,
         result && result.health,
@@ -2124,7 +2516,7 @@ function finalizeBufferedTaskCapture(study, record, reason) {
     if (!study || !record) return null;
     initializeTaskCapture(record);
     closeOpenPageVisit(record);
-    const rows = record.captureRows.length;
+    const rows = capturedRowsForRecord(record).length;
     record.captureHealth = finalCaptureHealth(record, {
         status: rows > 0 ? 'stopped' : 'empty',
         code: reason || null,
@@ -2239,11 +2631,11 @@ function failActiveStudyCapture(win, err) {
 }
 
 // Stamps end data onto the in-flight task record, if any.
-function closeOpenTaskRecord(outcome) {
+function closeOpenTaskRecord(outcome, at = Date.now()) {
     if (!activeStudy || activeStudy.kind !== 'session' || activeStudy.phase !== 'task') return;
     const record = activeStudy.taskRecords[activeStudy.taskRecords.length - 1];
     if (!record || record.endedAtMs !== undefined) return;
-    record.endedAtMs = Date.now();
+    record.endedAtMs = at;
     record.outcome = outcome;
     if (outcome === 'done' && !record.events.some(event => event.type === 'done')) {
         record.events.push({
@@ -2253,6 +2645,10 @@ function closeOpenTaskRecord(outcome) {
         });
     }
     const win = studyWindow();
+    if (outcome === 'done' && typeof record.doneUrl === 'string') {
+        record.finalUrl = record.doneUrl;
+        return;
+    }
     try {
         record.finalUrl = win && !win.isDestroyed() ? win.scrutinizerView.webContents.getURL() : null;
     } catch {
@@ -2363,17 +2759,31 @@ async function advanceStudySession(win) {
     }
     study.captureTransition = true;
     const record = openTaskRecord();
+    const doneAt = Date.now();
+    if (record) {
+        record.doneAtMs = doneAt;
+        record.captureClosing = true;
+        record.captureCutoffMs = taskElapsedMs(record, doneAt);
+        try {
+            record.doneUrl = win && !win.isDestroyed()
+                ? win.scrutinizerView.webContents.getURL() : null;
+        } catch {
+            record.doneUrl = null;
+        }
+        // Clamp the evidence interval at the participant action before any
+        // bounded stop/screenshot/diff work can observe a later navigation.
+        closeOpenPageVisit(record, doneAt);
+    }
     if (record && !record.events.some(event => event.type === 'done')) {
-        const at = Date.now();
         record.events.push({
             type: 'done',
-            t: taskElapsedMs(record, at),
-            at: new Date(at).toISOString()
+            t: taskElapsedMs(record, doneAt),
+            at: new Date(doneAt).toISOString()
         });
     }
     try {
         await finalizeCurrentTaskCapture(win);
-        closeOpenTaskRecord('done');
+        closeOpenTaskRecord('done', doneAt);
         if (study.taskIndex < study.tasks.length - 1) {
             study.taskIndex += 1;
             study.phase = 'interstitial';
@@ -4064,6 +4474,7 @@ app.on('will-quit', () => {
     globalShortcut.unregisterAll();
     // Quit mid-session: flush the partial summary so timing data survives.
     finalizeInterruptedSession('quit');
+    void closeStimulusDiffWorker();
 });
 
 app.on('activate', function () {

@@ -66,4 +66,20 @@ describe('Study toolbar contract', () => {
         expect(main).toContain('await finalizeCurrentTaskCapture(win)');
         expect(main).toContain('const capture = writeCompleteStudyCapture(study, summary)');
     });
+
+    it('settles and serializes PNG anchors while keeping pixel comparison off-thread', () => {
+        expect(main).toContain('const trackerReady = restartTracker ? injectStudyCapture(win, record)');
+        expect(main).toContain('await waitForStudyCaptureSettle(wc)');
+        expect(main).toContain("'stimulus_settle_timeout'");
+        expect(main).toContain('record.captureQueuePromise = queued');
+        expect(main).toContain('record.captureRequestSequence += 1');
+        expect(main).toContain("console.log('[StudyCapture] Skipped superseded did-finish-load.')");
+        expect(main).toContain('async function preserveSettledStudyCandidate(study, record, provisionalVisit, candidate)');
+        expect(main).toContain('record.pageVisits.splice(provisionalIndex + 1, 0, settledVisit)');
+        expect(main).toContain('await drainStudyCapturePostProcessing(record)');
+        expect(main).toContain('difference = await compareStimuli(baseline, stimulus.buffer, {');
+        expect(main).toContain('await captureDoneStimulusIfChanged(win, study, record, doneAt)');
+        expect(main).toContain('closeOpenPageVisit(record, doneAt)');
+        expect(main).toContain("closeOpenTaskRecord('done', doneAt)");
+    });
 });

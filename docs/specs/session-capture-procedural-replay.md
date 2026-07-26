@@ -97,10 +97,20 @@ DataCollector and Workbench can distinguish setup failure from genuine
 participant behavior without inferring from zeros.
 
 The study lifecycle starts the tracker only after the task page finishes
-loading, preserves privacy-scrubbed rows across full navigations, and stops the
-tracker before Done advances the session. Each row crosses a sandboxed isolated
-world through a narrow preload bridge; collector rejection or a renderer/main
-row-count mismatch becomes `row_delivery_failed`, never a successful stop.
+loading. Tracking begins immediately and a provisional PNG is acquired before
+settling, so behavior during the settle window keeps its original stimulus
+anchor. A settled candidate waits for fonts, two animation frames, and a 500 ms
+DOM-quiet window, bounded by a two-second hard deadline. If it materially
+differs, it starts a second same-URL interval; otherwise it is discarded rather
+than overwriting provisional evidence. Screenshot requests are serialized, but
+the settle timer and pixel comparison run outside that queue. A newer page can
+therefore wait only for an already-running screenshot, which has a five-second
+deadline. A navigation sequence guard retains the prior valid anchor or fails
+closed rather than attaching a PNG to the wrong URL. The tracker preserves
+privacy-scrubbed rows across full navigations and stops before Done advances the
+session. Each row crosses a sandboxed isolated world through a narrow preload
+bridge; collector rejection or a renderer/main row-count mismatch becomes
+`row_delivery_failed`, never a successful stop.
 
 Completed artifacts are published with a same-volume atomic directory rename.
 The writer refuses to publish unless every recorded task has a trail and at
@@ -126,6 +136,19 @@ stream. Rationale: live pages are non-stationary; re-rendering archived HTML
 against drifted CSS is unfixable (AdSERP lesson). Replay prefers the live URL
 and falls back to the screenshot through the static-stimulus path
 (`docs/specs/static-stimulus-foveation.md`) when the page has drifted.
+
+Done also takes a terminal candidate PNG. PNG decoding and pixel comparison run
+on one bounded Node worker thread, never on Electron's main thread. The terminal
+anchor is retained only when dimensions differ or the worker reports a material
+pixel change; identical and immaterial candidates are discarded. Decode limits,
+worker errors, and the bounded comparison timeout fail conservatively by
+retaining the candidate. The Chromium capture itself has a five-second deadline
+and terminal candidates are rejected if navigation races the screenshot. Done
+is the evidence cutoff: later tracker rows are excluded, task duration uses the
+participant's click, and the post-stop terminal anchor is indexed at that
+logical boundary rather than presented as frame-exact acquisition. Chromium
+debugger ownership and page-lifecycle coordination remain on the main process,
+where `webContents` is valid.
 
 ## Privacy
 
