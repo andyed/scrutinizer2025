@@ -20,6 +20,7 @@ html, body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     overflow: hidden;
     user-select: none;
+    -webkit-font-smoothing: antialiased;
 }
 
 .toolbar {
@@ -57,8 +58,14 @@ button:active {
 }
 
 button:disabled {
-    opacity: 0.5;
+    color: #d4d4d4;
+    background-color: #292929;
     cursor: default;
+}
+
+button:focus-visible {
+    outline: 2px solid #99ccff;
+    outline-offset: 2px;
 }
 
 .nav-controls {
@@ -109,37 +116,82 @@ button:disabled {
 .study-container {
     flex: 1;
     min-width: 0;
-    display: flex;
+    height: 100%;
+    display: grid;
+    grid-template-rows: 40px 48px;
+    gap: 4px;
+    padding: 6px 0;
+}
+
+.study-control-row {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
+}
+
+.study-instruction-row {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding: 4px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--input-bg);
 }
 
 .study-label {
     flex-shrink: 0;
     color: #ffb15a;
-    font-size: 11px;
+    font-size: 16px;
     font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.study-instruction-label {
+    color: #d4d4d4;
+    font-size: 16px;
+    font-weight: 600;
 }
 
 #study-instruction {
-    width: auto;
     min-width: 0;
-    flex: 1;
-    justify-content: flex-start;
-    padding: 0 10px;
-    background: var(--input-bg);
     color: var(--text-color);
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 20px;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    text-wrap: pretty;
+}
+
+#study-back,
+#study-origin,
+#study-done {
+    min-height: 40px;
+}
+
+#study-back {
+    width: auto;
+    min-width: 72px;
+    gap: 6px;
+    padding: 0 12px;
+    border: 1px solid var(--border-color);
+    color: #ddd;
+    font-weight: 600;
 }
 
 #study-origin {
     width: auto;
+    min-width: 0;
     max-width: 190px;
-    padding: 0 9px;
+    justify-self: end;
+    padding: 0 12px;
     /* Trust-critical text (participant's site-identity signal) — 8:1 floor.
        8.49:1 on the #202020 toolbar. */
     color: #bbb;
@@ -159,7 +211,8 @@ button:disabled {
 
 #study-done {
     width: auto;
-    padding: 0 11px;
+    min-width: 64px;
+    padding: 0 14px;
     /* Light-on-dark for salience (participants must find the exit) and
        contrast: #111 on #99ccff is 11.18:1. The previous white-on-accent
        pair was 3.98:1, below even WCAG AA. */
@@ -170,6 +223,31 @@ button:disabled {
 
 #study-done:hover {
     background: #b3d9ff; /* 12.85:1 with #111 */
+}
+
+@media (max-width: 560px) {
+    .toolbar {
+        padding-inline: 6px;
+    }
+
+    .study-control-row {
+        gap: 6px;
+    }
+
+    #study-back {
+        min-width: 64px;
+        padding-inline: 9px;
+    }
+
+    #study-origin {
+        max-width: 104px;
+        padding-inline: 8px;
+    }
+
+    .study-instruction-row {
+        gap: 8px;
+        padding-inline: 9px;
+    }
 }
 
 /* Fovea Toggle Button */

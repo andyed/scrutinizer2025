@@ -6,7 +6,9 @@ const reloadBtn = document.getElementById('reload-btn');
 const urlTrigger = document.getElementById('url-trigger');
 const foveaToggleBtn = document.getElementById('fovea-toggle-btn');
 const studyContainer = document.getElementById('study-container');
+const studyBack = document.getElementById('study-back');
 const studyLabel = document.getElementById('study-label');
+const studyInstructionLabel = document.getElementById('study-instruction-label');
 const studyInstruction = document.getElementById('study-instruction');
 const studyOrigin = document.getElementById('study-origin');
 const studyDone = document.getElementById('study-done');
@@ -43,6 +45,7 @@ function renderToolbar() {
     const inSession = Number.isInteger(viewState.taskNumber) && Number.isInteger(viewState.taskCount) && viewState.taskCount > 1;
     studyLabel.textContent = inSession ? `Task ${viewState.taskNumber} of ${viewState.taskCount}` : 'Task';
     studyLabel.title = viewState.taskId ? `Task ID: ${viewState.taskId}` : 'Study task';
+    studyInstructionLabel.textContent = viewState.showingUrl ? 'Task URL' : 'Instructions';
     studyInstruction.textContent = centerText;
     studyInstruction.title = centerText;
     studyInstruction.setAttribute(
@@ -55,6 +58,7 @@ function renderToolbar() {
 }
 
 backBtn.addEventListener('click', () => { ipcRenderer.send('toolbar:navigate-back'); });
+studyBack.addEventListener('click', () => { ipcRenderer.send('toolbar:navigate-back'); });
 forwardBtn.addEventListener('click', () => { ipcRenderer.send('toolbar:navigate-forward'); });
 reloadBtn.addEventListener('click', () => { ipcRenderer.send('toolbar:reload'); });
 foveaToggleBtn.addEventListener('click', () => { ipcRenderer.send('toolbar:toggle-fovea'); });
@@ -119,6 +123,7 @@ ipcRenderer.on('toolbar:fovea-state', (event, isEnabled) => {
 
 ipcRenderer.on('toolbar:update-nav-state', (event, { canGoBack, canGoForward }) => {
     backBtn.disabled = !canGoBack;
+    studyBack.disabled = !canGoBack;
     forwardBtn.disabled = !canGoForward;
 });
 

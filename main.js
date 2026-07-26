@@ -31,6 +31,8 @@ const STUDY_CAPTURE_QUIET_MS = 500;
 const STUDY_CAPTURE_SETTLE_MAX_MS = 2000;
 const STUDY_CAPTURE_SCREENSHOT_TIMEOUT_MS = 5000;
 const STUDY_STIMULUS_DIFF_TIMEOUT_MS = 2500;
+const BROWSE_TOOLBAR_HEIGHT = 40;
+const STUDY_TOOLBAR_HEIGHT = 104;
 
 const STUDY_MODE_IDS = Object.values(modesRegistry.modes).map((mode) => mode.id);
 // Auto-updater: graceful fallback if electron-updater not bundled
@@ -109,6 +111,63 @@ const sendToOverlays = (channel, ...args) => {
 
 function isStudyWindow(win) {
     return Boolean(win && !win.isDestroyed() && (win.studyMode === true || (activeStudy && activeStudy.windowId === win.id)));
+}
+
+function toolbarHeightForWindow(win) {
+    return isStudyWindow(win) ? STUDY_TOOLBAR_HEIGHT : BROWSE_TOOLBAR_HEIGHT;
+}
+
+function activeHistoryIndex(webContents) {
+    const history = webContents && webContents.navigationHistory;
+    if (!history || typeof history.getActiveIndex !== 'function') return null;
+    const index = history.getActiveIndex();
+    return Number.isInteger(index) ? index : null;
+}
+
+function studyTaskHistoryActive(win) {
+    if (!isStudyWindow(win) || !activeStudy || activeStudy.windowId !== win.id) return false;
+    return activeStudy.kind !== 'session' || activeStudy.phase === 'task';
+}
+
+function canNavigateHistory(win, direction) {
+    if (!win || win.isDestroyed() || !win.scrutinizerView ||
+        win.scrutinizerView.webContents.isDestroyed()) return false;
+    const wc = win.scrutinizerView.webContents;
+    if (!isStudyWindow(win)) {
+        return direction === 'back' ? wc.canGoBack() : wc.canGoForward();
+    }
+    if (!studyTaskHistoryActive(win)) return false;
+    if (direction === 'forward') return wc.canGoForward();
+    const activeIndex = activeHistoryIndex(wc);
+    return Number.isInteger(activeIndex) && Number.isInteger(win.studyHistoryFloorIndex) &&
+        activeIndex > win.studyHistoryFloorIndex;
+}
+
+function navigateHistory(win, direction) {
+    if (!canNavigateHistory(win, direction)) return false;
+    const wc = win.scrutinizerView.webContents;
+    const activeIndex = activeHistoryIndex(wc);
+    if (Number.isInteger(activeIndex) && typeof wc.goToIndex === 'function') {
+        wc.goToIndex(activeIndex + (direction === 'back' ? -1 : 1));
+    } else if (direction === 'back') {
+        wc.goBack();
+    } else {
+        wc.goForward();
+    }
+    return true;
+}
+
+function toolbarNavigationState(win) {
+    return {
+        canGoBack: canNavigateHistory(win, 'back'),
+        canGoForward: canNavigateHistory(win, 'forward')
+    };
+}
+
+function armStudyHistoryFloor(win) {
+    if (!win || win.isDestroyed() || !win.scrutinizerView) return;
+    win.studyHistoryFloorIndex = null;
+    win.studyHistoryFloorPending = true;
 }
 
 function isStudySender(sender) {
@@ -344,7 +403,6 @@ ipcMain.on('emulate-touch', async (event, { type, x, y }) => {
 async function applyMobileEmulation(win, enabled) {
     if (!win || !win.scrutinizerView) return;
     const wc = win.scrutinizerView.webContents;
-    const TOOLBAR_HEIGHT = 40;
 
     try {
         // Attach debugger if not already attached
@@ -386,7 +444,7 @@ async function applyMobileEmulation(win, enabled) {
 
             // Resize Window
             const width = targetProfile.width;
-            const height = targetProfile.height + TOOLBAR_HEIGHT;
+            const height = targetProfile.height + toolbarHeightForWindow(win);
 
             win.setResizable(true); // Ensure we can resize first
             win.setSize(width, height, true);
@@ -563,8 +621,8 @@ ipcMain.on('navigate:to', (event, url) => {
 ipcMain.on('hud:request:window-bounds', (event) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
-    if (win) {
-        const [width, height] = win.getContentSize(); // Use getContentSize to exclude title bar
+    if (win && win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+        const [width, height] = win.scrutinizerHud.getContentSize();
         event.reply('window-size', { width, height });
     }
 });
@@ -573,8 +631,8 @@ ipcMain.on('hud:request:window-bounds', (event) => {
 ipcMain.on('get-window-size', (event) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerHud && w.scrutinizerHud.webContents === event.sender);
-    if (win) {
-        const [width, height] = win.getContentSize(); // Use getContentSize to exclude title bar
+    if (win && win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+        const [width, height] = win.scrutinizerHud.getContentSize();
         event.reply('window-size', { width, height });
     }
 });
@@ -593,6 +651,9 @@ ipcMain.on('hud:capture:request', async (event) => {
 
     if (win && win.scrutinizerView && win.scrutinizerHud) {
         try {
+            const frameSequence = (win.captureFrameSequence || 0) + 1;
+            win.captureFrameSequence = frameSequence;
+            const capturedScroll = win.latestBrowserScroll || { x: 0, y: 0 };
             // Performance Optimization: 1:1 Capture Fidelity
             // Explicitly specify capture bounds to ensure 1:1 pixel mapping
             // This eliminates scaling artifacts and improves text clarity
@@ -628,7 +689,10 @@ ipcMain.on('hud:capture:request', async (event) => {
             win.scrutinizerHud.webContents.send('hud:frame-captured', {
                 buffer: buffer,
                 width: size.width,
-                height: size.height
+                height: size.height,
+                frameSequence,
+                scrollX: capturedScroll.x,
+                scrollY: capturedScroll.y
             });
         } catch (err) {
             console.error('[Main] Capture error:', err);
@@ -705,6 +769,23 @@ ipcMain.on('browser:zoom-changed', (event, zoom) => {
     }
 });
 
+// Keep the visualization synchronized with native BrowserView scrolling. The
+// HUD uses this immediately to suppress stale captured pixels until a frame at
+// the settled scroll position arrives.
+ipcMain.on('browser:scroll', (event, x, y) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
+    if (!win) return;
+    const position = {
+        x: Number.isFinite(x) ? x : 0,
+        y: Number.isFinite(y) ? y : 0
+    };
+    win.latestBrowserScroll = position;
+    if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+        win.scrutinizerHud.webContents.send('browser:scroll', position);
+    }
+});
+
 // Forward structure map updates from content to HUD
 ipcMain.on('structure-update', (event, blocks, trigger) => {
     const windows = BrowserWindow.getAllWindows();
@@ -755,17 +836,17 @@ ipcMain.on('keydown', (event, keyEvent) => {
 
     // Navigation: Back / Forward (with debouncing)
     if (code === 'ArrowLeft' && (cmdOrCtrl || altKey)) {
-        if (!isStudyWindow(win) && win.scrutinizerView && canNavigate(win.id, 'back')) {
+        if (canNavigateHistory(win, 'back') && canNavigate(win.id, 'back')) {
             console.log('[Main] Navigating back (from keyboard shortcut)');
-            win.scrutinizerView.webContents.goBack();
+            navigateHistory(win, 'back');
         }
         return;
     }
 
     if (code === 'ArrowRight' && (cmdOrCtrl || altKey)) {
-        if (!isStudyWindow(win) && win.scrutinizerView && canNavigate(win.id, 'forward')) {
+        if (canNavigateHistory(win, 'forward') && canNavigate(win.id, 'forward')) {
             console.log('[Main] Navigating forward (from keyboard shortcut)');
-            win.scrutinizerView.webContents.goForward();
+            navigateHistory(win, 'forward');
         }
         return;
     }
@@ -790,16 +871,16 @@ ipcMain.on('toolbar:navigate-back', (event) => {
     const windows = BrowserWindow.getAllWindows();
     // Find window where toolbarView is the sender
     const win = windows.find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
-    if (win && !isStudyWindow(win) && win.scrutinizerView && win.scrutinizerView.webContents.canGoBack()) {
-        win.scrutinizerView.webContents.goBack();
+    if (win && canNavigateHistory(win, 'back') && canNavigate(win.id, 'back')) {
+        navigateHistory(win, 'back');
     }
 });
 
 ipcMain.on('toolbar:navigate-forward', (event) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
-    if (win && !isStudyWindow(win) && win.scrutinizerView && win.scrutinizerView.webContents.canGoForward()) {
-        win.scrutinizerView.webContents.goForward();
+    if (win && canNavigateHistory(win, 'forward') && canNavigate(win.id, 'forward')) {
+        navigateHistory(win, 'forward');
     }
 });
 
@@ -942,7 +1023,7 @@ function createScrutinizerWindow(startUrl, options = {}) {
         : startUrl;
     console.log('[Main] Creating new Scrutinizer window (dual-window architecture)', loggedTarget ? 'with target: ' + loggedTarget : '(default URL)');
 
-    const TOOLBAR_HEIGHT = 40;
+    const initialToolbarHeight = study ? STUDY_TOOLBAR_HEIGHT : BROWSE_TOOLBAR_HEIGHT;
     const isTestMode = process.env.TEST_MODE === 'true';
 
     // Determine initial bounds based on emulation state
@@ -962,12 +1043,12 @@ function createScrutinizerWindow(startUrl, options = {}) {
         if (profile) {
             console.log(`[Main] Initializing window with mobile profile: ${profile.label}`);
             initialWidth = profile.width;
-            initialHeight = profile.height + TOOLBAR_HEIGHT;
+            initialHeight = profile.height + initialToolbarHeight;
             initialResizable = false;
         } else {
             // Fallback
             initialWidth = 390;
-            initialHeight = 844 + TOOLBAR_HEIGHT;
+            initialHeight = 844 + initialToolbarHeight;
             initialResizable = false;
         }
     } else {
@@ -994,6 +1075,10 @@ function createScrutinizerWindow(startUrl, options = {}) {
     win.studyMode = Boolean(study);
     win.toolbarReady = false;
     win.hudReady = false;
+    win.latestBrowserScroll = { x: 0, y: 0 };
+    win.captureFrameSequence = 0;
+    win.studyHistoryFloorIndex = null;
+    win.studyHistoryFloorPending = false;
 
     // Explicitly set menu for Windows/Linux
     if (process.platform !== 'darwin') {
@@ -1047,6 +1132,13 @@ function createScrutinizerWindow(startUrl, options = {}) {
         if (!navigationArrow && !lockedCommand) return;
 
         event.preventDefault();
+        if (navigationArrow) {
+            const direction = key === 'arrowleft' ? 'back' : 'forward';
+            if (canNavigateHistory(win, direction) && canNavigate(win.id, direction)) {
+                navigateHistory(win, direction);
+            }
+            return;
+        }
         if (commandKey && key === 'l' && win.toolbarReady) {
             win.toolbarView.webContents.send('toolbar:show-study-url');
         }
@@ -1074,18 +1166,24 @@ function createScrutinizerWindow(startUrl, options = {}) {
 
     // Position views — use getContentSize() not getSize() because child view
     // bounds are relative to the content area (excludes title bar on macOS)
+    let toolbarOffset = isTestMode ? 0 : initialToolbarHeight;
     const updateViewBounds = () => {
         const [width, height] = win.getContentSize();
         if (isTestMode) {
             // TEST_MODE: hide toolbar, content gets full window height.
-            // Eliminates 40px toolbar offset from captures.
             toolbarView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
             contentView.setBounds({ x: 0, y: 0, width: width, height: height });
         } else {
+            toolbarOffset = toolbarHeightForWindow(win);
             // Toolbar at top
-            toolbarView.setBounds({ x: 0, y: 0, width: width, height: TOOLBAR_HEIGHT });
+            toolbarView.setBounds({ x: 0, y: 0, width: width, height: toolbarOffset });
             // Content below toolbar
-            contentView.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width: width, height: height - TOOLBAR_HEIGHT });
+            contentView.setBounds({
+                x: 0,
+                y: toolbarOffset,
+                width,
+                height: Math.max(0, height - toolbarOffset)
+            });
         }
     };
     updateViewBounds();
@@ -1096,7 +1194,6 @@ function createScrutinizerWindow(startUrl, options = {}) {
     // Position it to match the content area of main window (not including title bar AND toolbar)
     const contentBounds = win.getContentBounds();
     // In TEST_MODE, no toolbar offset — HUD matches full content area
-    const toolbarOffset = isTestMode ? 0 : TOOLBAR_HEIGHT;
     const hudY = contentBounds.y + toolbarOffset;
     const hudHeight = contentBounds.height - toolbarOffset;
     if (isTestMode) {
@@ -1142,11 +1239,12 @@ function createScrutinizerWindow(startUrl, options = {}) {
     const syncHudBounds = () => {
         if (!win.isDestroyed() && !hudWindow.isDestroyed()) {
             const contentBounds = win.getContentBounds();
+            toolbarOffset = isTestMode ? 0 : toolbarHeightForWindow(win);
             hudWindow.setBounds({
                 x: contentBounds.x,
                 y: contentBounds.y + toolbarOffset,
                 width: contentBounds.width,
-                height: contentBounds.height - toolbarOffset
+                height: Math.max(0, contentBounds.height - toolbarOffset)
             });
         }
     };
@@ -1155,6 +1253,10 @@ function createScrutinizerWindow(startUrl, options = {}) {
 
     // Initial sync
     syncHudBounds();
+    win.updateScrutinizerBounds = () => {
+        updateViewBounds();
+        syncHudBounds();
+    };
 
     // Clean up when window closes
     win.on('closed', () => {
@@ -1213,10 +1315,7 @@ function createScrutinizerWindow(startUrl, options = {}) {
         // Update Toolbar
         if (toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
             toolbarView.webContents.send('toolbar:update-loading', false);
-            toolbarView.webContents.send('toolbar:update-nav-state', {
-                canGoBack: contentView.webContents.canGoBack(),
-                canGoForward: contentView.webContents.canGoForward()
-            });
+            toolbarView.webContents.send('toolbar:update-nav-state', toolbarNavigationState(win));
         }
 
         if (activeStudy && activeStudy.kind === 'session' &&
@@ -1258,6 +1357,7 @@ function createScrutinizerWindow(startUrl, options = {}) {
     contentView.webContents.on('did-start-navigation', (event, url, isInPlace, isMainFrame) => {
         if (isMainFrame && !isInPlace) {
             console.log('[Main] Navigation started:', url);
+            win.latestBrowserScroll = { x: 0, y: 0 };
             if (isStudyWindow(win)) {
                 const record = openTaskRecord();
                 closeOpenPageVisit(record);
@@ -1271,6 +1371,7 @@ function createScrutinizerWindow(startUrl, options = {}) {
                 }
             }
             if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
+                hudWindow.webContents.send('browser:scroll', win.latestBrowserScroll);
                 hudWindow.webContents.send('hud:reset-visual-memory');
             }
         } else {
@@ -1302,16 +1403,17 @@ function createScrutinizerWindow(startUrl, options = {}) {
         // Update Toolbar
         if (toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
             toolbarView.webContents.send('toolbar:update-url', url);
-            toolbarView.webContents.send('toolbar:update-nav-state', {
-                canGoBack: contentView.webContents.canGoBack(),
-                canGoForward: contentView.webContents.canGoForward()
-            });
+            toolbarView.webContents.send('toolbar:update-nav-state', toolbarNavigationState(win));
         }
     };
 
     // Only listen to did-navigate for main frame navigations
     // did-navigate-in-page is for hash changes and single-page app navigations
     contentView.webContents.on('did-navigate', (event, url) => {
+        if (win.studyHistoryFloorPending && studyTaskHistoryActive(win)) {
+            win.studyHistoryFloorIndex = activeHistoryIndex(contentView.webContents);
+            win.studyHistoryFloorPending = false;
+        }
         if (isStudyWindow(win)) {
             const record = openTaskRecord();
             if (record) {
@@ -1371,6 +1473,9 @@ function createScrutinizerWindow(startUrl, options = {}) {
 
     // Load start URL in the content view
     const urlToLoad = startUrl || currentStartPage || 'https://github.com/andyed/scrutinizer2025?tab=readme-ov-file#what-is-scrutinizer';
+    if (study && (study.kind !== 'session' || study.phase === 'task')) {
+        armStudyHistoryFloor(win);
+    }
     contentView.webContents.loadURL(urlToLoad);
 
     // Send init state to HUD once it loads
@@ -1378,6 +1483,7 @@ function createScrutinizerWindow(startUrl, options = {}) {
         win.hudReady = true;
         if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
             console.log('[Main] HUD loaded. Sending init-state.');
+            hudWindow.webContents.send('browser:scroll', win.latestBrowserScroll);
             hudWindow.webContents.send('hud:settings:radius-options', RADIUS_OPTIONS);
             hudWindow.webContents.send('settings:radius-options', RADIUS_OPTIONS); // Legacy
 
@@ -1478,9 +1584,10 @@ function createScrutinizerWindow(startUrl, options = {}) {
 
                 // Bounds check still needs local coords
                 const localX = cursorPos.x - contentBounds.x;
-                const localY = cursorPos.y - contentBounds.y - 40;
+                const localY = cursorPos.y - contentBounds.y - toolbarOffset;
+                const contentHeight = Math.max(0, contentBounds.height - toolbarOffset);
 
-                if (localX >= 0 && localX < contentBounds.width && localY >= 0 && localY < contentBounds.height) {
+                if (localX >= 0 && localX < contentBounds.width && localY >= 0 && localY < contentHeight) {
                     // Send zoom=1.0 since coords are already window-relative
                     if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
                         win.scrutinizerHud.webContents.send('browser:mousemove', x, y, 1.0);
@@ -1717,6 +1824,7 @@ function sendStudyToolbarState(win) {
         taskNumber: activeStudy.kind === 'session' ? activeStudy.taskIndex + 1 : null,
         taskCount: activeStudy.kind === 'session' ? activeStudy.tasks.length : null
     });
+    win.toolbarView.webContents.send('toolbar:update-nav-state', toolbarNavigationState(win));
 }
 
 function studyRuntimePayload(study) {
@@ -2720,6 +2828,7 @@ function beginCurrentSessionTask(win) {
 
     sendStudyRuntimeState(win); // resets Visual Memory + applies the task condition
     sendStudyToolbarState(win);
+    armStudyHistoryFloor(win);
     win.scrutinizerView.webContents.loadURL(task.targetUrl);
     rebuildMenu();
 }
@@ -2819,9 +2928,15 @@ function applyStudyLaunch(launch) {
     study.windowId = mainWindow.id;
     applyRuntimeStateToGlobals(study.runtimeState);
     mainWindow.studyMode = true;
+    if (typeof mainWindow.updateScrutinizerBounds === 'function') {
+        mainWindow.updateScrutinizerBounds();
+    }
 
     sendStudyRuntimeState(mainWindow);
     sendStudyToolbarState(mainWindow);
+    if (study.kind !== 'session' || study.phase === 'task') {
+        armStudyHistoryFloor(mainWindow);
+    }
     mainWindow.scrutinizerView.webContents.loadURL(studyEntryUrl(study));
     rebuildMenu();
 
@@ -2847,9 +2962,14 @@ function exitStudyMode() {
         }
         if (win.toolbarReady) win.toolbarView.webContents.send('toolbar:exit-study');
         win.studyMode = false;
+        win.studyHistoryFloorIndex = null;
+        win.studyHistoryFloorPending = false;
     }
 
     activeStudy = null;
+    if (win && !win.isDestroyed() && typeof win.updateScrutinizerBounds === 'function') {
+        win.updateScrutinizerBounds();
+    }
     rebuildMenu();
 }
 
@@ -3558,7 +3678,7 @@ function runIntegrationTest() {
                                     await new Promise(resolve => setTimeout(resolve, 200));
 
                                     // Use content bounds (not window outer bounds) to match HUD positioning.
-                                    // The HUD is offset by TOOLBAR_HEIGHT (40px) from content top.
+                                    // The HUD is offset by the active toolbar height from content top.
                                     // screenX/Y must land in HUD coordinates after overlay.js subtracts window.screenX/Y.
                                     const cb = mainWindow.getContentBounds();
                                     // HUD position: x = cb.x, y = cb.y + toolbarOffset

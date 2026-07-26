@@ -5,6 +5,12 @@
 (() => {
     const { ipcRenderer } = require('electron');
     const CONFIG = require('./config');
+    const {
+        normalizeScrollPosition,
+        isFrameAtScrollPosition
+    } = require('../shared/scroll-freshness');
+
+    const SCROLL_IDLE_MS = 90;
 
     let scrutinizer;
     let captureInterval = null;
@@ -70,6 +76,33 @@
         // Start/stop capture loop
         let isCapturing = false;
         let isWaitingForFrame = false;
+        let currentScroll = { x: 0, y: 0 };
+        let frameScroll = null;
+        let scrollIdle = true;
+        let scrollIdleTimer = null;
+        let lastFrameSequence = 0;
+        const overlayCanvas = document.getElementById('overlay-canvas');
+
+        const updateScrollFreshness = () => {
+            if (!overlayCanvas || !isCapturing) return;
+            const fresh = frameScroll !== null &&
+                isFrameAtScrollPosition(frameScroll, currentScroll);
+            const present = scrollIdle && fresh;
+            overlayCanvas.style.visibility = present ? 'visible' : 'hidden';
+            overlayCanvas.dataset.scrollFreshness = present ? 'fresh' : 'waiting';
+        };
+
+        const handleBrowserScroll = (position) => {
+            currentScroll = normalizeScrollPosition(position);
+            scrollIdle = false;
+            updateScrollFreshness();
+            if (scrollIdleTimer) clearTimeout(scrollIdleTimer);
+            scrollIdleTimer = setTimeout(() => {
+                scrollIdleTimer = null;
+                scrollIdle = true;
+                updateScrollFreshness();
+            }, SCROLL_IDLE_MS);
+        };
 
         const requestNextFrame = () => {
             if (!isCapturing) return;
@@ -85,6 +118,11 @@
             log('[Overlay] Starting capture loop (self-clocking)');
             isCapturing = true;
             isWaitingForFrame = false;
+            frameScroll = null;
+            if (overlayCanvas) {
+                overlayCanvas.style.visibility = 'hidden';
+                overlayCanvas.dataset.scrollFreshness = 'waiting';
+            }
             requestNextFrame();
         };
 
@@ -93,12 +131,33 @@
             log('[Overlay] Stopping capture loop');
             isCapturing = false;
             isWaitingForFrame = false;
+            if (scrollIdleTimer) clearTimeout(scrollIdleTimer);
+            scrollIdleTimer = null;
+            scrollIdle = true;
+            frameScroll = null;
+            if (overlayCanvas) {
+                overlayCanvas.style.visibility = 'visible';
+                overlayCanvas.dataset.scrollFreshness = 'inactive';
+            }
         };
+
+        ipcRenderer.on('browser:scroll', (event, position) => {
+            handleBrowserScroll(position);
+        });
 
         // Listen for frame data from main process
         ipcRenderer.on('hud:frame-captured', (event, data) => {
             // Mark as ready for next frame
             isWaitingForFrame = false;
+
+            const frameSequence = Number.isFinite(data.frameSequence)
+                ? data.frameSequence : lastFrameSequence + 1;
+            if (frameSequence <= lastFrameSequence) {
+                if (isCapturing) requestAnimationFrame(requestNextFrame);
+                return;
+            }
+            lastFrameSequence = frameSequence;
+            frameScroll = normalizeScrollPosition(data);
 
             if (Math.random() < 0.05) {
                 log(`[Overlay] Received frame: ${data.width}x${data.height}`);
@@ -108,6 +167,7 @@
                 const buffer = new Uint8Array(data.buffer);
                 scrutinizer.processFrame(buffer, data.width, data.height);
             }
+            updateScrollFreshness();
 
             // Request next frame if still capturing
             if (isCapturing) {
@@ -162,6 +222,8 @@
         // Listen for page load events
         ipcRenderer.on('browser:did-start-loading', () => {
             log('[Overlay] Page loading started');
+            frameScroll = null;
+            updateScrollFreshness();
         });
 
         ipcRenderer.on('browser:did-finish-load', () => {

@@ -22,10 +22,18 @@
         </div>
 
         <div id="study-container" class="study-container hidden" aria-live="polite">
-            <span id="study-label" class="study-label">Task</span>
-            <button id="study-instruction" class="study-instruction" type="button"></button>
-            <button id="study-origin" class="study-origin" type="button" aria-label="Show full task URL"></button>
-            <button id="study-done" class="study-done" type="button">Done</button>
+            <div class="study-control-row">
+                <button id="study-back" class="study-back" type="button" aria-label="Back" title="Back" disabled>
+                    <span aria-hidden="true">←</span> Back
+                </button>
+                <span id="study-label" class="study-label">Task</span>
+                <button id="study-origin" class="study-origin" type="button" aria-label="Show full task URL"></button>
+                <button id="study-done" class="study-done" type="button">Done</button>
+            </div>
+            <div class="study-instruction-row">
+                <span id="study-instruction-label" class="study-instruction-label">Instructions</span>
+                <div id="study-instruction" class="study-instruction"></div>
+            </div>
         </div>
 
         <div class="menu-controls browse-only">

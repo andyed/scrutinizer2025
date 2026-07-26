@@ -2,7 +2,7 @@
 
 > **Status:** Implemented (parser, session state machine, interstitial, toolbar counter, summary writer, Link Builder session mode; unit-tested). Packaged macOS verification pending, per the v1 spec's rule that dev-mode behavior is not release evidence.
 > **Implementation scope:** platform-neutral grammar; macOS first, Windows uses the same parser via its own delivery path
-> **Last updated:** 2026-07-19
+> **Last updated:** 2026-07-26
 > **Related:** [Usability Study Deep Links and Study Toolbar](usability-study-deep-links.md), [Phase 3 — Usability-testing foundation](../sprucing/phase-3-usability-foundation.md), [Human Subjects Data Collection Platform](human_subjects_data_collection.md), [Usability-Testing Practitioner Guide](../tutorials/usability-testing-practitioner-guide.md)
 
 ## Summary
@@ -168,12 +168,17 @@ Identical to v1: no task or session setting ever reaches `settingsManager`; quit
 Study mode gains a progress counter in the leading label position:
 
 ```text
-[Task 2 of 5]  [Instruction text………………………]  [example.com ▾]  [Done]
+[← Back]  [Task 2 of 5]                  [example.com ▾]  [Done]
+[Instructions]  [Instruction text………………………………………]
 ```
 
+- The Study toolbar is 104px tall: a 40px control row and a dedicated 48px instruction row, with spacing and padding. Browse mode remains 40px tall.
+- Back is visible during tasks and follows Chromium's canonical navigation history, but cannot cross the current task's initial-page boundary. It is disabled on interstitial and completion screens.
 - The counter replaces the static "Task" label when `kind === 'session'`; single-task links keep today's presentation.
 - The counter is non-interactive and included in the polite live region announcement when a task changes ("Task 2 of 5: Find the refund policy.").
-- Everything else — truncation, expansion, origin toggle, read-only URL, 40px height, focus order — is unchanged from the v1 spec. The counter must not push the instruction area below usable width; at minimum widths the counter compresses to "2/5".
+- The origin remains a compact, read-only identity signal; selecting it temporarily replaces the instruction row with the full task URL.
+- The toolbar, content view, and visualization HUD resize from the same active-toolbar-height value so the canvas remains registered to the stimulus viewport.
+- During fast native scrolling, the visualization hides a captured frame as soon as its recorded scroll position is stale. It resumes after scroll settles and a fresh frame arrives, so old pixels never snap backward over the live page.
 
 ## Interstitial screen
 

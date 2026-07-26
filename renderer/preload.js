@@ -438,13 +438,22 @@ window.addEventListener('DOMContentLoaded', () => {
         }, 100); // Wait 100ms after last scroll event
     };
 
-    // Trigger scans on relevant events
-    if (domAdapter) {
-        // Scroll needs fast updates for smooth tracking
-        window.addEventListener('scroll', () => {
+    const sendScrollPosition = () => {
+        ipcRenderer.send('browser:scroll', window.scrollX || 0, window.scrollY || 0);
+    };
+    // The native BrowserView scrolls independently of the captured HUD. Send
+    // its position on every document even if DOM analysis failed to start.
+    window.addEventListener('scroll', () => {
+        sendScrollPosition();
+        if (domAdapter) {
             scanAndSend(true); // Immediate throttled scan
             scheduleFinalScan(); // Schedule debounced final scan
-        }, { passive: true });
+        }
+    }, { passive: true });
+    sendScrollPosition();
+
+    // Trigger scans on relevant events
+    if (domAdapter) {
         window.addEventListener('resize', scanAndSend, { passive: true });
 
         // Observer for DOM mutations
