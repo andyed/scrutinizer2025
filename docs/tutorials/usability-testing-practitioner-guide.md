@@ -231,11 +231,13 @@ task goal. Record and adjudicate goal achievement separately using the study's
 outcome rubric. Everything runs locally in your browser; session data is never
 uploaded.
 
-Current status: the packaged 2.8.x app records the session summary JSON
-described above. Full procedural capture — per-task input trails and page
-screenshots, which unlock the Workbench's motion measures and replay — ships
-with the DataCollector milestone. The Workbench and its file formats are ready
-now, and its bundled demo session shows the complete workflow. See the
+Current status: the source build now records per-task input trails and full-page
+stimulus anchors, then publishes the complete Workbench session directory
+atomically. That unlocks the Workbench's motion measures and procedural replay
+for source-built studies. A packaged macOS verification and release is still
+required before treating this as generally available in the distributed 2.8.x
+app. The Workbench and its file formats are ready now, and its bundled demo
+session shows the complete workflow. See the
 Workbench Guide (`scrutinizer-moderator/docs/workbench-guide.md`, sibling repo)
 for the roster, quality-control flags, and measure definitions.
 

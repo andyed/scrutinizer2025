@@ -8,6 +8,7 @@ const html = fs.readFileSync(path.join(ROOT, 'renderer/toolbar.html'), 'utf8');
 const css = fs.readFileSync(path.join(ROOT, 'renderer/toolbar.css'), 'utf8');
 const js = fs.readFileSync(path.join(ROOT, 'renderer/toolbar.js'), 'utf8');
 const main = fs.readFileSync(path.join(ROOT, 'main.js'), 'utf8');
+const preload = fs.readFileSync(path.join(ROOT, 'renderer/preload.js'), 'utf8');
 
 describe('Study toolbar contract', () => {
     it('contains task instructions, compressed origin, and Done controls', () => {
@@ -48,5 +49,21 @@ describe('Study toolbar contract', () => {
         // Untrusted instruction text must never be rendered as HTML.
         expect(interstitial).toContain('instructionsEl.textContent');
         expect(interstitial).not.toContain('innerHTML');
+    });
+
+    it('keeps the isolated capture bridge and main-process collector on one world id', () => {
+        const mainWorld = main.match(/const STUDY_CAPTURE_WORLD_ID = (\d+);/);
+        const preloadWorld = preload.match(/const STUDY_CAPTURE_WORLD_ID = (\d+);/);
+        expect(mainWorld).not.toBeNull();
+        expect(preloadWorld).not.toBeNull();
+        expect(preloadWorld[1]).toBe(mainWorld[1]);
+        expect(preload).toContain("ipcRenderer.sendSync('study:capture-row'");
+        expect(main).toContain("ipcMain.on('study:capture-row'");
+    });
+
+    it('starts capture after task load and stops it before advancing', () => {
+        expect(main).toContain('await captureStudyPageVisit(win, { restartTracker: true })');
+        expect(main).toContain('await finalizeCurrentTaskCapture(win)');
+        expect(main).toContain('const capture = writeCompleteStudyCapture(study, summary)');
     });
 });

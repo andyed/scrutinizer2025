@@ -4,8 +4,8 @@
  * Session-capture envelope (`scrutinizer-session-capture/1`).
  *
  * Pure module — no Electron, no DOM, no filesystem — so the envelope can be
- * built and validated headlessly. Writing it to disk is the integration
- * ticket's job (P3-2 proper).
+ * built and validated headlessly. The Electron lifecycle and atomic on-disk
+ * publication live in main.js and shared/session-directory-writer.js.
  *
  * Spec: docs/specs/session-capture-procedural-replay.md
  *
@@ -249,6 +249,8 @@ function normalizeCaptureHealth(health) {
         rowCount: finite(health.rowCount) ? health.rowCount : 0,
         taskId: health.taskId !== undefined ? health.taskId : null,
         pollMs: finite(health.pollMs) ? health.pollMs : null,
+        deliveryFailureCount: finite(health.deliveryFailureCount)
+            ? health.deliveryFailureCount : 0,
         trackerSource: nonEmptyString(health.trackerSource) ? health.trackerSource : null,
         trackerBinding: binding
     };
@@ -475,6 +477,10 @@ function validateEnvelope(envelope) {
                 if (health.pollMs !== null && health.pollMs !== undefined &&
                     (!finite(health.pollMs) || health.pollMs < 0)) {
                     push('capture.health.pollMs: expected null or a finite non-negative number');
+                }
+                if (health.deliveryFailureCount !== undefined &&
+                    (!finite(health.deliveryFailureCount) || health.deliveryFailureCount < 0)) {
+                    push('capture.health.deliveryFailureCount: expected a finite non-negative number');
                 }
             }
         }

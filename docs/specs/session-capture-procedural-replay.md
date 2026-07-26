@@ -1,6 +1,7 @@
 # Session Capture — Procedural Replay (P3-2 substrate)
 
-*Status: SPEC (2026-07-25). Decisions from the usability-pivot review: capture is
+*Status: PROCEDURAL CAPTURE WRITE PATH IMPLEMENTED IN SOURCE (2026-07-26).
+Decisions from the usability-pivot review: capture is
 **procedural replay, not video**. This spec defines the on-disk session record and
 the input-trail wire format. It refines P3-2 in
 [`../sprucing/phase-3-usability-foundation.md`](../sprucing/phase-3-usability-foundation.md);
@@ -95,6 +96,18 @@ included in `captureMeta().health` and `ScanpathData.meta.captureHealth`, so the
 DataCollector and Workbench can distinguish setup failure from genuine
 participant behavior without inferring from zeros.
 
+The study lifecycle starts the tracker only after the task page finishes
+loading, preserves privacy-scrubbed rows across full navigations, and stops the
+tracker before Done advances the session. Each row crosses a sandboxed isolated
+world through a narrow preload bridge; collector rejection or a renderer/main
+row-count mismatch becomes `row_delivery_failed`, never a successful stop.
+
+Completed artifacts are published with a same-volume atomic directory rename.
+The writer refuses to publish unless every recorded task has a trail and at
+least one referenced PNG stimulus. A failed or interrupted write may leave a
+legacy timing summary for recovery, but never a partially admission-shaped
+session directory.
+
 ### Coordinate contract
 
 Follow `docs/adserp-coordinate-system.md`. The trail records **client-viewport
@@ -107,7 +120,8 @@ at replay import, as the AdSERP importer already does.)
 ### Stimulus anchors
 
 One full-page screenshot per page-visit (navigation or SPA URL change), captured
-via the existing capture infrastructure — a static archive, **not** a frame
+via Chromium's full-page capture path (including content beyond the current
+viewport) — a static archive, **not** a frame
 stream. Rationale: live pages are non-stationary; re-rendering archived HTML
 against drifted CSS is unfixable (AdSERP lesson). Replay prefers the live URL
 and falls back to the screenshot through the static-stimulus path

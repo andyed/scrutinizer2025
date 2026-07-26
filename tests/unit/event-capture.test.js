@@ -14,6 +14,7 @@
 
 const {
     createEventCapture,
+    rowsToScanpathData,
     isEditableTarget,
     stripValueAttrs,
     DEFAULT_POLL_MS,
@@ -192,6 +193,53 @@ describe('start() tracker configuration', () => {
 });
 
 describe('column mapping → ScanpathData', () => {
+    it('streams only the privacy-scrubbed row to the DataCollector callback', () => {
+        const tracker = makeTracker();
+        const delivered = [];
+        const capture = createEventCapture({
+            tracker,
+            window: makeWindow(),
+            now: () => 1000,
+            onRow: captured => delivered.push(captured)
+        });
+        capture.start();
+        tracker.sink(row({
+            event: 'keydown',
+            attrs: '{"INPUT":{"name":"q","value":"private"}}'
+        }), {
+            target: el('input'),
+            key: 'x',
+            code: 'KeyX'
+        });
+
+        expect(delivered).toHaveLength(1);
+        expect(delivered[0].attrs).toEqual({ INPUT: { name: 'q' } });
+        expect(delivered[0].masked).toBe(true);
+        expect(JSON.stringify(delivered[0])).not.toContain('private');
+        expect(JSON.stringify(delivered[0])).not.toContain('KeyX');
+    });
+
+    it('maps merged rows with the same pure converter used by the main process', () => {
+        const data = rowsToScanpathData([
+            {
+                t: 25,
+                event: 'click',
+                x: 10,
+                y: 20,
+                scrollX: 0,
+                scrollY: 30,
+                xpath: '/html/body/button',
+                attrs: {}
+            }
+        ], { taskId: 'merged-task' });
+
+        expect(data.meta.taskId).toBe('merged-task');
+        expect(data.mouseTimeline).toEqual([
+            { t: 25, x: 10, y: 20, event: 'click', xpath: '/html/body/button' }
+        ]);
+        expect(data.events[0]).toMatchObject({ type: 'click', timestamp: 25 });
+    });
+
     it('maps evtrack columns onto MouseTimelineEvent fields', () => {
         const { tracker, capture } = harness({ scrollX: 0, scrollY: 0 });
         capture.start();
@@ -489,6 +537,25 @@ describe('stripValueAttrs', () => {
 });
 
 describe('defensive behaviour', () => {
+    it('marks the capture failed when the DataCollector rejects a row', () => {
+        const tracker = makeTracker();
+        const capture = createEventCapture({
+            tracker,
+            window: makeWindow(),
+            onRow: () => false
+        });
+
+        capture.start({ taskId: 'delivery-failure' });
+        tracker.sink(row(), { target: el('div') });
+
+        expect(capture.health()).toMatchObject({
+            status: 'failed',
+            code: 'row_delivery_failed',
+            rowCount: 1,
+            deliveryFailureCount: 1
+        });
+    });
+
     it('hardens getXPath so a detached node cannot kill capture, and restores it on stop', () => {
         const tracker = makeTracker();
         const trackLib = {

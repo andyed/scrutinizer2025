@@ -182,6 +182,85 @@ function defaultClock() {
 }
 
 /**
+ * Convert privacy-scrubbed buffered rows into the canonical ScanpathData shape.
+ * Kept pure so the main-process DataCollector can merge rows streamed across
+ * full-page navigations without reimplementing event semantics.
+ *
+ * @param {Object[]} sourceRows
+ * @param {Object} [meta]
+ * @returns {Object} ScanpathData
+ */
+function rowsToScanpathData(sourceRows, meta = {}) {
+    const mouseTimeline = [];
+    const scrollTimeline = [];
+    const events = [];
+
+    for (const row of Array.isArray(sourceRows) ? sourceRows : []) {
+        if (!row || typeof row !== 'object') continue;
+        if (finite(row.x) && finite(row.y)) {
+            const entry = { t: row.t, x: row.x, y: row.y, event: row.event };
+            if (row.xpath) entry.xpath = row.xpath;
+            mouseTimeline.push(entry);
+        }
+
+        // Every buffered row carries a scroll sample — reconstruction of the
+        // percept needs the offset between scroll events, not just at them.
+        scrollTimeline.push({ t: row.t, scrollY: row.scrollY });
+
+        if (!STREAM_EVENTS.has(row.event)) continue;
+
+        const data = {
+            event: row.event,
+            xpath: row.xpath,
+            x: finite(row.x) ? row.x : null,
+            y: finite(row.y) ? row.y : null,
+            scrollY: row.scrollY,
+            attrs: row.attrs
+        };
+        let type;
+        if (KEY_EVENTS.has(row.event)) {
+            type = 'key';
+            data.masked = row.masked === true;
+            if (!data.masked) {
+                data.key = row.key !== undefined ? row.key : null;
+                data.code = row.code !== undefined ? row.code : null;
+                data.ctrlKey = !!row.ctrlKey;
+                data.metaKey = !!row.metaKey;
+                data.altKey = !!row.altKey;
+                data.shiftKey = !!row.shiftKey;
+            }
+        } else if (row.event === 'scroll') {
+            type = 'scroll';
+            data.scrollX = row.scrollX;
+        } else if (row.event === 'click' || row.event === 'dblclick') {
+            type = 'click';
+        } else {
+            type = row.event;
+        }
+        events.push({ type, timestamp: row.t, data });
+    }
+
+    return {
+        meta: Object.assign({
+            dataset: 'scrutinizer',
+            participantId: null,
+            stimulusId: null,
+            stimulusWidth: null,
+            stimulusHeight: null,
+            taskId: null,
+            pollMs: DEFAULT_POLL_MS,
+            devicePixelRatio: 1,
+            startedAt: null,
+            captureHealth: null
+        }, meta),
+        fixations: [],
+        events,
+        mouseTimeline,
+        scrollTimeline
+    };
+}
+
+/**
  * Create a capture adapter.
  *
  * Everything external is injectable so the adapter is unit-testable without a
@@ -193,11 +272,13 @@ function defaultClock() {
  * @param {Object} [deps.tracker] - evtrack `TrackUI`; lazily required from vendor/ when omitted
  * @param {Object} [deps.trackLib] - evtrack `TrackLib`; used only to harden getXPath
  * @param {function(): number} [deps.now] - Monotonic clock in ms (performance.now)
+ * @param {function(Object): void} [deps.onRow] - Receives each privacy-scrubbed buffered row
  * @returns {Object} capture instance
  */
 function createEventCapture(deps = {}) {
     const win = deps.window !== undefined ? deps.window : defaultWindow();
     const now = typeof deps.now === 'function' ? deps.now : defaultClock();
+    const onRow = typeof deps.onRow === 'function' ? deps.onRow : null;
 
     let tracker = deps.tracker || null;
     let trackerSource = tracker ? 'injected' : null;
@@ -210,6 +291,8 @@ function createEventCapture(deps = {}) {
     let running = false;
     let lifecycle = 'idle';
     let failure = null;
+    let deliveryFailureCount = 0;
+    let lastDeliveryFailure = null;
     let t0 = 0;
     let startedWallClock = 0;
     let effectivePollMs = DEFAULT_POLL_MS;
@@ -338,6 +421,12 @@ function createEventCapture(deps = {}) {
             code = 'empty_trail';
             message = 'Capture stopped without receiving any tracker rows.';
         }
+        if (deliveryFailureCount > 0) {
+            status = 'failed';
+            code = 'row_delivery_failed';
+            message = lastDeliveryFailure ||
+                'One or more capture rows could not be delivered to the DataCollector.';
+        }
         return {
             status,
             code,
@@ -345,6 +434,7 @@ function createEventCapture(deps = {}) {
             rowCount: rows.length,
             taskId,
             pollMs: effectivePollMs,
+            deliveryFailureCount,
             trackerSource,
             trackerBinding: running
                 ? (trackerBinding() || lastTrackerBinding)
@@ -421,6 +511,17 @@ function createEventCapture(deps = {}) {
             Object.assign(buffered, keyPayload(domEvent, masked));
         }
         rows.push(buffered);
+        if (onRow) {
+            try {
+                if (onRow(buffered) === false) {
+                    throw new Error('The capture row delivery callback rejected the row.');
+                }
+            } catch (err) {
+                deliveryFailureCount += 1;
+                lastDeliveryFailure = err && err.message
+                    ? err.message : 'Capture row delivery callback failed.';
+            }
+        }
     }
 
     function parseExtras(extras) {
@@ -459,6 +560,8 @@ function createEventCapture(deps = {}) {
         taskId = opts.taskId || null;
         effectivePollMs = finite(opts.pollMs) && opts.pollMs >= 0 ? opts.pollMs : DEFAULT_POLL_MS;
         lastTrackerBinding = null;
+        deliveryFailureCount = 0;
+        lastDeliveryFailure = null;
 
         const activeTracker = resolveTracker();
         if (!activeTracker || typeof activeTracker.record !== 'function') {
@@ -567,6 +670,8 @@ function createEventCapture(deps = {}) {
         if (!running) {
             lifecycle = 'idle';
             failure = null;
+            deliveryFailureCount = 0;
+            lastDeliveryFailure = null;
         }
     }
 
@@ -623,57 +728,8 @@ function createEventCapture(deps = {}) {
      * @returns {Object} ScanpathData
      */
     function toScanpathData(meta = {}) {
-        const mouseTimeline = [];
-        const scrollTimeline = [];
-        const events = [];
-
-        for (const row of rows) {
-            if (finite(row.x) && finite(row.y)) {
-                const entry = { t: row.t, x: row.x, y: row.y, event: row.event };
-                if (row.xpath) entry.xpath = row.xpath;
-                mouseTimeline.push(entry);
-            }
-
-            // Every buffered row carries a scroll sample — reconstruction of the
-            // percept needs the offset between scroll events, not just at them.
-            scrollTimeline.push({ t: row.t, scrollY: row.scrollY });
-
-            if (!STREAM_EVENTS.has(row.event)) continue;
-
-            const data = {
-                event: row.event,
-                xpath: row.xpath,
-                x: finite(row.x) ? row.x : null,
-                y: finite(row.y) ? row.y : null,
-                scrollY: row.scrollY,
-                attrs: row.attrs
-            };
-            let type;
-            if (KEY_EVENTS.has(row.event)) {
-                type = 'key';
-                data.masked = row.masked === true;
-                if (!data.masked) {
-                    data.key = row.key !== undefined ? row.key : null;
-                    data.code = row.code !== undefined ? row.code : null;
-                    data.ctrlKey = !!row.ctrlKey;
-                    data.metaKey = !!row.metaKey;
-                    data.altKey = !!row.altKey;
-                    data.shiftKey = !!row.shiftKey;
-                }
-            } else if (row.event === 'scroll') {
-                type = 'scroll';
-                data.scrollX = row.scrollX;
-            } else if (row.event === 'click' || row.event === 'dblclick') {
-                type = 'click';
-            } else {
-                type = row.event;
-            }
-            events.push({ type, timestamp: row.t, data });
-        }
-
         const env = environment();
-        return {
-            meta: Object.assign({
+        return rowsToScanpathData(rows, Object.assign({
                 dataset: 'scrutinizer',
                 participantId: null,
                 stimulusId: null,
@@ -684,12 +740,7 @@ function createEventCapture(deps = {}) {
                 devicePixelRatio: env.devicePixelRatio,
                 startedAt: startedWallClock ? new Date(startedWallClock).toISOString() : null,
                 captureHealth: health()
-            }, meta),
-            fixations: [],
-            events,
-            mouseTimeline,
-            scrollTimeline
-        };
+            }, meta));
     }
 
     return {
@@ -710,6 +761,7 @@ function createEventCapture(deps = {}) {
 
 module.exports = {
     createEventCapture,
+    rowsToScanpathData,
     isEditableTarget,
     stripValueAttrs,
     keyPayload,

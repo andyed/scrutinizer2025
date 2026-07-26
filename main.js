@@ -1,4 +1,6 @@
-const { app, BrowserWindow, Menu, ipcMain, WebContentsView, globalShortcut, session } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, WebContentsView, globalShortcut, nativeImage, session } = require('electron');
+const fs = require('fs');
+const crypto = require('crypto');
 const path = require('path');
 const { buildMenuTemplate, RADIUS_OPTIONS } = require('./menu-template');
 const settingsManager = require('./settings-manager');
@@ -7,12 +9,20 @@ const modesRegistry = require('./shared/modes.json');
 const { STUDY_SCHEME, parseStudyDeepLink } = require('./shared/study-deep-link');
 const { buildStudyRuntimeState } = require('./shared/study-runtime-state');
 const { resolveTaskRuntimeState, buildSessionSummary, summaryFileName } = require('./shared/study-session');
+const {
+    buildEnvelope,
+    stimulusFileName
+} = require('./shared/session-capture');
+const { writeSessionDirectory } = require('./shared/session-directory-writer');
+const { rowsToScanpathData } = require('./renderer/instrumentation/event-capture');
 
 // Session interstitial: the content view has no node integration, so the
 // bundled screen signals "Begin" by navigating to a sentinel URL that
 // will-navigate intercepts and cancels. The .invalid TLD never resolves.
 const STUDY_BEGIN_URL = 'https://begin.study.scrutinizer.invalid/';
 const STUDY_INTERSTITIAL_URL = require('url').pathToFileURL(path.join(__dirname, 'renderer', 'study-interstitial.html')).toString();
+const STUDY_CAPTURE_WORLD_ID = 1004;
+const STUDY_CAPTURE_GLOBAL = '__scrutinizerStudyEventCapture';
 
 const STUDY_MODE_IDS = Object.values(modesRegistry.modes).map((mode) => mode.id);
 // Auto-updater: graceful fallback if electron-updater not bundled
@@ -892,8 +902,29 @@ ipcMain.on('toolbar:open-url-dialog', (event) => {
 ipcMain.on('toolbar:study-done', (event) => {
     const win = BrowserWindow.getAllWindows().find(w => w.toolbarView && w.toolbarView.webContents === event.sender);
     if (!isStudyWindow(win)) return;
-    if (activeStudy && activeStudy.kind === 'session') advanceStudySession(win);
+    if (activeStudy && activeStudy.kind === 'session') {
+        void advanceStudySession(win).catch((err) => failActiveStudyCapture(win, err));
+    }
     else exitStudyMode();
+});
+
+// The isolated capture world can only deliver to the active study's content
+// WebContents. Returning an acknowledgement lets the adapter surface a
+// collector failure instead of silently treating a dropped row as captured.
+ipcMain.on('study:capture-row', (event, payload) => {
+    const win = BrowserWindow.getAllWindows().find(candidate =>
+        candidate.scrutinizerView && candidate.scrutinizerView.webContents === event.sender
+    );
+    event.returnValue = Boolean(isStudyWindow(win) && appendStudyCaptureRow(payload));
+});
+
+ipcMain.on('study:capture-bridge-error', (event, payload) => {
+    const win = BrowserWindow.getAllWindows().find(candidate =>
+        candidate.scrutinizerView && candidate.scrutinizerView.webContents === event.sender
+    );
+    if (!win || !isStudyWindow(win)) return;
+    win.studyCaptureBridgeError = payload && typeof payload.message === 'string'
+        ? payload.message : 'Capture bridge initialization failed.';
 });
 
 function createScrutinizerWindow(startUrl, options = {}) {
@@ -1179,6 +1210,15 @@ function createScrutinizerWindow(startUrl, options = {}) {
                 canGoForward: contentView.webContents.canGoForward()
             });
         }
+
+        if (activeStudy && activeStudy.kind === 'session' &&
+            activeStudy.phase === 'task' && isStudyWindow(win)) {
+            try {
+                await captureStudyPageVisit(win, { restartTracker: true });
+            } catch (err) {
+                failActiveStudyCapture(win, err);
+            }
+        }
     });
 
     // Also listen for did-stop-loading
@@ -1200,6 +1240,7 @@ function createScrutinizerWindow(startUrl, options = {}) {
     contentView.webContents.on('did-start-navigation', (event, url, isInPlace, isMainFrame) => {
         if (isMainFrame && !isInPlace) {
             console.log('[Main] Navigation started:', url);
+            if (isStudyWindow(win)) closeOpenPageVisit(openTaskRecord());
             if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
                 hudWindow.webContents.send('hud:reset-visual-memory');
             }
@@ -1247,8 +1288,18 @@ function createScrutinizerWindow(startUrl, options = {}) {
         contentView.webContents.send('browser:force-scan');
     });
 
-    // Note: Removed did-navigate-in-page listener to avoid duplicate URL updates
-    // Hash changes and SPA navigations are handled by did-navigate
+    // An SPA route or hash change is a new replay anchor while preserving the
+    // current tracker instance. Screenshot it without starting a second row
+    // stream on the same document.
+    contentView.webContents.on('did-navigate-in-page', (event, url, isMainFrame) => {
+        if (!isMainFrame) return;
+        sendUrlUpdate(url, 'did-navigate-in-page');
+        if (activeStudy && activeStudy.kind === 'session' &&
+            activeStudy.phase === 'task' && isStudyWindow(win)) {
+            void captureStudyPageVisit(win, { restartTracker: false })
+                .catch((err) => failActiveStudyCapture(win, err));
+        }
+    });
 
     // Intercept target="_blank" links
     contentView.webContents.setWindowOpenHandler(({ url }) => {
@@ -1656,6 +1707,9 @@ function buildActiveStudy(launch) {
             taskIndex: 0,
             phase: 'interstitial',
             taskRecords: [],
+            nextPageVisitIndex: 1,
+            captureTransition: false,
+            captureFailed: false,
             summaryWritten: false,
             previousRuntimeState,
             runtimeState: resolveTaskRuntimeState(previousRuntimeState, launch.session.defaults, launch.tasks[0].overrides),
@@ -1698,6 +1752,492 @@ function studyInterstitialUrl(study, state = 'next') {
     return url.toString();
 }
 
+let studyCaptureSources = null;
+
+function loadStudyCaptureSources() {
+    if (studyCaptureSources) return studyCaptureSources;
+    const read = (relativePath) => fs.readFileSync(path.join(__dirname, relativePath), 'utf8');
+    studyCaptureSources = {
+        trackLib: read('renderer/instrumentation/vendor/evtrack/tracklib.js'),
+        trackUi: read('renderer/instrumentation/vendor/evtrack/trackui.js'),
+        adapter: read('renderer/instrumentation/event-capture.js')
+    };
+    return studyCaptureSources;
+}
+
+function openTaskRecord() {
+    if (!activeStudy || activeStudy.kind !== 'session' || activeStudy.phase !== 'task') return null;
+    return activeStudy.taskRecords[activeStudy.taskRecords.length - 1] || null;
+}
+
+function taskElapsedMs(record, at = Date.now()) {
+    return record && Number.isFinite(record.startedAtMs)
+        ? Math.max(0, at - record.startedAtMs) : 0;
+}
+
+function initializeTaskCapture(record) {
+    if (!record.captureToken) record.captureToken = crypto.randomUUID();
+    if (!Array.isArray(record.captureRows)) record.captureRows = [];
+    if (!(record.captureRowKeys instanceof Set)) record.captureRowKeys = new Set();
+    if (!(record.captureSegmentOffsets instanceof Map)) record.captureSegmentOffsets = new Map();
+    if (!(record.captureRowsBySegment instanceof Map)) record.captureRowsBySegment = new Map();
+    if (!Number.isFinite(record.captureDeliveryFailureCount)) record.captureDeliveryFailureCount = 0;
+    if (!Array.isArray(record.pageVisits)) record.pageVisits = [];
+    if (!(record.stimuliByPageVisitId instanceof Map)) record.stimuliByPageVisitId = new Map();
+    return record;
+}
+
+function closeOpenPageVisit(record, at = Date.now()) {
+    if (!record || !Array.isArray(record.pageVisits)) return;
+    const visit = record.pageVisits[record.pageVisits.length - 1];
+    if (visit && visit.tEnd === null) {
+        visit.tEnd = Math.max(visit.tStart, taskElapsedMs(record, at));
+    }
+}
+
+function beginPageVisit(study, record, url, at = Date.now()) {
+    initializeTaskCapture(record);
+    closeOpenPageVisit(record, at);
+    const pageVisitId = `pv-${String(study.nextPageVisitIndex).padStart(3, '0')}`;
+    study.nextPageVisitIndex += 1;
+    const visit = {
+        pageVisitId,
+        taskId: record.taskId,
+        url,
+        tStart: taskElapsedMs(record, at),
+        tEnd: null,
+        screenshot: stimulusFileName(pageVisitId),
+        stimulusWidth: null,
+        stimulusHeight: null
+    };
+    record.pageVisits.push(visit);
+    return visit;
+}
+
+function normalizeStreamedRow(row, offsetMs) {
+    if (!row || typeof row !== 'object' || !Number.isFinite(row.t)) return null;
+    const normalized = Object.assign({}, row, {
+        t: Math.max(0, offsetMs + row.t)
+    });
+    return normalized;
+}
+
+function appendStudyCaptureRow(payload) {
+    const record = openTaskRecord();
+    if (!record || !payload || payload.token !== record.captureToken ||
+        payload.taskId !== record.taskId || typeof payload.segmentId !== 'string') {
+        return false;
+    }
+    initializeTaskCapture(record);
+    const reject = () => {
+        record.captureDeliveryFailureCount += 1;
+        return false;
+    };
+    if (!Number.isFinite(payload.rowIndex) ||
+        !record.captureSegmentOffsets.has(payload.segmentId)) return reject();
+    const key = `${payload.segmentId}:${payload.rowIndex}`;
+    if (record.captureRowKeys.has(key)) return true;
+    const row = normalizeStreamedRow(
+        payload.row,
+        record.captureSegmentOffsets.get(payload.segmentId)
+    );
+    if (!row) return reject();
+    record.captureRowKeys.add(key);
+    record.captureRows.push(row);
+    record.captureRowsBySegment.set(
+        payload.segmentId,
+        (record.captureRowsBySegment.get(payload.segmentId) || 0) + 1
+    );
+    return true;
+}
+
+async function injectStudyCapture(win, record) {
+    initializeTaskCapture(record);
+    if (win.studyCaptureBridgeError) {
+        const error = new Error(win.studyCaptureBridgeError);
+        error.code = 'capture_bridge_failed';
+        throw error;
+    }
+    const wc = win.scrutinizerView.webContents;
+    const sources = loadStudyCaptureSources();
+    const segmentId = crypto.randomUUID();
+    const offsetMs = taskElapsedMs(record);
+    record.captureSegmentOffsets.set(segmentId, offsetMs);
+    record.captureRowsBySegment.set(segmentId, 0);
+
+    const tokenJson = JSON.stringify(record.captureToken);
+    const taskJson = JSON.stringify(record.taskId);
+    const segmentJson = JSON.stringify(segmentId);
+    const appVersionJson = JSON.stringify(app.getVersion());
+    const platformJson = JSON.stringify(process.platform);
+    const globalJson = JSON.stringify(STUDY_CAPTURE_GLOBAL);
+    const bootstrap = `
+        (function () {
+            var module = { exports: {} };
+            var require = function (id) {
+                var name = String(id);
+                if (name.indexOf('trackui') !== -1) return { TrackUI: window.TrackUI };
+                if (name.indexOf('tracklib') !== -1) return { TrackLib: window.TrackLib };
+                throw new Error('unsupported capture dependency: ' + name);
+            };
+            ${sources.adapter}
+            var bridge = window.scrutinizerStudyCaptureBridge;
+            if (!bridge || typeof bridge.emitRow !== 'function') {
+                return {
+                    started: false,
+                    health: {
+                        status: 'failed',
+                        code: 'capture_bridge_unavailable',
+                        message: 'The isolated capture bridge is unavailable.',
+                        rowCount: 0
+                    }
+                };
+            }
+            var rowIndex = 0;
+            var capture = module.exports.createEventCapture({
+                window: window,
+                onRow: function (row) {
+                    var delivered = bridge.emitRow({
+                        token: ${tokenJson},
+                        taskId: ${taskJson},
+                        segmentId: ${segmentJson},
+                        rowIndex: rowIndex++,
+                        row: row
+                    });
+                    if (delivered !== true) {
+                        throw new Error('The main-process DataCollector rejected a capture row.');
+                    }
+                }
+            });
+            window[${globalJson}] = capture;
+            var started = capture.start({ taskId: ${taskJson} });
+            return {
+                started: started,
+                health: capture.health(),
+                meta: capture.captureMeta({
+                    appVersion: ${appVersionJson},
+                    platform: ${platformJson}
+                })
+            };
+        })();
+    `;
+    // Electron returns one evaluation result for the call, not one result per
+    // WebSource. Keep vendor setup and bootstrap in one source so the returned
+    // value is unambiguously the readiness handshake.
+    const result = await wc.executeJavaScriptInIsolatedWorld(
+        STUDY_CAPTURE_WORLD_ID,
+        [{ code: `${sources.trackLib}\n${sources.trackUi}\n${bootstrap}` }]
+    );
+    if (!result || result.started !== true) {
+        console.error('[StudyCapture] Readiness handshake returned:', result);
+        const health = result && result.health ? result.health : {};
+        const error = new Error(health.message || 'Study capture did not become ready.');
+        error.code = health.code || 'capture_start_failed';
+        error.health = health;
+        throw error;
+    }
+    record.captureMeta = record.captureMeta || result.meta;
+    record.captureHealth = result.health;
+    record.activeCaptureSegmentId = segmentId;
+    return result;
+}
+
+async function stopInjectedStudyCapture(win) {
+    if (!win || win.isDestroyed() || !win.scrutinizerView ||
+        win.scrutinizerView.webContents.isDestroyed()) return null;
+    const script = `
+        (function () {
+            var capture = window[${JSON.stringify(STUDY_CAPTURE_GLOBAL)}];
+            if (!capture) return null;
+            capture.stop();
+            return { health: capture.health(), meta: capture.captureMeta() };
+        })();
+    `;
+    return win.scrutinizerView.webContents.executeJavaScriptInIsolatedWorld(
+        STUDY_CAPTURE_WORLD_ID,
+        [{ code: script }]
+    );
+}
+
+async function captureFullPageStimulus(webContents, devicePixelRatio) {
+    let attachedHere = false;
+    if (!webContents.debugger.isAttached()) {
+        webContents.debugger.attach('1.3');
+        attachedHere = true;
+    }
+    try {
+        await webContents.debugger.sendCommand('Page.enable');
+        const metrics = await webContents.debugger.sendCommand('Page.getLayoutMetrics');
+        const size = metrics && (metrics.cssContentSize || metrics.contentSize);
+        const cssWidth = size && Number.isFinite(size.width) ? Math.ceil(size.width) : 0;
+        const cssHeight = size && Number.isFinite(size.height) ? Math.ceil(size.height) : 0;
+        const dpr = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0
+            ? devicePixelRatio : 1;
+        if (cssWidth <= 0 || cssHeight <= 0) {
+            const error = new Error('The page did not report a capturable layout size.');
+            error.code = 'stimulus_size_invalid';
+            throw error;
+        }
+        if (cssWidth * cssHeight * dpr * dpr > 100000000) {
+            const error = new Error(
+                `Full-page stimulus would exceed the 100 megapixel safety limit (${cssWidth}×${cssHeight} CSS px at DPR ${dpr}).`
+            );
+            error.code = 'stimulus_too_large';
+            throw error;
+        }
+        const shot = await webContents.debugger.sendCommand('Page.captureScreenshot', {
+            format: 'png',
+            fromSurface: true,
+            captureBeyondViewport: true,
+            clip: { x: 0, y: 0, width: cssWidth, height: cssHeight, scale: dpr }
+        });
+        const buffer = Buffer.from(shot.data, 'base64');
+        const image = nativeImage.createFromBuffer(buffer);
+        const imageSize = image.getSize();
+        const expectedWidth = Math.round(cssWidth * dpr);
+        const expectedHeight = Math.round(cssHeight * dpr);
+        if (imageSize.width !== expectedWidth || imageSize.height !== expectedHeight) {
+            const error = new Error(
+                `Full-page stimulus scale mismatch: expected ${expectedWidth}×${expectedHeight}, got ${imageSize.width}×${imageSize.height}.`
+            );
+            error.code = 'stimulus_scale_mismatch';
+            throw error;
+        }
+        return { buffer, width: imageSize.width, height: imageSize.height };
+    } finally {
+        if (attachedHere && webContents.debugger.isAttached()) webContents.debugger.detach();
+    }
+}
+
+async function captureStudyPageVisit(win, { restartTracker = true } = {}) {
+    const study = activeStudy;
+    const record = openTaskRecord();
+    if (!study || !record || !win || win.isDestroyed()) return null;
+    initializeTaskCapture(record);
+    if (record.captureSetupPromise) return record.captureSetupPromise;
+
+    record.captureSetupPromise = (async () => {
+        const wc = win.scrutinizerView.webContents;
+        if (restartTracker) await injectStudyCapture(win, record);
+        const url = wc.getURL();
+        const visit = beginPageVisit(study, record, url);
+        const meta = record.captureMeta || {};
+        const stimulus = await captureFullPageStimulus(wc, meta.devicePixelRatio);
+        visit.stimulusWidth = stimulus.width;
+        visit.stimulusHeight = stimulus.height;
+        record.stimuliByPageVisitId.set(visit.pageVisitId, stimulus.buffer);
+        return visit;
+    })();
+    try {
+        return await record.captureSetupPromise;
+    } finally {
+        record.captureSetupPromise = null;
+    }
+}
+
+function finalCaptureHealth(record, rendererHealth, stopError) {
+    const rows = Array.isArray(record.captureRows) ? record.captureRows.length : 0;
+    const reportedRows = rendererHealth && Number.isFinite(rendererHealth.rowCount)
+        ? rendererHealth.rowCount : null;
+    const activeSegmentRows = record.captureRowsBySegment instanceof Map &&
+        typeof record.activeCaptureSegmentId === 'string'
+        ? (record.captureRowsBySegment.get(record.activeCaptureSegmentId) || 0)
+        : rows;
+    const rendererDeliveryFailures = rendererHealth &&
+        Number.isFinite(rendererHealth.deliveryFailureCount)
+        ? rendererHealth.deliveryFailureCount : 0;
+    const collectorDeliveryFailures = Number.isFinite(record.captureDeliveryFailureCount)
+        ? record.captureDeliveryFailureCount : 0;
+    const deliveryFailures = Math.max(rendererDeliveryFailures, collectorDeliveryFailures);
+    const deliveryMismatch = reportedRows !== null && reportedRows !== activeSegmentRows;
+    const deliveryFailed = deliveryFailures > 0 || deliveryMismatch;
+    const health = Object.assign({}, rendererHealth || record.captureHealth || {}, {
+        status: stopError || deliveryFailed ? 'failed' : (rows > 0 ? 'stopped' : 'empty'),
+        code: stopError ? 'capture_stop_failed'
+            : (deliveryFailed ? 'row_delivery_failed' : (rows > 0 ? null : 'empty_trail')),
+        message: stopError
+            ? stopError.message
+            : (deliveryFailed
+                ? (deliveryMismatch
+                    ? `The active renderer segment recorded ${reportedRows} rows but the DataCollector retained ${activeSegmentRows}.`
+                    : 'One or more capture rows were rejected by the DataCollector.')
+                : (rows > 0 ? null : 'Capture stopped without receiving any tracker rows.')),
+        rowCount: rows,
+        deliveryFailureCount: deliveryFailures,
+        taskId: record.taskId
+    });
+    if (!Number.isFinite(health.pollMs)) health.pollMs = 16;
+    if (!Number.isFinite(health.deliveryFailureCount)) health.deliveryFailureCount = 0;
+    return health;
+}
+
+function buildTaskTrail(study, record) {
+    initializeTaskCapture(record);
+    record.captureRows.sort((left, right) => left.t - right.t);
+    const firstVisit = record.pageVisits[0] || {};
+    const meta = record.captureMeta || {};
+    record.captureTrail = rowsToScanpathData(record.captureRows, {
+        participantId: study.session.participantId,
+        stimulusId: firstVisit.pageVisitId || null,
+        stimulusWidth: firstVisit.stimulusWidth || null,
+        stimulusHeight: firstVisit.stimulusHeight || null,
+        taskId: record.taskId,
+        pollMs: meta.pollMs || 16,
+        devicePixelRatio: meta.devicePixelRatio || 1,
+        startedAt: new Date(record.startedAtMs).toISOString(),
+        captureHealth: record.captureHealth
+    });
+    return record.captureTrail;
+}
+
+async function finalizeCurrentTaskCapture(win) {
+    const study = activeStudy;
+    const record = openTaskRecord();
+    if (!study || !record) return null;
+    if (record.captureSetupPromise) await record.captureSetupPromise;
+    let result = null;
+    let stopError = null;
+    try {
+        result = await stopInjectedStudyCapture(win);
+        if (!result || !result.health) {
+            const error = new Error('The active capture segment was unavailable during stop.');
+            error.code = 'capture_stop_missing';
+            throw error;
+        }
+        // Let row IPC already emitted by the isolated world drain before the
+        // canonical trail snapshot is assembled.
+        await new Promise((resolve) => setImmediate(resolve));
+    } catch (err) {
+        stopError = err;
+    }
+    closeOpenPageVisit(record);
+    record.captureHealth = finalCaptureHealth(
+        record,
+        result && result.health,
+        stopError
+    );
+    if (record.captureMeta) record.captureMeta.health = record.captureHealth;
+    return buildTaskTrail(study, record);
+}
+
+function finalizeBufferedTaskCapture(study, record, reason) {
+    if (!study || !record) return null;
+    initializeTaskCapture(record);
+    closeOpenPageVisit(record);
+    const rows = record.captureRows.length;
+    record.captureHealth = finalCaptureHealth(record, {
+        status: rows > 0 ? 'stopped' : 'empty',
+        code: reason || null,
+        message: reason ? 'Capture ended before the renderer stop handshake completed.' : null,
+        rowCount: rows
+    }, null);
+    if (reason && rows > 0) {
+        record.captureHealth.code = reason;
+        record.captureHealth.message = 'Capture ended before the renderer stop handshake completed.';
+    }
+    if (record.captureMeta) record.captureMeta.health = record.captureHealth;
+    return buildTaskTrail(study, record);
+}
+
+function captureEnvelopeForStudy(study, summary) {
+    const taskRecords = study.taskRecords.map((record, index) => Object.assign(
+        {},
+        summary.tasks[index],
+        {
+            events: Array.isArray(record.events) ? record.events : [],
+            captureHealth: record.captureHealth || null
+        }
+    ));
+    const pageVisits = study.taskRecords.flatMap((record) => record.pageVisits || []);
+    const firstMetaRecord = study.taskRecords.find((record) => record.captureMeta);
+    const capture = firstMetaRecord ? Object.assign({}, firstMetaRecord.captureMeta) : {};
+    const healthRecords = study.taskRecords
+        .map(record => record.captureHealth)
+        .filter(Boolean);
+    if (healthRecords.length > 0) {
+        const failed = healthRecords.find(health => health.status === 'failed');
+        const empty = healthRecords.find(health =>
+            health.status === 'empty' || health.code === 'empty_trail'
+        );
+        const representative = failed || empty || healthRecords[healthRecords.length - 1];
+        capture.health = Object.assign({}, representative, {
+            status: failed ? 'failed' : (empty ? 'empty' : 'stopped'),
+            code: failed ? (failed.code || 'capture_failed')
+                : (empty ? 'empty_trail' : null),
+            message: failed ? failed.message
+                : (empty ? 'At least one task stopped without tracker rows.' : null),
+            rowCount: healthRecords.reduce((sum, health) =>
+                sum + (Number.isFinite(health.rowCount) ? health.rowCount : 0), 0),
+            deliveryFailureCount: healthRecords.reduce((sum, health) =>
+                sum + (Number.isFinite(health.deliveryFailureCount)
+                    ? health.deliveryFailureCount : 0), 0),
+            taskId: null
+        });
+    } else {
+        capture.health = null;
+    }
+    return buildEnvelope({
+        sessionId: summary.sessionId,
+        participantId: summary.participantId,
+        appVersion: summary.appVersion,
+        platform: summary.platform,
+        startedAt: summary.startedAt,
+        endedAt: summary.endedAt,
+        endReason: summary.endReason,
+        defaults: summary.defaults,
+        tasks: taskRecords,
+        capture,
+        pageVisits
+    });
+}
+
+function writeCompleteStudyCapture(study, summary) {
+    const envelope = captureEnvelopeForStudy(study, summary);
+    const trailsByTaskId = new Map();
+    const stimuliByPageVisitId = new Map();
+    for (const record of study.taskRecords) {
+        if (record.captureTrail) trailsByTaskId.set(record.taskId, record.captureTrail);
+        if (record.stimuliByPageVisitId instanceof Map) {
+            for (const [pageVisitId, buffer] of record.stimuliByPageVisitId) {
+                stimuliByPageVisitId.set(pageVisitId, buffer);
+            }
+        }
+    }
+    return writeSessionDirectory({
+        rootDir: path.join(app.getPath('userData'), 'study-sessions'),
+        envelope,
+        trailsByTaskId,
+        stimuliByPageVisitId
+    });
+}
+
+function failActiveStudyCapture(win, err) {
+    if (!activeStudy || activeStudy.kind !== 'session' || activeStudy.phase !== 'task' ||
+        activeStudy.captureFailed) return;
+    activeStudy.captureFailed = true;
+    const record = openTaskRecord();
+    if (record) {
+        record.captureHealth = Object.assign({
+            status: 'failed',
+            code: err && err.code ? err.code : 'capture_setup_failed',
+            message: err && err.message ? err.message : 'Study capture setup failed.',
+            rowCount: Array.isArray(record.captureRows) ? record.captureRows.length : 0,
+            taskId: record.taskId,
+            pollMs: 16,
+            deliveryFailureCount: 0,
+            trackerSource: null,
+            trackerBinding: null
+        }, err && err.health ? err.health : {});
+        initializeTaskCapture(record);
+        closeOpenPageVisit(record);
+        if (record.captureMeta) record.captureMeta.health = record.captureHealth;
+        buildTaskTrail(activeStudy, record);
+    }
+    console.error('[StudyCapture] Capture gate failed:', err && err.message ? err.message : err);
+    closeOpenTaskRecord('session_ended');
+    finishStudySession(win, 'capture_failed');
+}
+
 // Stamps end data onto the in-flight task record, if any.
 function closeOpenTaskRecord(outcome) {
     if (!activeStudy || activeStudy.kind !== 'session' || activeStudy.phase !== 'task') return;
@@ -1705,6 +2245,13 @@ function closeOpenTaskRecord(outcome) {
     if (!record || record.endedAtMs !== undefined) return;
     record.endedAtMs = Date.now();
     record.outcome = outcome;
+    if (outcome === 'done' && !record.events.some(event => event.type === 'done')) {
+        record.events.push({
+            type: 'done',
+            t: taskElapsedMs(record, record.endedAtMs),
+            at: new Date(record.endedAtMs).toISOString()
+        });
+    }
     const win = studyWindow();
     try {
         record.finalUrl = win && !win.isDestroyed() ? win.scrutinizerView.webContents.getURL() : null;
@@ -1717,20 +2264,26 @@ function writeSessionSummary(study, endReason) {
     if (study.summaryWritten) return;
     study.summaryWritten = true;
     try {
-        const fs = require('fs');
         const summary = buildSessionSummary(study, {
             endReason,
             endedAt: Date.now(),
             appVersion: app.getVersion(),
             platform: process.platform
         });
-        const dir = path.join(app.getPath('userData'), 'study-sessions');
-        fs.mkdirSync(dir, { recursive: true });
-        const file = path.join(dir, summaryFileName(summary));
-        // finalUrl fields can carry sensitive query strings from the
-        // participant's own navigation — restrict to the current user.
-        fs.writeFileSync(file, JSON.stringify(summary, null, 2), { mode: 0o600 });
-        console.log(`[Study] Session summary written: ${file}`);
+        try {
+            const capture = writeCompleteStudyCapture(study, summary);
+            console.log(`[StudyCapture] Complete session directory written: ${capture.directoryPath}`);
+        } catch (captureErr) {
+            // A legacy summary preserves task timing, but it is intentionally
+            // not admission-shaped and cannot be mistaken for replay evidence.
+            const dir = path.join(app.getPath('userData'), 'study-sessions');
+            fs.mkdirSync(dir, { recursive: true });
+            const file = path.join(dir, summaryFileName(summary));
+            fs.writeFileSync(file, JSON.stringify(summary, null, 2), { mode: 0o600 });
+            console.warn('[StudyCapture] Complete capture unavailable; wrote timing summary only:',
+                captureErr && captureErr.message ? captureErr.message : captureErr);
+            console.log(`[Study] Session summary written: ${file}`);
+        }
     } catch (err) {
         console.error('[Study] Failed to write session summary:', err);
     }
@@ -1740,8 +2293,13 @@ function writeSessionSummary(study, endReason) {
 // session is replaced by a new link, or the app quits mid-session.
 function finalizeInterruptedSession(endReason) {
     if (!activeStudy || activeStudy.kind !== 'session' || activeStudy.summaryWritten) return;
+    const study = activeStudy;
+    const record = openTaskRecord();
     closeOpenTaskRecord('session_ended');
-    writeSessionSummary(activeStudy, endReason);
+    if (record && !record.captureTrail) {
+        finalizeBufferedTaskCapture(study, record, 'capture_interrupted');
+    }
+    writeSessionSummary(study, endReason);
 }
 
 // will-navigate sentinel handler: the interstitial's Begin button.
@@ -1760,7 +2318,8 @@ function beginCurrentSessionTask(win) {
         targetUrl: task.targetUrl,
         startedAtMs: Date.now(),
         outcome: null,
-        runtimeState: study.runtimeState
+        runtimeState: study.runtimeState,
+        events: []
     });
 
     sendStudyRuntimeState(win); // resets Visual Memory + applies the task condition
@@ -1791,8 +2350,9 @@ function finishStudySession(win, endReason) {
 // an interstitial is showing has no task to complete — skipping isn't
 // supported, so it deliberately ends the session with the records so far.
 // Done on the completion screen performs the deferred restore + exit.
-function advanceStudySession(win) {
+async function advanceStudySession(win) {
     const study = activeStudy;
+    if (!study || study.captureTransition) return;
     if (study.phase === 'complete') {
         exitStudyMode();
         return;
@@ -1801,17 +2361,32 @@ function advanceStudySession(win) {
         finishStudySession(win, 'ended_early');
         return;
     }
-    closeOpenTaskRecord('done');
-    if (study.taskIndex < study.tasks.length - 1) {
-        study.taskIndex += 1;
-        study.phase = 'interstitial';
-        // Foveation off on the interstitial; Visual Memory resets at Begin.
-        sendStudyRuntimeState(win, { resetMemory: false });
-        sendStudyToolbarState(win);
-        win.scrutinizerView.webContents.loadURL(studyInterstitialUrl(study));
-        return;
+    study.captureTransition = true;
+    const record = openTaskRecord();
+    if (record && !record.events.some(event => event.type === 'done')) {
+        const at = Date.now();
+        record.events.push({
+            type: 'done',
+            t: taskElapsedMs(record, at),
+            at: new Date(at).toISOString()
+        });
     }
-    finishStudySession(win, 'completed');
+    try {
+        await finalizeCurrentTaskCapture(win);
+        closeOpenTaskRecord('done');
+        if (study.taskIndex < study.tasks.length - 1) {
+            study.taskIndex += 1;
+            study.phase = 'interstitial';
+            // Foveation off on the interstitial; Visual Memory resets at Begin.
+            sendStudyRuntimeState(win, { resetMemory: false });
+            sendStudyToolbarState(win);
+            await win.scrutinizerView.webContents.loadURL(studyInterstitialUrl(study));
+            return;
+        }
+        finishStudySession(win, 'completed');
+    } finally {
+        study.captureTransition = false;
+    }
 }
 
 function applyStudyLaunch(launch) {

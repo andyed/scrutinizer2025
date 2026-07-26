@@ -129,6 +129,7 @@ describe('buildEnvelope', () => {
             rowCount: 312,
             taskId: 'billing-navigation',
             pollMs: 16,
+            deliveryFailureCount: 0,
             trackerSource: 'commonjs-host-bound',
             trackerBinding: {
                 hostBound: true,
@@ -138,6 +139,24 @@ describe('buildEnvelope', () => {
             }
         });
         expect(validateEnvelope(envelope).ok).toBe(true);
+    });
+
+    it('validates a reported capture-row delivery failure count', () => {
+        const envelope = buildEnvelope(validInput({
+            capture: Object.assign({}, validInput().capture, {
+                health: {
+                    status: 'failed',
+                    code: 'row_delivery_failed',
+                    rowCount: 4,
+                    deliveryFailureCount: 1
+                }
+            })
+        }));
+        expect(validateEnvelope(envelope)).toEqual({ ok: true, errors: [] });
+
+        envelope.capture.health.deliveryFailureCount = -1;
+        expect(validateEnvelope(envelope).errors.join('\n'))
+            .toMatch(/deliveryFailureCount/);
     });
 
     it('derives the coordinate contract from the capture DPR', () => {

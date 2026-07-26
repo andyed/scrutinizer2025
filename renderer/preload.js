@@ -1,4 +1,25 @@
-const { ipcRenderer, webFrame } = require('electron');
+const { contextBridge, ipcRenderer, webFrame } = require('electron');
+
+// The main process injects the vendored event tracker into this isolated world.
+// Keep the bridge tiny: rows have already been privacy-scrubbed by
+// event-capture.js before they cross into the main-process DataCollector.
+const STUDY_CAPTURE_WORLD_ID = 1004;
+try {
+    contextBridge.exposeInIsolatedWorld(
+        STUDY_CAPTURE_WORLD_ID,
+        'scrutinizerStudyCaptureBridge',
+        {
+            emitRow(payload) {
+                if (!payload || typeof payload !== 'object') return false;
+                return ipcRenderer.sendSync('study:capture-row', payload) === true;
+            }
+        }
+    );
+} catch (err) {
+    ipcRenderer.send('study:capture-bridge-error', {
+        message: err && err.message ? err.message : 'Capture bridge initialization failed.'
+    });
+}
 
 // classifyPrimitive is inlined below rather than required from
 // ./dom-primitive-classifier. Electron 30's preload context (with
