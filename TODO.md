@@ -6,6 +6,25 @@ Migrated from master backlog on 2026-03-25. Detailed tasks for the Scrutinizer f
 
 ---
 
+## 🔴 NEXT DECISION — WB-2 authoring surface: www vs. moderator (2026-08-06)
+
+The Study Link Builder in `scrutinizer-www` just grew multi-task session support
+(~480 lines, committed 2026-08-06), but [`docs/specs/study-workbench-webapp.md`](docs/specs/study-workbench-webapp.md)
+says WB-2's Designer **supersedes** `study-link-builder.html` and migrates
+practitioner tooling out of www ("www stays marketing/science; one lead per
+surface"). Two authoring surfaces are now diverging.
+
+Decide before the next round of authoring-UI work:
+- **(a)** Build WB-2 in `scrutinizer-moderator`, freeze the www builder, and
+  have www link out to it — follows the spec.
+- **(b)** Amend the spec to keep a lightweight single/multi-task builder in www
+  and scope WB-2 to study-config + moderator packet only.
+
+Either way the deep-link parser stays vendored from `shared/study-deep-link.js`;
+this is a question about *which surface hosts the UI*, not about the parser.
+
+---
+
 ## ⚠️ Post-Isotropic Audit Remediation — 2026-06-05
 
 From the 17-agent release audit (`docs/assessments/2026-06-05-post-isotropic-release-audit.md`, covering v2.6.0 → HEAD). Net trajectory: biological plausibility **MIXED** (leaning regress on the *default*), usability **MIXED**. Honesty + engineering hygiene improved while the scientific centerpiece slipped out of the default and the validation layer rotted. Recommendation is **fix-forward, not revert to v2.6.1** — a hard revert would discard the master curve, scanpath replay, the Visual-Memory-Off fix, the v2.7.3 honesty taxonomy, and the BGRA/self-heal stability fixes, while curing only the default-mode regression that B1 fixes in one line. See "Revert vs. fix-forward" note at the end of this section.
