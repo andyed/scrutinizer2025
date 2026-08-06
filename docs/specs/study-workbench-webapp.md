@@ -77,6 +77,12 @@ truth; the vendored copies carry a header pointing back.
 
 ### WB-3 — Replay + attention maps (2D, non-foveated)
 
+**Implementation status:** first practitioner slice is available in
+`scrutinizer-moderator`: full-page stimulus playback, scroll-corrected pointer
+path, numbered click markers, page-transition/click timeline marks, scrub/play,
+and a time-weighted cursor-dwell heatmap. Pre-rendered foveated-frame playback
+and cross-session attention-map aggregation remain planned.
+
 - Trail playback over the per-page stimulus screenshot: cursor path, click and
   task-event markers, timeline scrubber. Page-space via the envelope's
   coordinate contract; screenshots are the ground truth (drift-proof).
