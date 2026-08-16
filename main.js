@@ -19,6 +19,7 @@ const {
     closeStimulusDiffWorker
 } = require('./shared/stimulus-diff');
 const { rowsToScanpathData } = require('./renderer/instrumentation/event-capture');
+const inputGating = require('./shared/input-gating');
 
 // Session interstitial: the content view has no node integration, so the
 // bundled screen signals "Begin" by navigating to a sentinel URL that
@@ -745,9 +746,32 @@ ipcMain.on('open-new-window', (event, url) => {
     else createScrutinizerWindow(url);
 });
 
+/**
+ * Send a pointer position to a window's HUD, subject to the input-gating policy.
+ *
+ * Every path that moves the fovea — real device, polling fallback, test driver —
+ * goes through here so `SCRUTINIZER_PHYSICAL_POINTER` / `SCRUTINIZER_SCRIPTED_POINTER`
+ * mean the same thing everywhere. See shared/input-gating.js.
+ *
+ * @param {BrowserWindow} win - Window owning the HUD
+ * @param {number} x - Screen-space x
+ * @param {number} y - Screen-space y
+ * @param {number} zoom
+ * @param {string} source - inputGating.PHYSICAL or inputGating.SCRIPTED
+ * @returns {boolean} true if the event was forwarded
+ */
+function forwardPointerToHud(win, x, y, zoom, source) {
+    if (!inputGating.acceptsPointer(source)) return false;
+    if (!win || !win.scrutinizerHud || win.scrutinizerHud.isDestroyed()) return false;
+    win.scrutinizerHud.webContents.send('browser:mousemove', x, y, zoom);
+    return true;
+}
+
+console.log(`[Main] Pointer input policy: ${inputGating.describe()}`);
+
 // Forward browser mouse position to HUD for foveal effect tracking
 let mouseEventCount = 0;
-ipcMain.on('browser:mousemove', (event, x, y, zoom = 1.0) => {
+ipcMain.on('browser:mousemove', (event, x, y, zoom = 1.0, meta = null) => {
     mouseEventCount++;
     // Log every 60th event
     if (mouseEventCount % 60 === 0) {
@@ -756,9 +780,7 @@ ipcMain.on('browser:mousemove', (event, x, y, zoom = 1.0) => {
     const windows = BrowserWindow.getAllWindows();
     // Find the window that owns this content view
     const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
-    if (win && win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
-        win.scrutinizerHud.webContents.send('browser:mousemove', x, y, zoom);
-    }
+    forwardPointerToHud(win, x, y, zoom, inputGating.pointerSource(meta));
 });
 
 ipcMain.on('browser:zoom-changed', (event, zoom) => {
@@ -1524,7 +1546,7 @@ function createScrutinizerWindow(startUrl, options = {}) {
     let mouseEventCount = 0; // Added for logging, as used in the provided snippet
 
     // Listen for DOM events and update timestamp
-    ipcMain.on('browser:mousemove', (event, x, y, zoom = 1.0) => {
+    ipcMain.on('browser:mousemove', (event, x, y, zoom = 1.0, meta = null) => {
         lastDOMEventTime = Date.now();
         mouseEventCount++;
         // Log every 60th event
@@ -1533,15 +1555,20 @@ function createScrutinizerWindow(startUrl, options = {}) {
         }
         const windows = BrowserWindow.getAllWindows();
         const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
-        if (win && win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
-            win.scrutinizerHud.webContents.send('browser:mousemove', x, y, zoom);
-        }
+        forwardPointerToHud(win, x, y, zoom, inputGating.pointerSource(meta));
     });
 
     const startMousePolling = () => {
         if (mousePollingInterval) {
             console.log('[Main] Polling already running');
             return; // Already polling
+        }
+
+        // The polling fallback reads the real device, so it is physical input by
+        // definition — never start it when physical input is suppressed.
+        if (!inputGating.acceptsPointer(inputGating.PHYSICAL)) {
+            console.log('[Main] Polling skipped - physical pointer input is suppressed');
+            return;
         }
 
         console.log('[Main] Starting mouse polling fallback');
@@ -1589,9 +1616,7 @@ function createScrutinizerWindow(startUrl, options = {}) {
 
                 if (localX >= 0 && localX < contentBounds.width && localY >= 0 && localY < contentHeight) {
                     // Send zoom=1.0 since coords are already window-relative
-                    if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
-                        win.scrutinizerHud.webContents.send('browser:mousemove', x, y, 1.0);
-                    }
+                    forwardPointerToHud(win, x, y, 1.0, inputGating.PHYSICAL);
                 }
             } catch (err) {
                 console.error('[Main] Mouse polling error:', err);
@@ -3263,7 +3288,7 @@ function runIntegrationTest() {
                 // chars for mode 12 from a capture artifact, not a real defect. (audit 2026-06-06)
                 if (!testTrajectory) {
                     for (let pulse = 0; pulse < 10; pulse++) {
-                        mainWindow.scrutinizerHud.webContents.send('browser:mousemove', screenTargetX, screenTargetY, 1.0);
+                        forwardPointerToHud(mainWindow, screenTargetX, screenTargetY, 1.0, inputGating.SCRIPTED);
                         await new Promise(resolve => setTimeout(resolve, 16)); // ~60fps
                     }
                     await new Promise(resolve => setTimeout(resolve, 200)); // dwell so velocity settles to ~0
@@ -3385,7 +3410,8 @@ function runIntegrationTest() {
                             console.log(`[Test] Running gaze trajectory: (${sx},${sy})→(${ex},${ey}) over ${duration}ms, capture at ${(captureNorm * 100).toFixed(0)}%`);
 
                             const sendGazePos = (px, py) => {
-                                ipcMain.emit('browser:mousemove', { sender: mainWindow.scrutinizerView.webContents }, px, py, 1.0);
+                                ipcMain.emit('browser:mousemove', { sender: mainWindow.scrutinizerView.webContents },
+                                    px, py, 1.0, { source: inputGating.SCRIPTED });
                             };
 
                             // Pre-position at start for 500ms so velocity starts from zero
@@ -3703,7 +3729,7 @@ function runIntegrationTest() {
                                         // GazeModel uses exponential lerp (maskSmoothness=0.4), so multiple
                                         // sends at the same position accelerate convergence and drop velocity.
                                         for (let pulse = 0; pulse < 10; pulse++) {
-                                            mainWindow.scrutinizerHud.webContents.send('browser:mousemove', screenX, screenY, 1.0);
+                                            forwardPointerToHud(mainWindow, screenX, screenY, 1.0, inputGating.SCRIPTED);
                                             await new Promise(resolve => setTimeout(resolve, 16)); // ~60fps
                                         }
 
@@ -4210,7 +4236,7 @@ function runBatchCapture() {
 
                 const screenTargetX = winBounds.x + targetX;
                 const screenTargetY = winBounds.y + targetY;
-                mainWindow.scrutinizerHud.webContents.send('browser:mousemove', screenTargetX, screenTargetY, 1.0);
+                forwardPointerToHud(mainWindow, screenTargetX, screenTargetY, 1.0, inputGating.SCRIPTED);
 
                 // Apply radius override
                 if (shot.radius) {

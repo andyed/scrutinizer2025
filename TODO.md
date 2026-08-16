@@ -106,7 +106,7 @@ A hard revert to v2.6.1 cures only B1 (default = shatter mode 14) — which B1 f
 - [ ] **Gaze Replay Blog Post** -- `scrutinizer-www/src/blog/drafts/2026-04-02-gaze-replay.html`. Needs: hero image (raw vs gazeplot side-by-side), 4-up gazeplot grid crops, task model SVG, interactive explorer screenshot. Fix image paths once assets are finalized.
 - [x] **Fix scanpath coordinate alignment** -- FPOGX/FPOGY are screenshot-space at 1280px (confirmed by AdSERP authors). Render SERPs at screenWidth, map coordinates directly. Previously had wrong 1422px window-width rendering causing reflow drift.
 - [ ] **Full-page gazeplot scroll offset** -- Tile capture scrolls by physical pixels (DPR-scaled) instead of CSS pixels. Tiles overlap or gap on some trials. Need `th` from CSS content bounds, not physical.
-- [ ] **Suppress mouse during TEST_MODE captures** -- Physical mouse movement contaminates gazeplot renders. TEST_MODE should ignore real cursor events.
+- [x] **Suppress mouse during TEST_MODE captures** -- Physical mouse movement contaminates gazeplot renders. Split into two knobs rather than overloading TEST_MODE, since the synthetic-cursor driver needs scripted input accepted in the same run that ignores the real device: `SCRUTINIZER_PHYSICAL_POINTER` (defaults to `ignore` under TEST_MODE) and `SCRUTINIZER_SCRIPTED_POINTER`, with per-event provenance so untagged events count as physical. `shared/input-gating.js`; all fovea-moving paths funnel through `forwardPointerToHud()` in `main.js`.
 - [ ] **Golden Captures** -- Retroactive v1.8.0 captures, optimize capture suite performance.
 - [ ] **FOVI Demo Page Redo** -- Fix flipped images, color decay, clean interactive demo.
 - [ ] **Color Search Experiment** -- PostHog opt-in logging for color-search.html.
