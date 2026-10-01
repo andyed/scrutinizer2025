@@ -10,6 +10,12 @@ const { STUDY_SCHEME, parseStudyDeepLink } = require('./shared/study-deep-link')
 const { buildStudyRuntimeState } = require('./shared/study-runtime-state');
 const { resolveTaskRuntimeState, buildSessionSummary, summaryFileName } = require('./shared/study-session');
 const {
+    STUDY_CONSENT_URL,
+    parseConsentSentinel,
+    resolveConsentParticipant,
+    buildConsentRecord
+} = require('./shared/study-consent');
+const {
     buildEnvelope,
     stimulusFileName
 } = require('./shared/session-capture');
@@ -1401,15 +1407,25 @@ function createScrutinizerWindow(startUrl, options = {}) {
         }
     });
 
-    // The interstitial's Begin button navigates to a sentinel URL because the
-    // content view has no IPC path. Cancel it and start the pending task.
-    // beginCurrentSessionTask guards on phase, so task-page content
-    // navigating to the sentinel cannot skip or restart tasks.
+    // The interstitial's buttons navigate to sentinel URLs because the
+    // content view has no IPC path. Cancel the navigation and act on it.
+    // The handlers guard on phase, so task-page content navigating to a
+    // sentinel cannot skip or restart tasks. Consent additionally requires
+    // the bundled interstitial to be the page that navigated: no task page
+    // is loaded during the consent phase, and this keeps it that way.
     contentView.webContents.on('will-navigate', (event, url) => {
         if (url === STUDY_BEGIN_URL || url.startsWith(STUDY_BEGIN_URL)) {
             event.preventDefault();
             beginCurrentSessionTask(win);
+            return;
         }
+        const consent = parseConsentSentinel(url);
+        if (!consent) return;
+        event.preventDefault();
+        const fromInterstitial = contentView.webContents.getURL().startsWith(STUDY_INTERSTITIAL_URL);
+        if (!fromInterstitial) return;
+        if (consent.action === 'agree') acceptStudyConsent(win, consent.participantId);
+        else declineStudyConsent(win);
     });
 
     // Forward navigation events to update HUD URL bar
@@ -1842,12 +1858,20 @@ function sendStudyToolbarState(win) {
     const onTaskPage = activeStudy.kind !== 'session' || activeStudy.phase === 'task';
     const liveUrl = onTaskPage ? win.scrutinizerView.webContents.getURL() : '';
     const completed = activeStudy.kind === 'session' && activeStudy.phase === 'complete';
+    // Before consent, and after a decline, no task has run: no counter.
+    const consenting = activeStudy.kind === 'session' && activeStudy.phase === 'consent';
+    const declined = activeStudy.kind === 'session' && activeStudy.declined === true;
+    let instructions = task.instructions;
+    if (declined) instructions = 'Nothing was recorded — press Done to finish.';
+    else if (completed) instructions = 'Session complete — press Done to finish.';
+    else if (consenting) instructions = 'Read the information on this page, then choose whether to take part.';
+    const showCounter = activeStudy.kind === 'session' && !consenting && !declined;
     win.toolbarView.webContents.send('toolbar:enter-study', {
         taskId: task.id,
-        instructions: completed ? 'Session complete — press Done to finish.' : task.instructions,
+        instructions,
         currentUrl: liveUrl || task.targetUrl,
-        taskNumber: activeStudy.kind === 'session' ? activeStudy.taskIndex + 1 : null,
-        taskCount: activeStudy.kind === 'session' ? activeStudy.tasks.length : null
+        taskNumber: showCounter ? activeStudy.taskIndex + 1 : null,
+        taskCount: showCounter ? activeStudy.tasks.length : null
     });
     win.toolbarView.webContents.send('toolbar:update-nav-state', toolbarNavigationState(win));
 }
@@ -1882,7 +1906,11 @@ function buildActiveStudy(launch) {
             session: launch.session,
             tasks: launch.tasks,
             taskIndex: 0,
-            phase: 'interstitial',
+            // Every session opens on the consent screen (P3-5). Nothing is
+            // captured or written until the participant agrees.
+            phase: 'consent',
+            consent: null,
+            savedName: null,
             taskRecords: [],
             nextPageVisitIndex: 1,
             captureTransition: false,
@@ -1908,16 +1936,28 @@ function buildActiveStudy(launch) {
 function studyEntryUrl(study) {
     if (study.kind !== 'session') return study.launch.task.targetUrl;
     // Re-created window mid-task resumes the task page; otherwise the
-    // session (re)enters through the current task's interstitial.
-    return study.phase === 'task'
-        ? study.tasks[study.taskIndex].targetUrl
-        : studyInterstitialUrl(study);
+    // session (re)enters through consent or the current task's interstitial.
+    if (study.phase === 'task') return study.tasks[study.taskIndex].targetUrl;
+    if (study.phase === 'consent') return studyInterstitialUrl(study, 'consent');
+    return studyInterstitialUrl(study);
 }
 
 function studyInterstitialUrl(study, state = 'next') {
     const url = new URL(STUDY_INTERSTITIAL_URL);
+    if (state === 'consent') {
+        url.searchParams.set('state', 'consent');
+        url.searchParams.set('count', String(study.tasks.length));
+        if (study.session.participantId) url.searchParams.set('participant', study.session.participantId);
+        return url.toString();
+    }
+    if (state === 'declined') {
+        url.searchParams.set('state', 'declined');
+        return url.toString();
+    }
     if (state === 'complete') {
         url.searchParams.set('state', 'complete');
+        if (study.session.participantId) url.searchParams.set('participant', study.session.participantId);
+        if (study.savedName) url.searchParams.set('saved', study.savedName);
         return url.toString();
     }
     const task = study.tasks[study.taskIndex];
@@ -2712,7 +2752,8 @@ function captureEnvelopeForStudy(study, summary) {
         defaults: summary.defaults,
         tasks: taskRecords,
         capture,
-        pageVisits
+        pageVisits,
+        consent: study.consent
     });
 }
 
@@ -2792,6 +2833,13 @@ function closeOpenTaskRecord(outcome, at = Date.now()) {
 function writeSessionSummary(study, endReason) {
     if (study.summaryWritten) return;
     study.summaryWritten = true;
+    // No consent, no record: covers a decline, and a session ended, replaced,
+    // or quit while the consent screen was still showing. Capture cannot have
+    // started either, since Begin requires consent.
+    if (study.kind === 'session' && !study.consent) {
+        console.log('[Study] Session ended before consent; nothing written.');
+        return;
+    }
     try {
         const summary = buildSessionSummary(study, {
             endReason,
@@ -2801,6 +2849,7 @@ function writeSessionSummary(study, endReason) {
         });
         try {
             const capture = writeCompleteStudyCapture(study, summary);
+            study.savedName = path.basename(capture.directoryPath);
             console.log(`[StudyCapture] Complete session directory written: ${capture.directoryPath}`);
         } catch (captureErr) {
             // A legacy summary preserves task timing, but it is intentionally
@@ -2809,6 +2858,7 @@ function writeSessionSummary(study, endReason) {
             fs.mkdirSync(dir, { recursive: true });
             const file = path.join(dir, summaryFileName(summary));
             fs.writeFileSync(file, JSON.stringify(summary, null, 2), { mode: 0o600 });
+            study.savedName = path.basename(file);
             console.warn('[StudyCapture] Complete capture unavailable; wrote timing summary only:',
                 captureErr && captureErr.message ? captureErr.message : captureErr);
             console.log(`[Study] Session summary written: ${file}`);
@@ -2831,10 +2881,52 @@ function finalizeInterruptedSession(endReason) {
     writeSessionSummary(study, endReason);
 }
 
+// will-navigate sentinel handler: the consent screen's Agree button. Moves
+// the session to task 1's interstitial; capture still waits for Begin.
+function acceptStudyConsent(win, screenParticipantId) {
+    if (!activeStudy || activeStudy.kind !== 'session' || activeStudy.phase !== 'consent') return;
+    if (!win || win.isDestroyed() || !isStudyWindow(win)) return;
+    const study = activeStudy;
+    const participant = resolveConsentParticipant(study.session.participantId, screenParticipantId);
+    // The page validates the code before navigating, so this only fails on a
+    // forged sentinel. Stay on the consent screen.
+    if (!participant.ok) return;
+
+    study.session = Object.assign({}, study.session, { participantId: participant.participantId });
+    study.consent = buildConsentRecord({
+        consentedAtMs: Date.now(),
+        participantIdSource: participant.source
+    });
+    study.phase = 'interstitial';
+    console.log(`[Study] Consent recorded (participant code from ${participant.source}).`);
+    sendStudyRuntimeState(win, { resetMemory: false });
+    sendStudyToolbarState(win);
+    win.scrutinizerView.webContents.loadURL(studyInterstitialUrl(study));
+    rebuildMenu();
+}
+
+// will-navigate sentinel handler: the consent screen's decline button. No
+// record is kept; the declined screen asks for the machine back, and Done
+// (or the menu escape) restores the baseline and exits.
+function declineStudyConsent(win) {
+    if (!activeStudy || activeStudy.kind !== 'session' || activeStudy.phase !== 'consent') return;
+    if (!win || win.isDestroyed() || !isStudyWindow(win)) return;
+    const study = activeStudy;
+    study.phase = 'complete';
+    study.declined = true;
+    study.summaryWritten = true;
+    console.log('[Study] Consent declined; nothing written.');
+    sendStudyRuntimeState(win, { resetMemory: false });
+    sendStudyToolbarState(win);
+    win.scrutinizerView.webContents.loadURL(studyInterstitialUrl(study, 'declined'));
+    rebuildMenu();
+}
+
 // will-navigate sentinel handler: the interstitial's Begin button.
 function beginCurrentSessionTask(win) {
     if (!activeStudy || activeStudy.kind !== 'session' || activeStudy.phase !== 'interstitial') return;
     if (!win || win.isDestroyed() || !isStudyWindow(win)) return;
+    if (!activeStudy.consent) return; // unreachable: interstitial follows consent
     const study = activeStudy;
     const task = study.tasks[study.taskIndex];
 
@@ -2883,7 +2975,9 @@ function finishStudySession(win, endReason) {
 async function advanceStudySession(win) {
     const study = activeStudy;
     if (!study || study.captureTransition) return;
-    if (study.phase === 'complete') {
+    // Done on the completion screen, or before consent was given: there is
+    // nothing to record, so restore the baseline and leave Study mode.
+    if (study.phase === 'complete' || study.phase === 'consent') {
         exitStudyMode();
         return;
     }
@@ -4651,7 +4745,9 @@ app.on('create-new-window', () => {
 // Handle "Exit Study Mode" / "End Study Session" menu action — the
 // moderator's escape hatch when the study toolbar itself is unusable.
 app.on('exit-study-mode', () => {
-    if (activeStudy && activeStudy.kind === 'session' && activeStudy.phase !== 'complete') {
+    // Before consent there is nothing to finish or write; exit directly.
+    if (activeStudy && activeStudy.kind === 'session' &&
+        activeStudy.phase !== 'complete' && activeStudy.phase !== 'consent') {
         closeOpenTaskRecord('session_ended');
         finishStudySession(studyWindow(), 'ended_early');
         return;

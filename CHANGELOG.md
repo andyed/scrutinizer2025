@@ -6,6 +6,7 @@
 
 - **Study Links:** Packaged builds register the versioned `scrutinizer://v1/task/start` URL route so a researcher can launch a web task from an ordinary browser instruction sheet with validated, temporary settings such as foveal radius, rendering mode, Comfort Mode, and Visual Memory.
 - **Study toolbar:** During a launched task, the normal URL controls are replaced with persistent task instructions, compressed destination-origin visibility, a read-only full-URL toggle, and a Done action. Study settings do not overwrite the user's saved preferences.
+- **Consent and debrief screens:** Every multi-task session link now opens on an in-app consent screen that states what Scrutinizer records during tasks, collects the participant code when the link has none, and captures or writes nothing unless the participant agrees. Declining shows "Nothing was recorded." After the last task a debrief screen names the participant code and the saved session folder. The capture envelope gains an optional, versioned `consent` record (`scrutinizer-consent/1`). The consent and debrief templates no longer claim that Scrutinizer stores no session data.
 - **Practitioner guide:** Added a task-oriented guide for using the scientifically motivated peripheral view to support emulated gaze shifts, control visual access, and reveal participants' functional focus—while distinguishing that operational signal from physiological gaze measurement.
 
 ### Changed

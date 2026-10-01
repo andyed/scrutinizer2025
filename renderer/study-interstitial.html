@@ -3,29 +3,41 @@
 
 <head>
     <meta charset="UTF-8">
+    <!-- Must equal CONSENT_TEXT_VERSION in shared/study-consent.js. Bump both
+         whenever the consent copy below changes (guard-tested). -->
+    <meta name="scrutinizer-consent-version" content="scrutinizer-consent/1">
     <title>Study Task</title>
     <style>
         /* All readable text holds the 8:1 contrast floor on #202020:
-           #eeeeee 13.9:1, #bbbbbb 8.49:1, #ffb15a 9.0:1, #111 on #99ccff 11.18:1. */
+           #eeeeee 14.0:1, #bbbbbb 8.49:1, #ffb15a 9.07:1, #111 on #99ccff 11.18:1.
+           Input text: #eeeeee on #2b2b2b 12.2:1. */
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        html, body {
+        html {
             height: 100%;
+            background: #202020;
+        }
+
+        body {
             background: #202020;
             color: #eeeeee;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
 
+        /* min-height (not height) lets the long consent and debrief states grow
+           the body, so the bottom padding survives at full scroll; margin:auto
+           on the card (not align-items:center) centers short states without
+           clipping the top of long ones. */
         body {
             display: flex;
-            align-items: center;
-            justify-content: center;
+            min-height: 100%;
             padding: 32px;
         }
 
         .card {
             max-width: 620px;
             width: 100%;
+            margin: auto;
         }
 
         .counter {
@@ -44,21 +56,95 @@
             overflow-wrap: break-word;
         }
 
+        .instructions:focus { outline: none; }
+
         .origin {
             color: #bbbbbb;
             font-size: 14px;
             margin-bottom: 34px;
         }
 
-        .origin code {
+        code {
             font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
             color: #eeeeee;
+            overflow-wrap: anywhere;
         }
 
-        #begin {
-            background: #99ccff;
-            color: #111111;
-            border: none;
+        .prose h2 {
+            font-size: 15px;
+            font-weight: 700;
+            margin: 20px 0 6px;
+        }
+
+        .prose p, .prose li {
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .prose ul { padding-left: 22px; }
+        .prose li + li { margin-top: 4px; }
+        .prose ul + p { margin-top: 10px; }
+
+        .field { margin-top: 26px; }
+
+        .field label {
+            display: block;
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        #participant-code {
+            width: 100%;
+            max-width: 280px;
+            background: #2b2b2b;
+            color: #eeeeee;
+            border: 1px solid #bbbbbb;
+            border-radius: 6px;
+            font: 16px ui-monospace, SFMono-Regular, Menlo, monospace;
+            padding: 9px 12px;
+        }
+
+        #participant-code:focus-visible,
+        #agree-check:focus-visible {
+            outline: 3px solid #ffffff;
+            outline-offset: 2px;
+        }
+
+        .agree {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            margin-top: 22px;
+            font-size: 16px;
+            line-height: 1.45;
+            cursor: pointer;
+        }
+
+        #agree-check {
+            flex: none;
+            width: 18px;
+            height: 18px;
+            margin-top: 3px;
+            accent-color: #99ccff;
+        }
+
+        .error {
+            color: #ffb15a;
+            font-size: 15px;
+            font-weight: 600;
+            margin-top: 14px;
+            min-height: 1.4em;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        button {
             border-radius: 6px;
             font-size: 16px;
             font-weight: 600;
@@ -66,9 +152,24 @@
             cursor: pointer;
         }
 
-        #begin:hover { background: #b3d9ff; }
+        .primary {
+            background: #99ccff;
+            color: #111111;
+            border: none;
+        }
 
-        #begin:focus-visible {
+        .primary:hover { background: #b3d9ff; }
+
+        .secondary {
+            background: transparent;
+            color: #eeeeee;
+            border: 1px solid #bbbbbb;
+            padding: 11px 24px;
+        }
+
+        .secondary:hover { background: #2b2b2b; }
+
+        button:focus-visible {
             outline: 3px solid #ffffff;
             outline-offset: 2px;
         }
@@ -79,57 +180,185 @@
             margin-top: 16px;
         }
 
+        .field .hint { margin-top: 6px; }
+
         .hidden { display: none; }
     </style>
 </head>
 
 <body>
     <main class="card">
-        <div id="counter" class="counter" aria-live="polite"></div>
-        <h1 id="instructions" class="instructions"></h1>
-        <p id="origin-row" class="origin">Task page: <code id="origin"></code></p>
-        <button id="begin" type="button">Begin</button>
-        <p id="hint" class="hint">Press Enter or select Begin when you are ready.</p>
-        <p id="complete-note" class="hint hidden">You can hand the machine back to the moderator.</p>
+        <!-- state=next: the task interstitial -->
+        <section id="next" class="hidden">
+            <div id="counter" class="counter" aria-live="polite"></div>
+            <h1 id="instructions" class="instructions"></h1>
+            <p id="origin-row" class="origin">Task page: <code id="origin"></code></p>
+            <button id="begin" class="primary" type="button">Begin</button>
+            <p class="hint">Press Enter or select Begin when you are ready.</p>
+        </section>
+
+        <!-- state=consent: shown once, before task 1. Copy is versioned. -->
+        <section id="consent" class="hidden">
+            <div class="counter">Before you start</div>
+            <h1 id="consent-title" class="instructions" tabindex="-1">Taking part in this session</h1>
+            <div class="prose">
+                <p>You will try <span id="consent-count">a few</span> short tasks on websites. We are testing the design, not you. There are no wrong answers.</p>
+
+                <h2>What Scrutinizer does</h2>
+                <p>It keeps the area around your mouse pointer clear and blurs everything farther away, the way your peripheral vision loses detail. It does not use a camera and does not track your eyes.</p>
+
+                <h2>What this computer records during the tasks</h2>
+                <ul>
+                    <li>Mouse movement, clicks, scrolling, and actions like copy and paste, with timestamps.</li>
+                    <li>The address of each page you visit, and a screenshot of it. A screenshot shows everything on the page, including anything you have typed there.</li>
+                    <li>Key presses. Inside a text box it records only that a key was pressed, never which key or what you typed. Outside text boxes it records which key.</li>
+                    <li>How long each task takes, your screen size, and the tool's settings.</li>
+                </ul>
+                <p>Nothing is recorded on screens like this one. The recording is saved on this computer under a participant code, not your name, and Scrutinizer does not upload it.</p>
+
+                <h2>Other recordings</h2>
+                <p>The moderator may also take notes or record video or audio with their own equipment. They will tell you what they record, who is running the study, and how long data is kept. You can say no.</p>
+
+                <h2>Your choice</h2>
+                <p>The blurred view can feel odd or tiring. You can take a break or stop at any time without giving a reason, and ask for your recording to be deleted.</p>
+            </div>
+
+            <div class="field" id="participant-entry">
+                <label for="participant-code">Participant code</label>
+                <input id="participant-code" type="text" maxlength="128" autocomplete="off"
+                    autocapitalize="off" spellcheck="false" aria-describedby="participant-hint">
+                <p id="participant-hint" class="hint">The moderator will give you this code. Do not use your name.</p>
+            </div>
+            <p class="field hidden" id="participant-fixed">Participant code: <code id="participant-fixed-code"></code></p>
+
+            <label class="agree" for="agree-check">
+                <input id="agree-check" type="checkbox">
+                <span>I have read this, had a chance to ask questions, and agree to take part.</span>
+            </label>
+            <p id="consent-error" class="error" role="alert"></p>
+            <div class="actions">
+                <button id="agree" class="primary" type="button">Agree and continue</button>
+                <button id="decline" class="secondary" type="button">I don't want to take part</button>
+            </div>
+        </section>
+
+        <!-- state=declined: consent refused; nothing was written. -->
+        <section id="declined" class="hidden">
+            <div class="counter">No problem</div>
+            <h1 class="instructions">Nothing was recorded.</h1>
+            <p class="hint">Thank you for considering it. Please hand the computer back to the moderator.</p>
+        </section>
+
+        <!-- state=complete: the debrief, after the last task or an early end. -->
+        <section id="complete" class="hidden">
+            <div class="counter">Session complete</div>
+            <h1 class="instructions">Thank you for taking part.</h1>
+            <div class="prose">
+                <h2>What we were testing</h2>
+                <p>Whether the design leads people to what they need when only part of the screen is clear at a time. Where you hesitated or got lost points at a problem in the design, not in you.</p>
+
+                <h2>What the software was doing</h2>
+                <p>It kept the area around your pointer clear and blurred the rest, as a model of peripheral vision. It did not track your eyes, so the pointer is not a record of where you looked.</p>
+
+                <h2>Your data</h2>
+                <p>The recording is saved on this computer under participant code <code id="debrief-code"></code>. If you would like it deleted, tell the moderator now.</p>
+            </div>
+            <p id="saved-row" class="hint">For the moderator: saved as <code id="saved-name"></code> in the app's study-sessions folder.</p>
+            <p id="unsaved-row" class="hint hidden">For the moderator: no session folder was written. Check the app log.</p>
+            <p class="hint">You can hand the computer back to the moderator.</p>
+        </section>
     </main>
 
     <script>
         // No IPC in the content view (no node integration, no preload). State
-        // arrives via query params; Begin signals main via a sentinel
-        // navigation that main.js intercepts in will-navigate and cancels.
+        // arrives via query params; buttons signal main via sentinel
+        // navigations that main.js intercepts in will-navigate and cancels.
         // The .invalid TLD guarantees no accidental network resolution.
+        // Sentinels must equal shared/study-consent.js (guard-tested).
         const BEGIN_URL = 'https://begin.study.scrutinizer.invalid/';
+        const CONSENT_URL = 'https://consent.study.scrutinizer.invalid/';
+        const DECLINE_URL = 'https://decline.study.scrutinizer.invalid/';
+        // Same rule as participant_id in shared/study-deep-link.js.
+        const CODE_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
+        const STATES = ['next', 'consent', 'declined', 'complete'];
 
         const params = new URLSearchParams(location.search);
-        const state = params.get('state') === 'complete' ? 'complete' : 'next';
-        const number = params.get('number') || '';
-        const count = params.get('count') || '';
-        const instructions = params.get('instructions');
-        const origin = params.get('origin');
+        const state = STATES.includes(params.get('state')) ? params.get('state') : 'next';
+        const show = (id) => document.getElementById(id).classList.remove('hidden');
+        const byId = (id) => document.getElementById(id);
 
-        const counterEl = document.getElementById('counter');
-        const instructionsEl = document.getElementById('instructions');
-        const originRow = document.getElementById('origin-row');
-        const beginBtn = document.getElementById('begin');
+        show(state);
 
-        if (state === 'complete') {
-            counterEl.textContent = 'Session complete';
-            instructionsEl.textContent = 'All tasks are finished. Thank you.';
-            originRow.classList.add('hidden');
-            beginBtn.classList.add('hidden');
-            document.getElementById('hint').classList.add('hidden');
-            document.getElementById('complete-note').classList.remove('hidden');
-        } else {
-            counterEl.textContent = number && count ? `Task ${number} of ${count}` : 'Study task';
+        if (state === 'next') {
+            const number = params.get('number') || '';
+            const count = params.get('count') || '';
+            const instructions = params.get('instructions');
+            const origin = params.get('origin');
+            byId('counter').textContent = number && count ? `Task ${number} of ${count}` : 'Study task';
             // textContent only — instructions are untrusted plain text.
+            const instructionsEl = byId('instructions');
             instructionsEl.textContent = instructions || 'Explore this page in Scrutinizer.';
             if (origin) {
-                document.getElementById('origin').textContent = origin;
+                byId('origin').textContent = origin;
             } else {
-                originRow.classList.add('hidden');
+                byId('origin-row').classList.add('hidden');
             }
+            const beginBtn = byId('begin');
             beginBtn.addEventListener('click', () => { location.href = BEGIN_URL; });
             beginBtn.focus();
+        } else if (state === 'consent') {
+            const count = Number.parseInt(params.get('count'), 10);
+            if (Number.isInteger(count) && count > 0) byId('consent-count').textContent = String(count);
+
+            // A code from the study link is shown read-only; main.js prefers it
+            // over anything typed here regardless.
+            const fixedCode = params.get('participant');
+            const linkSuppliedCode = fixedCode !== null && CODE_PATTERN.test(fixedCode);
+            if (linkSuppliedCode) {
+                byId('participant-entry').classList.add('hidden');
+                byId('participant-fixed-code').textContent = fixedCode;
+                show('participant-fixed');
+            }
+
+            const input = byId('participant-code');
+            const check = byId('agree-check');
+            const error = byId('consent-error');
+
+            const agree = () => {
+                const code = linkSuppliedCode ? fixedCode : input.value.trim();
+                if (!CODE_PATTERN.test(code)) {
+                    error.textContent = 'Enter the participant code from the moderator: letters, numbers, dots, dashes or underscores.';
+                    input.focus();
+                    return;
+                }
+                if (!check.checked) {
+                    error.textContent = 'Check the box to agree, or choose "I don’t want to take part".';
+                    check.focus();
+                    return;
+                }
+                location.href = `${CONSENT_URL}?participant=${encodeURIComponent(code)}`;
+            };
+
+            byId('agree').addEventListener('click', agree);
+            byId('decline').addEventListener('click', () => { location.href = DECLINE_URL; });
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') agree();
+            });
+            input.addEventListener('input', () => { error.textContent = ''; });
+            check.addEventListener('change', () => { error.textContent = ''; });
+            // Focus the heading, not the code field: focusing the field would
+            // scroll the consent text out of view before it is read.
+            byId('consent-title').focus();
+        } else if (state === 'complete') {
+            const code = params.get('participant');
+            byId('debrief-code').textContent = code && CODE_PATTERN.test(code) ? code : '(none)';
+            const saved = params.get('saved');
+            if (saved) {
+                byId('saved-name').textContent = saved;
+            } else {
+                byId('saved-row').classList.add('hidden');
+                show('unsaved-row');
+            }
         }
     </script>
 </body>

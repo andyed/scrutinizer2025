@@ -143,7 +143,7 @@ New error codes: `LINK_TOO_LONG`, `TOO_FEW_TASKS`, `TOO_MANY_TASKS`, `NON_CONTIG
 
 ### Lifecycle
 
-1. **Launch** (cold or warm — same rules as v1): validate atomically, snapshot runtime state once, enter Study mode, show the **interstitial for task 1**.
+1. **Launch** (cold or warm — same rules as v1): validate atomically, snapshot runtime state once, enter Study mode, show the **consent screen** (`phase: 'consent'`; see §Consent and debrief). Agreeing records consent and shows the **interstitial for task 1**; declining shows a "nothing was recorded" screen and writes nothing.
 2. **Interstitial**: the content view shows a bundled neutral screen — task counter ("Task 1 of 5"), full instructions at readable size, and a single **Begin** button. No stimulus loads yet. This is app chrome loaded from the packaged app (never a `data:`/remote URL), and it is where the moderator resets site state, checks the participant is ready, or answers questions. The toolbar already shows Study mode with the same counter and instruction.
 3. **Begin**: reset Visual Memory, apply the task's resolved runtime state (`snapshot ← session defaults ← task overrides`) through the existing `study:apply-runtime-settings` path, stamp `startedAt`, navigate the content view to `targetUrl`.
 4. **Task runs**: identical to v1 Study mode — locked toolbar, compressed origin, read-only ⌘L, in-page navigation allowed and reflected.
@@ -186,7 +186,19 @@ Study mode gains a progress counter in the leading label position:
 - Shows: task counter, full instruction text (rendered with `textContent`), target origin (so the moderator can confirm the right stimulus is next), Begin button.
 - Foveated rendering is **disabled on the interstitial** regardless of task settings — instructions are meta-task text, and the participant should read them unimpeded. Task settings apply at Begin. The completion state gets the same exemption: the session's runtime restore is deferred until Done is pressed on the completion screen, so "Session complete" is never rendered foveated.
 - Keyboard: Begin is focused by default; Enter activates. The screen is fully readable by assistive technology.
-- The interstitial is the designated future mount point for consent (before task 1) and debrief (after task M) — P3-5 should extend this screen rather than adding a separate surface.
+- Consent (before task 1) and debrief (after task M) are states of this same screen, not a separate surface. See §Consent and debrief.
+
+## Consent and debrief
+
+*Implemented 2026-09-30 (P3-5).* Pure logic lives in `shared/study-consent.js`. The screens are the `consent`, `declined`, and `complete` states of `renderer/study-interstitial.html`.
+
+- **Consent opens every session link.** The screen states what Scrutinizer records during tasks (pointer, clicks, scrolling, page addresses with a screenshot each, masked key presses, timing, screen size, settings), that nothing is recorded on interstitial screens, that data stays on the machine under a participant code, and that the moderator may record with their own equipment. Unfoveated, like every non-task phase.
+- **Participant code.** If the link carries `participant_id`, the screen shows it read-only and it wins. Otherwise the screen requires one (same rule as `participant_id`: 1–128 of `A–Z a–z 0–9 . _ -`). This lets one link serve a walk-up queue with a distinct code per participant.
+- **Agree** navigates to the sentinel `https://consent.study.scrutinizer.invalid/?participant=<code>`; **decline** to `https://decline.study.scrutinizer.invalid/`. main.js acts on them only in `phase: 'consent'` and only when the bundled interstitial is the navigating page.
+- **No consent, no record.** `writeSessionSummary` writes nothing for a session without a consent record. That covers a decline, Done or End Study Session during consent (both exit directly), a replacing link, and a quit. Begin also refuses without consent, so capture cannot start.
+- **Consent record.** The capture envelope gains an optional `consent` block: `{ textVersion, consentedAt, participantIdSource: 'link' | 'consent_screen' }`. `textVersion` (`scrutinizer-consent/1`) names the exact wording shown. A unit test pins a digest of the wording to its version, so editing the copy without bumping the version fails CI. Envelopes captured before 2026-09-30 have no `consent` key and stay valid.
+- **Debrief.** The `complete` state shows what was tested, what the software did, the participant code, and, in small print for the moderator, the saved session folder name, so a withdrawal request can be honoured by deleting that folder.
+- **Paper forms still apply.** `docs/templates/consent.md` covers what the app cannot know: who runs the study, retention, recordings made with the moderator's own equipment, and signatures.
 
 ## Session summary artifact
 

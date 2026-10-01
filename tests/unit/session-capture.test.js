@@ -234,7 +234,7 @@ describe('superset of scrutinizer-session-summary/1', () => {
     it('adds exactly the capture blocks on top of the summary keys', () => {
         const envelope = buildEnvelope(validInput());
         const added = Object.keys(envelope).filter(key => SUMMARY_KEYS.indexOf(key) === -1);
-        expect(added.sort()).toEqual(['capture', 'coordinates', 'extendsSchema', 'pageVisits']);
+        expect(added.sort()).toEqual(['capture', 'consent', 'coordinates', 'extendsSchema', 'pageVisits']);
     });
 
     it('every task carries the summary task keys, plus events', () => {

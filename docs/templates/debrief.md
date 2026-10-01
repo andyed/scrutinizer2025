@@ -28,12 +28,18 @@ loses detail and color too. Constraining the screen this way makes visible
 which parts of a design carry information at a glance and which vanish
 into clutter.
 
-Two things it did **not** do:
+It did **not** track your eyes. There is no camera involved, and the pointer
+is not a measurement of where you looked.
 
-- It did not track your eyes. There is no camera involved, and the pointer
-  is not a measurement of where you looked.
-- It did not record you. Scrutinizer stores no session data. [If the session
-  was recorded, restate here what was recorded, per the consent form.]
+It **did** record your mouse movement, clicks, scrolling, the pages you
+visited with a screenshot of each, key presses (inside text boxes, only that a
+key was pressed), and task timing, saved on this computer under your
+participant ID. [If you also recorded notes, video, or audio, restate them
+here, per the consent form.]
+
+> Scrutinizer shows its own short debrief after the last task, including the
+> participant code and the name of the saved session folder. Read this fuller
+> version aloud or hand it over as well.
 
 ## Your data
 

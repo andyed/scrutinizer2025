@@ -130,7 +130,7 @@ test -d docs/templates && ls docs/templates
 ```
 **Done when:** consent + debrief screens gate a session, and the referenced template files exist.
 
-- [ ] P3-5 complete
+- [x] **P3-5 complete** — 2026-09-30. Consent and debrief are states of the study interstitial (`renderer/study-interstitial.html`), logic in `shared/study-consent.js`; spec in [`usability-study-multi-task-sessions.md` §Consent and debrief](../specs/usability-study-multi-task-sessions.md). Every session link opens on consent; the participant code comes from the link or is typed there; nothing is captured or written without agreement; the envelope carries a versioned `consent` record. Templates corrected: they claimed Scrutinizer stores no session data, untrue since the 2026-07-26 write path. Verified by driving the Electron app over CDP through agree (2 tasks, valid envelope), decline, and quit-on-consent (nothing written). Not built: a demographic survey (the human-subjects spec lists one) and in-app deletion on withdrawal (the debrief names the folder instead).
 
 ---
 

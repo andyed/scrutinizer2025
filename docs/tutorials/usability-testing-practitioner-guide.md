@@ -140,10 +140,15 @@ Build session links in the [Study Link Builder](https://scrutinizer.app/study-li
 
 What the participant experiences:
 
-1. The link opens an **interstitial screen**: "Task 1 of N", the full task instructions at readable size, the task page's origin, and a **Begin** button. Foveation is off on this screen so instructions are read unimpeded. This pause is the moderator's moment to reset site state or answer questions.
+0. The link opens a **consent screen**: what Scrutinizer records during tasks, that data stays on this computer under a participant code, that you may record with your own equipment, and that they can stop at any time. If the link has no `participant_id`, the screen asks for one: type the code you assign (P01, P02, …), so one link can serve a whole walk-up queue. **Agree and continue** moves to task 1. **I don't want to take part** shows "Nothing was recorded" and writes nothing; press Done to return to browsing. Nothing is captured before agreement. The screen does not replace your paper consent form ([template](../templates/consent.md)), which covers who you are, retention, your own recordings, and signatures.
+1. Next comes an **interstitial screen**: "Task 1 of N", the full task instructions at readable size, the task page's origin, and a **Begin** button. Foveation is off on this screen so instructions are read unimpeded. This pause is the moderator's moment to reset site state or answer questions.
 2. **Begin** applies the task's condition, resets Visual Memory, and loads the task page. The toolbar shows "Task 1 of N" with the instruction.
 3. **Done** ends the task and shows the next interstitial. Timing is recorded automatically.
-4. After the final task, a completion screen appears ("Session complete"), still unfoveated. Pressing **Done** on it restores the participant's normal settings and returns to ordinary browsing.
+4. After the final task, a **debrief screen** appears, still unfoveated: what was tested, what the software did, the participant code, and, in small print for you, the name of the saved session folder. Pressing **Done** on it restores the participant's normal settings and returns to ordinary browsing.
+
+If a participant withdraws and asks for their data to be deleted, delete the folder the debrief names from `~/Library/Application Support/scrutinizer-electron/study-sessions/` (macOS). Delete their entries from any recordings you made yourself as well.
+
+**Your own video or audio.** Scrutinizer does not record video or audio. If you record the session yourself (screen recorder, camera, think-aloud audio), the session folder can be lined up with your footage afterwards: every timestamp in `envelope.json` is wall-clock time, and each matches a visible screen change. The cleanest anchor is the moment the participant agrees on the consent screen (`consent.consentedAt`): the screen switches to the task 1 interstitial within tens of milliseconds. Keep your recorder's clock synced to network time, and start recording before the participant reaches the consent screen.
 
 Semantics to know when moderating:
 
@@ -153,7 +158,7 @@ Semantics to know when moderating:
 
 ### The session summary
 
-Every session — completed, ended early, replaced, or interrupted by quitting — writes a local JSON summary to the app's data directory (`~/Library/Application Support/scrutinizer-electron/study-sessions/` on macOS), named `<session_id>-<start time>-summary.json`. It records the session and participant IDs, the condition defaults, and per task: start/end timestamps, duration, outcome, final URL, and the resolved settings. This gives you time-on-task per task with no manual timing.
+Every session the participant consented to — completed, ended early, replaced, or interrupted by quitting — writes a local JSON summary to the app's data directory (`~/Library/Application Support/scrutinizer-electron/study-sessions/` on macOS), named `<session_id>-<start time>-summary.json`. It records the session and participant IDs, the condition defaults, and per task: start/end timestamps, duration, outcome, final URL, and the resolved settings. This gives you time-on-task per task with no manual timing.
 
 Treat the file as potentially sensitive: `finalUrl` reflects wherever the participant actually navigated and can contain query strings. Keep summaries with the study's other data under its data-handling plan, and use anonymous codes for `participant_id` — never names.
 

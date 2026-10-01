@@ -64,6 +64,14 @@ const CAPTURE_HEALTH_STATUSES = [
     'idle', 'awaiting_first_row', 'recording', 'stopped', 'empty', 'failed'
 ];
 
+/**
+ * Where a consent record's participant code came from. Mirrors
+ * PARTICIPANT_ID_SOURCES in shared/study-consent.js — keep in sync (pinned by
+ * a unit test). Not imported: this module is vendored into the moderator app
+ * without study-consent.js.
+ */
+const CONSENT_PARTICIPANT_SOURCES = ['link', 'consent_screen'];
+
 const SAFE_NAME = /[^A-Za-z0-9._-]+/g;
 
 function finite(value) {
@@ -274,6 +282,21 @@ function normalizeCapture(capture) {
 }
 
 /**
+ * Consent record from the in-app consent screen (P3-5), or null. Field values
+ * pass through unchanged so validateEnvelope can reject a malformed record
+ * rather than have it silently repaired here.
+ */
+function normalizeConsent(consent) {
+    if (!isPlainObject(consent)) return null;
+    return {
+        textVersion: consent.textVersion !== undefined ? consent.textVersion : null,
+        consentedAt: consent.consentedAt !== undefined ? consent.consentedAt : null,
+        participantIdSource: consent.participantIdSource !== undefined
+            ? consent.participantIdSource : null
+    };
+}
+
+/**
  * Build a `scrutinizer-session-capture/1` envelope.
  *
  * @param {Object} input
@@ -289,6 +312,7 @@ function normalizeCapture(capture) {
  * @param {Object} [input.capture] - Capture block, e.g. from eventCapture.captureMeta()
  * @param {Object} [input.coordinates] - Overrides for the derived coordinate contract
  * @param {Object[]} [input.pageVisits] - Stimulus anchor index
+ * @param {Object} [input.consent] - {textVersion, consentedAt, participantIdSource}
  * @returns {Object} envelope
  */
 function buildEnvelope(input = {}) {
@@ -317,7 +341,8 @@ function buildEnvelope(input = {}) {
         extendsSchema: SUMMARY_SCHEMA,
         capture,
         coordinates,
-        pageVisits
+        pageVisits,
+        consent: normalizeConsent(input.consent)
     };
 }
 
@@ -529,6 +554,27 @@ function validateEnvelope(envelope) {
         });
     }
 
+    // --- consent -------------------------------------------------------------
+    // Optional: sessions captured before the consent screen shipped have no
+    // consent key, and must stay admissible. A present record must be whole.
+    if (envelope.consent !== null && envelope.consent !== undefined) {
+        const consent = envelope.consent;
+        if (!isPlainObject(consent)) {
+            push('consent: expected an object or null');
+        } else {
+            if (!nonEmptyString(consent.textVersion)) {
+                push('consent.textVersion: required — which consent wording was shown');
+            }
+            if (!nonEmptyString(consent.consentedAt) || isNaN(Date.parse(consent.consentedAt))) {
+                push('consent.consentedAt: required ISO 8601 timestamp');
+            }
+            if (CONSENT_PARTICIPANT_SOURCES.indexOf(consent.participantIdSource) === -1) {
+                push(`consent.participantIdSource: expected one of ` +
+                    `${CONSENT_PARTICIPANT_SOURCES.join('|')}`);
+            }
+        }
+    }
+
     return { ok: errors.length === 0, errors };
 }
 
@@ -550,5 +596,6 @@ module.exports = {
     TASK_EVENT_TYPES,
     TASK_OUTCOMES,
     CAPTURE_HEALTH_STATUSES,
+    CONSENT_PARTICIPANT_SOURCES,
     ENVELOPE_BASENAME
 };

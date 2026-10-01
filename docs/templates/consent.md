@@ -6,6 +6,13 @@
 > policy, their requirements take precedence. Pair with
 > [debrief.md](debrief.md) and the
 > [Usability-Testing Practitioner Guide](../tutorials/usability-testing-practitioner-guide.md).
+>
+> **In-app consent.** Every multi-task session link opens on a consent screen
+> inside Scrutinizer (wording version `scrutinizer-consent/1`). It covers what
+> the app records and collects the participant code. Nothing is captured or
+> written until the participant agrees. This form covers what the app cannot
+> know: who is running the study, how long data is kept, any recording you make
+> with your own equipment, and signatures.
 
 ---
 
@@ -34,19 +41,31 @@ not know where you are looking — only where the pointer is.
 
 ## What we will record
 
-*(Researcher: check all that apply and delete the rest.)*
+**Scrutinizer records, during the tasks only:**
+
+- Mouse movement, clicks, scrolling, and actions like copy and paste, with
+  timestamps.
+- The address of each page you visit, and a screenshot of it. A screenshot
+  shows everything on the page, including anything you typed there.
+- Key presses. Inside a text box it records only that a key was pressed,
+  never which key or what you typed. Outside text boxes it records which key.
+- How long each task takes, the screen size, and the tool's settings.
+
+It saves this on this computer under your participant ID and uploads nothing.
+
+**The moderator will also record** *(researcher: check all that apply and
+delete the rest)*:
 
 - [ ] Handwritten / typed notes by the moderator
 - [ ] Screen recording of the task window
+- [ ] Video of the session (camera)
 - [ ] Audio recording of the conversation
-- [ ] Task timing and completion notes
 - [ ] [other — specify]
 
 Everything recorded is labeled with your participant ID, not your name.
-Nothing is uploaded automatically: Scrutinizer itself stores no session data
-and sends nothing off this computer. Any recordings listed above are made
-with separate software, kept [where], retained for [duration], and accessible
-to [who].
+Recordings listed above are made with the moderator's own equipment, kept
+[where], retained for [duration], and accessible to [who]. The Scrutinizer
+session data is kept [where], retained for [duration], and accessible to [who].
 
 ## Risks and comfort
 
