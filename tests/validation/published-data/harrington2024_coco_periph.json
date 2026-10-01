@@ -1,5 +1,5 @@
 {
-  "source": "Harrington, C., Pepe, A., Ling, S., & Rosenholtz, R. (2024). COCO-Periph: Bridging the gap between human and machine perception with a peripheral vision benchmark. ICLR 2024.",
+  "source": "Harrington, A., DuTell, V., Hamilton, M., Tewari, A., Stent, S., Freeman, W. T., & Rosenholtz, R. (2024). COCO-Periph: Bridging the gap between human and machine perception in the periphery. ICLR 2024.",
   "license": "MIT",
   "url": "https://data.csail.mit.edu/coco_periph/",
   "note": "TTM-transformed COCO images at 4 eccentricities (5°, 10°, 15°, 20°). Includes human psychophysics data for object recognition at each eccentricity. Uses Rosenholtz Texture Tiling Model for peripheral encoding.",

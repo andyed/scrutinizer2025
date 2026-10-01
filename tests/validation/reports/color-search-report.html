@@ -238,8 +238,8 @@
 <div class="intro">
   <strong>What this tests:</strong> Scrutinizer's chromatic pooling model predicts that color information
   decays faster than luminance in peripheral vision, with red-green (RG) channels collapsing ~5&times;
-  faster than blue-yellow (BY). These predictions derive from castleCSF parameters (Bowers et al. 2025)
-  applied to Oklab perceptual color space. We validate by rendering colored dot arrays through
+  faster than blue-yellow (BY). These predictions use the castleCSF per-channel decay model (Ashraf et al. 2024),
+  with decay rates calibrated to Bowers et al. (2025), applied to Oklab perceptual color space. We validate by rendering colored dot arrays through
   Scrutinizer's filter, measuring chroma retention at each eccentricity ring, and comparing
   the RG/BY decay ratio against published psychophysical data from Mullen &amp; Kingdom (2002),
   Bowers (2025), and Hansen et al. (2009).
