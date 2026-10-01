@@ -21,9 +21,11 @@ Exit: v2.8.1 release notes updated; release itself gated on Wave 1 verification.
 
 ## Wave 1 — Verify the delivery path, build the study kit, run the pilot (1–2 days)
 
-- [ ] **Signed/notarized DMG handoff verification** — Safari + Chrome, cold + warm
-      launch, Browse-toolbar-flash criterion. The release gate; nothing
-      study-shaped happens until this passes.
+- [x] **Signed/notarized DMG** — exists (confirmed by Andy 2026-09-30). The
+      Safari + Chrome, cold + warm launch, Browse-toolbar-flash results are not
+      recorded here.
+- [x] In-app consent + debrief screens (P3-5) — DONE 2026-09-30. Unblocks
+      walk-up sessions, so a playtest queue can be the pilot.
 - [x] `docs/templates/consent.md` + `debrief.md` (P3-5 partial; referenced by
       `human_subjects_data_collection.md`) — DONE 2026-07-16
 - [x] Study Link builder page on scrutinizer-www (`src/study-link-builder.html`;
