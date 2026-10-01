@@ -31,7 +31,13 @@ const FRAG_PATH = path.join(REPO_ROOT, 'renderer/shaders/peripheral.frag');
 // pooled_stat_path.file_blob_sha pin in arm-0-config.json was refreshed -> the config's own hash
 // moved. sampleDoGReconstructed still lives at the pinned line 283; Arm-0 mode-16 pipeline and all
 // knobs are byte-unchanged.
-const EXPECTED_HASH_PREFIX = '15d837133857';
+// Refreshed 2026-10-01 (docs/comment fact pass): comment-only edits in peripheral.frag (citation
+// fixes: FOVI author order, Pointer 1996, Jiang/Shooner/Mullen, detection-threshold wording) and
+// label/citation-metadata edits in modes.json (mode 0/1 labels, rod-vision claims) moved both blob
+// SHAs -> both pins in arm-0-config.json refreshed -> the config's own hash moved. Mode 16's
+// pipeline knobs are unchanged (only its `citations` metadata changed); sampleDoGReconstructed
+// still lives at the pinned line 283; validate() and validateLive() pass.
+const EXPECTED_HASH_PREFIX = 'ee091be67707';
 
 describe('Mind2Web Arm-0 config hash', () => {
     let cfg;

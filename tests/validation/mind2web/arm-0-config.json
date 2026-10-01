@@ -55,13 +55,13 @@
     "function": "sampleDoGReconstructed",
     "signature_prefix": "vec4 sampleDoGReconstructed(",
     "line": 283,
-    "file_blob_sha": "51414a41c4ee571c4b8fe906bfc742666c9cdd60",
+    "file_blob_sha": "757df687fc3bd26387b3c146b3ba367bf7bc7678",
     "note": "DoG-reconstructed sampling path. Not the MIP fallback (sampleMIPPooled at line 628). file_blob_sha is the git blob SHA (git hash-object) — any edit to the file invalidates it. signature_prefix is grepped from the live file at the pinned line to catch function renames and signature changes. Step 3 wires the capability-detect branch to throw if MIP fallback is silently substituted at runtime."
   },
 
   "modes_json_drift_pin": {
     "file": "shared/modes.json",
-    "file_blob_sha": "5e518bab22b46fc948868921180cb0922faab84d",
+    "file_blob_sha": "23e77f03e8efe20bbe28203843840b2c8caf1f06",
     "note": "Blob SHA of shared/modes.json at freeze. validateLive() re-reads the file and compares. Catches the mode-15-style silent drift where pipeline knobs are edited without updating the Arm-0 snapshot. Refreshed 2026-07-11 (P0-3): the only change since the prior pin (e2d9108…) was mode 17 METADATA — emptied a phantom `tests` array and reworded `architectural_purpose`; no pipeline knob and nothing in mode 16 / the mind2web Arm-0 path changed."
   },
 
