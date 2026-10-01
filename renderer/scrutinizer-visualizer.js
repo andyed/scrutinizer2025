@@ -241,7 +241,7 @@ class ScrutinizerVisualizer {
                     
                     float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
                     
-                    // Contrast boost (Magnocellular pathway)
+                    // Contrast boost
                     float contrast = 1.0 + (0.3 * u_intensity);
                     float boostedGray = (gray - 0.5) * contrast + 0.5;
                     boostedGray = clamp(boostedGray, 0.0, 1.0);

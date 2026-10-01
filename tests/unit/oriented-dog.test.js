@@ -3,13 +3,13 @@
  *
  * Tests the mathematical model (cutoff boost, energy decomposition, radial-tangential
  * anisotropy, eccentricity fade) — not the GPU shader. Mirrors the formulas in
- * peripheral.frag lines 174–338.
+ * sampleDoGReconstructed() in peripheral.frag.
  *
  * Validated against:
  *   Phase 1: Appelle 1972 (oblique effect — 30-50% cardinal acuity advantage)
  *   Phase 2: Hubel & Wiesel 1962 (V1 simple cell 4-channel orientation tuning)
  *   Phase 3: Toet & Levi 1992 (radial-tangential crowding asymmetry)
- *   Phase 4: Berkley et al. 1975, Essock 1990 (eccentricity-dependent fade)
+ *   Phase 4: Berkley et al. 1975, Pointer 1996 (eccentricity-dependent fade)
  */
 
 'use strict';
@@ -338,7 +338,7 @@ describe('Phase 3: Radial-tangential anisotropy (Toet & Levi 1992)', function ()
 
 // ─── Phase 4: Eccentricity-Dependent Fade ───────────────────────────────────
 
-describe('Phase 4: Eccentricity fade (Berkley 1975, Essock 1990)', function () {
+describe('Phase 4: Eccentricity fade (Berkley 1975, Pointer 1996)', function () {
 
     it('fine bands lose cardinal advantage by ~10° (Berkley et al. 1975)', function () {
         // Claim: Band 0 (finest, >4 cpd) fades to zero between 3° and 10°.
@@ -351,9 +351,9 @@ describe('Phase 4: Eccentricity fade (Berkley 1975, Essock 1990)', function () {
         assertClose(fade_10deg, 0.0, 0.01, 'band 0 at 10° (end)');
     });
 
-    it('coarse bands retain cardinal advantage to 25°+ (Essock 1990)', function () {
+    it('coarse bands retain cardinal advantage to 25°+ (Pointer 1996)', function () {
         // Claim: Band 7 (coarsest, <0.5 cpd) fades from 8° to 25°.
-        // Basis: Essock (1990) — oblique effect persists for coarse gratings.
+        // Basis: Pointer (1996) found a global oblique effect at low-to-medium SFs to at least 40°.
         const fade_8deg = eccFade(7, 8.0);
         const fade_25deg = eccFade(7, 25.0);
         const fade_15deg = eccFade(7, 15.0);
@@ -376,7 +376,7 @@ describe('Phase 4: Eccentricity fade (Berkley 1975, Essock 1990)', function () {
 
     it('coarse bands retain advantage at eccentricities where fine bands have lost it', function () {
         // Claim: At 12°, band 7 still has orient fade but band 0 does not.
-        // Basis: Frequency-dependent fade rates (Berkley 1975, Essock 1990).
+        // Basis: Frequency-dependent fade rates (Berkley 1975, Pointer 1996).
         const fine_12 = eccFade(0, 12.0);
         const coarse_12 = eccFade(7, 12.0);
         expect(fine_12).toBeLessThan(0.1);   // band 0: gone by 10°
@@ -417,7 +417,7 @@ describe('Oriented DoG parameter sanity (modes.json)', function () {
         expect(biological.dog_radial_bias).toBeGreaterThan(0);
     });
 
-    it('highkey has radial_bias = 0 (Phase 3 off for default mode)', function () {
+    it('highkey has radial_bias = 0 (Phase 3 off for High-Key)', function () {
         expect(highkey.dog_radial_bias).toBe(0);
     });
 });

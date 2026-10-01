@@ -29,7 +29,7 @@ const sharpness = parseFloat(getArg('sharpness', '0.0'));
 const useCMF = hasFlag('cmf');
 const jsonOutput = hasFlag('json');
 
-// CMF defaults (Blauch, Konkle & Alvarez 2026)
+// CMF defaults (Blauch, Alvarez & Konkle 2026)
 const CMF_A = parseFloat(getArg('cmf-a', '2.78'));
 const ECC_SCALING = parseFloat(getArg('ecc-scaling', '0.75'));
 const FOVEA_DEG = 2.0;

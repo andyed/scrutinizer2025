@@ -23,8 +23,8 @@ TEMPLATE_HTML = REPO_ROOT / "scripts/mind2web-replay-template.html"
 
 # Mode-id → (short name, descriptor) for the UI dropdown.
 MODE_INFO = {
-    0:  ("High-Key",       "default — peripheral bandwidth filtering, rod-like desat"),
-    1:  ("Biological",     "Purkinje shift, luminance-driven, V1 rod simulation"),
+    0:  ("High-Key",       "peripheral bandwidth filtering, eccentricity-dependent desat"),
+    1:  ("Biological",     "stylized Purkinje-shift darkening of peripheral reds"),
     4:  ("Minecraft",      "blocks sized to CMF MIP at each eccentricity"),
     6:  ("Log-Polar MIP",  "explicit cortical magnification (Blauch et al. 2026)"),
     14: ("Pyramid Mongrel","Laplacian pyramid metamer (silently → High-Key)"),

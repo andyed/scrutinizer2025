@@ -9,6 +9,7 @@
  *   analyze_url    — Score a single URL
  *   analyze_urls   — Score multiple URLs with summary
  *   compare_pages  — Side-by-side comparison of two URLs
+ *   capture_vision — Screenshot with the Scrutinizer peripheral effect applied
  *
  * Setup:
  *   claude mcp add scrutinizer-audit -- node cli/mcp/server.js
@@ -95,7 +96,7 @@ const TOOLS = [
     },
     {
         name: 'capture_vision',
-        description: 'Take a screenshot of a web page WITH the Scrutinizer visual effect (foveal blur, color degradation, etc) applied at a specific fixation point. Returns a base64 PNG image block. Use this when the user wants to SEE what a page looks like to someone with visual impairments.',
+        description: 'Take a screenshot of a web page WITH the Scrutinizer visual effect (peripheral blur, color degradation, etc) applied at a specific fixation point. Returns a base64 PNG image block. Use this when the user wants to SEE a simulation of how the page looks in peripheral vision from that fixation point.',
         inputSchema: {
             type: 'object',
             properties: {
@@ -113,7 +114,7 @@ const TOOLS = [
                 },
                 mode: {
                     type: 'string',
-                    description: 'Aesthetic mode ID (0=Default, 1=Red/Cyan, etc). Default is 0.'
+                    description: 'Aesthetic mode ID (0=High-Key Ghosting, 1=Biological/Purkinje, 12=FOVI Cortical Grid; see shared/modes.json). Default for this tool is 0.'
                 },
                 radius: {
                     type: 'number',

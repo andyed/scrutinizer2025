@@ -5,14 +5,15 @@
  * on search engine result pages. 2,776 trials, 47 participants, Gazepoint
  * GP3 HD eye tracker (150 Hz) + mouse tracking.
  *
- * Key challenge: fixation data is in PAGE-SPACE pixels (absolute document
- * coordinates that grow with scroll), while mouse data is in SCREEN-SPACE
- * pixels (fixed viewport). Scroll events in the mouse CSV provide the
- * offset needed to reconcile the two coordinate systems.
+ * Key challenge: fixation and mouse data are both in PAGE-SPACE pixels
+ * (absolute document coordinates that grow with scroll). Mouse data are
+ * evtrack pageX/pageY in window-sized coordinates and are rescaled to screen
+ * coordinates. Scroll events in the mouse CSV provide the offset that converts
+ * both to viewport-relative coordinates.
  *
  * Data files per trial (keyed by ID like "p004-b1-t1"):
  *   fixation-data/{id}.csv    — timestamp,FPOGX,FPOGY,FPOGD (page-space px, ms)
- *   mouse-movement-data/{id}.csv — timestamp,xpos,ypos,event,xpath (screen-space px)
+ *   mouse-movement-data/{id}.csv — timestamp,xpos,ypos,event,xpath (page-space px, window-sized)
  *   trial-metadata/{id}.xml   — viewport dimensions, document size
  *   ad-boundary-data/{id}.json — ad bounding boxes (optional metadata)
  *

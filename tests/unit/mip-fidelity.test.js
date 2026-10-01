@@ -13,11 +13,13 @@
  * Metrics:
  *   1. Spectral selectivity — DoG has graded band weights; rect has a step function
  *   2. Low-freq preservation ratio — DoG preserves layout bands better than detail bands
- *   3. Perceptual fidelity — weighted by peripheral CSF (Brown et al. 2023)
+ *   3. Perceptual fidelity — weighted by an assumed peripheral importance profile
+ *      (PERIPHERAL_CSF below: hand-set, low bands weighted higher)
  *   4. Transition smoothness — DoG bands roll off gradually; rect has a hard cutoff
  *
- * Validated against: Brown, Blauch, Konkle & Alvarez (2023) — texture synthesis
- * metamers require frequency-selective pooling for perceptual equivalence.
+ * Background: Brown, DuTell, Walter, Rosenholtz, Shirley, McGuire & Luebke (2023),
+ * ACM TAP, doi:10.1145/3564605, pool texture statistics per pyramid scale. This
+ * test compares band-weight profiles only; it does not compare against their metamers.
  */
 
 'use strict';

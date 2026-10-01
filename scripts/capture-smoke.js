@@ -2,7 +2,7 @@
 /**
  * Smoke Test Capture
  *
- * Quick pipeline sanity check — 6 shots across 3 Electron batches.
+ * Quick pipeline sanity check — 12 shots across 5 Electron batches.
  * Uses local file:// reference pages (no network dependency).
  * Output in tests/smoke-captures/ (gitignored).
  *

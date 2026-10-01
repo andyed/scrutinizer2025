@@ -3,10 +3,10 @@
     "modes": {
         "highkey": {
             "id": 0,
-            "label": "High-Key Ghosting (Default)",
+            "label": "High-Key Ghosting",
             "shortLabel": "High-Key",
             "category": "research",
-            "description": "Simulates peripheral bandwidth filtering with rod-like desaturation, Eigengrau tinting, and chromatic aberration. The default mode for usability research.",
+            "description": "Simulates peripheral bandwidth filtering with eccentricity-dependent desaturation, Eigengrau tinting, and chromatic aberration. Usability-oriented: peripheral reds turn grey and stay visible.",
             "pipeline": {
                 "lgn_use_structure_mask": true,
                 "lgn_use_saliency_gate": true,
@@ -44,7 +44,7 @@
             ],
             "citations": {
                 "technique": "Oklab desaturation (Ottosson, 2020)",
-                "biological_basis": "Rod-dominated peripheral vision, Eigengrau tint"
+                "biological_basis": "Peripheral loss of chromatic sensitivity; the Eigengrau tint is stylistic"
             }
         },
         "biological": {
@@ -52,7 +52,7 @@
             "label": "Biological (Purkinje Darkening)",
             "shortLabel": "Purkinje",
             "category": "research",
-            "description": "Rigorous simulation of rod vision: red objects fade to black shadows (Purkinje shift), luminance drops significantly. More accurate but less usable.",
+            "description": "Stylized Purkinje-shift darkening: red objects fade toward black in the far periphery and peripheral luminance drops. The Purkinje shift occurs at low (scotopic/mesopic) light levels; at normal screen luminance peripheral vision is cone-mediated. Less usable than High-Key.",
             "pipeline": {
                 "lgn_use_structure_mask": true,
                 "lgn_use_saliency_gate": true,
@@ -89,7 +89,7 @@
             ],
             "citations": {
                 "technique": "Purkinje shift simulation",
-                "biological_basis": "Rod spectral sensitivity peaks at 505nm (cyan)"
+                "biological_basis": "Scotopic (rod) luminous efficiency peaks near 507 nm (blue-green)"
             }
         },
         "frosted": {
@@ -238,7 +238,7 @@
             "label": "Log-Polar MIP — Color Only (Blauch 2026)",
             "shortLabel": "Log-Polar",
             "category": "research",
-            "description": "Cortical magnification from Blauch, Konkle & Alvarez (2026): mipLevel = maxMip × [ln(r+a) - ln(a)] / [ln(r_max+a) - ln(a)]. a=2.78°, r_max derived from screen geometry. Spatial resolution falloff only — no DoG bands, no crowding distortion. Gaussian color decay is Scrutinizer's own addition.",
+            "description": "Cortical magnification from Blauch, Alvarez & Konkle (2026): mipLevel = maxMip × [ln(r+a) - ln(a)] / [ln(r_max+a) - ln(a)]. a=2.78°, r_max derived from screen geometry. Spatial resolution falloff only — no DoG bands, no crowding distortion. Gaussian color decay is Scrutinizer's own addition.",
             "pipeline": {
                 "lgn_use_structure_mask": false,
                 "lgn_use_saliency_gate": false,
@@ -573,7 +573,7 @@
             "architectural_purpose": "Baseline arm for DOM-aware perception path. Preserves current-generation peripheral rendering for 2IFC comparison against the new path. Expected to be byte-identical to mode 0 until intentional divergence.",
             "citations": {
                 "technique": "Clone of High-Key (Ottosson 2020 Oklab desaturation)",
-                "biological_basis": "Rod-dominated peripheral vision, Eigengrau tint"
+                "biological_basis": "Peripheral loss of chromatic sensitivity; the Eigengrau tint is stylistic"
             }
         },
         "structural_chrome_suppression": {

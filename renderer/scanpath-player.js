@@ -7,7 +7,10 @@
  *
  * Saccade trajectories use the minimum-jerk profile (Flash & Hogan 1985):
  *   s(t) = 10t³ - 15t⁴ + 6t⁵
- * This produces a bell-shaped velocity profile matching biological saccades.
+ * This produces a symmetric bell-shaped velocity profile, an approximation of
+ * saccade kinematics. Real saccade velocity profiles skew (deceleration longer
+ * than acceleration) as duration grows with amplitude (Van Opstal & Van
+ * Gisbergen 1987, Vision Res 27:731).
  *
  * Saccade duration follows the main sequence (Bahill et al. 1975):
  *   duration_ms = 2.2 × amplitude_deg + 21

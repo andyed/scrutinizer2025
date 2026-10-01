@@ -30,7 +30,7 @@ RENDERS_DIR = CARD_DIR / "renders"
 
 # Mode-id → human name. Use names not numbers in the output.
 MODE_NAMES = {
-    0:  "High-Key (default)",
+    0:  "High-Key",
     1:  "Biological",
     2:  "Frosted",
     3:  "Blueprint",

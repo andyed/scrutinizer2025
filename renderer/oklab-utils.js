@@ -11,8 +11,10 @@
  * 
  * Benefits for peripheral vision simulation:
  * - Perceptually uniform desaturation (no muddy artifacts)
- * - Separates Magno (L) and Parvo (a,b) pathways biologically
- * - Natural rod vision simulation
+ * - Separates lightness (L) from the red-green (a) and blue-yellow (b) opponent
+ *   axes, so luminance and chromatic decay can be set independently. This is a
+ *   color-space split; it does not map onto the magno/parvo pathways.
+ * - Desaturation toward grey is a single scale on a and b
  * 
  * License: Public Domain / MIT
  */

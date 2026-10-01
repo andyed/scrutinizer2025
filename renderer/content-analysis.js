@@ -1,5 +1,5 @@
 /**
- * ContentAnalysis — Pre-cortical feature extraction
+ * ContentAnalysis — content maps for the LGN-gating stage
  *
  * Orchestrates content analysis layers that feed the LGN gating stage:
  * structure map (Gestalt grouping), saliency map (visual attention),
@@ -9,9 +9,10 @@
  * The modes.json pipeline config (lgn_use_structure_mask, lgn_use_saliency_gate)
  * controls which analyzers are active per aesthetic mode.
  *
- * Biological analog: Pre-cortical feature extraction (retinal ganglion cells,
- * LGN magno/parvo pathways). Both biology and simulation solve the same problem:
- * selectively allocating limited processing bandwidth to high-value input.
+ * What it computes: structure and primitive maps from the DOM layout, plus
+ * saliency and congestion statistics from the captured pixels (Web Workers).
+ * These maps are inputs to the shader's LGN-gating stage. The module does not
+ * model retinal ganglion cells or the magno/parvo pathways.
  *
  * @module ContentAnalysis
  */

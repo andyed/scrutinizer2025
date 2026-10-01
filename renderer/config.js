@@ -88,7 +88,7 @@ const CONFIG = {
     lengthTuningMidpoint: 0.5,     // persistence value at half-max suppression. 0.5 = "edge
                                    // continues ~halfway through the probe window."
     lengthTuningSteepness: 8.0,    // sigmoid slope. CBM 2002 shoulder shape matches ~6-10.
-    lengthTuningProbeSteps: 8,     // K_STEPS — costs 2 texture reads per step. 8 = ±16 px at
+    lengthTuningProbeSteps: 8,     // K_STEPS — costs 8 texture reads per step (4 each side). 8 = ±16 px at
                                    // MIP 1 ≈ "very long" edge near the 45 px fovea.
 
     // Debug settings

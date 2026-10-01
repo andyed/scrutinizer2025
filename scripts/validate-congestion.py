@@ -37,9 +37,10 @@ MAP_DIR = OUTPUT_DIR / "python_maps"
 
 
 # ── Rosenholtz benchmark image download ──────────────────────────────────
-# The 25 benchmark scenes from Rosenholtz, Li & Nakano (2007).
-# These are the images used in the subjective clutter rating experiment
-# (Spearman r=0.83 between FC scalar and human judgments).
+# The 25 maps from the Feature Congestion CHI 2005 paper (Rosenholtz, Li,
+# Mansfield & Jin 2005), ranked for clutter by 20 observers
+# (Spearman rho=0.83 between FC scalar and mean human ranking).
+# Only the visual-clutter test image below is fetched automatically.
 #
 # Source: visual-clutter repo test images and MIT DSpace supplementary materials.
 # If these URLs become stale, the script skips gracefully and works with

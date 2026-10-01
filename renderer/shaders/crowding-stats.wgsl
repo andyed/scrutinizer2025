@@ -9,7 +9,7 @@
 // References:
 //   Rosenholtz et al. (2012) — mongrel summary statistics
 //   Walton et al. (2021) — efficient peripheral synthesis
-//   Blauch, Konkle & Alvarez (2026) — FOVI cortical magnification
+//   Blauch, Alvarez & Konkle (2026) — FOVI cortical magnification
 
 struct Config {
     width: u32,

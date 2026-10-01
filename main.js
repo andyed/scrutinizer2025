@@ -1719,7 +1719,7 @@ ipcMain.on('export:citation-screenshot', async (event, options = {}) => {
 
         const metadata = {
             // Nullish coalescing (??) preserves explicit 0 values for params where
-            // 0 is a valid user choice (mode 0 = High-Key Ghosting default,
+            // 0 is a valid user choice (mode 0 = High-Key Ghosting,
             // intensity 0 = no degradation, caStrength 0 = no chromatic aberration).
             // The v2.7.2 visualMemory bug taught us not to use || on mode-like ids.
             modeId: options.modeId ?? currentAestheticMode ?? 0,

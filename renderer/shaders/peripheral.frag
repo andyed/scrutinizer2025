@@ -113,9 +113,9 @@ uniform float u_reading_span;          // 0=strict circle, 1=asymmetric envelope
 uniform float u_reading_span_strength; // 0.7=comfort, 1.0=full Rayner asymmetry
 uniform float u_comfort_radius;       // Comfort mode dead zone (normalized screen units, 0=off)
 uniform float u_chromatic_pooling;  // 0.0=off (legacy uniform desat), 1.0=on
-uniform float u_rg_decay;           // RG (L-M) eccentricity decay k_e (default 0.072, Bowers et al. 2025 suprathreshold)
+uniform float u_rg_decay;           // RG (L-M) eccentricity decay k_e (default 0.072, fit to Bowers et al. 2025 detection thresholds)
 uniform float u_rg_freq_decay;      // RG frequency-dependent decay k_ef (default 0.003)
-uniform float u_yv_decay;           // YV S-(L+M) base decay k_e (default 0.014, Bowers et al. 2025 suprathreshold)
+uniform float u_yv_decay;           // YV S-(L+M) base decay k_e (default 0.014, fit to Bowers et al. 2025 detection thresholds)
 uniform float u_yv_freq_decay;      // YV frequency-dependent decay k_ef (default 0.008)
 uniform float u_supra_exponent;     // Threshold→appearance compression (default 0.5; 1.0=raw threshold)
 
@@ -219,7 +219,7 @@ float computeMipLevel(float eccentricity, float fovea_radius);
 // given UV. 1.0 = no suppression (short edge or flat); (1 - strength) = full
 // suppression (long edge with high persistence). Hoisted to a function so
 // the same probe can gate both orientBonus (DoG band reconstruction, modest
-// visual effect) AND V1 strength at processV4 line ~1053 (the actual driver
+// visual effect) AND V1 strength in processV1() (the actual driver
 // of the peripheral fringe pattern Andy was observing on photo borders).
 //
 // Probe span scales with local CMF MIP level (D2 in spec). Per-step samples
@@ -429,8 +429,9 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     }
 
     // Sample 13 MIP levels at half-octave spacing (LOD 0.0 to 6.0 in 0.5 steps)
-    // Half-integer LODs trigger hardware trilinear interpolation (2 bilinear reads + lerp),
-    // giving us the half-octave Gaussian we need. 13 samples = 21 bilinear lookups total.
+    // Half-integer LODs trigger hardware trilinear interpolation (2 bilinear reads + lerp).
+    // Hardware MIPs are box/bilinear filtered, so the trilinear read approximates a
+    // half-octave Gaussian. 13 samples = 19 bilinear lookups (7 integer + 6 x 2 half-integer).
     // MIP 5-6 textures are tiny (60×33, 30×16 for 1920×1080) — reads are cache-free.
     vec4 mip[13];
     mip[0]  = textureLod(u_texture, uv, 0.0);
@@ -475,7 +476,7 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     float e2 = max(dog_e2, 0.01);
     if (u_cmf_enabled > 0.5) {
         // CMF-derived: c_k = cmf_a × (exp(k×0.5×scale) − 1) / fovea_deg
-        // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
+        // Schwartz (1980), Blauch, Alvarez & Konkle (2026)
         float fovea_deg = 1.0;  // 1° foveal radius (2° diameter)
         float maxMipLevel = 6.0;
         float scale = u_cortical_max / maxMipLevel / (u_ecc_scaling / 0.75);
@@ -514,7 +515,8 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     //
     // Eccentricity fade: the oblique effect diminishes with retinal eccentricity.
     // Fine bands lose the cardinal advantage by ~10° (Berkley et al. 1975),
-    // coarse bands retain it to ~25° (Essock 1990). Rate depends on spatial frequency.
+    // coarse bands retain it further out (Pointer 1996: a global oblique effect at
+    // low-to-medium SFs to at least 40°). Rate depends on spatial frequency.
     // fovea_radius ≈ 1° foveal radius (2° diameter) → px_per_deg ≈ fovea_radius / 1.0
     float px_per_deg = max(fovea_radius / 1.0, 1.0);
     float visual_ecc_deg = visual_ecc / px_per_deg;
@@ -522,7 +524,7 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     for (int k = 0; k < 12; k++) {
         // Per-band eccentricity fade:
         //   Band 0 (finest, >4 cpd): fades 3°–10° (Berkley 1975: gone by 8–18°)
-        //   Band 11 (coarsest, <0.125 cpd): fades 8°–25° (Essock 1990: persists to 40°)
+        //   Band 11 (coarsest, <0.125 cpd): fades 8°–25° (Pointer 1996: persists to at least 40°)
         float fadeStart = mix(3.0, 8.0, float(k) / 11.0);
         float fadeEnd   = mix(10.0, 25.0, float(k) / 11.0);
         float eccFade   = 1.0 - smoothstep(fadeStart, fadeEnd, visual_ecc_deg);
@@ -708,7 +710,7 @@ float computeMipLevel(float eccentricity, float fovea_radius) {
     float maxMipLevel = 6.0;
     if (u_cmf_enabled > 0.5) {
         // Cortical distance: d(r) = log(1 + r/a), numerically stable form
-        // Schwartz (1980), Blauch, Konkle & Alvarez (2026)
+        // Schwartz (1980), Blauch, Alvarez & Konkle (2026)
         float r_deg = normalizedEcc * 2.0;
         float cortical_dist = log(1.0 + r_deg / u_cmf_a);
         // ecc_scaling modulates pooling zone growth rate (Brown et al. 2023).
@@ -933,7 +935,7 @@ struct BenderConfig {
     float octave2_scale;   // 2nd octave freq multiplier (2.0)
     float octave2_weight;  // 2nd octave amplitude (0.5)
     float amplitude;       // UV-space warp magnitude (0.0024)
-    vec2  bias;            // per-axis strength (vec2(2.0, 1.0) for horiz/radial bias)
+    vec2  bias;            // per-axis strength in screen x/y (vec2(2.0, 1.0) = 2:1 horizontal bias)
 };
 
 struct CutterConfig {
@@ -1113,8 +1115,9 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
 
     // V1 length-tuning: long structural edges get reduced V1 displacement so
     // peripheral fringe quiets. Externally gated on u_length_tuning_enabled so
-    // the ~32 texture reads inside computeLengthSuppress are entirely skipped
-    // for the 16+ modes that don't enable it (mode 17 is the only one that does).
+    // the up-to-68 texture reads inside computeLengthSuppress (4 center + 8 per
+    // step x K_STEPS=8) are entirely skipped for the 16+ modes that don't enable
+    // it (mode 17 is the only one that does).
     // The processV1 site's `uv` is already source-space (called from main with
     // the original uv, not the V1-distorted one), so the probe walks the right
     // signal. The helper internally uses `eccentricity` for CMF-scaled probe
@@ -1342,7 +1345,7 @@ V1_Signal processV1(vec2 uv, vec2 uv_corrected, LGN_Signal lgn, ModeConfig confi
             bc.octave2_scale = 2.0;
             bc.octave2_weight = 0.5;
             bc.amplitude = 0.0024;
-            bc.bias = vec2(2.0, 1.0);  // 2:1 radial bias (Toet & Levi 1992)
+            bc.bias = vec2(2.0, 1.0);  // 2:1 horizontal bias in screen x (fixed axis; does not follow the radial direction)
             vec2 fractalWarp = applyBender(uv_corrected, bc, strength, u_intensity);
 
             // === CUTTER: cell size tracks sector extent ===
@@ -1576,7 +1579,9 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
     float t = ecc.masterT; // local alias for downstream code that references t directly
     vec3 col = mix(foveaCol, pooledCol, ecc.blendFactor);
 
-    // === MAGNOCELLULAR PATHWAY: Luminance Contrast Preservation ===
+    // === LUMINANCE CONTRAST PRESERVATION ===
+    // Rescales pooled color toward the source luminance (engineering step; not a
+    // magnocellular-pathway model).
     if (eccentricity > 0.001) {
         vec3 cleanSample = sampleSource(uv).rgb;
         float cleanLuma = dot(cleanSample, vec3(0.299, 0.587, 0.114));
@@ -1845,14 +1850,14 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
 
             // Per-channel chromatic decay directly in Oklab — a and b channels
             // ARE the L-M and S-(L+M) opponent axes. No RGB decomposition needed.
-            // Suprathreshold ramps (Shooner, Jiang & Mullen 2022; Hansen et al. 2009):
+            // Suprathreshold ramps (Jiang, Shooner & Mullen 2022; Hansen et al. 2009):
             //   RG (a): foveal specialization, steep early onset → 97% in far periphery
             //   YV (b): NOT foveal-specific, slow onset → 90% in far periphery
             // Per-channel differential: red-green boundaries dissolve while
             // blue-yellow persists at the same eccentricity.
             float normEcc = max(0.0, dist - fovea_radius) / max(fovea_radius, 0.001);
             float ecc_deg = normEcc * 2.0;
-            // Phase 1: mid-periphery decay (Shooner/Hansen data)
+            // Phase 1: mid-periphery decay (Jiang et al./Hansen data)
             // Phase 2: far-periphery extension — additive, C2-continuous at junction
             float rgFade = smoothstep(1.0, 12.0, ecc_deg) * 0.7
                          + smoothstep(12.0, 50.0, ecc_deg) * 0.27;  // a: 97% max
@@ -2015,7 +2020,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         blended.z = mix(labCenter.z, neighborAvg.z, t * 0.25);  // b (YV)
 
         // Per-channel chromatic decay.
-        // Phase 1: mid-periphery (Shooner/Hansen data, tightened for desktop ecc range)
+        // Phase 1: mid-periphery (Jiang et al./Hansen data, tightened for desktop ecc range)
         // Phase 2: far-periphery extension — additive, C2-continuous at junction
         float normEcc = max(0.0, dist - fovea_radius) / max(fovea_radius, 0.001);
         float ecc_deg = normEcc * 2.0;
@@ -2085,7 +2090,7 @@ vec3 congestionHeatmap(float t) {
 }
 
 // Apply the shared RG/YV eccentricity decay in Oklab space. Same fade curves
-// as the baseline V4 path at ~line 1630 (Shooner/Jiang/Mullen 2022 suprathreshold;
+// as the V4 style-4 and style-8 paths (Jiang, Shooner & Mullen 2022 suprathreshold;
 // Hansen et al. 2009 scene-scale color survival):
 //   rgFade = smoothstep(1, 12, e)·0.7 + smoothstep(12, 50, e)·0.27
 //   yvFade = smoothstep(3, 20, e)·0.35 + smoothstep(20, 60, e)·0.55

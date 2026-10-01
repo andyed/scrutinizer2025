@@ -14,7 +14,7 @@ Source: /Users/andyed/Documents/dev/scrutinizer-repo/scrutinizer2025/tests/golde
 
 | Metric | Value | Interpretation |
 |--------|-------|----------------|
-| Oklab L variance ratio | 1.028 | Mode 10 preserves more luminance contrast |
+| Oklab L variance ratio | 1.028 | Mode 10 preserves more luminance variance |
 | Chrom variance ratio | 0.901 | Both modes pool color similarly |
 | Transition zone L ratio (3°) | 1.131 | Pooling path onset divergence (fovealRadius=2.37°, blendFactor≈0.33) |
 

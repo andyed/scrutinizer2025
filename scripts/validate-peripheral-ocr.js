@@ -481,7 +481,7 @@ async function main() {
     // RC-2.5: the PARAFOVEA (near-fovea transition) must not be totally destroyed —
     // degradation there should be graceful, not a cliff to zero. Scoped to the parafovea
     // on purpose: near/far-peripheral text being near-unreadable is biologically correct
-    // (humans cannot read at 10-30 deg eccentricity), so a floor out there would wrongly
+    // (humans cannot read typical-size text at 10-30 deg eccentricity), so a floor out there would wrongly
     // fail every faithful foveation model. (Calibrated 2026-06-06 against the first real
     // OCR curves — both mode 0 and mode 12 correctly read ~0% in the far periphery.)
     // The floor is 10%, NOT a precise parafoveal target: the parafovea is a noisy,

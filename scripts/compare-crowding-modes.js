@@ -516,13 +516,13 @@ function main() {
     console.log(`[${gradient0 ? 'PASS' : 'FAIL'}] H4a: Mode 0 crowding ratio decreases with eccentricity (monotonic gradient)`);
     console.log(`[${gradient10 ? 'PASS' : 'FAIL'}] H4b: Mode 10 crowding ratio decreases with eccentricity (monotonic gradient)`);
 
-    // H5: Oklab L variance ratio > 1.0 at ≥6° (metamer preserves luminance contrast)
+    // H5: Oklab L variance ratio > 1.0 at ≥6° (metamer preserves luminance variance)
     const periphPatch = patch28.filter(r => r.ecc_deg >= 6 && r.lumVarianceRatio !== null);
     const avgLumRatio = avg(periphPatch.map(r => r.lumVarianceRatio));
     const h5 = avgLumRatio !== null && avgLumRatio > 1.0;
     console.log(`[${h5 ? 'PASS' : 'FAIL'}] H5: Oklab L variance ratio > 1.0 at >=6° (avg=${fmt(avgLumRatio)})`);
     if (h5) {
-        console.log(`       → Compute mongrel preserves ${((avgLumRatio - 1.0) * 100).toFixed(1)}% more luminance contrast than MIP blur`);
+        console.log(`       → Compute mongrel has ${((avgLumRatio - 1.0) * 100).toFixed(1)}% more Oklab L variance than MIP blur`);
     }
 
     // H6: Chrominance variance ratio ≈ 1.0 (both modes pool color similarly)
@@ -595,7 +595,7 @@ function main() {
         '',
         `| Metric | Value | Interpretation |`,
         `|--------|-------|----------------|`,
-        `| Oklab L variance ratio | ${fmt(avgLumRatio)} | ${avgLumRatio > 1.0 ? 'Mode 10 preserves more luminance contrast' : avgLumRatio < 1.0 ? 'Mode 10 smooths more' : 'Similar'} |`,
+        `| Oklab L variance ratio | ${fmt(avgLumRatio)} | ${avgLumRatio > 1.0 ? 'Mode 10 preserves more luminance variance' : avgLumRatio < 1.0 ? 'Mode 10 smooths more' : 'Similar'} |`,
         `| Chrom variance ratio | ${fmt(avgChromRatio)} | ${avgChromRatio !== null && Math.abs(avgChromRatio - 1.0) < 0.25 ? 'Both modes pool color similarly' : 'Chrominance differs'} |`,
         `| Transition zone L ratio (3°) | ${fmt(avgFovLumRatio)} | Pooling path onset divergence (fovealRadius=2.37°, blendFactor≈0.33) |`,
         '',

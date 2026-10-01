@@ -1,6 +1,7 @@
 /**
  * Saliency Computation Worker with Center-Surround (DoG) & Face Detection
- * Implements Difference-of-Gaussians for biologically accurate saliency detection
+ * Implements Difference-of-Gaussians center-surround filtering (an approximation of
+ * retinal/LGN center-surround receptive fields) for saliency detection,
  * combined with a specific "Face Channel" using face-api.js (Tiny Face Detector).
  */
 
@@ -193,7 +194,8 @@ function generateStructureMasks(blocks, targetW, targetH, sourceW, sourceH, dpr)
 // ── V1 length-tuning / end-stopping (Hubel-Wiesel 1965, Cavanaugh-Bair-Movshon 2002)
 // ─────────────────────────────────────────────────────────────────────────────
 // Production hook for the algorithm whose shader reference implementation lives
-// at peripheral.frag:281-339. See docs/specs/length_tuned_edge_suppression.md D4.
+// in peripheral.frag (computeLengthSuppress() and the inline probe in
+// sampleDoGReconstructed()). See docs/specs/length_tuned_edge_suppression.md D4.
 //
 // Walks tangent over the SOURCE LUMINANCE (Oklab L of the captured frame at
 // saliency resolution), computes per-pixel persistence, and sigmoid-suppresses
@@ -202,9 +204,9 @@ function generateStructureMasks(blocks, targetW, targetH, sourceW, sourceH, dpr)
 // pyramid synth weight), giving the mechanism the visual reach P1's shader-
 // only orientBonus hook couldn't deliver.
 //
-// Cost: ~1ms once per saliency cycle at 256-512 px (vs 32 texture reads per
-// edge fragment per frame in the shader path). Pure JS, runs on this worker
-// thread off the main thread.
+// Cost: ~1ms once per saliency cycle at 256-512 px (vs 64 probe-loop texture
+// reads per edge fragment per frame in the shader path: 8 per step x K_STEPS=8).
+// Pure JS, runs on this worker thread off the main thread.
 function suppressLongEdges(saliency, sourceL, width, height, params) {
     const { K_STEPS, midpoint, steepness, strength } = params;
     // Gate threshold on luminance gradient at saliency-map resolution.
@@ -232,7 +234,7 @@ function suppressLongEdges(saliency, sourceL, width, height, params) {
         for (let x = 2; x < width - 2; x++) {
             const i = rowBase + x;
             // Center luminance gradient via 4-neighbour difference (matches
-            // the shader's gradient construction at peripheral.frag:244-250).
+            // the shader's gradient construction in computeLengthSuppress()).
             const gx = L[i + 1] - L[i - 1];
             const gy = L[i + width] - L[i - width];
             const g2 = gx * gx + gy * gy;
@@ -537,8 +539,8 @@ self.onmessage = async function (e) {
     }
 
     // PASS 4.5: V1 length-tuning / end-stopping suppression.
-    // Production hook for the algorithm whose shader reference lives at
-    // peripheral.frag:281-339. Walks tangent over source luminance (I),
+    // Production hook for the algorithm whose shader reference lives in
+    // peripheral.frag computeLengthSuppress(). Walks tangent over source luminance (I),
     // sigmoid-suppresses saliency for long-edge regions. See spec §D4.
     // Mutating saliency in place; re-derive maxVal in PASS 5's normalize.
     if (lengthTuning && lengthTuning.enabled) {

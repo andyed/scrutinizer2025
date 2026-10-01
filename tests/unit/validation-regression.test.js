@@ -23,17 +23,17 @@ const path = require('path');
 const modesPath = path.join(__dirname, '../../shared/modes.json');
 const modes = JSON.parse(fs.readFileSync(modesPath, 'utf8'));
 
-// Use highkey (the default mode) — the primary validation target
+// Use highkey (mode 0) — the primary validation target
 const mode0 = modes.modes['highkey'];
 const pipeline = mode0.pipeline;
 
-const RG_DECAY      = pipeline.rg_decay;         // 0.072
+const RG_DECAY      = pipeline.rg_decay;         // 0.085
 const RG_FREQ_DECAY = pipeline.rg_freq_decay;     // 0.003
 const YV_DECAY      = pipeline.yv_decay;           // 0.014
 const YV_FREQ_DECAY = pipeline.yv_freq_decay;      // 0.008
 const SUPRA         = pipeline.supra_exponent;     // 0.5
 
-const CROWDING_THRESHOLD = pipeline.crowding_density_threshold;  // 0.6
+const CROWDING_THRESHOLD = pipeline.crowding_density_threshold;  // 0.3
 const CROWDING_STEEPNESS = pipeline.crowding_density_steepness;  // 20.0
 
 // ─── Load published data ────────────────────────────────────────────────────
