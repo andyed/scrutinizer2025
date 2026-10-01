@@ -23,6 +23,35 @@ moment. No screen/video recording.
   `ScanpathData` (`renderer/scanpath/scanpath-types.js`). Capture is the write
   side of that format. **Do not invent a new schema.**
 
+### External recordings: join, don't record (decided 2026-09-30)
+
+Researchers will bring their own video and audio gear: a screen recorder, a
+camera on the participant, a think-aloud audio track. Scrutinizer does not
+record video or audio itself and does not try to. Its job is to make the
+session record **joinable** to that footage after the fact.
+
+What already supports a join: every envelope timestamp is wall-clock ISO 8601
+(`consent.consentedAt`, each task's `startedAt`/`endedAt`, `done` events), and
+each one coincides with a visible screen change that a screen recording or a
+camera aimed at the screen picks up (consent → task interstitial → task page →
+interstitial → debrief). Matching one transition in the footage gives the clock
+offset; matching two gives drift.
+
+Precision varies by anchor. Agreeing on the consent screen loads a bundled
+local file, so that transition follows `consentedAt` within tens of
+milliseconds (first paint 33 ms after `consentedAt`, one measurement on an
+Apple Silicon Mac, 2026-09-30). A task's `startedAt` precedes its page load by network latency.
+The screen change after Done follows capture finalization (screenshot + diff),
+which can take a second or more.
+
+Planned, not built:
+
+- **Sync slate.** A brief, high-contrast full-screen mark plus an optional
+  tone at session start and end, each stamped in the envelope, so alignment
+  does not depend on page-load timing and survives audio-only recordings.
+- **Workbench join.** Load an external video next to a session, mark one
+  anchor, and play the footage in lockstep with WB-3 replay.
+
 ## Session record layout
 
 One directory per session:
@@ -169,5 +198,6 @@ and must not be inferred from `outcome: 'done'`. Report layer follows **ISO
 
 ## Out of scope
 
-Video/screen recording, webcam gaze, cloud sinks, ExperimentRunner sequencing
-(P3-1), pipeline-snapshot fusion (P3-2 proper), BubbleView (P3-3).
+In-app video/screen/audio recording (external recordings are joined instead;
+see §External recordings), webcam gaze, cloud sinks, ExperimentRunner
+sequencing (P3-1), pipeline-snapshot fusion (P3-2 proper), BubbleView (P3-3).
