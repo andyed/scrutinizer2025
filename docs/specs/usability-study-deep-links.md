@@ -33,12 +33,12 @@ Scrutinizer can be configured manually for an RFV walkthrough, but that makes a 
 
 - The researcher must reproduce the correct URL, foveal radius, model, and behavioral settings.
 - Participants may see or edit browser controls instead of focusing on the task.
-- The task instruction lives outside Scrutinizer and can be lost after the task page opens.
+- The task instruction is outside Scrutinizer and can be lost after the task page opens.
 - Manual configuration makes sessions harder to reproduce across participants.
 
 A study link makes the task definition portable while keeping the stimulus inside the installed, calibrated Scrutinizer app.
 
-Strategically, this turns RFV from a reviewer-controlled visualization into a repeatable usability-testing intervention. Its scientifically motivated peripheral rendering is intended to approximate the information available to eye-movement planning outside fixation. The active loop is: modeled peripheral view → target selection → pointer movement as an emulated gaze shift → new foveal information and Visual Memory → next target selection. Detailed visual access is bound to the participant's pointer, so each movement reveals which region they choose to bring into functional focus. The participant and moderator share the same stimulus: the moderator can see what information was available before a move, what the participant revealed next, and where peripheral cues failed to guide the task. This is not a claim that pointer coordinates are physiological gaze; it is a controlled emulation of task-relevant visual access and fixation change.
+With study links, RFV moves from a reviewer-controlled visualization to a repeatable usability-testing intervention. Its scientifically motivated peripheral rendering is intended to approximate the information available to eye-movement planning outside fixation. The active loop is: modeled peripheral view → target selection → pointer movement as an emulated gaze shift → new foveal information and Visual Memory → next target selection. Detailed visual access is bound to the participant's pointer, so each movement reveals which region they choose to bring into functional focus. The participant and moderator share the same stimulus: the moderator can see what information was available before a move, what the participant revealed next, and where peripheral cues failed to guide the task. Pointer coordinates stand in for gaze as a controlled emulation of task-relevant visual access and fixation change. They are not measurements of physiological gaze.
 
 ## Goals
 
@@ -49,16 +49,16 @@ Strategically, this turns RFV from a reviewer-controlled visualization into a re
 - Load one HTTP(S) task URL.
 - Apply a small, explicit set of validated settings for that task.
 - Keep task settings in memory only; never persist them as user defaults.
-- Put task instructions in the existing toolbar without changing its 40px height.
+- Put task instructions in the toolbar, in an instruction row below the 40px control row.
 - Keep the target origin visible in compressed form.
 - Let the user reveal the full URL without making it editable during the task.
 - Provide a clear way to end the task and return to normal browsing.
 - Fail closed on malformed or unsupported links.
 - Preserve an extensible route for future study manifests and fixation-memory tasks.
 
-### Future, not macOS v1
+### Future (after macOS v1)
 
-- ~~Multi-task study sequencing.~~ **Implemented** — see [Multi-Task Study Sessions](usability-study-multi-task-sessions.md) (`scrutinizer://v1/session/start`).
+- ~~Multi-task study sequencing.~~ **Implemented** (see [Multi-Task Study Sessions](usability-study-multi-task-sessions.md), `scrutinizer://v1/session/start`).
 - Consent, participant IDs, counterbalancing, and debrief flows.
 - Behavioral or gaze data collection and export.
 - Free-scan, timed, guided-fixation, replayed-scanpath, or preseeded-memory exposure phases.
@@ -189,7 +189,7 @@ Authoring tools should generate these links; researchers should not be expected 
 
 The existing toolbar reserves its flexible center region for the URL. During a task, the instruction is more important than the full location, but completely hiding the destination would remove useful origin and trust context. Study mode therefore replaces the editable URL presentation with instructions while retaining a compact origin control.
 
-The toolbar remains exactly 40px high. HUD placement, content bounds, capture geometry, and fixation coordinates currently depend on that height.
+The Study toolbar is 104px high: a 40px control row and a 48px instruction row (current layout: [Multi-Task Study Sessions](usability-study-multi-task-sessions.md#toolbar)). Browse mode stays 40px. HUD placement, content bounds, capture geometry, and fixation coordinates depend on the active toolbar height.
 
 ### Browse mode
 
@@ -204,15 +204,16 @@ Existing behavior remains unchanged:
 Default presentation:
 
 ```text
-[Task]  [Instruction text………………………………]  [example.com ▾]  [Done]
+[← Back]  [Task]                  [example.com ▾]  [Done]
+[Instructions]  [Instruction text………………………………]
 ```
 
 Requirements:
 
 - `Task` is a non-interactive status label. If `task_id` is absent, use “Study task.”
-- Instructions occupy the flexible center space and truncate with an ellipsis.
+- Instructions occupy the instruction row and clamp at two lines with an ellipsis.
 - Hovering or focusing the instruction exposes the complete text through an accessible label/title.
-- Activating the instruction may toggle an expanded, read-only instruction presentation, but must not resize the 40px toolbar or alter the content/HUD coordinate frame.
+- Activating the instruction may toggle an expanded, read-only instruction presentation, but must not resize the toolbar or alter the content/HUD coordinate frame.
 - The origin control displays `URL.origin` without path, query, credentials, or fragment.
 - Activating the origin control toggles the center presentation between task instructions and the full, read-only target URL. Activating it again restores instructions.
 - URL updates caused by in-page navigation update the stored full URL and compressed origin, but do not replace the task instructions.
@@ -265,7 +266,7 @@ For macOS v1, one app-wide task may be active at a time. Store an in-memory obje
 }
 ```
 
-This is runtime state, not the future on-disk experiment/session record.
+This is runtime state. The future on-disk experiment/session record is a separate object.
 
 ### Persistence rules
 
@@ -307,7 +308,7 @@ Add an electron-builder protocol entry to `package.json`:
 }
 ```
 
-This generates the relevant `CFBundleURLTypes` entry in the packaged app's `Info.plist`. Registration must be verified against the signed/notarized `.app`, not only a development launch.
+This generates the relevant `CFBundleURLTypes` entry in the packaged app's `Info.plist`. Registration must be verified against the signed/notarized `.app`. A development launch alone is not enough.
 
 After readiness, the packaged app calls `app.setAsDefaultProtocolClient('scrutinizer')` and logs a warning if registration returns false. This call is skipped when `app.isPackaged` is false. macOS can only register schemes already present in `Info.plist`; development registration is not an acceptable substitute for packaged verification.
 
@@ -342,7 +343,7 @@ Use latest-valid-link-wins while starting. This avoids opening duplicate tasks w
 For a pending valid task:
 
 1. Initialize `settingsManager` and snapshot persisted/current runtime defaults.
-2. Apply overrides to an in-memory initial-state object, not to `settingsManager`.
+2. Apply overrides to an in-memory initial-state object. Do not write them to `settingsManager`.
 3. Create the primary window with the task target URL.
 4. Initialize the HUD with the overridden runtime state.
 5. Initialize the toolbar directly in Study mode.
@@ -462,7 +463,7 @@ toolbar:exit-study
 toolbar:study-done
 ```
 
-`toolbar:update-url` continues to drive Browse mode. In Study mode it updates the stored task URL/origin without replacing instruction text.
+`toolbar:update-url` continues to update Browse mode. In Study mode it updates the stored task URL/origin without replacing instruction text.
 
 ### Packaging
 
@@ -499,7 +500,7 @@ If a study is already active:
 
 Unsupported reserved routes, including `study/run` in v1, must say that the installed Scrutinizer version does not yet support that study link.
 
-Navigation failures after a valid launch are page-load failures, not parse failures. Keep Study mode and its instruction visible, show the normal load failure, and let the researcher exit the task.
+Navigation failures after a valid launch are page-load failures and are handled separately from parse failures. Keep Study mode and its instruction visible, show the normal load failure, and let the researcher exit the task.
 
 ---
 
@@ -608,7 +609,7 @@ No Windows delivery code or release claim is included in the macOS v1 milestone.
 
 ### Packaged macOS verification
 
-Run against the installed signed/notarized app, not only `npm start`:
+Run against the installed signed/notarized app as well as `npm start`:
 
 1. Inspect the built app's `Info.plist` for the `scrutinizer` URL scheme.
 2. Install/move Scrutinizer to `/Applications` and launch it once.
@@ -636,7 +637,7 @@ Run against the installed signed/notarized app, not only `npm start`:
 - [ ] Task settings are runtime-only and do not change `settings.json`.
 - [ ] The task opens in the primary window without a saved-page or Browse-toolbar flash.
 - [ ] Study mode shows task instructions, compressed current origin, read-only full URL access, and Done.
-- [ ] Toolbar height remains 40px and content/HUD geometry is unchanged.
+- [ ] Study toolbar height is 104px and content/HUD geometry follows the active toolbar height.
 - [ ] Browse navigation, URL editing, and task-controlled simulation changes are locked during Study mode.
 - [ ] Done restores the pre-task runtime state and normal toolbar.
 - [ ] Visual Memory resets between task links.

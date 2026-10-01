@@ -5,7 +5,7 @@
 ## 1. Overview
 **Blueprint Mods** are a collection of practical diagnostic visualization modes designed for Vision Researchers, UI Designers, and UX Professionals.
 
-Rather than simulating the *user's experience* (Human Vision), Blueprint Mods visualize the *diagnostic data* underlying the simulation. They answer the question: *"Why is the AI reacting this way?"* making them a practical tool for tuning designs and parameters.
+Blueprint Mods visualize the *diagnostic data* underlying the simulation. The Human Vision modes are the ones that simulate the *user's experience*. They show why the simulation responds the way it does, which makes them a practical tool for tuning designs and parameters.
 
 ### Core Philosophy
 *   **Transparency**: Every internal buffer (Saliency, Structure, Inhibition) must be visualizable.
@@ -40,7 +40,7 @@ Visualizes the raw semantic scaffolding provided by the DOM scanner.
 Visualizes the "Perceived Groups" formed by clustering nearby structure blocks.
 *   **Visual**: Organic "blobs" or convex hulls wrapping groups of elements.
 *   **Algorithm**: DBSCAN + Convex Hull or Morphological Closing.
-*   **Goal**: Verify "Object-Based Distortion". If the AI sees a paragraph as 5 separate lines, the distortion will tear it apart. If it sees 1 blob, the distortion will move it coherently.
+*   **Goal**: Verify "Object-Based Distortion". If the clustering splits a paragraph into 5 separate lines, the distortion will tear it apart. If it groups the paragraph as 1 blob, the distortion will move it coherently.
 
 <!-- Section D (Mongrel Textures) Removed per feedback -->
 
@@ -65,7 +65,7 @@ Currently, the Saliency Worker returns a single `ImageData` buffer.
 ```
 
 ### 3.2 Texture Packing (Debug Pathway)
-**Important**: This packing strategy is *specifically* for the specialized debug visualization. The main simulation pipeline may continue to use a single-channel saliency texture for performance, or read only the relevant channels.
+This packing strategy applies only to the debug visualization. The main simulation pipeline may continue to use a single-channel saliency texture for performance, or read only the relevant channels.
 
 **Texture 3 (`u_saliencyMap`) Repurpose for Debug**:
 *   **R**: Final Saliency (Standard)
@@ -95,9 +95,9 @@ if (u_v4_style_id == 3) { // Blueprint Mode
 ---
 
 ## 4. Graduation to Core (The "Why")
-These visuals are not just for show. They validate the components needed for **Next-Gen features**:
+These visualizations are also used to validate the components that later features need:
 
-1.  **Object-Based Distortion**: Once Gestalt Blobs are validated visually, we use them to mask V1 distortion. Instead of warping *pixels*, we warp *blobs*. This prevents text tearing.
+1.  **Object-Based Distortion**: Once Gestalt Blobs are validated visually, we use them to mask V1 distortion so that each *blob* warps as a unit. This prevents text tearing.
 2.  **Semantic Saliency**: Once we prove the Inhibitor mask correctly targets background noise, we enable it by default to fix the "distracting wallpaper" bug.
 3.  **Adaptive Fidelity**: Using the Excitor mask to dynamically adjust the Foveal Radius (e.g., expand fovea when looking at a complex UI menu).
 
@@ -109,7 +109,7 @@ These visuals are not just for show. They validate the components needed for **N
     *   Main thread captures `screenshot` + `structureData` (serialized list of blocks) together.
     *   Both are sent to Worker in one message.
     *   Worker computes saliency on pixels, masks on structure data.
-    *   Result is perfectly aligned time-wise.
+    *   Both outputs come from the same snapshot, so they are aligned in time.
 
 ### Phase 2: Debug Overlay Shader
 *   **Task**: Update `peripheral.frag` to visualize the G/B channels.

@@ -2,7 +2,7 @@
 
 > **Last updated:** 2026-03-11
 
-**Status**: Complete (results in [validation-journal.md](../validation-journal.md#wave-3-crowding-geometry))
+**Status**: Complete (results in [validation-journal.md](../../validation-journal.md#wave-3-crowding-geometry))
 **Created**: 2026-03-07
 **Dependencies**: `renderer/shaders/peripheral.frag` (density-gated crowding, polar sectors), `renderer/config.js`, Wave 1-2 infrastructure, existing reference pages (`crowding.html`, `crowding-stimulus.html`)
 
@@ -10,9 +10,9 @@
 
 Scrutinizer models crowding through three mechanisms:
 
-1. **MIP pooling** (V4) — hardware MIP-maps approximate biological receptive field growth. `computeMipLevel()` maps eccentricity to MIP levels 0-4, each level doubling the averaging region.
-2. **Polar sector quantization** (V1 type 4, V4 style 8) — polar grid with ring spacing `ef=1.007`, `bias=2.0`, producing sectors whose radial extent is ~2x tangential extent.
-3. **Density-gated V1 distortion** (shipped v1.9.1) — sigmoid gate on structure map density. Dense content (text clusters) gets full Lateral Smash; isolated elements get 30% floor.
+1. **MIP pooling** (V4): hardware MIP-maps approximate biological receptive field growth. `computeMipLevel()` maps eccentricity to MIP levels 0-4, each level doubling the averaging region.
+2. **Polar sector quantization** (V1 type 4, V4 style 8): polar grid with ring spacing `ef=1.007`, `bias=2.0`, producing sectors whose radial extent is ~2x tangential extent.
+3. **Density-gated V1 distortion** (shipped v1.9.1): sigmoid gate on structure map density. Dense content (text clusters) gets full Lateral Smash; isolated elements get 30% floor.
 
 Wave 3 validates that these mechanisms collectively reproduce the spatial geometry of visual crowding as described by Bouma's law and the TTM (Rosenholtz et al. 2012).
 
@@ -28,7 +28,7 @@ Bouma (1970) established that a target letter becomes unidentifiable when flanke
 | 10° | 5.0° | 225 px |
 | 15° | 7.5° | 338 px |
 
-The critical spacing zone is **not circular** — it extends ~2x further radially than tangentially (Toet & Levi 1992), which Scrutinizer models via `u_crowding_radial_bias = 2.0`.
+The critical spacing zone is **elliptical**. It extends ~2x further radially than tangentially (Toet & Levi 1992), which Scrutinizer models via `u_crowding_radial_bias = 2.0`.
 
 ## 1. Falsifiable Predictions
 
@@ -42,7 +42,7 @@ Each MIP level doubles the averaging area: MIP 0 = 1px, MIP 1 = 2px, MIP 2 = 4px
 pooling_diameter_px ≈ 2^mipLevel(e)
 ```
 
-**Test**: Compute `2^computeMipLevel(e)` at eccentricities 2-15° and compare the pooling diameter (in degrees) to `0.5 * e`. The ratio `pooling_diameter / critical_spacing` should be between 0.3 and 2.0 — we're not claiming exact match, but the growth rate must be proportional.
+**Test**: Compute `2^computeMipLevel(e)` at eccentricities 2-15° and compare the pooling diameter (in degrees) to `0.5 * e`. The ratio `pooling_diameter / critical_spacing` should be between 0.3 and 2.0. The pass condition is a proportional growth rate, so absolute sizes may differ from Bouma.
 
 ### Prediction B: Polar sector radial extent matches Bouma critical spacing
 
@@ -51,7 +51,7 @@ The polar sector computation (peripheral.frag:310-349) produces sectors with:
 - At `r = parafovea_radius` (≈225px at medium): ring width ≈ 3.2px
 - At `r = 0.3` (≈10° at medium): ring width ≈ 4.2px
 
-**Test**: At each eccentricity, compute polar sector radial extent in degrees and compare to Bouma's 0.5 * eccentricity. The sectors are intentionally fine-grained (tracking CMF block sizes, not crowding zones), so the question is: how many sectors fit within one Bouma critical spacing zone? This ratio should be approximately constant across eccentricities (indicating proportional scaling).
+**Test**: At each eccentricity, compute polar sector radial extent in degrees and compare to Bouma's 0.5 * eccentricity. The sectors are intentionally fine-grained because they track CMF block sizes, so the question is how many sectors fit within one Bouma critical spacing zone. This ratio should be approximately constant across eccentricities (indicating proportional scaling).
 
 ### Prediction C: Density gating differentiates crowded vs isolated
 
@@ -72,7 +72,7 @@ Toet & Levi (1992) found crowding zones are elliptical: ~2:1 radial:tangential r
 
 ### Prediction E: Crowding onset matches Bouma threshold
 
-At the transition point — flanker spacing exactly at 0.5x eccentricity — there should be a measurable drop in target identifiability compared to wider spacing. This tests whether the density gate + V1 distortion together produce the right spatial threshold.
+At the transition point (flanker spacing exactly at 0.5x eccentricity), there should be a measurable drop in target identifiability compared to wider spacing. This tests whether the density gate + V1 distortion together produce the right spatial threshold.
 
 **Test**: Use `crowding.html` with parametric flanker spacing (new feature). At 6° eccentricity, vary spacing from 0.2x to 0.8x eccentricity. Plot target letter contrast retention vs spacing. The curve should show a transition near 0.5x.
 
@@ -88,7 +88,7 @@ Already built. Three font-size columns (16/28/48px), rows at 3°/6°/10° eccent
 
 Already built. Tests orientation (Gabor), color grouping, and complexity dimensions of crowding across three columns.
 
-### New: `crowding-radial.html` — Radial vs tangential flanking
+### New: `crowding-radial.html` (radial vs tangential flanking)
 
 Tests Prediction D. Layout:
 
@@ -97,11 +97,11 @@ Tests Prediction D. Layout:
 - Each target has two flanker conditions:
   - **Radial**: flankers placed along the radial axis (between target and fixation, and beyond target)
   - **Tangential**: flankers placed perpendicular to radial axis
-- Flanker spacing: 0.4x eccentricity (2.4° at 6°) — inside Bouma for radial, borderline for tangential
+- Flanker spacing: 0.4x eccentricity (2.4° at 6°), inside Bouma for radial and borderline for tangential
 - Font size: 28px (large enough to rule out acuity)
 - Golden dots at center + each target position
 
-### New: `crowding-spacing.html` — Parametric Bouma spacing
+### New: `crowding-spacing.html` (parametric Bouma spacing)
 
 Tests Prediction E. Layout:
 
@@ -114,7 +114,7 @@ Tests Prediction E. Layout:
 
 ## 3. Analytical Validation
 
-### `analyze-crowding.js` — Crowding zone measurement
+### `analyze-crowding.js`: Crowding zone measurement
 
 Pixel-level analysis of crowding reference page screenshots.
 
@@ -130,9 +130,9 @@ Pixel-level analysis of crowding reference page screenshots.
    - CR < 1.0 → crowding effect present (good)
    - CR ≈ 1.0 → no crowding differentiation (bad)
 
-3. **Position scatter**: Sample 5x5 grid centered on expected target position. Compute variance of luminance — higher variance indicates more V1 Lateral Smash displacement.
+3. **Position scatter**: Sample 5x5 grid centered on expected target position. Compute variance of luminance. Higher variance indicates more V1 Lateral Smash displacement.
 
-### `analyze-crowding-geometry.js` — Pooling region size extraction
+### `analyze-crowding-geometry.js`: Pooling region size extraction
 
 Computes Scrutinizer's effective pooling region sizes and compares to Bouma.
 
@@ -161,7 +161,7 @@ function boumaCriticalSpacing(ecc_deg, ppd) {
 
 **Output**: Table comparing pooling region sizes to Bouma at eccentricities 2-15°, plus a Bouma ratio (`pooling_diameter / critical_spacing`) at each point.
 
-### `analyze-polar-sectors.js` — Sector geometry vs Bouma
+### `analyze-polar-sectors.js`: Sector geometry vs Bouma
 
 Computes polar sector dimensions and compares to crowding zones.
 
@@ -225,18 +225,18 @@ Computes polar sector dimensions and compares to crowding zones.
 ### Tier 1: Must Pass
 
 1. **Crowding ratio < 0.8 at 6° and 10°**: Crowded targets show measurably more degradation than isolated targets at the same eccentricity.
-2. **Proportional MIP scaling**: The ratio `pooling_diameter / eccentricity` stays within 0.5x-2.0x of a constant across the 2-15° range (i.e., pooling grows linearly, not quadratically or sub-linearly).
+2. **Proportional MIP scaling**: The ratio `pooling_diameter / eccentricity` stays within 0.5x-2.0x of a constant across the 2-15° range (i.e., pooling grows linearly with eccentricity).
 3. **Polar sector radial > tangential**: Sector radial extent exceeds tangential extent by at least 1.5:1 at all measured eccentricities.
 
 ### Tier 2: Should Pass
 
-4. **Bouma ratio within 3x**: Effective pooling diameter is within 0.15-1.5x of Bouma's 0.5*e at each measured eccentricity. (We expect to be smaller than Bouma because MIP pooling is one of several crowding mechanisms, not the sole one.)
+4. **Bouma ratio within 3x**: Effective pooling diameter is within 0.15-1.5x of Bouma's 0.5*e at each measured eccentricity. (We expect to be smaller than Bouma because MIP pooling is one of several crowding mechanisms.)
 5. **Density gate separation**: The crowding ratio at 10° (where density difference matters most) is at least 0.15 lower than at 3° (where crowding is mild regardless of density).
 6. **Radial-tangential asymmetry 1.5:1 to 2.5:1**: Measured across polar sector geometry, consistent with Toet & Levi's ~2:1 finding.
 
 ### Tier 3: Stretch
 
-7. **Pelli & Tillman size independence**: Crowding ratio is similar across the three font-size columns (16/28/48px) at matched eccentricity — crowding depends on spacing, not target size.
+7. **Pelli & Tillman size independence**: Crowding ratio is similar across the three font-size columns (16/28/48px) at matched eccentricity. Crowding depends on spacing and is independent of target size.
 8. **Stimulus-specific crowding**: Using `crowding-stimulus.html`, same-orientation Gabor flankers produce stronger crowding than orthogonal flankers at matched spacing and eccentricity.
 9. **Bouma transition sharpness**: Using `crowding-spacing.html`, the crowding ratio vs spacing curve shows a sigmoid-like transition centered near 0.5x eccentricity.
 
@@ -260,18 +260,18 @@ Plus analytical scripts that need no screenshots (geometry validation).
 
 | File | Action | Est. Lines |
 |------|--------|-----------|
-| `tests/reference-pages/crowding-radial.html` | Create — radial vs tangential flanking stimulus | ~200 |
-| `tests/reference-pages/crowding-spacing.html` | Create — parametric Bouma spacing stimulus | ~180 |
-| `scripts/analyze-crowding.js` | Create — pixel-level crowding ratio from screenshots | ~200 |
-| `scripts/analyze-crowding-geometry.js` | Create — pooling region size vs Bouma comparison | ~150 |
-| `scripts/analyze-polar-sectors.js` | Create — sector geometry extraction and validation | ~120 |
-| `scripts/validate-crowding.js` | Create — comparison orchestrator (tiers 1-3) | ~180 |
-| `scripts/report-crowding.js` | Create — HTML report with tables and diagrams | ~150 |
+| `tests/reference-pages/crowding-radial.html` | Create: radial vs tangential flanking stimulus | ~200 |
+| `tests/reference-pages/crowding-spacing.html` | Create: parametric Bouma spacing stimulus | ~180 |
+| `scripts/analyze-crowding.js` | Create: pixel-level crowding ratio from screenshots | ~200 |
+| `scripts/analyze-crowding-geometry.js` | Create: pooling region size vs Bouma comparison | ~150 |
+| `scripts/analyze-polar-sectors.js` | Create: sector geometry extraction and validation | ~120 |
+| `scripts/validate-crowding.js` | Create: comparison orchestrator (tiers 1-3) | ~180 |
+| `scripts/report-crowding.js` | Create: HTML report with tables and diagrams | ~150 |
 | `tests/validation/published-data/bouma1970_critical_spacing.json` | Create | ~15 |
 | `tests/validation/published-data/toet_levi1992_asymmetry.json` | Create | ~10 |
 | `tests/validation/published-data/pelli_tillman2008_crowding.json` | Create | ~10 |
 
-## 8. Key Numerical Anchors
+## 8. Numerical Anchors
 
 These are the specific numbers the validation will test against, derived from the shader code:
 
@@ -285,7 +285,7 @@ These are the specific numbers the validation will test against, derived from th
 | 10 | 5.0 | 10.0 | 1.46 | ~3.4 | 10.6 | 225 | 0.047 |
 | 15 | 7.5 | 15.0 | 1.68 | ~3.9 | 14.9 | 338 | 0.044 |
 
-The MIP pooling diameter is ~5% of Bouma critical spacing. This is expected — MIP pooling handles the frequency-domain averaging (what survives), not the spatial extent of interference (what crowds). The spatial extent of crowding is modeled by V1 Lateral Smash displacement, which operates at a larger scale.
+The MIP pooling diameter is ~5% of Bouma critical spacing. This is expected. MIP pooling handles the frequency-domain averaging (what survives). The spatial extent of interference (what crowds) is modeled by V1 Lateral Smash displacement, which operates at a larger scale.
 
 ### Polar Sectors (ef=1.007, bias=2.0)
 
@@ -297,7 +297,7 @@ Ring width at distance r: `r * (1.007^2.0 - 1) = r * 0.014`
 | 6° (0.333) | 0.00467 | 0.093 | 3.0 | ~32 |
 | 10° (0.556) | 0.00778 | 0.156 | 5.0 | ~32 |
 
-Polar sectors are much finer than Bouma zones (~30 sectors per critical spacing). This is by design — the sectors track CMF block sizes for rendering fidelity, not crowding zones. The density gate and V1 distortion amplitude handle the crowding spatial extent.
+Polar sectors are much finer than Bouma zones (~30 sectors per critical spacing). This is by design. The sectors track CMF block sizes for rendering fidelity. The density gate and V1 distortion amplitude handle the crowding spatial extent.
 
 ### V1 Lateral Smash (the actual crowding displacement)
 
@@ -306,7 +306,7 @@ The V1 distortion amplitude (warp in UV space) scales with:
 strength = lgn.suppressionFactor * v1_strength_mult * eccentricityScale * crowdingFactor
 ```
 
-Where `eccentricityScale = smoothstep(fovea_radius, parafovea_radius, dist)` and the warp amplitude is `strength * noise * warpAmplitude`. The effective displacement in pixels needs to be measured empirically from screenshots — this is what `analyze-crowding.js` does.
+Where `eccentricityScale = smoothstep(fovea_radius, parafovea_radius, dist)` and the warp amplitude is `strength * noise * warpAmplitude`. The effective displacement in pixels needs to be measured empirically from screenshots, which is what `analyze-crowding.js` does.
 
 ## 9. Success Criteria
 
@@ -316,11 +316,12 @@ Where `eccentricityScale = smoothstep(fovea_radius, parafovea_radius, dist)` and
 
 ## 10. Relationship to Existing Crowding Work
 
-The density-gated crowding spec (`density_gated_crowding.md`) established the V1 displacement mechanism. This wave validated the *geometry* — whether the spatial extent and shape of Scrutinizer's crowding zones match published psychophysics. v2.2 added congestion-gated MIP pooling with Bouma-scaled edge density, which provides spacing selectivity that V1 displacement alone cannot. The three layers are complementary:
+The density-gated crowding spec (`density_gated_crowding.md`) established the V1 displacement mechanism. This wave validated the *geometry*: whether the spatial extent and shape of Scrutinizer's crowding zones match published psychophysics. v2.2 added congestion-gated MIP pooling with Bouma-scaled edge density, which provides spacing selectivity that V1 displacement alone cannot. The two mechanisms are complementary:
 
-- Density gating (v1.9.1): **what** gets crowded (dense vs sparse) — V1 displacement strength
-- Congestion-gated MIP pooling (v2.2): **where** crowding happens (Bouma-scaled spacing selectivity) — information loss
-- Wave 3 validation: confirms both mechanisms produce geometry consistent with Bouma (1970) and Toet & Levi (1992)
+- Density gating (v1.9.1) sets what gets crowded (dense vs sparse), via V1 displacement strength
+- Congestion-gated MIP pooling (v2.2) sets where crowding happens (Bouma-scaled spacing selectivity), via information loss
+
+Wave 3 tested both and confirms that they produce geometry consistent with Bouma (1970) and Toet & Levi (1992).
 
 ## References
 

@@ -16,8 +16,7 @@ This document outlines the multi-process architecture of Scrutinizer 2025. The a
 *   **Component**: `WebContentsView` attached to the Main Window.
 *   **Role**: The "Browser". Displays the actual web page.
 *   **Key Files**:
-    *   `renderer/preload.js`: The bridge script injected into every web page.
-    *   `renderer/dom-adapter.js`: Scans the DOM for structure data.
+    *   `renderer/preload.js`: The bridge script injected into every web page. Contains the inlined `DomAdapter` that scans the DOM for structure data (the standalone `renderer/dom-adapter.js` is not loaded by the app).
 *   **Responsibilities**:
     *   Rendering web content.
     *   Capturing user input (Mouse, Keyboard, Scroll).
@@ -34,8 +33,8 @@ This document outlines the multi-process architecture of Scrutinizer 2025. The a
     *   `renderer/structure-map.js`: Rasterizer for structure data.
 *   **Properties**:
     *   `transparent: true`
-    *   `clickThrough: true` (Ignores mouse events, forwards them to OS/Main Window).
-    *   `alwaysOnTop`: Synced to move with the Main Window.
+    *   `setIgnoreMouseEvents(true, { forward: true })`: click-through (ignores mouse events, forwards them to the Main Window). Interactive overlays such as the ComplexityHUD turn this off while hovered.
+    *   `parent: win`: a child window of the Main Window, so it stays above it and moves with it.
 
 ---
 
@@ -55,20 +54,20 @@ Since the Overlay Window is click-through, it cannot natively detect mouse movem
 This pipeline generates the "Structure Map" texture used for the "Wireframe" and "Simulation" modes.
 
 1.  **Trigger**: `preload.js` detects `scroll`, `resize`, or `MutationObserver` events.
-    - **Scroll Performance**: Dual-strategy approach ensures smooth tracking with ~60fps updates during scroll and accurate final position capture:
+    - **Scroll Performance**: Two scan strategies run together, giving smooth tracking with ~60fps updates during scroll and an accurate final position:
       - **Throttled scans** (16ms): Run continuously during scrolling for smooth visual tracking
       - **Debounced final scan** (100ms): Always runs after scrolling stops to capture exact final position
     - **Mutation handling**: Standard throttle (100ms) for DOM changes
 2.  **Scan**: `DomAdapter.scan(document.body)` traverses the DOM and extracts `StructureBlock` objects (rect, type, density, lineHeight).
     - **Element Detection Strategy**: Uses semantic attributes instead of hardcoded tag lists:
       - **Text**: TreeWalker for text nodes (highest priority)
-      - **Media**: Explicit tags (`img`, `svg`, `video`, `canvas`, `picture`, `embed`, `object`, `meter`, `progress`)
+      - **Media**: Explicit tags (`img`, `svg`, `video`, `canvas`, `iframe`, `picture`, `embed`, `object`, `meter`, `progress`)
       - **Interactive**: Semantic detection via:
         - Form controls (`button`, `input`, `textarea`, `select`)
         - Links with href (`a[href]`)
         - ARIA roles (`[role="button"]`, `[role="link"]`, `[role="tab"]`, etc.)
         - Interactivity markers (`[onclick]`, `[tabindex]`, `[contenteditable]`)
-    - This approach is robust to new HTML elements and modern web frameworks
+    - This approach handles new HTML elements and modern web frameworks without a hardcoded tag list
 3.  **Send**: `preload.js` sends `ipcRenderer.send('structure-update', blocks)`.
 4.  **Route**: `main.js` forwards the data to the HUD window via `structure-update`.
 5.  **Rasterize**: `Scrutinizer.handleStructureUpdate` receives the blocks and uses `StructureMap` to draw them onto an offscreen canvas (encoding data into RGBA channels at 50% resolution).
@@ -88,7 +87,7 @@ This loop captures the browser content to use as the source texture for the WebG
     *   **Color Correction**: Electron captures are BGRA. The Fragment Shader's `sampleSource` helper handles the BGRA->RGBA swizzle centrally to ensure correct colors.
 
 ### D. Saliency Pipeline (Pixel-Based)
-This pipeline generates the "Saliency Map" used to guide the user's attention (heatmaps) and modulate visual effects. It runs off the main thread to ensure 60fps rendering.
+This pipeline generates the "Saliency Map" used to guide the user's attention (heatmaps) and modulate visual effects. It runs off the main thread so rendering stays at 60fps.
 
 1.  **Input**: The `Scrutinizer` receives a new high-res frame from `processFrame`.
 2.  **Dispatch**: The frame bitmap is cloned and posted to `saliency-worker.js`.
@@ -118,19 +117,19 @@ When the active mode has `compute_tier >= 2.5`, a WebGPU compute pipeline genera
 
 #### Frame Synchronization Invariant
 
-The MIP chain (TEXTURE0) is **synchronous** — `gl.texImage2D()` + `gl.generateMipmap()` complete before the draw call. TEXTURE0 always reflects the current frame.
+The MIP chain (TEXTURE0) is **synchronous**: `gl.texImage2D()` + `gl.generateMipmap()` complete before the draw call. TEXTURE0 always reflects the current frame.
 
-The compute texture (TEXTURE5) is **asynchronous** — 2-5 frame latency from dispatch to readback. During this window, TEXTURE5 contains data from a previous frame.
+The compute texture (TEXTURE5) is **asynchronous**, with 2-5 frame latency from dispatch to readback. During this window, TEXTURE5 contains data from a previous frame.
 
 **The invalidation pattern** prevents stale artifacts:
 
 | Event | Action | Effect |
 |-------|--------|--------|
 | Navigation (`did-navigate`) | `invalidateComputeTexture()` + reset metamer state + `frameCounter = -1` | Shader falls back to MIP until fresh compute arrives |
-| Scroll (`structure-update`, `trigger=scroll`) | `invalidateComputeTexture()` + `_metamerInitialized = false` | Same — MIP fallback during resynth |
+| Scroll (`structure-update`, `trigger=scroll`) | `invalidateComputeTexture()` + `_metamerInitialized = false` | Same: MIP fallback during resynth |
 | Readback complete (`.then()` callback) | `uploadComputeTexture()` sets `_hasComputeData = true` + `_metamerInitialized = false` | Shader uses fresh compute; forces another resynth next cycle for dynamic content |
 
-`invalidateComputeTexture()` sets `_hasComputeData = false`. The shader uniform `u_compute_tier` is gated: `this._hasComputeData ? this._computeTier : 0.0`. When false, the shader ignores TEXTURE5 entirely and renders from the fresh MIP chain — the same path as mode 0.
+`invalidateComputeTexture()` sets `_hasComputeData = false`. The shader uniform `u_compute_tier` is gated: `this._hasComputeData ? this._computeTier : 0.0`. When false, the shader ignores TEXTURE5 entirely and renders from the fresh MIP chain, the same path as mode 0.
 
 **Design principle**: The compute texture is a **progressive enhancement**. When it's fresh, the periphery gets texture-synthesized content. When it's stale or pending, the system degrades gracefully to MIP-based rendering. The user sees clean content at all times; the metamer snaps in when available.
 
@@ -147,7 +146,10 @@ The compute texture (TEXTURE5) is **asynchronous** — 2-5 frame latency from di
     h: Number,      // Height
     type: Number,   // 1.0=Text, 0.5=Image, 0.0=UI
     density: Number,// 0.0-1.0 (Visual mass)
-    lineHeight: Number // px (For rhythm/wireframe bars)
+    lineHeight: Number, // px (For rhythm/wireframe bars)
+    fontSizePx: Number, // px (text blocks only)
+    ariaRole: Number,   // ARIA role ID 0-12 (Blueprint mode)
+    primitiveType: String // DOM primitive class (e.g. 'text', 'button', 'link')
 }
 ```
 
@@ -158,7 +160,7 @@ The compute texture (TEXTURE5) is **asynchronous** — 2-5 frame latency from di
     {
         x: Number,      // Canvas X
         y: Number,      // Canvas Y
-        radius: Number, // Foveal radius at capture
+        radius: Number, // Memory radius: 2.5 × foveal radius at capture
         timestamp: Number // Time of capture
     },
     // ...
@@ -169,4 +171,4 @@ The compute texture (TEXTURE5) is **asynchronous** — 2-5 frame latency from di
 *   **Red**: Rhythm (Line Height normalized).
 *   **Green**: Density (Visual Mass).
 *   **Blue**: Type (Semantic Category).
-*   **Alpha**: 1.0 (Opaque).
+*   **Alpha**: ARIA role ID (`ariaRole / 12`); 0 in whitespace.

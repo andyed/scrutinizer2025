@@ -8,16 +8,16 @@
 
 ## Motivation
 
-Scrutinizer simulates foveated vision in the browser using WebGL. jsPsych runs behavioral experiments in the browser using JavaScript. Combining them creates the first browser-based gaze-contingent experimental tool — a gap in the field.
+Scrutinizer simulates foveated vision in the browser using WebGL. jsPsych runs behavioral experiments in the browser using JavaScript. Combining them puts real-time foveated rendering inside jsPsych trials. Browser-based contingent displays already exist (jsPsych's WebGazer extension for webcam eye tracking; MouseView.js for a cursor-directed aperture), but neither applies an eccentricity-dependent model of peripheral vision to the stimulus.
 
-The lineage: PsyScope (1990s, Mac, Macintosh Common Lisp) → PsychoPy (2000s, Python, OpenGL) → jsPsych (2010s, JavaScript, browser). Each generation moved toward accessibility. Scrutinizer adds what none of them have: real-time foveation simulation as a stimulus manipulation, not just a post-hoc analysis.
+The lineage runs PsyScope (1990s, Mac, Macintosh Common Lisp) → PsychoPy (2000s, Python, OpenGL) → jsPsych (2010s, JavaScript, browser). Each generation moved toward accessibility. Scrutinizer adds real-time foveation simulation as a stimulus manipulation.
 
 ### What PsychoPy Does (and Doesn't)
 
 PsychoPy (Peirce et al., 2019) is the current standard for desktop psychophysics experiments. It handles monitor calibration, stimulus timing, and response collection with sub-millisecond precision via OpenGL. It supports gaze-contingent paradigms through eye tracker integration (SR Research, Tobii).
 
 What PsychoPy doesn't do:
-- Run in browsers (Pavlovia exports are limited)
+- Run Coder (Python) experiments in browsers (Builder experiments export to PsychoJS for Pavlovia, but not every component is supported online)
 - Simulate foveated vision as a stimulus manipulation
 - Work without dedicated eye tracking hardware
 
@@ -38,7 +38,7 @@ PsychoPy should be cited in the arxiv paper as the primary prior art for experim
 
 ### Historical Context
 
-PsyScope (Cohen, MacWhinney, Flatt & Provost, 1993) was built at CMU in Macintosh Common Lisp. Andy worked on the parallel version (~1990). jsPsych is the spiritual successor for the browser era — same design philosophy (trial-based, timeline-driven, plugin architecture) but accessible to anyone with a web browser.
+PsyScope (Cohen, MacWhinney, Flatt & Provost, 1993) was built at CMU in Macintosh Common Lisp. Andy worked on the parallel version (~1990). jsPsych is the spiritual successor for the browser era. It shares PsyScope's design philosophy (trial-based, timeline-driven, plugin architecture) and runs in any web browser.
 
 ```bibtex
 @article{cohen1993,
@@ -77,19 +77,19 @@ Three tiers of gaze input, each with different precision/accessibility tradeoffs
 
 #### Tier 1: Webcam Gaze Estimation (Primary)
 
-**MediaPipe FaceMesh + Iris** (Apache-2.0) via TensorFlow.js — actual gaze tracking using a standard webcam.
+**MediaPipe FaceMesh + Iris** (Apache-2.0) via TensorFlow.js: gaze estimation from a standard webcam.
 
 MediaPipe's face landmarks model tracks 468 facial landmarks including iris center coordinates. Combined with head pose estimation and a calibration routine, this provides screen-point gaze estimation. The underlying models (FaceMesh, Iris) are Apache-2.0 licensed. Runs in-browser, CPU-based (no GPU required, though WebGL backend available for acceleration). ~3MB model weights.
 
 Note: Google's official position is that iris tracking "does not infer the location at which people are looking." This is true of the raw model output. The calibration step (mapping iris position + head pose → screen coordinates) is what makes it gaze estimation. WebGazer.js does this calibration but adds a GPL license. Building a permissive-license calibration layer on top of Apache-2.0 MediaPipe models is the path.
 
-**remote-calibrator** (EasyEyes/Pelli lab, MIT) provides the calibration infrastructure — viewing distance estimation, screen size measurement, and basic gaze direction. Critical because Scrutinizer's eccentricity calculations depend on knowing the viewing distance.
+**remote-calibrator** (EasyEyes/Pelli lab, MIT) provides the calibration infrastructure: viewing distance estimation, screen size measurement, and basic gaze direction. Critical because Scrutinizer's eccentricity calculations depend on knowing the viewing distance.
 
 Advantages:
-- Real gaze tracking — measures where the eyes point, not where the hand moves
+- Gaze tracking: measures where the eyes point
 - No dedicated hardware required
-- All Apache-2.0 / MIT — no GPL
-- ~30ms update rate (vs ~200ms for mouse movements)
+- All Apache-2.0 / MIT (no GPL)
+- ~30 ms update interval (webcam frame rate)
 
 Limitations:
 - Requires webcam permission
@@ -109,11 +109,11 @@ Limitations:
 
 #### Tier 2: Mouse-Contingent Aperture (Attention Tracking)
 
-**MouseView.js** (Anwyl-Irvine et al., 2021) — MIT licensed, already cited in the arxiv paper.
+**MouseView.js** (Anwyl-Irvine et al., 2021): MIT licensed, already cited in the arxiv paper.
 
-This is **not gaze tracking**. It measures attentional allocation through motor behavior — where participants choose to move the cursor to reveal content. Different signal, different timescale. The mouse moves where attention *decides* to go; the eyes move where attention *is pulled* before conscious decision.
+This is **not gaze tracking**. It measures attentional allocation through motor behavior: where participants choose to move the cursor to reveal content. Different signal, different timescale. Cursor moves follow deliberate choices at motor-response speed; the eyes make three to four saccades per second (Rayner, 1998), guided by both task goals and stimulus salience.
 
-Useful for a different class of experiments: measuring deliberate information-seeking strategy rather than reflexive visual attention.
+Useful for a different class of experiments: measuring deliberate information-seeking strategy.
 
 Advantages:
 - No hardware or permissions required
@@ -122,9 +122,9 @@ Advantages:
 - Published validation (Anwyl-Irvine et al., 2021; BRM)
 
 Limitations:
-- Not gaze — measures voluntary motor behavior, not involuntary eye movements
-- ~200ms motor latency vs ~30ms saccadic latency
-- Reveals strategy, not perception
+- Measures cursor movement. It does not record gaze.
+- A cursor move to a target takes several hundred ms; a saccade lasts ~30–50 ms (both start after ~200 ms latency)
+- Reveals search strategy. It does not measure what participants perceive.
 
 #### Tier 3: Hardware Eye Tracker (Gold Standard)
 
@@ -139,10 +139,10 @@ gazeSource: 'hardware'  // Tier 3: WebSocket to eye tracker
 ### What Scrutinizer Provides
 
 The existing Scrutinizer WebGL pipeline:
-1. **Cortical magnification function** — maps eccentricity to blur radius (Rovamo & Virsu, 1979; Schwartz, 1980)
-2. **Chromatic degradation** — color perception loss in periphery (Mullen & Kingdom, 2002; Hansen et al., 2009)
-3. **Crowding simulation** — feature averaging beyond Bouma's limit (Bouma, 1970; Pelli & Tillman, 2008)
-4. **Metamerism** — texture synthesis for peripheral appearance (Freeman & Simoncelli, 2011; Walton et al., 2021)
+1. **Cortical magnification function:** maps eccentricity to blur radius (Rovamo & Virsu, 1979; Schwartz, 1980)
+2. **Chromatic degradation:** color perception loss in periphery (Mullen & Kingdom, 2002; Hansen et al., 2009)
+3. **Crowding simulation:** feature averaging beyond Bouma's limit (Bouma, 1970; Pelli & Tillman, 2008)
+4. **Metamerism:** texture synthesis for peripheral appearance (Freeman & Simoncelli, 2011; Walton et al., 2021)
 
 All of these are already implemented as WebGL shaders. The jsPsych plugin exposes them as experimental manipulations.
 
@@ -220,13 +220,13 @@ Run standard usability tasks (card sorting, visual search, navigation) through t
 Present COCO images (or COCO-Periph stimuli) through foveation model. Measure detection accuracy as a function of eccentricity. Compares human peripheral detection to model predictions.
 
 ### 3. Crowding Threshold Measurement
-Present letter identification tasks at varying eccentricities with and without flankers. The foveation overlay makes crowding visible — participants experience what their visual system actually processes.
+Present letter identification tasks at varying eccentricities with and without flankers. The foveation overlay renders a simulation of crowding, so participants see the model's prediction of peripheral encoding.
 
 ### 4. Attention Allocation Studies
 Track where participants "look" (via mouse) when viewing web pages, data visualizations, or UI designs under foveated conditions. Reveals attentional strategies that normal viewing obscures.
 
 ### 5. Reading Under Foveation
-Combine with iBlipper (RSVP) — present text through foveation overlay. Measure reading speed and comprehension as a function of foveal radius. Tests whether the Stroop-effect-based reading model holds under degraded peripheral vision.
+Combine with iBlipper (RSVP) and present text through the foveation overlay. Measure reading speed and comprehension as a function of foveal radius. Tests whether the Stroop-effect-based reading model holds under degraded peripheral vision.
 
 ---
 
@@ -261,9 +261,9 @@ Combine with iBlipper (RSVP) — present text through foveation overlay. Measure
 | MediaPipe FaceMesh + Iris | Apache-2.0 | Webcam gaze estimation (Tier 1) |
 | TensorFlow.js | Apache-2.0 | ML runtime for MediaPipe models |
 | remote-calibrator | MIT | Viewing distance, screen calibration |
-| MouseView.js | MIT | Mouse-contingent attention tracking (Tier 2, not gaze) |
+| MouseView.js | MIT | Mouse-contingent attention tracking (Tier 2; does not track gaze) |
 
-All MIT/BSD/Apache — no GPL contamination.
+All MIT/BSD/Apache, with no GPL dependencies.
 
 ---
 
@@ -316,12 +316,12 @@ All MIT/BSD/Apache — no GPL contamination.
 
 ## Connection to Existing Work
 
-This plugin sits at the intersection of three Scrutinizer threads:
+This plugin connects three Scrutinizer threads:
 
-1. **The arxiv paper** — validates the foveation model by showing it produces measurable behavioral effects in controlled experiments
-2. **The RFV lineage** — Restricted Focus Viewer (Jansen et al., 2003) → ScreenMasker (Orlov & Bednarik, 2016) → Scrutinizer (Edmonds, 2007/2025). Each generation added fidelity; the jsPsych plugin adds experimental control.
-3. **BubbleView connection** — Kim et al. (2017) showed click-contingent apertures can approximate eye tracking for importance maps. MouseView.js extended this. Scrutinizer adds biologically grounded foveation instead of simple Gaussian blur.
+1. **The arxiv paper:** validates the foveation model by showing it produces measurable behavioral effects in controlled experiments
+2. **The RFV lineage:** Restricted Focus Viewer (Jansen et al., 2003) → ScreenMasker (Orlov & Bednarik, 2016) → Scrutinizer (Edmonds, 2007/2025). Each generation added fidelity; the jsPsych plugin adds experimental control.
+3. **BubbleView connection:** Kim et al. (2017) showed click-contingent apertures can approximate eye tracking for importance maps. MouseView.js extended this. Scrutinizer adds biologically grounded foveation instead of simple Gaussian blur.
 
 ---
 
-*This spec is a living document. Implementation begins with Phase 1 (core plugin + mouse tracking).*
+*Implementation begins with Phase 1 (core plugin + mouse tracking).*

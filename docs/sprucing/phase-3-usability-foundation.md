@@ -1,30 +1,30 @@
-# Phase 3 — Usability-testing foundation
+# Phase 3: Usability-testing foundation
 
-*Goal of the phase: build the minimal-credible foundation for running usability studies with Scrutinizer, reusing what already exists rather than inventing. The hard parts (scanpath replay, gazeplot pipeline with rigorous coordinates, behavioral instrumentation, a written platform spec) are already built — this phase adds the connective tissue.*
+*Goal of the phase: build the minimal-credible foundation for running usability studies with Scrutinizer, reusing what already exists. The hard parts (scanpath replay, gazeplot pipeline with rigorous coordinates, behavioral instrumentation, a written platform spec) are already built. This phase adds the connective tissue.*
 
 **Gate:** requires the Phase 2 control plane (P2-1) and per-trial condition toggle (P2-2). A study that can't set conditions programmatically or export a unified event log isn't credible. Do not start P3 until Phase 2 exits.
 
 ## What already exists (reuse, don't rebuild)
 
-- **Scanpath replay engine** — `renderer/scanpath-player.js` (biologically-plausible saccades: minimum-jerk per Flash & Hogan 1985, main-sequence duration per Bahill 1975), `renderer/scanpath/scanpath-types.js` (`Fixation`/`ScanpathEvent`/`MouseTimelineEvent`/`ScrollTimelineEvent` with xpath DOM anchors), importers for AdSERP/COCO-Search18/uEyes. **`ScanpathData` is the ready-made session schema.**
-- **Full-page gazeplot pipeline** — `scripts/capture-fullpage-gazeplot.js`, `scripts/batch-adserp-gazeplots.js`, and `docs/adserp-coordinate-system.md` (page-space vs screen-space, DPI scaling, scroll-offset subtraction — the most error-prone part of gaze work, already solved and documented).
-- **Behavioral instrumentation** — `scrutinizer-www/src/js/{approach-retreat,clicksense,reading-doppler}.js` (dwell, AOI approach/retreat with a clicked/deferred/evaluated_rejected/not_approached taxonomy, IAB viewability, click-confidence, DOM-path targeting). Framework-free; portable into the renderer.
-- **Written platform design** — `docs/specs/human_subjects_data_collection.md` (Mode A/B/C, config schema, export formats, IRB posture) and `docs/JSPSYCH_INTEGRATION_SPEC.md`.
+- **Scanpath replay engine:** `renderer/scanpath-player.js` (biologically-plausible saccades: minimum-jerk per Flash & Hogan 1985, main-sequence duration per Bahill 1975), `renderer/scanpath/scanpath-types.js` (`Fixation`/`ScanpathEvent`/`MouseTimelineEvent`/`ScrollTimelineEvent` with xpath DOM anchors), importers for AdSERP/COCO-Search18/uEyes. **`ScanpathData` is the ready-made session schema.**
+- **Full-page gazeplot pipeline:** `scripts/capture-fullpage-gazeplot.js`, `scripts/batch-adserp-gazeplots.js`, and `docs/adserp-coordinate-system.md` (page-space vs screen-space, DPI scaling, scroll-offset subtraction). Coordinate handling is the most error-prone part of gaze work, and it is already solved and documented.
+- **Behavioral instrumentation:** `scrutinizer-www/src/js/{approach-retreat,clicksense,reading-doppler}.js` (dwell, AOI approach/retreat with a clicked/deferred/evaluated_rejected/not_approached taxonomy, IAB viewability, click-confidence, DOM-path targeting). Framework-free; portable into the renderer.
+- **Written platform design:** `docs/specs/human_subjects_data_collection.md` (Mode A/B/C, config schema, export formats, IRB posture) and `docs/JSPSYCH_INTEGRATION_SPEC.md`.
 
 **Rule:** adopt `ScanpathData` as the on-disk session format and the `human_subjects_data_collection.md` config JSON as the task-definition format. Do not invent new schemas.
 
 ---
 
-> **Partial overlap shipped 2026-07-19:** ordered multi-task sequencing for moderated sessions now exists via `scrutinizer://v1/session/start` (see `docs/specs/usability-study-multi-task-sessions.md`) — Done-advance flow, per-task condition overrides, and a local session-summary JSON with per-task timing. P3-1 still owns conditions × trials expansion and counterbalancing; when built, ExperimentRunner should emit session launches in that format rather than adding a second sequencing path. The summary JSON is a seed of P3-2's DataCollector, keyed by the same session/task IDs.
+> **Partial overlap shipped 2026-07-19:** ordered multi-task sequencing for moderated sessions now exists via `scrutinizer://v1/session/start` (see `docs/specs/usability-study-multi-task-sessions.md`): Done-advance flow, per-task condition overrides, and a local session-summary JSON with per-task timing. P3-1 still owns conditions × trials expansion and counterbalancing; when built, ExperimentRunner should emit session launches in that format rather than adding a second sequencing path. The summary JSON is a seed of P3-2's DataCollector, keyed by the same session/task IDs.
 
-## P3-1 — ExperimentRunner: load task JSON, sequence trials, stamp metadata
+## P3-1: ExperimentRunner (load task JSON, sequence trials, stamp metadata)
 
 **Goal:** No `ExperimentRunner`/participant/session module exists (`grep ExperimentRunner|DataCollector|counterbalance renderer/ main.js` → nothing; session/participant is only a typedef field). Build the minimal core brick: load a task-definition JSON, sequence trials/tasks, and stamp each recorded session with participant + task + condition.
 
 **Files:** new `renderer/experiment/experiment-runner.js`; task-definition format from `docs/specs/human_subjects_data_collection.md` (the config JSON with `conditions`, `trials_per_condition`, `counterbalance`, `ppd`, `iti_ms`, etc.).
 
 **Steps:**
-1. Read `docs/specs/human_subjects_data_collection.md` config schema — use it verbatim as the input format.
+1. Read the `docs/specs/human_subjects_data_collection.md` config schema and use it verbatim as the input format.
 2. Build `ExperimentRunner` that: parses the config, expands conditions × trials, applies counterbalancing (`latin_square` per the spec), and yields an ordered trial list.
 3. For each trial: call the Phase 2 control plane (`set-mode`/`set-enabled`) to apply the condition, run the trial, and stamp the recorded session (a `ScanpathData` object) with `{participantId, taskId, condition, trialIndex}`.
 4. Keep it headless-testable: the runner logic (sequencing, counterbalancing) is pure and must have unit tests independent of the app.
@@ -39,22 +39,22 @@ npx jest tests/unit/experiment-runner.test.js   # sequencing + counterbalance ar
 
 ---
 
-## P3-2 — DataCollector: unified timestamped session record + local export
+## P3-2: DataCollector (unified timestamped session record + local export)
 
-> **Design decisions locked 2026-07-25** (see [`../specs/session-capture-procedural-replay.md`](../specs/session-capture-procedural-replay.md)): capture is **procedural replay, not video** — session envelope (`scrutinizer-session-capture/1`, a superset of the shipped `scrutinizer-session-summary/1`) + input trail in the **evtrack wire schema** (vendored, no server leg — AdSERP-compatible so approach-retreat/clicksense tooling ingests study output unchanged) mapped into `ScanpathData` timelines + **one full-page screenshot per page-visit** as stimulus anchor. Raw rows at `pollMs: 16`; CIF measures and episode geometry are derived post hoc. Form-field keystrokes masked. Report layer cites **ISO 25062:2025** (config snapshot → §7.4.6 evaluation environment, deep-link params → §7.8.4 independent variables), not NIST CIF 1999.
+> **Design decisions locked 2026-07-25** (see [`../specs/session-capture-procedural-replay.md`](../specs/session-capture-procedural-replay.md)): capture is **procedural replay** and records no video. It consists of a session envelope (`scrutinizer-session-capture/1`, a superset of the shipped `scrutinizer-session-summary/1`), an input trail in the **evtrack wire schema** mapped into `ScanpathData` timelines, and **one full-page screenshot per page-visit** as stimulus anchor. The evtrack copy is vendored with no server leg and stays AdSERP-compatible, so approach-retreat/clicksense tooling ingests study output unchanged. Raw rows at `pollMs: 16`; CIF measures and episode geometry are derived post hoc. Form-field keystrokes masked. The report layer cites **ISO 25062:2025** (config snapshot → §7.4.6 evaluation environment, deep-link params → §7.8.4 independent variables) instead of NIST CIF 1999.
 >
-> **P3-2a (substrate) — LANDED 2026-07-25** (merge `418b126` + reconciliation `c7aa720`): vendored evtrack (`renderer/instrumentation/vendor/evtrack/`, upstream `cabb3b7`, MIT, server leg removed), capture adapter (`renderer/instrumentation/event-capture.js`), envelope writer (`shared/session-capture.js`, superset contract guard-tested against `study-session.js`), 82 tests. **Readiness hardening landed 2026-07-25:** CommonJS preload loading now binds TrackUI to the real DOM host, verifies listener attachment, rolls back failed starts, and records explicit `tracker_*` / `empty_trail` health instead of silently treating an inert tracker as capture. P3-2 proper (stream fusion below) builds on this.
+> **P3-2a (substrate): LANDED 2026-07-25** (merge `418b126` + reconciliation `c7aa720`): vendored evtrack (`renderer/instrumentation/vendor/evtrack/`, upstream `cabb3b7`, MIT, server leg removed), capture adapter (`renderer/instrumentation/event-capture.js`), envelope writer (`shared/session-capture.js`, superset contract guard-tested against `study-session.js`), 82 tests. **Readiness hardening landed 2026-07-25:** CommonJS preload loading now binds TrackUI to the live DOM host, verifies listener attachment, rolls back failed starts, and records explicit `tracker_*` / `empty_trail` health instead of silently treating an inert tracker as capture. P3-2 proper (stream fusion below) builds on this.
 >
-> **Procedural write path — LANDED IN SOURCE 2026-07-26:** multi-task study pages now start readiness-gated capture after load, stream privacy-scrubbed rows through a sandboxed isolated-world bridge, preserve one task clock across navigations, and atomically publish the complete Workbench session directory. Tracking starts immediately; navigation/SPA pages get a provisional PNG followed by a bounded font/frame/DOM-settled candidate, with serialization and navigation guards. Materially changed candidates start a second same-URL interval instead of overwriting provisional evidence. Done is the trail cutoff; its candidate PNG is compared off-thread and retained only for material page changes. Missing trails/stimuli and row-delivery mismatches fail closed. Packaged macOS verification/release remains a separate gate; pipeline-snapshot and behavioral-episode fusion below remain P3-2 proper.
+> **Procedural write path (LANDED IN SOURCE 2026-07-26):** on multi-task study pages, readiness-gated capture now starts after load, privacy-scrubbed rows are streamed through a sandboxed isolated-world bridge, one task clock is preserved across navigations, and the complete Workbench session directory is published atomically. Tracking starts immediately; navigation/SPA pages get a provisional PNG followed by a bounded font/frame/DOM-settled candidate, with serialization and navigation guards. For a materially changed candidate, a second same-URL interval is started instead of overwriting provisional evidence. Done is the trail cutoff; its candidate PNG is compared off-thread and retained only for material page changes. Missing trails/stimuli and row-delivery mismatches fail closed. Packaged macOS verification/release remains a separate gate; pipeline-snapshot and behavioral-episode fusion below remain P3-2 proper.
 
-**Goal:** No unified event stream fuses behavioral signals with per-frame render/gaze state, and nothing exports locally (`renderer/logger.js` is a console forwarder; the behavioral libs sink to PostHog cloud). Build a `DataCollector` that merges the streams into one timestamped session record and writes local CSV+JSON per the spec's export schema. **This unification is what makes results credible and re-analyzable.**
+**Goal:** No unified event stream fuses behavioral signals with per-frame render/gaze state, and nothing exports locally (`renderer/logger.js` is a console forwarder; the behavioral libs sink to PostHog cloud). Build a `DataCollector` that merges the streams into one timestamped session record and writes local CSV+JSON per the spec's export schema.
 
 **Files:** new `renderer/experiment/data-collector.js`; capture substrate per `session-capture-procedural-replay.md` (`renderer/instrumentation/vendor/evtrack/`, `renderer/instrumentation/event-capture.js`, `shared/session-capture.js`); export schema from `human_subjects_data_collection.md` (per-trial CSV + per-fixation Scrutinizer-snapshot JSON).
 
 **Steps:**
 1. Merge three streams with a common `performance.now()` clock:
    - Behavioral episodes from the ported clicksense/approach-retreat/reading-doppler libs (P3-4).
-   - Mouse/gaze samples (60Hz) — reuse the control plane's event log (P2-1 `export-event-log`).
+   - Mouse/gaze samples (60Hz) from the control plane's event log (P2-1 `export-event-log`).
    - Per-fixation Scrutinizer pipeline snapshots: MIP level, density gate, saliency, availability score at AOI centroids (the app already computes these internally; expose them at fixation time).
 2. Write two artifacts per session: a trial-level CSV (stimulus, condition, target, response, RT, correct) and a per-fixation JSON (the pipeline snapshots). Use the AdSERP coordinate conventions (`docs/adserp-coordinate-system.md`) for all spatial fields.
 3. Local-only: no cloud sink. Swap the behavioral libs' PostHog adapter for a local file writer (P3-4).
@@ -70,9 +70,9 @@ node -e "const c=require('fs'); /* read the emitted session dir, assert CSV rows
 
 ---
 
-## P3-3 — BubbleView click-to-deblur mode: the first study paradigm ⭐
+## P3-3: BubbleView click-to-deblur mode, the first study paradigm ⭐
 
-**Goal:** Ship a BubbleView-style click-to-deblur task as the first usability paradigm — **no hardware, reuses the existing mouse-contingent aperture, yields attention heatmaps directly comparable to the gazeplot pipeline.** Highest-leverage first study type. (Research basis: `research/kim17bubbleview.pdf`; `docs/research-opportunities.md` §2.2 already proposes the BubbleView extension. The mouse-contingent foveation aperture in `renderer/gaze-model.js` is essentially an inverted BubbleView.)
+**Goal:** Ship a BubbleView-style click-to-deblur task as the first usability paradigm. It **needs no hardware, reuses the existing mouse-contingent aperture, and yields attention heatmaps directly comparable to the gazeplot pipeline.** (Research basis: `research/kim17bubbleview.pdf`; `docs/research-opportunities.md` §2.2 already proposes the BubbleView extension. The mouse-contingent foveation aperture in `renderer/gaze-model.js` works as an inverted BubbleView.)
 
 **Files:** new task mode wiring; reuse `renderer/gaze-model.js` (aperture), `scripts/capture-fullpage-gazeplot.js` (heatmap output), `DataCollector` (P3-2).
 
@@ -92,14 +92,14 @@ ls tests/golden-captures/bubbleview/ 2>/dev/null | head
 
 ---
 
-## P3-4 — Port the behavioral instrumentation into the renderer (local sink)
+## P3-4: Port the behavioral instrumentation into the renderer (local sink)
 
-**Goal:** The clicksense/approach-retreat/reading-doppler libs live in `scrutinizer-www` and sink to PostHog. Port them into the Electron renderer to instrument any loaded page during a session, with a **local** file sink instead of cloud.
+**Goal:** The clicksense/approach-retreat/reading-doppler libs are in `scrutinizer-www` and sink to PostHog. Port them into the Electron renderer to instrument any loaded page during a session, with a **local** file sink instead of cloud.
 
 **Files:** copy `scrutinizer-www/src/js/{approach-retreat,clicksense,reading-doppler}.js` into `renderer/instrumentation/`; replace their `createPostHogAdapter` with a local adapter feeding `DataCollector` (P3-2).
 
 **Steps:**
-1. Vendor the three libs (they're framework-free). Keep them as a clean copy with a header noting the source-of-truth is `scrutinizer-www` (mirror the "don't rebuild in other repos" rule — decide which repo owns them, cross-link).
+1. Vendor the three libs (they're framework-free). Keep them as a clean copy with a header noting the source-of-truth is `scrutinizer-www` (mirror the "don't rebuild in other repos" rule: decide which repo owns them and cross-link).
 2. Replace the PostHog sink with a local adapter that emits `ar_episode`/`ar_click`/`ar_session_summary` events into the DataCollector's stream.
 3. Attach them to the loaded-page context when a session is active.
 
@@ -113,7 +113,7 @@ ls tests/golden-captures/bubbleview/ 2>/dev/null | head
 
 ---
 
-## P3-5 — Consent / debrief screen + local data-retention
+## P3-5: Consent / debrief screen + local data-retention
 
 **Goal:** `human_subjects_data_collection.md` documents an ethics/IRB posture and references a `docs/templates/` consent dir that doesn't exist. Add a lightweight consent/debrief flow and a stated local-only retention policy. (The app being Electron/offline already satisfies most of the posture.)
 
@@ -122,7 +122,7 @@ ls tests/golden-captures/bubbleview/ 2>/dev/null | head
 **Steps:**
 1. Add a consent screen shown before a session starts (checkbox + participant-provided anonymous ID) and a debrief screen after.
 2. Create `docs/templates/consent.md` and `docs/templates/debrief.md` (the referenced-but-missing templates).
-3. State retention: data written local-only; if webcam gaze (MediaPipe/WebGazer) is added later, keep frames in-worker, never persist raw video.
+3. State retention: data written local-only; if webcam gaze (MediaPipe/WebGazer) is added later, keep frames in-worker and do not persist raw video.
 
 **Verify:**
 ```
@@ -130,25 +130,25 @@ test -d docs/templates && ls docs/templates
 ```
 **Done when:** consent + debrief screens gate a session, and the referenced template files exist.
 
-- [x] **P3-5 complete** — 2026-09-30. Consent and debrief are states of the study interstitial (`renderer/study-interstitial.html`), logic in `shared/study-consent.js`; spec in [`usability-study-multi-task-sessions.md` §Consent and debrief](../specs/usability-study-multi-task-sessions.md). Every session link opens on consent; the participant code comes from the link or is typed there; nothing is captured or written without agreement; the envelope carries a versioned `consent` record. Templates corrected: they claimed Scrutinizer stores no session data, untrue since the 2026-07-26 write path. Verified by driving the Electron app over CDP through agree (2 tasks, valid envelope), decline, and quit-on-consent (nothing written). Not built: a demographic survey (the human-subjects spec lists one) and in-app deletion on withdrawal (the debrief names the folder instead).
+- [x] **P3-5 complete:** 2026-09-30. Consent and debrief are states of the study interstitial (`renderer/study-interstitial.html`), logic in `shared/study-consent.js`; spec in [`usability-study-multi-task-sessions.md` §Consent and debrief](../specs/usability-study-multi-task-sessions.md). Every session link opens on consent; the participant code comes from the link or is typed there; nothing is captured or written without agreement; a versioned `consent` record is written into the envelope. Templates corrected: they claimed Scrutinizer stores no session data, untrue since the 2026-07-26 write path. Verified by driving the Electron app over CDP through agree (2 tasks, valid envelope), decline, and quit-on-consent (nothing written). Not built: a demographic survey (the human-subjects spec lists one) and in-app deletion on withdrawal (the debrief names the folder instead).
 
 ---
 
-## P3-6 — Study Workbench: browser-based study management + analysis
+## P3-6: Study Workbench (browser-based study management + analysis)
 
 **Goal:** Moderator/analyst work must not require the thick client. Build the
 static, fully client-side workbench as a **new sub-repo
-`scrutinizer-repo/scrutinizer-moderator`** (working name; NOT scrutinizer-www,
-which stays marketing/science) per
+`scrutinizer-repo/scrutinizer-moderator`** (working name; scrutinizer-www
+stays marketing/science) per
 [`../specs/study-workbench-webapp.md`](../specs/study-workbench-webapp.md):
-Session Library + CIF measures (WB-1, first — serves the pilot findings memo),
+Session Library + CIF measures (WB-1, built first to serve the pilot findings memo),
 multi-task Study Designer absorbing the www link builder (WB-2), 2D replay +
 page-space heatmaps (WB-3), ISO 25062:2025 report generator (WB-4),
 approach-retreat episode analytics (WB-5). Session directory = the interchange
 format; computational logic born in this repo (`shared/session-measures.js`,
 Jest-tested) and vendored to the moderator app per the study-deep-link
 precedent; the app ships with zero analytics; no shader re-implementation in
-the browser — foveated replay is served as pre-rendered frames from the
+the browser. Foveated replay is served as pre-rendered frames from the
 engine's headless pipeline, with live foveation via deep-link into the
 instrument.
 
@@ -158,11 +158,11 @@ instrument.
 
 ## Phase 3 exit criteria
 
-A usability study runs end-to-end from a task-definition JSON: consent → counterbalanced trials with programmatic conditions → unified local session record (behavioral + gaze + pipeline snapshots) → attention heatmap in the gazeplot coordinate frame → debrief. The first shipped paradigm (BubbleView) needs no hardware. Every artifact is reproducible and re-analyzable. **This is the usability-testing foundation, built on a verified instrument.**
+A usability study runs end-to-end from a task-definition JSON: consent → counterbalanced trials with programmatic conditions → unified local session record (behavioral + gaze + pipeline snapshots) → attention heatmap in the gazeplot coordinate frame → debrief. The first shipped paradigm (BubbleView) needs no hardware. Every artifact is reproducible and re-analyzable.
 
 ---
 
 ## Notes on scope discipline
 
-- The Mode C "squint test" (researcher-as-participant loading a real page) **already works today** per the spec — it just lacks structured task-definition + export. P3-1/P3-2 give it exactly that. Ship Mode C first if you want an early win before full A/B studies.
-- Eye-tracking hardware / WebGazer is explicitly **out of scope** for the minimal foundation — mouse trajectory is a documented cheap proxy, and BubbleView needs no tracker. Add hardware gaze only after the mouse-based foundation is solid.
+- The Mode C "squint test" (researcher-as-participant loading a real page) **already works today** per the spec. It lacks only structured task-definition + export. P3-1/P3-2 give it exactly that. Ship Mode C first if you want an early win before full A/B studies.
+- Eye-tracking hardware / WebGazer is explicitly **out of scope** for the minimal foundation. Mouse trajectory is a documented cheap proxy, and BubbleView needs no tracker. Add hardware gaze only after the mouse-based foundation is solid.

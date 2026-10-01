@@ -17,7 +17,7 @@ This document outlines improvements to `color-saliency-map.js` based on computat
 I = 0.2126 * R + 0.7152 * G + 0.0722 * B
 ```
 
-**Rationale**: Human vision is most sensitive to green (~72%), then red (~21%), then blue (~7%). This dramatically improves saliency accuracy for detecting text, UI elements, and natural scenes.
+**Rationale**: BT.709 weights each channel by its contribution to luminance, which follows the eye's photopic sensitivity curve (peak near 555 nm, in the green): green ~72%, red ~21%, blue ~7%. This improves saliency accuracy for detecting text, UI elements, and natural scenes.
 
 **Files**: `renderer/color-saliency-map.js:62`
 
@@ -38,7 +38,7 @@ const W_RG = 0.35;
 const W_BY = 0.35;
 ```
 
-**Rationale**: Reduces floating-point arithmetic overhead, improves code readability, and makes tuning easier.
+**Rationale**: Improves code readability and makes tuning easier (the arithmetic is unchanged).
 
 **Files**: `renderer/color-saliency-map.js:75`
 
@@ -65,7 +65,7 @@ return { data: saliency, width: this.width, height: this.height, maxVal };
 ### 4. ✅ Merge Feature Extraction and Combination Loops
 **Priority**: MEDIUM | **Effort**: MEDIUM | **Impact**: MEDIUM
 
-**Current**: 2 passes (Extract+Combine → Normalize+Write)
+**Current**: 3 separate passes (Extract → Combine → Normalize)
 
 **Improved**: 2 passes (Extract+Combine → Normalize+Write)
 
@@ -80,7 +80,7 @@ return { data: saliency, width: this.width, height: this.height, maxVal };
 ### 5. ✅ Adaptive Resolution Scaling  
 **Priority**: LOW | ** Effort**: LOW | **Impact**: LOW
 
-**Current**: Adaptive target max dimension (e.g., 256px)
+**Current**: Fixed `scale = 0.25` (25% resolution)
 
 **Improved**: Target maximum dimension (e.g., 256px)
 ```javascript
@@ -113,7 +113,7 @@ For each feature map (I, RG, BY):
 - Isolated objects "pop out" (high saliency)
 - Uniform regions suppressed (low saliency)
 - Edges and boundaries enhanced
-- Biologically accurate attention mechanism
+- Biologically inspired center-surround mechanism (Itti, Koch & Niebur, 1998)
 
 **Performance:**
 - Separable Gaussian blur (O(2n) vs O(n²))
@@ -157,7 +157,7 @@ self.onmessage = (e) => {
 - Pipeline depth: Process frame N while rendering frame N-1
 - Fallback for browsers without `OffscreenCanvas` support
 
-**Files**: New `renderer/workers/saliency-worker.js`
+**Files**: New `renderer/saliency-worker.js`
 
 ---
 
@@ -194,7 +194,7 @@ Current weights (`W_I = 0.3`, `W_RG = 0.35`, `W_BY = 0.35`) are heuristic. Consi
 4. ✅ **Phase 4** (Completed): Web Workers (Implemented in `renderer/saliency-worker.js`)
 5. ⬜ **Phase 5** (Planned): Cognitive Alignment & Gated Saliency (Saliency-Structure Fusion)
 
-**Status update**: Phase 1-4 complete. Phase 5 is the next major frontier.
+**Status update**: Phase 1-4 complete. Phase 5 is next.
 
 ---
 
@@ -233,4 +233,4 @@ We attempted to implement multiplicative gating using a packed Structure Map.
 **Status**: ✅ COMPLETE (2025-12-14)
 
 **Problem**: Worker latency causes "scroll tearing" where the saliency map (old) misaligns with the structure map (new).
-**Solution**: Snapshot `structureData` and pass it *with* the image to the worker. The worker generates masks locally, ensuring pixel-perfect alignment for that frame.
+**Solution**: Snapshot `structureData` and pass it *with* the image to the worker. The worker generates masks locally, so the masks align with that frame's pixels.

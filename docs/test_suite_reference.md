@@ -15,7 +15,7 @@ The suite targets a set of local HTML files representing common web UI archetype
 
 ## Test Scenarios (Fixations)
 
-For each page, the suite captures screenshots with the fovea positioned at three critical points to verify different eccentricities.
+The suite defines three standard fixation points (`FIXATION_COORDS` in `scripts/capture-golden.js`) to verify different eccentricities. Most pages capture only `center`; each task's `fixations` list in the script sets which points it uses.
 
 ### 1. Center (`_center.png`)
 *   **Coordinates**: `0.5, 0.5` (Mid-screen)
@@ -47,17 +47,16 @@ Run the following command to regenerate all golden images:
 npm run capture-golden
 ```
 
-**Artifacts Location**: `tests/golden-captures/v1.4.2/`
+**Artifacts Location**: `tests/golden-captures/v{VERSION}/` (the version in `package.json`)
 
-## Debug Verification (CLI Flags)
+## Debug Verification (Debug Views)
 
-You can force specific debug modes using CLI arguments. This is critical for verifying the underlying feature maps before running a full regression suite.
+You can turn on the debug views from the **Simulation** menu (**Show Saliency Map**, `Ctrl+Shift+S`; **Show Structure Map**, `Ctrl+Shift+D`), or capture them in test mode with `TEST_MODES=saliency` / `TEST_MODES=structure`. Check the underlying feature maps this way before running a full regression suite.
 
-| Flag | Effect | Pass Criteria (What to look for) | Fail Criteria (Red Flags) |
+| View | Effect | Pass Criteria (What to look for) | Fail Criteria (Red Flags) |
 |:-----|:-------|:---------------------------------|:--------------------------|
-| `--debug-saliency` | Shows Saliency Heatmap | **Blue/Green/Red Gradient**. Text/Edges should be Red. Background should be Blue. | **Solid Red Screen** (Data corruption/overflow). **Solid Blue** (Empty map). |
-| `--debug-saliency` | Shows Saliency Heatmap | **Blue/Green/Red Gradient**. Text/Edges should be Red. Background should be Blue. | **Solid Red Screen** (Data corruption/overflow). **Solid Blue** (Empty map). |
-| `--debug-structure` | Shows Structure Map | **Red Overlay**. Density determines opacity. Blocks should match page content. | **"Shredded" Noise** (Byte packing error). **Invisible** (Alpha channel issue). |
+| Saliency (`TEST_MODES=saliency`) | Shows Saliency Heatmap | **Blue/Green/Red Gradient**. Text/Edges should be Red. Background should be Blue. | **Solid Red Screen** (Data corruption/overflow). **Solid Blue** (Empty map). |
+| Structure (`TEST_MODES=structure`) | Shows Structure Map | **Red Overlay**. Density determines opacity. Blocks should match page content. | **"Shredded" Noise** (Byte packing error). **Invisible** (Alpha channel issue). |
 
 ## Verification Patterns
 
@@ -79,7 +78,7 @@ We use two distinct testing patterns depending on the scope of the feature.
 
 ## Face Detection Verification
 
-A targeted test exists to verify the "Face Channel" integration. This test loads a page with a known face (`text/reference-pages/face-test.html`) and captures the saliency map.
+A targeted test exists to verify the "Face Channel" integration. This test loads a page with a known face (`tests/reference-pages/face-test.html`) and captures the saliency map.
 
 ### Running the Test
 ```bash
@@ -93,17 +92,17 @@ node scripts/verify-face-detection.js
 ### Example Usage
 ```bash
 # Verify Saliency Map is working
-npm start -- --debug-saliency
+TEST_MODE=true TEST_URL=https://example.com TEST_MODES=saliency npm start
 
 # Verify Structure Map packing
-npm start -- --debug-structure
+TEST_MODE=true TEST_URL=https://example.com TEST_MODES=structure npm start
 ```
 
 ## Critical Verification Checklist
-Before shipping ANY change to `structure-map.js` or `peripheral.frag`, you MUST manualy verify:
+Before shipping ANY change to `structure-map.js` or `peripheral.frag`, you MUST manually verify:
 
-1.  **Saliency Map Integrity**: Run `--debug-saliency`. If it looks like a solid color, **STOP**. You have broken the mapping.
-2.  **Blueprint Mode Clarity**: Run `--blueprint`. Images should be **solid blocks**, not "fuzz". Text should be "schematic lines".
+1.  **Saliency Map Integrity**: Turn on **Show Saliency Map**. If it looks like a solid color, **STOP**. You have broken the mapping.
+2.  **Blueprint Mode Clarity**: Switch to Blueprint (mode 3). Images should be **solid blocks** without fuzz. Text should be "schematic lines".
 3.  **Red Saliency Regression**: We have hit this twice. Always check that the saliency map is NOT full-red.
 
 ## Pixel-Level Saliency Verification

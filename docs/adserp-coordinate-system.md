@@ -18,7 +18,7 @@ Source: AdSERP README, convergence.py, find_interesting_trials.py, evtrack docs.
 - **Window viewport**: 1422x1137 CSS pixels (larger than 1280x1024 screen due to ~111% Windows DPI scaling)
 - **Source**: [evtrack](https://github.com/luileito/evtrack) library, captures `event.pageX/pageY`
 - **Events**: mousemove, click, mousedown, mouseup, scroll, load, etc.
-- **Scroll events**: `ypos` contains `window.scrollY` (cumulative offset, not delta)
+- **Scroll events**: `ypos` contains `window.scrollY` (the absolute scroll offset)
 
 ## Converting Between Coordinate Systems
 
@@ -52,8 +52,8 @@ Both subtract scroll from fixation Y.
 1. Window > screen because of Windows DPI scaling (~111%)
 2. Fixation coords are in 1280-wide space; mouse coords are in 1422-wide space
 3. Both Y axes are page-space (include scroll offset)
-4. Scroll events give cumulative position, not deltas
-5. Mean gaze-mouse divergence ~500px mid-trial is NORMAL (not a bug)
+4. Scroll events give the absolute scroll position. They are not deltas.
+5. Mean gaze-mouse divergence ~500px mid-trial is NORMAL. It does not indicate a bug.
 
 ## References
 

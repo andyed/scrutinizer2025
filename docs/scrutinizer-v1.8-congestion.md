@@ -20,7 +20,7 @@ planStatus:
 
 ## Goals
 
-- Ship congestion assessment as a first-class feature (currently partially shipped in v1.7)
+- Ship congestion assessment as a stable feature (currently partially shipped in v1.7)
 - Document the validation pipeline and computational trade-offs for the blog
 - Complete Mode 9 (Congestion-Gated Pooling) or cut it cleanly
 - Expand the validation corpus for statistical robustness
@@ -36,11 +36,11 @@ planStatus:
 - Final metric: `congestion = var_I + var_RG + var_BY`
 
 **Architecture**: Dual-worker system
-- **Saliency worker** (256px, every 15th frame) — real-time peripheral blur modulation
-- **Congestion worker** (1024px, on-demand) — high-res diagnostic when toggled on
+- **Saliency worker** (256px, every 15th frame): real-time peripheral blur modulation
+- **Congestion worker** (1024px, on-demand): high-res diagnostic when toggled on
 
 **Scoring**: `sqrt(congestion_p90 * 0.7 + edgeDensity_p90 * 0.3) * 100`
-- p90 percentile captures busy regions, ignores whitespace
+- p90 percentile measures the busy regions and ignores whitespace
 - sqrt scaling spreads [0,1] into discriminative [0,100] range
 
 **Display**: Complexity HUD with Score / Stats / Spatial tabs
@@ -49,13 +49,11 @@ planStatus:
 
 ### What's Incomplete
 
-1. **Mode 9 (Congestion-Gated Pooling)** — flag in modes.json, shader wired to read `u_congestionMap` on TEXTURE4, but pooling modulation not implemented. The hypothesis: cluttered regions get stronger peripheral pooling (harder to read in periphery).
-2. **Validation corpus** — only 10 images. Spearman correlation needs 20-30 for statistical confidence.
-3. **Blog documentation** — draft exists at `blog/drafts/congestion-score/post.md`, not published.
+1. **Mode 9 (Congestion-Gated Pooling):** flag in modes.json, shader wired to read `u_congestionMap` on TEXTURE4, but pooling modulation not implemented. The hypothesis is that cluttered regions get stronger peripheral pooling (harder to read in periphery).
+2. **Validation corpus:** only 10 images. Spearman correlation needs 20-30 for statistical confidence.
+3. **Blog documentation:** draft exists at `blog/drafts/congestion-score/post.md` and is unpublished.
 
-## The Key Discovery: Fixed Sigma
-
-The most important technical finding to document:
+## Fixed Sigma Outperforms Auto-Scaled Sigma
 
 **Auto-scaled sigma fails on web content.**
 
@@ -65,26 +63,26 @@ The most important technical finding to document:
 | 768px | 7.5 | 0.60 FAIL | 2.5 | **0.93** PASS |
 | 1024px | 10.0 | 0.65 FAIL | 2.5 | 0.92 PASS |
 
-**Why**: Auto-scaling was designed for natural images at varying capture resolutions (same scene, different zoom). Web pages at 512px and 1024px are the same page at different pixel densities — scaling σ up smears text, borders, and UI into indistinguishable blobs. Fixed σ keeps the neighborhood matched to the feature scale that matters (text, icons, borders).
+**Why**: Auto-scaling was designed for natural images at varying capture resolutions (same scene, different zoom). Web pages at 512px and 1024px are the same page at different pixel densities. Scaling σ up smears text, borders, and UI into indistinguishable blobs. Fixed σ keeps the neighborhood matched to the feature scale that matters (text, icons, borders).
 
-This is the story. The algorithm is simple; knowing *not* to scale the kernel is the insight.
+*(Correction 2026-10-01: the sweep downscaled the same native screenshots to each `maxDim`, so the inputs were scaled versions of each other, and auto-scaled σ covered the same page area at every resolution (σ ≈ 10–42 native px for this corpus). What changed between the auto and fixed runs was neighborhood size: fixed σ=2.5 pools over a 2–4× smaller page area at 512–1024 px, closer to the reference's σ=3 px pooling on native-resolution images. The defect was the `extract-congestion.js` default; the worker already used fixed σ=2.5.)*
 
 ## Computational Challenges to Document
 
 ### 1. Dual-Resolution Architecture
-The core tension: congestion as a diagnostic (needs accuracy, 1024px) vs. congestion as a real-time input to the shader pipeline (needs speed, 256px). The dual-worker system resolves this but creates two different quality tiers. The saliency worker's 256px congestion is "directionally correct" — it ranks regions the same, but the absolute values differ. Good enough for gating peripheral blur strength; not good enough for the HUD score.
+The core tension is between congestion as a diagnostic (needs accuracy, 1024px) and congestion as a real-time input to the shader pipeline (needs speed, 256px). The dual-worker system resolves this but creates two different quality tiers. The saliency worker's 256px congestion is "directionally correct": it ranks regions the same, but the absolute values differ. That is good enough for gating peripheral blur strength. The HUD score needs accurate absolute values.
 
 ### 2. Gaussian Blur in a Web Worker
 Separable Gaussian blur is O(w × h × kernel_size) per channel, twice (horizontal + vertical). At σ=2.5, kernel is ~16px wide. At 1024px with 3 channels + variance computation, that's ~100M multiply-adds per frame. Web Workers make this non-blocking, but it's still 100-500ms per analysis frame. The cached buffer pattern (`Float32Array` allocated once, reused) avoids GC pressure.
 
 ### 3. Single-Scale vs Multi-Scale
-Rosenholtz's original uses a multi-scale steerable pyramid (4 orientations × 4 scales = 16 subbands). Our single Gaussian at σ=2.5 captures ~80% of the ranking accuracy at <5% of the compute. The multi-scale approach would catch orientation-dependent clutter (diagonal stripes vs. horizontal lines) — our approach can't distinguish these. For web content, this matters less than for natural scenes.
+Rosenholtz's original uses a multi-scale steerable pyramid (4 orientations × 4 scales = 16 subbands). Our single Gaussian at σ=2.5 retains ~80% of the ranking accuracy at <5% of the compute. The multi-scale approach would catch orientation-dependent clutter (diagonal stripes vs. horizontal lines). Our approach can't distinguish these. For web content, this matters less than for natural scenes.
 
 ### 4. Scoring Formula Design
-Why p90, not mean? A page with one cluttered hero and clean whitespace elsewhere has low mean but high p90. The p90 answers "how bad are the busy parts?" — the question designers actually care about. The 70/30 congestion/edge weighting came from empirical tuning against the test corpus — edge density alone over-weights text-heavy pages.
+Why p90 instead of the mean? A page with one cluttered hero and clean whitespace elsewhere has low mean but high p90. The p90 measures how bad the busy parts are, which is what designers care about. The 70/30 congestion/edge weighting came from empirical tuning against the test corpus. Edge density alone over-weights text-heavy pages.
 
 ### 5. Heatmap Resolution Mismatch
-The congestion map is computed at 1024px but displayed on a page that could be any size. The WebGL renderer uploads it as a texture and samples with bilinear interpolation. This works because congestion is spatially smooth (it's a variance measure after Gaussian blur), but pixel-level overlay alignment requires careful UV mapping. The shader reads `u_congestionMap` at the fragment's UV coordinate — no coordinate transform needed if both textures share the same aspect ratio.
+The congestion map is computed at 1024px but displayed on a page that could be any size. The WebGL renderer uploads it as a texture and samples with bilinear interpolation. This works because congestion is spatially smooth (it's a variance measure after Gaussian blur), but pixel-level overlay alignment requires careful UV mapping. The shader reads `u_congestionMap` at the fragment's UV coordinate, so no coordinate transform is needed if both textures share the same aspect ratio.
 
 ## Validation Pipeline
 
@@ -113,13 +111,13 @@ compare-congestion.js     →  comparison_report.json
 
 ### What the Tests Prove
 
-1. **Rank ordering matches**: Scrutinizer ranks all 10 images in the same order as the Python reference (ρ=0.93)
+1. **Rank ordering mostly matches**: at 768px, Scrutinizer gives 5 of 10 images the same rank as the Python reference and places the rest within 3 ranks (ρ=0.93)
 2. **Fixed sigma is correct**: All three fixed-σ resolutions pass; all three auto-scaled fail
 3. **Absolute values diverge**: SSIM ~0.50 (simplified algorithm + different color space = different heatmap values, but same spatial structure and ranking)
 
 ### What the Tests Don't Cover
 
-1. **Human judgment correlation**: Rosenholtz validated against 25 hand-rated maps (ρ=0.83 with humans). Those maps were never published. We validate against her *algorithm*, not her *human data*.
+1. **Human judgment correlation**: Rosenholtz validated against 25 hand-rated maps (ρ=0.83 with humans). Those maps were never published. We validate against her algorithm only.
 2. **Orientation clutter**: No test image isolates diagonal-vs-horizontal clutter (would expose single-scale limitation)
 3. **Dynamic content**: All tests are static screenshots. Live pages with animation, scroll position, viewport changes untested.
 
@@ -127,7 +125,7 @@ compare-congestion.js     →  comparison_report.json
 
 ### Option A: Ship What's Working (Minimal v1.8)
 - Promote congestion HUD from experimental to stable
-- Publish blog post documenting the algorithm, validation, and fixed-sigma discovery
+- Publish blog post documenting the algorithm, validation, and fixed-sigma result
 - Expand corpus to 20 images
 - Cut Mode 9 (move to backlog as v1.9 or later)
 - Version bump + CHANGELOG
@@ -136,7 +134,7 @@ compare-congestion.js     →  comparison_report.json
 - Everything in Option A, plus:
 - Complete Mode 9: congestion map modulates peripheral pooling strength
 - Hypothesis: `pooling_intensity = base_intensity * (1 + congestion * k)`
-- Needs perceptual validation — does it look right? Does cluttered content degrade more naturally?
+- Needs perceptual validation: does it look right? Does cluttered content degrade more naturally?
 - Risk: gating formula is hypothesis-stage, may need iteration
 
 ### Option C: Research Release (v1.8-beta)
@@ -148,7 +146,7 @@ compare-congestion.js     →  comparison_report.json
 ## Acceptance Criteria
 
 - [ ] Validation corpus expanded to 20+ images (Spearman ρ ≥ 0.85 maintained)
-- [ ] Blog post published: algorithm, validation pipeline, fixed-sigma discovery, computational challenges
+- [ ] Blog post published: algorithm, validation pipeline, fixed-sigma result, computational challenges
 - [ ] Complexity HUD stable (no config reset bug regressions)
 - [ ] Mode 9 decision: ship, cut, or beta-flag
 - [ ] CHANGELOG updated
@@ -176,4 +174,4 @@ blog/drafts/congestion-score/      # Blog draft
 
 - Rosenholtz, R., Li, Y., & Nakano, L. (2007). "Measuring visual clutter." *Journal of Vision*, 7(2), 17.
 - Rosenholtz, R. (2020). "Demystifying visual awareness." *Trends in Cognitive Sciences*.
-- `visual-clutter` Python package (MIT port of Rosenholtz MATLAB toolbox)
+- `visual-clutter` Python package (MIT-licensed third-party Python port of the Rosenholtz MATLAB toolbox, by Amir Hossein Kargaran)

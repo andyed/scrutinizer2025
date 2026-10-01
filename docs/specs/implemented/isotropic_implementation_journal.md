@@ -1,21 +1,21 @@
 # Isotropic Mode 12: Implementation Journal
 
-> **Date:** 2026-03-15 (attempts 1-7), 2026-03-19 (attempt 8 — shipped)
-> **Status:** Shipped — attempt 8 is the default mode (mode 12)
+> **Date:** 2026-03-15 (attempts 1-7), 2026-03-19 (attempt 8, shipped)
+> **Status:** Shipped. Attempt 8 is the default mode (mode 12)
 > **Parent spec:** `isotropic_cortical_sampling.md`
 
 ## Goal
 
 Make mode 12 (V1 distortion type 5) produce peripheral degradation that:
 - Destroys text readability (letters unrecognizable beyond parafovea)
-- Preserves texture structure (lines of text visible as lines, not fog)
+- Preserves texture structure (lines of text stay visible as lines)
 - Uses isotropic sector geometry from Blauch (2026) to drive degradation
 - Looks at least as realistic as mode 0 (v2.4.1 smoothstep baseline)
 
 ## What Was Built
 
 ### Sector geometry (KEEP)
-`computeCorticalSector()` in `peripheral.frag` — computes ring index, spoke count, sector center UV, radial spacing. Math verified against Blauch Python to 3 decimal places (see `tests/unit/isotropic-sectors.test.js`, 19 passing tests). This is correct and should be preserved.
+`computeCorticalSector()` in `peripheral.frag` computes ring index, spoke count, sector center UV, and radial spacing. Math verified against Blauch Python to 3 decimal places (see `tests/unit/isotropic-sectors.test.js`, 19 passing tests). This is correct and should be preserved.
 
 ### Sector parameters at key eccentricities (N=50, r_max=15°)
 
@@ -26,18 +26,18 @@ Make mode 12 (V1 distortion type 5) produce peripheral degradation that:
 | 8° | ~34 | ~104 | ~19px | ~16px |
 | 12° | ~41 | ~126 | ~27px | ~16px |
 
-Key observation: at 5° eccentricity, sectors (~13px) are smaller than letter glyphs (~16-20px). Letters span 2-3 sectors. This means sector-level operations (snap, average) don't cleanly isolate features — they either leave letters partly intact or produce sub-letter averaging artifacts.
+At 5° eccentricity, sectors (~13px) are smaller than letter glyphs (~16-20px). Letters span 2-3 sectors. This means sector-level operations (snap, average) don't cleanly isolate features. They either leave letters partly intact or produce sub-letter averaging artifacts.
 
 ## Approaches Tried
 
 ### 1. UV snap to sector center
-**Idea:** Snap each pixel's UV to the center of its cortical sector before sampling. All pixels in a sector see the same texel.
+**Idea:** Snap each pixel's UV to the center of its cortical sector before sampling. All pixels in a sector sample the same texel.
 
 **Result:** Gray blobs everywhere.
 
-**Why:** A sector spanning black text on white background averages to gray. This is spatial averaging, not peripheral vision. Peripheral vision preserves local contrast and texture statistics (Rosenholtz TTM) — it scrambles features, not erases them.
+**Why:** A sector spanning black text on white background averages to gray. This is spatial averaging. Peripheral vision preserves local contrast and texture statistics (Rosenholtz TTM) while scrambling features.
 
-**Lesson:** Any mechanism that converges pixels toward a common sample point produces mean color. UV snap is fundamentally wrong for text-on-background content.
+**Lesson:** Any mechanism that converges pixels toward a common sample point produces mean color. UV snap is wrong for text-on-background content.
 
 ### 2. textureGrad with sector-sized derivatives
 **Idea:** Use `textureGrad()` instead of `textureLod()` in the DoG reconstruction. Pass sector-width derivatives so the GPU automatically samples at the MIP level matching sector resolution.
@@ -46,14 +46,14 @@ Key observation: at 5° eccentricity, sectors (~13px) are smaller than letter gl
 
 **Why:** The DoG reconstruction subtracts adjacent MIP levels: `sum(w[i] * (mip[i] - mip[i+1]))`. When textureGrad pushes ALL 9 bands to high MIP, adjacent bands converge to the same value, differences → 0, weights sum to ~0, output → gray. The frequency-selective behavior of DoG requires bands at different resolutions. Forcing them all to sector resolution destroys the entire reconstruction.
 
-**Lesson:** textureGrad is the wrong tool for DoG. The DoG bands MUST span different MIP levels. Only `textureLod` with a floor (not a forced level) preserves the frequency cascade.
+**Lesson:** textureGrad is the wrong tool for DoG. The DoG bands MUST span different MIP levels. Only `textureLod` with a floor (a minimum LOD applied to each band) preserves the frequency cascade.
 
 ### 3. Per-pixel hash jitter
 **Idea:** Add small random UV displacement per pixel, scaled by sector size.
 
 **Result:** No visible effect on text readability.
 
-**Why:** Hash noise at pixel scale creates ~2.5px displacement cells. A 20px letter glyph spans ~8 noise cells. The noise shifts individual pixels but the letter shape survives because the displacement is incoherent at letter scale — like static on a TV, you can still read through it.
+**Why:** Hash noise at pixel scale creates ~2.5px displacement cells. A 20px letter glyph spans ~8 noise cells. The noise shifts individual pixels but the letter shape survives because the displacement is incoherent at letter scale.
 
 **Lesson:** Displacement must be coherent at the feature scale you want to destroy. For ~20px letters, you need ~10-20px coherent displacement regions. But regions that large create visible tiles (see #5).
 
@@ -62,7 +62,7 @@ Key observation: at 5° eccentricity, sectors (~13px) are smaller than letter gl
 
 **Result:** Minimal effect on readability. Smooth warping visible but letters still legible.
 
-**Why:** Same scale mismatch as #3. The 800-frequency simplex noise creates ~2.4px wavelength features. Even with larger amplitude (up to 24px throw), the smooth noise warps letters as rigid bodies — they shift position but remain recognizable. Mode 0 works because it combines this smooth warp with a discrete scramble that breaks up the rigid letter shapes.
+**Why:** Same scale mismatch as #3. The 800-frequency simplex noise creates ~2.4px wavelength features. Even with larger amplitude (up to 24px throw), the smooth noise warps letters as rigid bodies. They shift position but remain recognizable. Mode 0 works because it combines this smooth warp with a discrete scramble that breaks up the rigid letter shapes.
 
 **Lesson:** Smooth warping alone cannot destroy letter identity. You need either (a) very large coherent displacement that moves letters apart, or (b) a second mechanism that breaks within-letter coherence.
 
@@ -73,16 +73,16 @@ Key observation: at 5° eccentricity, sectors (~13px) are smaller than letter gl
 
 **Why:** Sector boundaries are visible as hard edges between shifted regions. Text lines crossing sector boundaries show staircase patterns. The tiles are geometrically regular (rings and spokes) which makes the pattern even more obvious than random tiles.
 
-**Lesson:** Sector-coherent operations produce sector-shaped artifacts. The isotropic geometry is mathematically elegant but visually conspicuous when used as a scramble unit. Any rendering that makes sector boundaries visible fails.
+**Lesson:** Sector-coherent operations produce sector-shaped artifacts. The isotropic geometry is visually conspicuous when used as a scramble unit. Any rendering that makes sector boundaries visible fails.
 
 ### 6. Type 0 discrete scramble (hash per 4px cell)
-**Idea:** Copy mode 0's "cutter" stage — hash-based displacement per 4px grid cell, 15px throw distance.
+**Idea:** Copy mode 0's "cutter" stage: hash-based displacement per 4px grid cell, 15px throw distance.
 
 **Result:** Pixel dust. Scattered individual pixels displaced into wrong neighborhoods.
 
 **Why:** A 4px cell at the edge of a dark letter on white background contains both dark and light pixels. The cell gets thrown 15px away as a unit, depositing dark pixels in a white region (or vice versa). On dark backgrounds (dark mode), scattered bright pixels are highly visible. On light backgrounds, scattered dark pixels blend in better (which is why mode 0 looks decent on typical light-mode web content).
 
-**Lesson:** The discrete scramble IS what kills readability in mode 0, but it creates non-biological artifacts that are visible in dark mode. It's a practical hack, not a principled solution.
+**Lesson:** The discrete scramble IS what kills readability in mode 0, but it creates non-biological artifacts that are visible in dark mode. It is a practical hack with no principled basis.
 
 ### 7. Type 0 noise + sector lodFloor (best result)
 **Idea:** Combine mode 0's smooth simplex warp (no discrete scramble) with a lodFloor derived from sector extent. The lodFloor clamps the finest DoG bands, preventing the reconstruction from resolving features smaller than the sector.
@@ -91,13 +91,13 @@ Key observation: at 5° eccentricity, sectors (~13px) are smaller than letter gl
 
 **lodFloor tuning:**
 - `1.0x` of `log2(sectorExtent * resolution)`: At 5°, lodFloor ≈ 3.7 → clamped bands 0-7 → killed all texture → foggy
-- `0.4x`: Minimal effect — text still sharp
-- `0.6x`: Best balance — noticeable degradation but text still partly readable
-- `0.8x`: Too much — texture starts disappearing
+- `0.4x`: Minimal effect (text still sharp)
+- `0.6x`: Best balance (noticeable degradation, but text still partly readable)
+- `0.8x`: Too much (texture starts disappearing)
 
-**Why it's still not right:** The lodFloor removes fine texture uniformly. Mode 0's strength is that peripheral content retains texture — you can tell whether you're looking at a paragraph, an image, a nav bar. The lodFloor erases this distinction. It's blur (progressive, but still blur), not scrambling.
+**Why it's still not right:** The lodFloor removes fine texture uniformly. Mode 0's strength is that peripheral content retains texture: you can tell whether you're looking at a paragraph, an image, a nav bar. The lodFloor erases this distinction. It produces blur (progressive, but still blur). It does not scramble features.
 
-**Lesson:** lodFloor is a dimmer switch on spatial frequency — it can't selectively destroy feature identity while preserving texture. The fundamental problem is that "destroy letters but keep texture" requires a mechanism that operates at the semantic level of features, not the optical level of spatial frequency.
+**Lesson:** lodFloor is a dimmer switch on spatial frequency. It can't selectively destroy feature identity while preserving texture. The fundamental problem is that "destroy letters but keep texture" requires a mechanism that operates at the semantic level of features.
 
 ## The Core Problem
 
@@ -111,34 +111,34 @@ Mode 12 needs to replicate this two-stage destruction using sector geometry as t
 
 ## Possible Directions (for next attempt)
 
-1. **Sector geometry drives transition rate, not mechanism.** Use mode 0's existing noise+scramble mechanism, but let the isotropic sector geometry control WHERE transitions happen (eccentricity thresholds). The rendering mechanism stays proven; the sector math controls the spatial profile.
+1. **Sector geometry sets the transition rate. It does not supply the rendering mechanism.** Use mode 0's existing noise+scramble mechanism, but let the isotropic sector geometry control WHERE transitions happen (eccentricity thresholds). The rendering mechanism stays proven; the sector math controls the spatial profile.
 
 2. **Sector-weighted smooth blending.** Instead of hard sector boundaries, use a smooth weighting function that peaks at sector centers. This could drive a texture-aware pooling operation without visible boundaries.
 
 3. **Work color first.** Peripheral color processing (chromatic decay, S-cone distribution) is less coupled to spatial scrambling. Establish the color pipeline, then layer spatial degradation on top. User's stated preference: "I'm thinking this time we work color then port to isotropic."
 
-4. **lodFloor as supplement, not replacement.** Use a gentle lodFloor (0.3-0.4x) alongside noise+scramble, not instead of it. The lodFloor softens the finest bands; the scramble handles feature destruction.
+4. **lodFloor as a supplement.** Use a gentle lodFloor (0.3-0.4x) alongside noise+scramble. The lodFloor softens the finest bands; the scramble handles feature destruction.
 
-### 8. Sector-parameterized Bender + Cutter (2026-03-19) — SHIPPED
+### 8. Sector-parameterized Bender + Cutter (2026-03-19): SHIPPED
 
-**Idea:** Don't use sectors as a rendering primitive at all. Use the proven noise-warp ("Bender") and discrete-scramble ("Cutter") from type 1, but parameterize their spatial frequency and cell size from sector extent. Sector geometry drives *where and how fast* degradation changes — not *how pixels change*.
+**Idea:** Don't use sectors as a rendering primitive at all. Use the proven noise-warp ("Bender") and discrete-scramble ("Cutter") from type 1, but parameterize their spatial frequency and cell size from sector extent. Sector geometry determines *where and how fast* degradation changes. It does not determine *how pixels change*.
 
 **Implementation:**
 - Extract Bender and Cutter as parameterized GLSL functions (`applyBender`, `applyCutter`) with config structs
 - Bender frequency inversely proportional to sector extent: `150 * 7 / sectorPx`
-- Cutter cell size tracks sector extent, capped at 12px: `clamp(sectorPx * 0.5, 4, 12)`
-- Throw distance bounded by sector width in UV space, 2:1 radial bias
+- Cutter cell size tracks sector extent, capped at 12px: `clamp(sectorPx * 0.5, 4, 12)` *(Correction 2026-10-01: every committed shader uses `clamp(sectorPx * 0.5, 8.0, 16.0)`, from the v2.6.0 release commit 5367403 on.)*
+- Throw distance bounded by sector width in UV space, 2:1 radial bias *(Correction 2026-10-01: the progressive multiplier takes throw to ~3.25× sector width at max eccentricity (item 3 below), and the 2:1 bias is applied along screen x, not the radial direction.)*
 - Same scrambleZone onset as type 1 (corticalStrength-based, Pelli & Tillman 2008)
 
-**Result:** Works. Passes all tests (smoke 7/7, unit 274/274, visual, memory, perf, integration). Rendering validation: angular isotropy CV < 0.5, zero dark scatter, texture preserved, mode-comparable statistics. Visual difference from type 1 is subtle — fewer implausible long-range scatters, smoother degradation profile.
+**Result:** Works. Passes all tests (smoke 7/7, unit 274/274, visual, memory, perf, integration). Rendering validation: angular isotropy CV < 0.5, zero dark scatter, texture preserved, mode-comparable statistics. Visual difference from type 1 is subtle: fewer implausible long-range scatters and a smoother degradation profile.
 
-**Why it worked:** Every previous attempt tried to make sectors the rendering unit — snap to sector center, average within sectors, gate at sector boundaries. All produced sector-shaped artifacts because sectors are large relative to features (a 13px sector at 5° spans less than one letter). The Bender/Cutter already operates at sub-feature scale. Parameterizing it from sector extent gives the CMF-derived spatial profile without introducing sector-scale coherence.
+**Why it worked:** Every previous attempt tried to make sectors the rendering unit: snap to sector center, average within sectors, gate at sector boundaries. All produced sector-shaped artifacts because sectors are large relative to features (a 13px sector at 5° spans less than one letter). The Bender/Cutter already operates at sub-feature scale. Parameterizing it from sector extent gives the CMF-derived spatial profile without introducing sector-scale coherence.
 
-**The principle:** Sector geometry drives transition rate, not mechanism. This is the key insight from the failure of attempts 1-7.
+Attempts 1-7 established that sector geometry sets the transition rate and does not supply the rendering mechanism.
 
 **Known approximations:**
 1. Forward-difference for `dr` (~3% from central difference at N=50)
-2. Radial/tangential bias in screen coordinates, not true polar
+2. Radial/tangential bias computed in screen coordinates as an approximation of true polar coordinates
 3. Progressive multiplier pushes throw to ~3.25x sector at max eccentricity
 
 **Shipped as:** V1 distortion type 5, mode 12 (FOVI Cortical Grid), default mode since 2026-03-19.
@@ -147,16 +147,16 @@ Mode 12 needs to replicate this two-stage destruction using sector geometry as t
 
 | Item | Status | Rationale |
 |------|--------|-----------|
-| `tests/unit/isotropic-sectors.test.js` | KEEP | Pure math — validates sector geometry against Blauch Python |
+| `tests/unit/isotropic-sectors.test.js` | KEEP | Pure math: validates sector geometry against Blauch Python |
 | `scripts/ocr-readability-comparison.js` | KEEP | Mode-agnostic validation tool |
 | `scripts/capture-isotropic-comparison.js` | KEEP | Comparison capture infrastructure |
 | `scripts/validate-isotropic-rendering.js` | NEW | Rendering validation (spec items 5-9), 12 checks |
 | `docs/golden/isotropic-side-by-side.html` | KEEP | 3-way visual comparison viewer |
-| `docs/specs/isotropic_cortical_sampling.md` | UPDATE | Mathematical spec needs status update (rendering shipped) |
-| `docs/specs/mode_graduation.md` | NEW | Process spec for promoting modes to default |
+| `docs/specs/implemented/isotropic_cortical_sampling.md` | UPDATE | Mathematical spec needs status update (rendering shipped) |
+| `docs/specs/implemented/mode_graduation.md` | NEW | Process spec for promoting modes to default |
 | `BenderConfig`/`CutterConfig` structs in peripheral.frag | NEW | Extracted, parameterized distortion components |
 | V1 type 5 distortion block | SHIPPED | Sector-parameterized Bender + Cutter (attempt 8) |
-| `computeCorticalSector()` in peripheral.frag | REVERTED | Not needed — type 5 computes sector extent inline |
+| `computeCorticalSector()` in peripheral.frag | REVERTED | Not needed: type 5 computes sector extent inline |
 
 ## References
 

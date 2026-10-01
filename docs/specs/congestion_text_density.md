@@ -2,14 +2,14 @@
 
 > **Last updated:** 2026-03-22
 
-**Status:** Shipped (v2.7) — eccentricity-weighted congestion + Bouma-scaled edge density
+**Status:** Shipped (v2.7): eccentricity-weighted congestion + Bouma-scaled edge density
 **Depends on:** Wave 5 Halverson findings (v2.1)
 **Original goal:** Graduate Mode 9 (Congestion-Gated Pooling) from experimental to default
 **Resolution:** Implemented via Option C (hybrid precomputed texture) with eccentricity weighting. See [eccentricity_weighted_congestion.md](implemented/eccentricity_weighted_congestion.md) for the v2.7 implementation.
 
 ## Problem
 
-The congestion gate (Rosenholtz Feature Congestion) does not respond to text density. The Halverson mixed-density stimulus — 5 sparse words vs 10 dense words at matched eccentricities — registers as **0/100 congestion** across the entire layout. Dense and sparse groups produce identical congestion values because Feature Congestion measures color variance, luminance contrast, and orientation energy, not character packing.
+The congestion gate (Rosenholtz Feature Congestion) does not respond to text density. The Halverson mixed-density stimulus (5 sparse words vs 10 dense words at matched eccentricities) registers as **0/100 congestion** across the entire layout. Dense and sparse groups produce identical congestion values because Feature Congestion measures color variance, luminance contrast, and orientation energy, none of which tracks character packing.
 
 ### v2.1 evidence
 
@@ -29,7 +29,7 @@ Halverson's TEE model defines density by **nearest-neighbor distance** between t
 - Sparse: nearest neighbor ≥ 0.15° → 90% encoding accuracy
 - Dense: nearest neighbor < 0.15° → 50% encoding accuracy
 
-This is not visual complexity (Feature Congestion). It's spatial packing of discrete readable elements. The biological basis: crowding in peripheral vision scales with the number of items competing for the same pooling region, not with the visual richness of those items.
+Text density measures the spatial packing of discrete readable elements, a different quantity from the visual complexity that Feature Congestion measures. In peripheral vision, crowding grows with the number of items competing for the same pooling region.
 
 ## v2.7 Implementation
 
@@ -41,7 +41,7 @@ The shipped solution combines Option C (precomputed edge density texture) with e
 4. **Congestion pooling gate**: 50/50 blend of Bouma edge density + eccentricity congestion modulates `coupledEccentricity`.
 5. **Resolution-gated saliency**: Acuity decay (`1/(1+ecc/E2)`, E2=8.0°) prevents over-protection of far-peripheral content.
 
-Validation: Spearman ρ=0.72 against Rosenholtz MIT reference (R channel unchanged).
+Validation: Spearman ρ=0.72 against the `visual-clutter` Python port of Rosenholtz's Feature Congestion (R channel unchanged).
 
 ## Historical: Proposed approaches
 
@@ -89,10 +89,10 @@ Add a text density channel to the content analysis pipeline (runs in overlay.js)
 2. Weight by inverse inter-element spacing (closer = denser)
 3. Write to an unused channel of the structure map or congestion map
 
-**Pros:** Uses existing DOM analysis, semantically accurate (knows what's text vs image).
-**Cons:** Same DOM block-level granularity problem — unless we switch to per-character bounding boxes via `Range.getClientRects()`.
+**Pros:** Uses existing DOM analysis, semantically accurate (distinguishes text from images).
+**Cons:** Same DOM block-level granularity problem, unless we switch to per-character bounding boxes via `Range.getClientRects()`.
 
-### Option C: Hybrid — precomputed edge density texture
+### Option C: Hybrid (precomputed edge density texture)
 
 Run edge density as a separate compute pass (like the congestion worker) on the captured frame.
 
@@ -125,7 +125,7 @@ Re-run the Halverson pipeline with the text density enhancement:
 
 ## Biological grounding
 
-The text density signal maps to **crowding zone occupancy** — how many items fall within the critical spacing (Bouma's law: ~0.5× eccentricity). Pelli et al. (2004) showed that crowding is the primary limit on peripheral letter recognition, and it depends on the number of flanking items, not their visual complexity. Feature Congestion captures clutter (visual complexity); text density captures crowding (spatial packing). Both matter; the current pipeline only has the first.
+The text density signal maps to **crowding zone occupancy**, the number of items within the critical spacing (Bouma's law: ~0.5× eccentricity). Pelli et al. (2004) showed that crowding is the primary limit on peripheral letter recognition, and it depends on the number of flanking items. Feature Congestion measures clutter (visual complexity); text density measures crowding (spatial packing). The pipeline blends the two (Bouma-scaled edge density and eccentricity-weighted congestion, `peripheral.frag` `congestionBoost`).
 
 ## References
 

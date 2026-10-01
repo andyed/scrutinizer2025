@@ -1,13 +1,13 @@
-# Isotropic Cortical Rendering — Migration Spec
+# Isotropic Cortical Rendering: Migration Spec
 
-> **Date:** 2026-03-17 (updated 2026-03-19 — shipped as v2.6.0)
+> **Date:** 2026-03-17 (updated 2026-03-19, shipped as v2.6.0)
 > **Status:** Shipped. Sector-parameterized Bender+Cutter (V1 type 5) is default mode since 2026-03-19. See implementation journal attempt #8.
 > **Prerequisite:** v2.5.0 (12-band DoG, calibrated chromatic decay)
 > **Goal:** ~~Replace rectangular MIP-based spatial degradation with isotropic cortical geometry~~ Parameterize existing displacement pipeline from isotropic cortical sector geometry
 
 ## Context
 
-Scrutinizer v2.5 has biologically grounded *color* (per-channel RG/BY decay, swatch preservation) but its *spatial* degradation uses rectangular MIP tiles and ad-hoc noise. The geometry that controls where and how resolution degrades is not derived from the cortical magnification function — it's a smoothstep ramp tuned by eye.
+Scrutinizer v2.5 has biologically grounded *color* (per-channel RG/BY decay, swatch preservation) but its *spatial* degradation uses rectangular MIP tiles and ad-hoc noise. The geometry that controls where and how resolution degrades is a smoothstep ramp tuned by eye. It is not derived from the cortical magnification function.
 
 The isotropic migration replaces this with sector geometry from Blauch, Alvarez & Konkle (2026, FOVI): rings at uniform cortical spacing, spokes matched for isotropy at every eccentricity. The math is verified (19 tests against Blauch's Python). The rendering mechanism is the open problem.
 
@@ -20,24 +20,24 @@ The isotropic migration replaces this with sector geometry from Blauch, Alvarez 
 | Grid visualizations | Working | `grid-comparison.html`, `cortical-manifold.html`, [CodePen](https://codepen.io/andy-edmonds/pen/019ced00-b472-7c33-8ebb-20982aa039ad) |
 | Capture infrastructure | Ready | `scripts/capture-isotropic-comparison.js` |
 | Rendering validation | 12/12 checks | `scripts/validate-isotropic-rendering.js` |
-| Blog draft | Updated for shipped impl | `scrutinizer-www/src/blog/drafts/isotropic-cortical-sampling.html` |
-| 8 rendering attempts (7 failed, 1 shipped) | Documented | `docs/specs/isotropic_implementation_journal.md` |
+| Blog draft | Updated for shipped impl | `scrutinizer-www/src/blog/2026-03-21-v2.6.html` (published 2026-03-21) |
+| 8 rendering attempts (7 failed, 1 shipped) | Documented | `docs/specs/implemented/isotropic_implementation_journal.md` |
 | V1 type 5 shader block | **Shipped** | `BenderConfig`/`CutterConfig` parameterized by sector extent |
-| `computeCorticalSector()` | **Reverted** | Not needed — type 5 computes sector extent inline |
+| `computeCorticalSector()` | **Reverted** | Not needed: type 5 computes sector extent inline |
 
 ## The Core Problem
 
 Mode 0's peripheral degradation works via two mechanisms:
-1. **Bender** — smooth simplex noise warp, shifts features around
-2. **Cutter** — discrete 4px hash scramble, breaks within-feature coherence
+1. **Bender:** smooth simplex noise warp, shifts features around
+2. **Cutter:** discrete 4px hash scramble, breaks within-feature coherence
 
 Together they destroy letter identity while preserving texture (you can tell paragraph from image from nav bar). Neither alone works. Every attempt to replace these with sector-based operations produced either gray blobs (sector averaging) or visible tile artifacts (sector-coherent scramble).
 
-The fundamental tension: **sectors are geometrically correct but visually conspicuous when used as operational units.** Any rendering that makes sector boundaries visible fails the usability test.
+**Sectors are geometrically correct but visually conspicuous when used as operational units.** Any rendering that makes sector boundaries visible fails the usability test.
 
-## Migration Strategy: Sector Geometry Drives Profile, Not Mechanism
+## Migration Strategy: Sector Geometry Sets the Transition Profile
 
-The key insight from the implementation journal (approach #1 in "Possible Directions"): use mode 0's proven noise+scramble mechanism, but let isotropic sector geometry control the **transition profile** — where degradation starts, how fast it intensifies, and the eccentricity-dependent scaling.
+The strategy follows approach #1 in the implementation journal's "Possible Directions": use mode 0's proven noise+scramble mechanism, but let isotropic sector geometry control the **transition profile** (where degradation starts, how fast it intensifies, and the eccentricity-dependent scaling).
 
 ### What changes
 
@@ -63,7 +63,7 @@ The key insight from the implementation journal (approach #1 in "Possible Direct
 
 ### Phase 1: Sector-parameterized MIP level
 
-Replace `computeMipLevel()` — currently a smoothstep over pixel distance — with a cortical-coordinate derivation:
+Replace `computeMipLevel()` (currently a smoothstep over pixel distance) with a cortical-coordinate derivation:
 
 ```glsl
 // Current: ad-hoc smoothstep
@@ -81,7 +81,7 @@ float computeMipLevel_cortical(float dist_deg) {
 }
 ```
 
-This alone changes the spatial frequency profile from linear-in-pixels to log-in-degrees. The DoG bands, noise, and scramble all inherit the new eccentricity function without code changes — they already consume the MIP level.
+This alone changes the spatial frequency profile from linear-in-pixels to log-in-degrees. The DoG bands, noise, and scramble all inherit the new eccentricity function without code changes, because they already consume the MIP level.
 
 **Validation:** Compare DoG band weights at 5°, 10°, 15° against current. The cortical mapping should produce faster initial rolloff and slower far-peripheral decay (matching Bowers' biphasic observation).
 
@@ -89,9 +89,9 @@ This alone changes the spatial frequency profile from linear-in-pixels to log-in
 
 ### Phase 2: Sector-scaled bender (noise frequency)
 
-Replace fixed-frequency simplex noise with noise scaled by sector extent. **Shipped in commit 3ac811c** — `baseFreq = 150.0 * 7.0 / sectorPx_v1`. Low risk, working.
+Replace fixed-frequency simplex noise with noise scaled by sector extent. **Shipped in commit 3ac811c:** `baseFreq = 150.0 * 7.0 / sectorPx_v1`. Low risk, working.
 
-**Coordinate space bug found and fixed (2026-03-17):** `fovea_radius` is in normalized-Y space (≈0.022), not pixels (≈45). The ppd computation `max(fovea_radius / 1.0, 1.0)` clamped to 1.0, neutering all sector scaling. Fixed by treating `fovea_radius` as `units_per_deg` (norm-Y per degree) and converting to pixels via `* u_resolution.y`. sectorPx now ranges from 7 (fovea) → ~23 (5°) → ~52 (15°) as intended.
+**Coordinate space bug found and fixed (2026-03-17):** `fovea_radius` is in normalized-Y space (≈0.022). It had been treated as pixels (≈45). The ppd computation `max(fovea_radius / 1.0, 1.0)` clamped to 1.0, neutering all sector scaling. Fixed by treating `fovea_radius` as `units_per_deg` (norm-Y per degree) and converting to pixels via `* u_resolution.y`. sectorPx now ranges from 7 (fovea) → ~23 (5°) → ~52 (15°) as intended.
 
 ### Phase 3: Sector-scaled cutter (scramble)
 
@@ -103,12 +103,12 @@ Replace fixed-frequency simplex noise with noise scaled by sector extent. **Ship
 Cell = 0.5× sector at sectorPx=7 → 4px cells → straddles text/background → grey average.
 Cell = 1.0× sector at sectorPx=7 → 7px cells → fine.
 Cell = 1.0× sector at sectorPx=100+ → 100px cells → **massive blocks, total OCR destruction.**
-**Pelli & Tillman 2008** says cells should be feature-scale, but feature scale doesn't grow linearly with cortical sector extent. Need a sublinear or capped scaling: `cellPx = max(7.0, min(sectorPx_v1, CAP))`.
+**Pelli & Tillman (2008)** describe crowding as feature integration, which suggests feature-scale cells, but feature scale doesn't grow linearly with cortical sector extent. Need a sublinear or capped scaling: `cellPx = max(7.0, min(sectorPx_v1, CAP))`.
 
 #### Issue 2: Throw distance (understood, not yet tunable)
-At sectorPx=7, throw = 1.5 × (7/3840) ≈ 0.003 — subtle shuffling. Fine.
-At sectorPx=100, throw = 1.5 × (100/3840) ≈ 0.039 — **cells displaced 150px.** Plus 2:1 radial bias → 300px radially. Total devastation.
-**Bouma 1970** is the zone, not the throw. Throw should be capped independently of cell size.
+At sectorPx=7, throw = 1.5 × (7/3840) ≈ 0.003 (subtle shuffling). Fine.
+At sectorPx=100, throw = 1.5 × (100/3840) ≈ 0.039, so **cells are displaced 150px.** Plus 2:1 radial bias → 300px radially.
+**Bouma 1970** defines the zone. It does not specify the throw. Throw should be capped independently of cell size.
 
 #### Issue 3: Source + destination structure gating (coded, untested at correct scale)
 The gating logic is sound (Rosenholtz 2012, Palmer 1992) but hasn't been tested with correctly-scaled sectorPx. It should help by suppressing throws into blank space, but can't fix the fundamental over-scaling.
@@ -120,7 +120,7 @@ The gating logic is sound (Rosenholtz 2012, Palmer 1992) but hasn't been tested 
 #### What needs to happen next
 The coordinate fix is correct mathematically. The downstream parameters need re-tuning against the now-realistic sectorPx values. Concretely:
 1. Cap sectorPx at a value that produces v2.4-like OCR profiles (~20-25px max?)
-2. Re-tune bender amplitude — `0.0024` was set when sectorPx=7 and baseFreq=150; at sectorPx=25, baseFreq=42, the warp is smoother and may need amplitude reduction
+2. Re-tune bender amplitude: `0.0024` was set when sectorPx=7 and baseFreq=150; at sectorPx=25, baseFreq=42, the warp is smoother and may need amplitude reduction
 3. Test structure gating at the corrected scale
 4. Validate against both SE and the new OCR relative recognition rate
 
@@ -133,7 +133,7 @@ Replace linear M-scaling cutoffs with cortical-ring-derived cutoffs:
 // Target: c[k] derived from ring at which sector extent equals band wavelength
 ```
 
-This is the most principled change but also the most complex. Each DoG band's cutoff eccentricity would be where the cortical sector size matches the band's spatial frequency — meaning the band carries useful information up to that eccentricity and noise beyond it.
+This is the most principled change but also the most complex. Each DoG band's cutoff eccentricity would be where the cortical sector size matches the band's spatial frequency. The band would then contribute useful information up to that eccentricity and noise beyond it.
 
 **Validation:** Per-band weight curves against Rovamo & Virsu 1979 CSF.
 
@@ -143,9 +143,9 @@ This is the most principled change but also the most complex. Each DoG band's cu
 
 ### The Root Cause
 
-The `fovea_deg` correction (2.0→1.0, commit 18b67bc, v2.4.0) was scientifically correct — the fovea IS ~1° radius, not 2°. But it halved `foveaRadius` from 90px to 45px, which halved `radius_norm`, `fovea_radius`, and `parafovea_radius` everywhere in the shader. Every distance-based boundary that was tuned against the old 90px fovea is now operating at 2× the intended eccentricity.
+The `fovea_deg` correction (2.0→1.0, commit 18b67bc, v2.4.0) was scientifically correct: the fovea IS ~1° radius. But it halved `foveaRadius` from 90px to 45px, which halved `radius_norm`, `fovea_radius`, and `parafovea_radius` everywhere in the shader. Every distance-based boundary that was tuned against the old 90px fovea is now operating at 2× the intended eccentricity.
 
-This is NOT a Shredder bug — it affects the entire pipeline: blur blend onset, eccentricity scale ramp, DoG band weights, Bouma edge density, congestion gating, and more.
+The regression affects the entire pipeline: blur blend onset, eccentricity scale ramp, DoG band weights, Bouma edge density, congestion gating, and more.
 
 ### Evidence
 
@@ -182,7 +182,7 @@ float progressive = 1.0 + max(0.0, (dist - parafovea_radius * 1.5) / parafovea_r
 throwDist *= progressive;
 ```
 
-Simple, no CMF dependency, no sector computation. The progressive scaling (`1.0 + eccentricity / parafovea_radius`) was the sole mechanism creating monotonic degradation. It worked because all the distance boundaries (`parafovea_radius`, `fovea_radius * 1.5`, `scrambleZone` onset) were calibrated against `fovea_deg=2.0`.
+The v2.3 code is simple, with no CMF dependency and no sector computation. The progressive scaling (`1.0 + eccentricity / parafovea_radius`) was the sole mechanism creating monotonic degradation. It worked because all the distance boundaries (`parafovea_radius`, `fovea_radius * 1.5`, `scrambleZone` onset) were calibrated against `fovea_deg=2.0`.
 
 ### Additional Finding: displaceLodBoost Creates Grey Fog
 
@@ -193,11 +193,11 @@ float displaceLodBoost = log2(max(1.0, displaceDist * 2.0));
 lodFloor = max(lodFloor, displaceLodBoost);
 ```
 
-This suppresses fine DoG bands proportional to Shredder displacement distance. When a pixel is thrown 16px, bands finer than 16px are killed. This strips high-frequency detail from displaced content, collapsing text into grey DC averages. **Removed in this session** — the cortical lodFloor (without displacement boost) is sufficient.
+This suppresses fine DoG bands proportional to Shredder displacement distance. When a pixel is thrown 16px, bands finer than 16px are killed. This strips high-frequency detail from displaced content, collapsing text into grey DC averages. **Removed in this session.** The cortical lodFloor (without displacement boost) is sufficient.
 
 ### Additional Finding: Blur Suppression in Scramble Zone
 
-The DoG/MIP blur pipeline samples the source texture at displaced UV coordinates with MIP-level blur. This averages scattered text fragments into grey fog — the wrong perceptual effect. Crowding should produce "a texture of letters" (Rosenholtz 2012), not grey halos.
+The DoG/MIP blur pipeline samples the source texture at displaced UV coordinates with MIP-level blur. This averages scattered text fragments into grey fog, which is the wrong perceptual effect. Crowding should produce "a texture of letters" (Rosenholtz 2012).
 
 A `scrambleZone` field was added to `V1_Signal` and used to suppress `blendFactor` in processV4:
 ```glsl
@@ -205,7 +205,7 @@ float scrambleBlurSuppress = 1.0 - v1.scrambleZone * 0.85;
 blendFactor *= scrambleBlurSuppress;
 ```
 
-This helps but is currently disabled pending the spatial boundary audit — it interacts with the fovea_deg regression.
+This helps but is currently disabled pending the spatial boundary audit, because it interacts with the fovea_deg regression.
 
 ### What Must Happen Before Any More Shader Changes
 
@@ -213,7 +213,7 @@ This helps but is currently disabled pending the spatial boundary audit — it i
 
 See **fovea_deg Spatial Boundary Audit** below.
 
-## fovea_deg Spatial Boundary Audit — RESOLVED via corticalStrength()
+## fovea_deg Spatial Boundary Audit: RESOLVED via corticalStrength()
 
 The audit identified 40+ `fovea_radius`/`parafovea_radius` boundaries across 8 modes. Rather than patch each with 2× multipliers (Option A), we implemented Option D: replace zone boundaries with a continuous `corticalStrength()` function linear in visual degrees.
 
@@ -223,13 +223,13 @@ The audit identified 40+ `fovea_radius`/`parafovea_radius` boundaries across 8 m
 
 ### What was implemented
 
-**1. `corticalStrength()` — continuous eccentricity function**
+**1. `corticalStrength()`: continuous eccentricity function**
 ```glsl
 float ecc_deg = max(0.0, dist) / max(fovea_radius, 0.001);
 float ecc_max = u_cmf_a * (exp(u_cortical_max) - 1.0);
 float corticalStrength = clamp(ecc_deg / ecc_max, 0.0, 1.0);
 ```
-Computed in processLGN, processV1, and processV4. Linear in visual degrees, derived from CMF uniforms. `fovea_radius` is a pixel-to-degree converter, not a spatial boundary.
+Computed in processLGN, processV1, and processV4. Linear in visual degrees, derived from CMF uniforms. `fovea_radius` is a pixel-to-degree converter. It does not mark a spatial boundary.
 
 **2. Zone boundary replacements (mode 0 core)**
 
@@ -244,18 +244,18 @@ Computed in processLGN, processV1, and processV4. Linear in visual degrees, deri
 | `contrastPreservation` smoothstep over parafovea range | `smoothstep(0.0, 0.2, cs)` |
 | `fovea protection: if (dist < fovea_radius × 0.5)` | `if (cs < 0.001)` |
 
-**3. v2.3 Shredder restored** — fixed grid (`vec2(400, 300)`), progressive scaling (`1.0 + cs × ecc_max × 0.20`), `scrambleZone` field added to V1_Signal for blur suppression downstream.
+**3. v2.3 Shredder restored:** fixed grid (`vec2(400, 300)`), progressive scaling (`1.0 + cs × ecc_max × 0.20`), `scrambleZone` field added to V1_Signal for blur suppression downstream.
 
-**4. `displaceLodBoost` removed** — DoG band stripping based on displacement distance created grey fog. The cortical `lodFloor` (without displacement boost) is sufficient.
+**4. `displaceLodBoost` removed:** DoG band stripping based on displacement distance created grey fog. The cortical `lodFloor` (without displacement boost) is sufficient.
 
-**5. Halo P0 fix** — three changes together eliminated the visible ring on gradients:
-- **100% blur suppression**: `blendFactor *= (1.0 - smoothstep(0.01, 0.20, cs))` — the DoG reconstruction creates color artifacts on smooth content; suppressing the blend to zero eliminates the ring. The Shredder's feature displacement IS the degradation.
+**5. Halo P0 fix:** three changes together eliminated the visible ring on gradients:
+- **100% blur suppression**: `blendFactor *= (1.0 - smoothstep(0.01, 0.20, cs))`. The DoG reconstruction creates color artifacts on smooth content. Suppressing the blend to zero eliminates the ring. The Shredder's feature displacement IS the degradation.
 - **Unified bypassTransition**: CA and desaturation share ONE onset curve (`smoothstep(0.02, 0.80, cs)`) instead of three overlapping smoothsteps. Stacked ramps created concentric rings.
 - **`desaturationFactor = bypassTransition`**: No separate desaturation onset ramp. The rod simulation at line ~1271 still references `desaturationFactor` but it's now just `bypassTransition`.
 
 ### Halo root cause (concise)
 
-Three overlapping smoothstep transitions (blur blend, desaturation onset, CA onset) at slightly different eccentricities created concentric rings visible on smooth gradients. Each ring was the boundary where one effect ramped from 0% to 100%. The DoG reconstruction isn't transparent on smooth content — band decomposition creates color shifts — so the blur blend transition was the most visible ring. Fix: eliminate the DoG blend entirely (100% blur suppression), use a single wide transition curve for all remaining color effects.
+Three overlapping smoothstep transitions (blur blend, desaturation onset, CA onset) at slightly different eccentricities created concentric rings visible on smooth gradients. Each ring was the boundary where one effect ramped from 0% to 100%. The DoG reconstruction isn't transparent on smooth content (band decomposition creates color shifts), so the blur blend transition was the most visible ring. Fix: eliminate the DoG blend entirely (100% blur suppression), use a single wide transition curve for all remaining color effects.
 
 ### OCR profile (session 5 → v2.6.0 final)
 
@@ -267,32 +267,32 @@ Session 5 OCR was measured at 2x DPR with stale baselines. v2.6.0 re-froze at 1x
 | Parafovea | 60% | 67% | |
 | Near-periph | 62% | 44% | |
 | Far-periph | 52% | 31% | PASSES (≤55%) |
-| Monotonic | Yes (84→60→62→52) | Yes | Near-periph slightly higher than parafovea — minor |
+| Monotonic | Yes (84→60→62→52) | Yes | Near-periph slightly higher than parafovea (minor) |
 | Overall | 57% | 40% | |
 
 All four OCR validation criteria pass for mode 12. The Cutter cell floor (raised from 4px to 8px) preserves foveal legibility while the throw distance provides far-peripheral degradation.
 
-**Color-shift artifact:** Resolved — threshold adjusted from 0.012 to 0.016 (below perceptual threshold ~0.02 Oklab). Chroma 0.0139 from CA's per-channel re-blend using pooledCol.
+**Color-shift artifact:** Resolved by adjusting the threshold from 0.012 to 0.016 (below perceptual threshold ~0.02 Oklab). Chroma 0.0139 from CA's per-channel re-blend using pooledCol.
 
 ### Known visual issues
 
-1. **Green tint in parafovea** — CA code overwrites `col.r` and `col.b` from `pooledCol` while leaving `col.g` from `foveaCol`. With 100% blur suppression, the green channel dominates. Fix: disable CA when blur is suppressed, or rewrite CA to use `foveaCol` for all channels.
+1. **Green tint in parafovea:** CA code overwrites `col.r` and `col.b` from `pooledCol` while leaving `col.g` from `foveaCol`. With 100% blur suppression, the green channel dominates. Fix: disable CA when blur is suppressed, or rewrite CA to use `foveaCol` for all channels.
 
-2. **Crosshatch pattern** (pre-existing, now more visible) — Shredder's fixed rectangular grid `vec2(400, 300)` creates ~5×6px cell boundaries. 100% blur suppression removes the DoG softening that previously masked them. **This is the strongest argument for the isotropic Shredder** — eccentricity-scaled cells would eliminate the rectangular pattern entirely.
+2. **Crosshatch pattern** (pre-existing, now more visible): Shredder's fixed rectangular grid `vec2(400, 300)` creates ~5×6px cell boundaries. 100% blur suppression removes the DoG softening that previously masked them. Eccentricity-scaled cells would eliminate the rectangular pattern entirely.
 
 ### What's next
 
 **Immediate (bug fixes):**
-1. Fix green tint — disable CA in the blur-suppressed zone, or rewrite CA to not use pooledCol
-2. Fix OCR capture determinism at 2x DPR — runs show 50-77% variance on the same shader
+1. Fix green tint: disable CA in the blur-suppressed zone, or rewrite CA to not use pooledCol
+2. Fix OCR capture determinism at 2x DPR: runs show 50-77% variance on the same shader
 
 **Next feature (isotropy):**
 The pipeline is ready for the sector-scaled Shredder:
-1. **Mode 12 (FOVI)** — implement sector-scaled cell sizing using `corticalStrength` (not the old `sectorPx` with its coordinate bug)
-2. **Eliminates crosshatch** — cells grow with eccentricity instead of fixed 400×300 grid
-3. **`corticalStrength` drives everything** — cell size, throw, scramble onset
-4. **Validation ready** — OCR baseline, radial profile, golden v2.3 reference
-5. **The blur/displacement tradeoff** — the isotropic Shredder may need partial blur in the far periphery to match v2.3's readability destruction. The halo fix (unified bypassTransition + blur suppression) provides the framework for content-aware blur gating.
+1. **Mode 12 (FOVI):** implement sector-scaled cell sizing using `corticalStrength`. Do not reuse the old `sectorPx` computation, which had the coordinate bug
+2. **Eliminates crosshatch:** cells grow with eccentricity instead of fixed 400×300 grid
+3. **`corticalStrength` sets cell size, throw, and scramble onset**
+4. **Validation ready:** OCR baseline, radial profile, golden v2.3 reference
+5. **The blur/displacement tradeoff:** the isotropic Shredder may need partial blur in the far periphery to match v2.3's readability destruction. The halo fix (unified bypassTransition + blur suppression) provides the framework for content-aware blur gating.
 
 **Format:** `location | current multiplier | v2.3 effective distance | corrected multiplier | notes`
 
@@ -300,9 +300,9 @@ The pipeline is ready for the sector-scaled Shredder:
 
 1. **`parafovea_radius = radius_norm * 2.5`** (line ~1688)
    - v2.3: 0.095 × 2.5 = 0.238 (≈5° eccentricity)
-   - v2.5: 0.048 × 2.5 = 0.119 (≈2.5° — too close)
+   - v2.5: 0.048 × 2.5 = 0.119 (≈2.5°, too close)
    - Fix: `radius_norm * 5.0`
-   - Impact: global — affects ALL downstream parafovea references
+   - Impact: global (affects ALL downstream parafovea references)
 
 2. **`parafoveaRamp = smoothstep(fovea_radius * 1.5, parafovea_radius, dist)`** (line ~847)
    - v2.3 start: 0.095 × 1.5 = 0.143 (≈3°)
@@ -324,11 +324,11 @@ The pipeline is ready for the sector-scaled Shredder:
    - If parafovea_radius is fixed, this auto-corrects
 
 6. **`sampleBoumaEdgeDensity: px_per_deg = max(fovea_radius / 1.0, 1.0)`** (line ~435)
-   - This was changed from `/2.0` to `/1.0` in v2.4 — already compensated for fovea_deg=1.0
+   - This was changed from `/2.0` to `/1.0` in v2.4, so it is already compensated for fovea_deg=1.0
    - Verify: should be correct
 
 7. **DoG cutoffs: `px_per_deg = max(fovea_radius / 1.0, 1.0)`** (line ~329)
-   - Same as above — already compensated
+   - Same as above: already compensated
 
 8. **`contrastPreservation = mix(0.6, 0.1, smoothstep(0.0, parafovea_radius - fovea_radius, eccentricity))`** (processV4)
    - v2.3: range = 0.238 - 0.095 = 0.143
@@ -336,10 +336,10 @@ The pipeline is ready for the sector-scaled Shredder:
    - Fix: auto-corrects if parafovea_radius fixed
 
 9. **Reading span: `radius_norm_pre * 0.7`** (line ~1673)
-   - Shift amount scales with fovea radius — verify it's still appropriate
+   - Shift amount scales with fovea radius. Verify it's still appropriate
 
 10. **Saccadic suppression: `parafovea_radius *= (1.0 - saccadeFactor)`** (line ~1690)
-    - Multiplicative — auto-corrects if parafovea_radius fixed
+    - Multiplicative, so it auto-corrects if parafovea_radius is fixed
 
 ### Audit Process
 
@@ -362,15 +362,15 @@ For each boundary:
 
 **Option C: Revert fovea_deg to 2.0 and compensate in CMF/DoG math**
 - Pro: All spatial boundaries auto-correct
-- Con: CMF math uses fovea_deg for cortical coordinate computation — would need separate variable
+- Con: CMF math uses fovea_deg for cortical coordinate computation, so it would need a separate variable
 
-**Recommended: Option D — Replace zones with continuous CMF-derived strength** (the "do it right" path).
+**Recommended: Option D, which replaces zones with continuous CMF-derived strength** (the "do it right" path).
 
-### Option D: Continuous corticalStrength() — No Zones
+### Option D: Continuous corticalStrength() with No Zones
 
-Rosenholtz's TTM: pooling regions grow continuously with eccentricity. There is no fovea/parafovea boundary in the biology — resolution degrades from the first arcminute off fixation. The current zone architecture (`fovea_radius`, `parafovea_radius`, 5+ smoothsteps) is an approximation that breaks when any single parameter changes (as fovea_deg proved).
+Rosenholtz's TTM: pooling regions grow continuously with eccentricity. There is no fovea/parafovea boundary in the biology. Resolution degrades from the first arcminute off fixation. The current zone architecture (`fovea_radius`, `parafovea_radius`, 5+ smoothsteps) is an approximation that breaks when any single parameter changes (as fovea_deg proved).
 
-Replace the piecewise ramp with a single base function — **linear in visual degrees**, not log:
+Replace the piecewise ramp with a single base function that is **linear in visual degrees**:
 
 ```glsl
 // Returns 0.0 at fixation, grows linearly with eccentricity in degrees.
@@ -383,15 +383,15 @@ float corticalStrength(float dist, float fovea_radius) {
 }
 ```
 
-**Why linear, not log:** The CMF log function `w = log(r + a)` describes the *cortical representation* — where things map on cortex. But the *perceptual consequence* (how much degradation) scales with M^-1 = r + a, which is **linear in eccentricity** (Bouma's law, TTM pooling region growth). A log curve grows too fast near fovea (0.47 at just 2°) and saturates in the far periphery (0.77→0.94 from 10°→20°) — the opposite of v2.3's working linear progressive scaling. Keep the log function for sector geometry and MIP mapping.
+**Why linear:** The CMF log function `w = log(r + a)` describes the *cortical representation*: where things map on cortex. But the *perceptual consequence* (how much degradation) scales with M^-1 = r + a, which is **linear in eccentricity** (Bouma's law, TTM pooling region growth). A log curve grows too fast near fovea (0.47 at just 2°) and saturates in the far periphery (0.77→0.94 from 10°→20°), which is the opposite of v2.3's working linear progressive scaling. Keep the log function for sector geometry and MIP mapping.
 
 **Per-effect transforms on the base:** Different visual functions have different eccentricity dependencies. `corticalStrength` is a base that each effect transforms:
 
 | Effect | Transform | Rationale | Replaces |
 |--------|-----------|-----------|----------|
-| Blur blend | `pow(cs, 0.7)` — faster onset | Acuity loss begins immediately off-fovea; E2 ≈ 2° for letter recognition | `baseBlend = smoothstep(0.0, fovea_radius * 0.5, ecc)` |
-| V1 displacement | `cs * cs` — slower onset | Crowding has foveal dead zone; doesn't dominate until 3-5° | `eccentricityScale` piecewise ramp + `boundaryProgress` + `farScale` |
-| Scramble onset | `smoothstep(0.02, 0.10, cs)` — threshold | Crowding is genuinely absent in central fovea (Pelli & Tillman 2008: ~0.5° uncrowded window) | `scrambleZone = smoothstep(parafovea * 1.0, parafovea * 1.5, dist)` |
+| Blur blend | `pow(cs, 0.7)` (faster onset) | Acuity loss begins immediately off-fovea; E2 ≈ 2° for letter recognition | `baseBlend = smoothstep(0.0, fovea_radius * 0.5, ecc)` |
+| V1 displacement | `cs * cs` (slower onset) | Crowding has foveal dead zone; doesn't dominate until 3-5° | `eccentricityScale` piecewise ramp + `boundaryProgress` + `farScale` |
+| Scramble onset | `smoothstep(0.02, 0.10, cs)` (threshold) | Crowding is absent in central fovea (Pelli & Tillman 2008: ~0.5° uncrowded window) | `scrambleZone = smoothstep(parafovea * 1.0, parafovea * 1.5, dist)` |
 
 Three tunable exponents replace 10 individual smoothstep boundaries. The per-effect exponents are calibrated against v2.3's OCR profile.
 
@@ -403,7 +403,7 @@ This replaces:
 - `baseBlend` in processV4 (blur onset)
 - `scrambleZone` in Shredder (scramble onset)
 
-`fovealRadius` becomes a calibration constant (pixels per degree), not a spatial boundary. Changing it from 45 to 90 adjusts the pixel→degree mapping but doesn't move any effect onset, because onsets are in degrees, not pixel multiples of fovea_radius.
+`fovealRadius` becomes a calibration constant (pixels per degree). Changing it from 45 to 90 adjusts the pixel→degree mapping but doesn't move any effect onset, because onsets are specified in degrees.
 
 **Data we have:**
 - `computeCorticalSector()` verified against Blauch Python (19 tests)
@@ -420,48 +420,45 @@ This replaces:
 
 **Validation strategy (from review):**
 - OCR per-ring recognition rate (existing pipeline, v2.3 as target)
-- **Luminance variance per ring** — extend `analyze-artifacts.js` patchStdDev to annular rings; rendered stddev ≥ 40% of baseline catches grey fog
-- **v2.3 golden SSIM** — per-ring structural similarity vs v2.3 capture, informational (flag if < 0.70)
+- **Luminance variance per ring:** extend `analyze-artifacts.js` patchStdDev to annular rings; rendered stddev ≥ 40% of baseline catches grey fog
+- **v2.3 golden SSIM:** per-ring structural similarity vs v2.3 capture, informational (flag if < 0.70)
 - Subband Entropy (existing, align ring boundaries with OCR rings)
 - Smoke 7/7 + artifact checks after every shader change
 
-**Critical regression signals:**
+**Regression signals:**
 - Fovea drops below 85% → `corticalStrength` is non-zero at fixation (check: `ecc_deg = 0` → `cs = 0`)
 - Far-periph rises above 75% → curve too shallow (check: `ecc_max` too large or displacement exponent too high)
 
 **Risk:** Medium. Larger refactor than Option A but eliminates the entire class of fovea_deg boundary bugs. The per-effect exponents give independent tuning without the fragility of zone boundaries.
 
-**Interaction warning:** `computeMipLevel()` already uses CMF-derived cutoffs. If `corticalStrength` also drives blur blend, there's a double-application risk — both the MIP level selection and the blend factor would encode eccentricity. Verify these don't compound at moderate eccentricities.
-
-**fovealRadius trace (one-line origin):**
-`renderer/config.js:4` → `fovealRadius: 45` → `scrutinizer.js:483` → `webgl-renderer.js:770` → `peripheral.frag:1686` → every smoothstep, blend, and ramp.
+**Interaction warning:** `computeMipLevel()` already uses CMF-derived cutoffs. If `corticalStrength` also drives blur blend, there's a double-application risk: both the MIP level selection and the blend factor would encode eccentricity. Verify these don't compound at moderate eccentricities.
 
 **fovealRadius trace (one-line origin):**
 `renderer/config.js:4` → `fovealRadius: 45` → `scrutinizer.js:483` → `webgl-renderer.js:770` → `peripheral.frag:1686` → every smoothstep, blend, and ramp.
 
 ## Constraints
 
-- **60fps** — all changes must run in the fragment shader without compute passes
-- **No sector boundaries visible** — any rendering that makes sectors perceptible fails
-- **Existing validation must not regress** — Tier 1: 9/9, Tier 2: 2/3, Tier 3: 3/3
-- **Mode 0 preserved** — isotropic is mode 12, mode 0 stays as-is for usability practitioners
-- **Blauch traceability** — every cortical-geometry formula must trace to `coords.py`
+- **60fps:** all changes must run in the fragment shader without compute passes
+- **No sector boundaries visible:** any rendering that makes sectors perceptible fails
+- **Existing validation must not regress:** Tier 1: 9/9, Tier 2: 2/3, Tier 3: 3/3
+- **Mode 0 preserved:** isotropic is mode 12, mode 0 stays as-is for usability practitioners
+- **Blauch traceability:** every cortical-geometry formula must trace to `coords.py`
 
 ## Open Questions
 
-1. **Biphasic RG decay interaction.** The remote branch added biphasic decay (knee at 15°, slow rate beyond). Cortical coordinates naturally produce biphasic behavior — steep near fovea, slowing in periphery. Do we need explicit biphasic params, or does `w = log(r + a)` give us the right curve shape for free?
+1. **Biphasic RG decay interaction.** The remote branch added biphasic decay (knee at 15°, slow rate beyond). Cortical coordinates naturally produce biphasic behavior: steep near fovea, slowing in periphery. Do we need explicit biphasic params, or does `w = log(r + a)` give us the right curve shape for free?
 
-2. **WebGPU compute path.** Mode 10 (texture synthesis) already uses WebGPU compute. Could a compute pass do sector-level pooling (Rosenholtz TTM-style summary statistics) that the fragment shader can't? This would be a Tier 3 approach — biologically faithful but GPU-compute dependent.
+2. **WebGPU compute path.** Mode 10 (texture synthesis) already uses WebGPU compute. Could a compute pass do sector-level pooling (Rosenholtz TTM-style summary statistics) that the fragment shader can't? This would be a Tier 3 approach, biologically faithful but GPU-compute dependent.
 
 3. **Traceability.** The implementation must trace faithfully to the FOVI formulation. Phase 1 (MIP level from cortical coordinate) is the cleanest traceability point.
 
 4. **lodFloor supplement.** Attempt #7 found that a gentle lodFloor (0.3-0.4×) alongside noise+scramble softens the finest bands without erasing texture. Worth revisiting as a Phase 2 addition.
 
-5. **DOM-aware text special-casing.** Scrutinizer has DOM bounding box info via the structure map (ARIA-typed regions, text density). For usability/designer use cases (not research), text regions could get a specialized degradation path: replace characters with "texture of letters" (horizontal stripes at text density) rather than pixel-level scramble. This sidesteps the cell-size/throw-distance tuning problem entirely for text while preserving the general-purpose cutter for non-text content. Not the most principled path (TTM doesn't know about DOM types), but pragmatically solves the biggest usability problem. Could be a toggle: "DOM-aware text pooling" for practitioners, raw V1 scramble for researchers.
+5. **DOM-aware text special-casing.** Scrutinizer has DOM bounding box info via the structure map (ARIA-typed regions, text density). For usability/designer use cases, text regions could get a specialized degradation path: replace characters with "texture of letters" (horizontal stripes at text density) rather than pixel-level scramble. This sidesteps the cell-size/throw-distance tuning problem entirely for text while preserving the general-purpose cutter for non-text content. This is a less principled path (TTM has no notion of DOM types), but it pragmatically solves the biggest usability problem. Could be a toggle: "DOM-aware text pooling" for practitioners, raw V1 scramble for researchers.
 
-6. **Subband Entropy as primary validation metric.** OCR is content-dependent and only works on text. SE measures spatial frequency content directly — the thing we're degrading. Proposed in RC-6. Should be implemented before the next Phase 3 tuning attempt so we're not blind-tuning against a noisy metric.
+6. **Subband Entropy as primary validation metric.** OCR is content-dependent and only works on text. SE measures spatial frequency content directly, which is the thing we're degrading. Proposed in RC-6. Should be implemented before the next Phase 3 tuning attempt so we're not blind-tuning against a noisy metric.
 
-## Release Criteria — Isotropic V1 Distortion
+## Release Criteria: Isotropic V1 Distortion
 
 Each phase ships when ALL Tier 1 criteria pass. Tier 2 should pass. Tier 3 is aspirational.
 
@@ -477,9 +474,9 @@ Each phase ships when ALL Tier 1 criteria pass. Tier 2 should pass. Tier 3 is as
 
 ### RC-2: OCR Relative Recognition Rate
 
-**Method change (2026-03-17 session 3):** Replaced OCR confidence with **relative recognition rate** — `scrambled_chars / baseline_chars` per annular ring. Baseline is a `mode_disabled` capture of the same page. This measures what fraction of text the shader destroys, not how confident tesseract is about surviving fragments.
+**Method change (2026-03-17 session 3):** Replaced OCR confidence with **relative recognition rate**, defined as `scrambled_chars / baseline_chars` per annular ring. Baseline is a `mode_disabled` capture of the same page. This measures what fraction of text the shader destroys.
 
-**Test page:** `tests/ocr-test-page.html` — 9-cell grid with dense text at known positions, high-contrast black-on-white. Designed for consistent OCR across the full viewport.
+**Test page:** `tests/ocr-test-page.html`, a 9-cell grid with dense text at known positions, high-contrast black-on-white. Designed for consistent OCR across the full viewport.
 
 #### Baseline measurements (2026-03-17)
 
@@ -492,11 +489,11 @@ Captured against `ocr-test-page.html` with fixation at center (0.5, 0.5). Baseli
 | **v2.5 mode 13 coord-fixed** (first attempt, uncapped) | 0.0% | 0.0% | 0.0% | 0.3% | 0.1% | — |
 | **v2.5 mode 13 coord-fixed** (capped 32px) | 1.7% | 0.0% | 0.3% | 0.9% | 0.7% | — |
 
-**Key findings:**
-- v2.5 Shredder with bugged coordinates does essentially nothing (100% recognition everywhere). The `ppd_v1 = max(fovea_radius / 1.0, 1.0)` clamp neutered it.
+**Results:**
+- v2.5 Shredder with bugged coordinates does nothing (100% recognition everywhere). The `ppd_v1 = max(fovea_radius / 1.0, 1.0)` clamp neutered it.
 - v2.4 mode 0 (anisotropic noise, type 0) is the target profile: fovea ~81%, declining to ~46% far-periph, 35pp drop.
-- The coordinate fix produced values 100× too aggressive. sectorPx reached 150+px at screen edges, creating massive blocks. Capping at 32px didn't help — the bender warp frequency also scaled down, creating huge smooth displacements.
-- The fix needs parameter tuning that matches v2.4's profile, not just correct coordinates.
+- The coordinate fix produced values 100× too aggressive. sectorPx reached 150+px at screen edges, creating massive blocks. Capping at 32px didn't help. The bender warp frequency also scaled down and created huge smooth displacements.
+- The fix also needs parameter tuning that matches v2.4's profile.
 
 #### Acceptance criteria (updated)
 
@@ -518,12 +515,12 @@ Captured against `ocr-test-page.html` with fixation at center (0.5, 0.5). Baseli
 | 3.4 | Text stays within bounding region | Visual: crowded text remains "block of unreadable squiggles" | No grey fog / scatter into white space (Rosenholtz 2012 "texture of letters") |
 | 3.5 | Gestalt grouping preserved | Visual: text blocks, nav bars, image regions distinguishable in periphery | Layout structure readable at 15° (Palmer 1992 common region) |
 
-### RC-4: Restricted Foveal Viewing — Usability
+### RC-4: Restricted Foveal Viewing (Usability)
 
 | # | Criterion | Test | Threshold |
 |---|-----------|------|-----------|
 | 4.1 | No spurious peripheral motion | Visual: static periphery when gaze is still | Zero boiling/shimmer (mode philosophy: stability > fidelity) |
-| 4.2 | Foveal reading unimpaired | Saccade through body text — foveal text sharp and stable | No jitter, no lag |
+| 4.2 | Foveal reading unimpaired | Saccade through body text: foveal text sharp and stable | No jitter, no lag |
 | 4.3 | Page navigation possible | Use Scrutinizer overlay to navigate real sites for 5 min | Can find nav, click links, read headlines |
 | 4.4 | 60fps sustained | Performance: frame time < 16.7ms on integrated GPU | No dropped frames on M1 MacBook |
 
@@ -536,14 +533,14 @@ Captured against `ocr-test-page.html` with fixation at center (0.5, 0.5). Baseli
 | 5.3 | Text density distinguishable | Body text vs heading vs caption | Different textures at matched eccentricity |
 | 5.4 | Congestion predicts difficulty | High-congestion region vs low-congestion | High congestion region is harder to parse peripherally |
 
-### RC-6: Subband Entropy Degradation Curve (proposed — replaces OCR as primary metric)
+### RC-6: Subband Entropy Degradation Curve (proposed replacement for OCR as primary metric)
 
-OCR measures letter recognition, which is content-dependent (dense body text vs sparse nav). Subband Entropy (SE) measures spatial frequency content directly — the thing we're actually degrading. SE is content-independent: a region with rich spatial frequency content has high SE; one where frequencies have been pooled away has low SE.
+OCR measures letter recognition, which is content-dependent (dense body text vs sparse nav). Subband Entropy (SE) measures spatial frequency content directly, which is what the shader degrades. SE is content-independent: a region with rich spatial frequency content has high SE; one where frequencies have been pooled away has low SE.
 
 **How it works:**
 1. Capture original page (unfiltered) and Scrutinizer-rendered version
 2. Crop annular rings at 5 eccentricities (same as OCR rings)
-3. Compute steerable pyramid decomposition (3 scales, 4 orientations — matches visual-clutter)
+3. Compute steerable pyramid decomposition (3 scales, 4 orientations, matching visual-clutter)
 4. Shannon entropy per subband, weighted combination (luminance 1.0, chrominance 0.0625)
 5. Report SE per ring for both original and rendered
 
@@ -562,23 +559,23 @@ OCR measures letter recognition, which is content-dependent (dense body text vs 
 - OCR is binary (word recognized or not) and content-dependent (text layout matters)
 - SE is continuous and measures the spatial frequency cascade directly
 - SE detects both over-degradation (fog, SE → 0) and under-degradation (SE stays flat)
-- SE works on any content (images, charts, nav bars), not text alone
-- The FC→SE correlation (6.6) validates that clutter drives degradation — biologically correct
+- SE works on any content (images, charts, nav bars)
+- The FC→SE correlation (6.6) checks that clutter drives degradation in the output. FC sets V1 distortion strength by construction, so this is an implementation check
 
-**Implementation:** `scripts/validate-subband-entropy.js` — Node.js, uses sharp for image cropping, custom steerable pyramid (port from visual-clutter's pyrtools approach or a JS wavelet library).
+**Implementation:** `scripts/validate-subband-entropy.js`, a Node.js script that uses sharp for image cropping and a custom steerable pyramid (port from visual-clutter's pyrtools approach or a JS wavelet library).
 
 ### Feature Congestion × Subband Entropy: The Dual Metric
 
-Scrutinizer's mission is to both **simulate** and **measure** the peripheral visual system:
+Scrutinizer **simulates** peripheral vision and **measures** images before and after filtering:
 
 | | Input (pre-filter) | Output (post-filter) |
 |---|---|---|
-| **Measure** | Feature Congestion (FC) — "how cluttered is this?" | Subband Entropy (SE) — "how much spatial info survived?" |
+| **Measure** | Feature Congestion (FC): "how cluttered is this?" | Subband Entropy (SE): "how much spatial info survived?" |
 | **Simulate** | FC drives V1 distortion strength (structure gate) | SE validates the degradation curve |
 
 FC on input predicts where degradation should be strongest.
-SE on output measures where degradation actually occurred.
-The correlation between them validates biological plausibility:
+SE on output measures where degradation occurred.
+The correlation between them checks internal consistency:
 high-FC regions should show the steepest SE drop.
 
 ### Current State (2026-03-17)
@@ -591,14 +588,14 @@ high-FC regions should show the steepest SE drop.
 | 3.4 Text bounding | Broken (grey fog) | Improved with dest structure gate | Needs destination saliency check |
 | 4.1 No motion | ✅ | ✅ | Static periphery preserved |
 
-**Key finding from this session**: The coordinate space mismatch (`fovea_radius` is normalized-Y ≈0.022, not pixels ≈45) caused all previous sector-scaling to be neutered (clamped to floor values). With the fix, the sector computation works but the throw distance/cell size tuning breaks the OCR curve. The path forward requires:
+The coordinate space mismatch (`fovea_radius` is normalized-Y ≈0.022 and had been treated as pixels ≈45) caused all previous sector-scaling to be neutered (clamped to floor values). With the fix, the sector computation works but the throw distance/cell size tuning breaks the OCR curve. The path forward requires:
 
 1. Fix the coordinate space once (norm-Y throughout)
 2. Decouple cell size from throw distance (science: cells = feature-scale, throw = Bouma-zone-gated)
 3. Add destination structure check (science: crowding doesn't scatter into empty space)
-4. Tune against the full RC-2 suite, not individual parameters
+4. Tune all parameters together against the full RC-2 suite
 
-## TTM Approximation Strategy — Fragment Shader Feasible
+## TTM Approximation Strategy: Fragment Shader Feasible
 
 ### What TTM computes (full inventory)
 
@@ -607,7 +604,7 @@ Per pooling region (growing linearly with eccentricity, ~0.5× Bouma):
 - Cross-scale magnitude correlations (parent-child bands at same orientation)
 - Cross-scale phase correlations (edge coherence across scales)
 - Cross-orientation correlations (co-occurrence of H/V/D within a scale)
-- Spatial autocorrelation at multiple lags (periodicity — line spacing, letter spacing)
+- Spatial autocorrelation at multiple lags (periodicity: line spacing, letter spacing)
 - ~700 parameters per pooling region (Portilla-Simoncelli 2000)
 
 ### Which statistics matter most (Rosenholtz 2012, 2016)
@@ -615,7 +612,7 @@ Per pooling region (growing linearly with eccentricity, ~0.5× Bouma):
 | Priority | Statistic | Scrutinizer status | Gap |
 |----------|-----------|-------------------|-----|
 | 1 | Mean luminance + variance | ✅ MIP chain + DoG bands | — |
-| 2 | **Cross-scale magnitude correlation** | ❌ Missing | **Biggest gap** — makes output "noise on blur" vs "structured texture" |
+| 2 | **Cross-scale magnitude correlation** | ❌ Missing | **Biggest gap**: makes output "noise on blur" vs "structured texture" |
 | 3 | Orientation distribution | ✅ 4 orientation energies | — |
 | 4 | Spatial frequency content | ✅ MIP-driven, M-scaling cutoffs | — |
 | 5 | Cross-orientation correlation | Partial (orient weights, not co-occurrence) | Minor |
@@ -635,20 +632,20 @@ float crossScaleWeight = 0.5;  // tune to taste
 contrastNoise *= (1.0 + coarseDev * crossScaleWeight);
 ```
 
-**Effect:** Bright coarse regions get more visible fine texture; dark regions get less. Text body (dark on light) produces texture with correct contrast envelope. Without this, noise is uniformly distributed → reads as TV static, not peripheral text.
+**Effect:** Bright coarse regions get more visible fine texture; dark regions get less. Text body (dark on light) produces texture with correct contrast envelope. Without this, noise is uniformly distributed and reads as TV static.
 
 ### Four ranked improvements (impact per GPU cost)
 
-1. **Cross-scale correlation modulation** — 1 textureLod + multiply. Addresses the biggest perceptual gap. Priority: ship with Phase 3.
-2. **Contrast preservation at high MIP** — ensure sigma_L drives noise amplitude even at MIP 4+. Verify compute stats don't sample already-blurred content.
-3. **Dual-frequency synthesis** — add line-spacing grating (from rhythm channel) on top of letter-spacing grating. Makes text regions read as "lines of stuff" vs "uniform stuff."
-4. **Low-frequency chrominance variation** — blend neighboring tile mean_ab instead of flat per-tile color. Prevents "flat color blocks" at tile boundaries.
+1. **Cross-scale correlation modulation:** 1 textureLod + multiply. Addresses the biggest perceptual gap. Priority: ship with Phase 3.
+2. **Contrast preservation at high MIP:** ensure sigma_L drives noise amplitude even at MIP 4+. Verify compute stats don't sample already-blurred content.
+3. **Dual-frequency synthesis:** add line-spacing grating (from rhythm channel) on top of letter-spacing grating. Makes text regions read as "lines of stuff" vs "uniform stuff."
+4. **Low-frequency chrominance variation:** blend neighboring tile mean_ab instead of flat per-tile color. Prevents "flat color blocks" at tile boundaries.
 
-### What SideEye/FGN and pix2pixHD taught us
+### Lessons from SideEye/FGN and pix2pixHD
 
-Both achieve near-real-time by training neural networks on TTM ground truth rather than computing statistics explicitly. Key architectural insight: **multi-scale discriminators** (pix2pixHD) implicitly enforce cross-scale consistency — the lesson is that cross-scale structure is the load-bearing statistic. Both sacrifice stochastic variation (producing one deterministic output per gaze position) which is acceptable for a design tool.
+Both achieve near-real-time by training neural networks on TTM ground truth rather than computing statistics explicitly. **Multi-scale discriminators** (pix2pixHD) implicitly enforce cross-scale consistency, which suggests that output quality depends most on cross-scale structure. Both sacrifice stochastic variation (producing one deterministic output per gaze position) which is acceptable for a design tool.
 
-Neither runs in a fragment shader. But both confirm: if you get cross-scale correlations right, the rest follows.
+Neither runs in a fragment shader.
 
 ### What produces "grey fog" vs "texture of letters"
 
@@ -663,33 +660,33 @@ Must destroy:
 
 Grey fog = MIP too high (variance collapses) + no orientation structure + no multi-scale structure. Fix: cross-scale correlation + contrast preservation + orientation-weighted synthesis.
 
-## Session 2 Learnings — Science Agent Findings
+## Session 2 Learnings: Science Agent Findings
 
-### Crowding is local pooling, not global scatter
-- Pelli, Palomares & Majaj (2004): features mis-bind within Bouma zone, don't teleport
+### Crowding is local pooling
+- Pelli, Palomares & Majaj (2004): features mis-bind within Bouma zone
 - Levi (2008), Whitney & Levi (2011): "compulsory averaging" within the pooling region
 - Features from outside the pooling region don't participate
 
-### TTM boundary behavior produces attenuation, not debris
-- Pooling regions that straddle content/background produce diluted texture (80% text region → 80% text statistics), not scattered pixels
+### TTM boundary behavior produces attenuation
+- Pooling regions that straddle content/background produce diluted texture (80% text region → 80% text statistics). They do not scatter pixels
 - Grey fog artifact has no TTM analog
 
 ### Crowded text still looks like text
-- Rosenholtz et al. (2012): peripheral text = "texture of letters" — density, rhythm, contrast preserved
+- Rosenholtz et al. (2012): peripheral text = "texture of letters", with density, rhythm, and contrast preserved
 - Balas, Nakano & Rosenholtz (2009): summary statistics explain crowding percept
 - Ensemble perception (Haberman & Whitney 2012): set-level stats available even when items unidentifiable
 
 ### Gestalt grouping survives peripheral degradation
 - Kimchi & Razpurker-Apfeld (2004): perceptual organization occurs without attention
-- Palmer (1992): common region principle — text blocks have strong bounded-region cues
+- Palmer (1992): common region principle. Text blocks have strong bounded-region cues
 - These are low-spatial-frequency, high-contrast features → survive pooling
 
-### Feature Congestion decomposition mirrors our pipeline
+### Feature Congestion decomposition compared with our pipeline
 From `kargaranamir/visual-clutter` (Rosenholtz 2007):
 - **Color clutter** = CIELab covariance determinant^(1/3) → our Oklab chromatic decay
 - **Contrast clutter** = DoG → local variance → our 12-band DoG
-- **Orientation clutter** = cos(2θ)/sin(2θ) covariance → our oblique effect
-- FC combination weights: contrast dominates (15× color weight) — validates edgeDensity as primary structure gate
+- **Orientation clutter** = cos(2θ)/sin(2θ) covariance → no direct counterpart. The oblique-effect stage weights edges by orientation angle; it does not measure local orientation variance
+- FC combination: each clutter map is divided by a normalizer (color 0.2088, contrast 0.0660, orientation 0.0269; `getClutter_FC` in `visual_clutter/clutter.py`), giving effective weights of about 4.8, 15.2 and 37.2. The normalizers equalize typical map magnitudes, so they do not rank the features or single out edgeDensity as the structure gate
 - **Subband Entropy** = steerable pyramid + Shannon entropy per band → proposed as content-independent validation metric
 
 ## References

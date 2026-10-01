@@ -10,14 +10,14 @@
 ### The Limitation of Simple Addition
 A simple weighted average (e.g., `0.7 * color + 0.3 * structure`) is insufficient. If the Structure Map identifies a region as pure noise, an additive model would still allow 70% of the distracting background texture to pass through.
 
-### The Solution: Multiplicative Inhibition & Additive Excitation
+### Multiplicative Inhibition & Additive Excitation
 We will separate the Structure Map's influence into two dynamic masks:
 1.  **The Inhibitor Mask ($M_{inh}$)**: Maps "noise/background" to near 0.0 and content to 1.0. This acts as a **Gate**.
 2.  **The Excitor Mask ($M_{exc}$)**: Maps critical UI (Buttons, Inputs) to high values. This acts as a **Boost**.
 
 **Implementation Logic**:
 ```javascript
-// 1. Bottom-up Calculation (The Lizard Brain)
+// 1. Bottom-up Calculation (pixel-driven)
 let rawSaliency = calculateColorOpponency() + calculateCenterSurround();
 
 // 2. Apply Inhibition (Gating) - SILENCE the noise
@@ -29,17 +29,17 @@ let gatedSaliency = rawSaliency * structureInhibitorMask;
 let finalSaliency = gatedSaliency + (structureExcitorMask * boostFactor);
 ```
 
-This ensures a high-contrast background pattern is ignored (Inhibited), while a low-contrast "Cancel" button is still detected (Excited+Boosted).
+With both masks, a high-contrast background pattern is ignored (Inhibited), while a low-contrast "Cancel" button is still detected (Excited+Boosted).
 
 ## 3. Recommendation: Gestalt Closure as a Post-Process
-**Verdict: Implement Closure via Clustering (not Pixels).**
+**Verdict: Implement Closure via Clustering on the Structure Map.**
 
 ### "Wireframe Mode" vs. Gestalt
 Visualizing the Structure Map (the "Ingredients") is different from visualizing Gestalt Closure (the "Recipe").
 *   **Structure**: "I see 5 crisp rectangles."
 *   **Gestalt**: "I see a Navigation Bar."
 
-To achieve the "organic blob" or "convex hull" visualization that represents true closure, we should not operate on pixels, but on the semantic bounding boxes from the Structure Map.
+To achieve the "organic blob" or "convex hull" visualization that represents true closure, we should operate on the semantic bounding boxes from the Structure Map. The closure pass does not read screenshot pixels.
 
 ### Recommended Algorithms
 1.  **DBSCAN (Density-Based Spatial Clustering)**:

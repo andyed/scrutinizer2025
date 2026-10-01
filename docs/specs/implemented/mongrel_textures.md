@@ -1,12 +1,12 @@
-# Mongrel Textures — Architectural Plan
+# Mongrel Textures: Architectural Plan
 
 > **Last updated:** 2026-03-22 (v2.7)
-> **Status:** Tiers 1–2.5 shipped. Tier 2.75 code complete (untracked — pyramid shaders + compute manager). Tier 3 (full TTM synthesis) is the next major target.
-> **Key question:** How to connect isotropic cortical sectors (v2.6) to summary-statistic pooling.
+> **Status:** Tiers 1–2.5 shipped. Tier 2.75 code complete (untracked: pyramid shaders + compute manager). Tier 3 (full TTM synthesis) is the next major target.
+> **Open question:** How to connect isotropic cortical sectors (v2.6) to summary-statistic pooling.
 
 ## The gap
 
-Scrutinizer v2.6 has the correct pooling *regions* — isotropic cortical sectors derived from the CMF (Blauch, Alvarez & Konkle 2026). What it lacks is the correct pooling *computation* within them. The current displacement pipeline (Bender+Cutter) scrambles pixels but preserves their identity. Peripheral vision doesn't preserve pixel identity — it computes summary statistics over pooling regions and discards the rest (Rosenholtz 2012, Freeman & Simoncelli 2011).
+Scrutinizer v2.6 has the correct pooling *regions*: isotropic cortical sectors derived from the CMF (Blauch, Alvarez & Konkle 2026). What it lacks is the correct pooling *computation* within them. The current displacement pipeline (Bender+Cutter) scrambles pixels but preserves their identity. Peripheral vision computes summary statistics over pooling regions and discards the rest, including pixel identity (Rosenholtz 2012, Freeman & Simoncelli 2011).
 
 The path from displacement to pooling is the central architectural challenge.
 
@@ -22,16 +22,16 @@ The peripheral visual system compresses information through receptive field pool
 | Spatial frequency | Coarse vs. fine texture | Serifs, thin strokes |
 | Element density | "Crowded" or "sparse" | Individual element count |
 
-This is the Texture Tiling Model (TTM, Rosenholtz et al. 2012): peripheral vision represents the world as summary statistics within eccentricity-scaled pooling regions. Mongrel textures are synthetic images that match these statistics — they look the same in peripheral vision as the original, but are unrecognizable when fixated.
+This is the Texture Tiling Model (TTM, Rosenholtz et al. 2012): peripheral vision represents the world as summary statistics within eccentricity-scaled pooling regions. Mongrel textures are synthetic images that match these statistics. They look the same in peripheral vision as the original, but are unrecognizable when fixated.
 
 ## Tier architecture
 
 | Tier | What it does | Status | Key file(s) |
 |------|-------------|--------|-------------|
-| **1** | MIP-based resolution falloff | Shipped (v1.4) | `peripheral.frag` — `sampleMIPPooled()` |
-| **1.5** | Density-gated V1 crowding | Shipped (v2.0) | `peripheral.frag` — crowding sigmoid |
-| **1.6** | Per-channel chromatic decay (RG/YV) | Shipped (v1.9) | `peripheral.frag` — `chromaticAttenuate()` |
-| **1.7** | CMF logarithmic MIP + isotropic grid | Shipped (v2.6) | `peripheral.frag` — type 5, `BenderConfig`/`CutterConfig` |
+| **1** | MIP-based resolution falloff | Shipped (v1.4) | `peripheral.frag`: `sampleMIPPooled()` |
+| **1.5** | Density-gated V1 crowding | Shipped (v2.0) | `peripheral.frag`: crowding sigmoid |
+| **1.6** | Per-channel chromatic decay (RG/YV) | Shipped (v1.9) | `peripheral.frag`: `chromaticAttenuate()` |
+| **1.7** | CMF logarithmic MIP + isotropic grid | Shipped (v2.6) | `peripheral.frag`: type 5, `BenderConfig`/`CutterConfig` |
 | **2** | Contrast-preserving pooling (WebGL2) | Planned | Fragment shader fallback for non-WebGPU hardware |
 | **2.5** | Tile-based Oklab stats + oriented noise | Shipped (v2.3) | `crowding-stats.wgsl`, `crowding-synth.wgsl` |
 | **2.75** | Laplacian pyramid + cross-scale correlations | Code complete (untracked) | `pyramid-decompose.wgsl`, `pyramid-stats.wgsl`, `pyramid-synth.wgsl`, `webgpu-pyramid-compute.js` |
@@ -39,13 +39,13 @@ This is the Texture Tiling Model (TTM, Rosenholtz et al. 2012): peripheral visio
 
 ### What each tier adds
 
-**Tiers 1–1.7 (shipped):** Eccentricity-dependent resolution loss. MIP chain provides spatial averaging. DoG band decomposition (12 bands) gives graded frequency rolloff instead of hard cutoff. Chromatic channels decay at biological rates (RG ~6x faster than YV). Isotropic sector geometry parameterizes displacement. The rendering *mechanism* is still pixel displacement, not statistical pooling.
+**Tiers 1–1.7 (shipped):** Eccentricity-dependent resolution loss. MIP chain provides spatial averaging. DoG band decomposition (12 bands) gives graded frequency rolloff instead of hard cutoff. Chromatic channels decay at biological rates (RG ~6x faster than YV). Isotropic sector geometry parameterizes displacement. The rendering *mechanism* is still pixel displacement. These tiers do not perform statistical pooling.
 
 **Tier 2 (planned):** Generate a statistical MIP texture encoding mean luminance + contrast variance per tile. The fragment shader reads these statistics and modulates noise amplitude to preserve local contrast during pooling. Prevents the "washed out" look of pure MIP averaging. WebGL2 compatible.
 
 **Tier 2.5 (shipped):** WebGPU compute pipeline extracts per-tile Oklab statistics (luminance mean, luminance variance, chrominance variance) and synthesizes oriented sine gratings that match. Two-pass: stats extraction → noise synthesis. Under 0.3ms on integrated GPU. Auto-fallback to fragment shader if frame budget exceeded.
 
-**Tier 2.75 (code complete, untracked):** Laplacian pyramid decomposition (4-scale) via WebGPU compute. Cross-scale magnitude correlation extraction and matching. Pyramid-based noise synthesis replaces oriented sine gratings. Mode 14 (`pyramid_mongrel`) defined in `modes.json`. 511-line test suite (`pyramid-decompose.test.js`). Validation scaffolding: Wave 7a/7b/7c scripts created (see `docs/specs/wave7_pyramid_validation.md`). **Risk:** `scrutinizer.js` defaults to mode 14 with a hard require on `webgpu-pyramid-compute.js` — needs try-catch fallback before commit.
+**Tier 2.75 (code complete, untracked):** Laplacian pyramid decomposition (4-scale) via WebGPU compute. Cross-scale magnitude correlation extraction and matching. Pyramid-based noise synthesis replaces oriented sine gratings. Mode 14 (`pyramid_mongrel`) defined in `modes.json`. 511-line test suite (`pyramid-decompose.test.js`). Validation scaffolding: Wave 7a/7b/7c scripts created (see `docs/specs/implemented/wave7_pyramid_validation.md`). **Risk:** `scrutinizer.js` defaults to mode 14 with a hard require on `webgpu-pyramid-compute.js`. It needs a try-catch fallback before commit.
 
 **Tier 3 (next target):** Full summary-statistic synthesis within isotropic cortical sectors. This is where the v2.6 isotropic grid connects to the v2.3 compute pipeline:
 
@@ -67,13 +67,13 @@ Output
 
 ### What needs building
 
-1. **Sector-aware statistics extraction.** Tier 2.5 uses fixed rectangular tiles. Tier 3 needs to compute statistics within the isotropic sector boundaries — ring-and-spoke geometry, not a uniform grid. The sector geometry is already computed in the JS reference implementation (19-test validated); it needs a WebGPU compute version that bins pixels into sectors and reduces per-sector.
+1. **Sector-aware statistics extraction.** Tier 2.5 uses fixed rectangular tiles. Tier 3 needs to compute statistics within the isotropic sector boundaries, which follow a ring-and-spoke geometry. The sector geometry is already computed in the JS reference implementation (19-test validated); it needs a WebGPU compute version that bins pixels into sectors and reduces per-sector.
 
-2. **Cross-scale magnitude correlation.** The biggest gap in Tier 2.5 (identified in `isotropic_migration.md`). TTM preserves correlations between spatial frequency bands at the same location — this is what makes "texture-ified" output look like texture rather than noise. Without it, synthesis produces colored noise overlaid on blur. Portilla & Simoncelli (2000) formalize the required statistics; Walton et al. (2021) demonstrate real-time computation in CUDA.
+2. **Cross-scale magnitude correlation.** The biggest gap in Tier 2.5 (identified in `isotropic_migration.md`). TTM preserves correlations between spatial frequency bands at the same location. Output synthesized with these correlations looks like texture. Without them, synthesis produces colored noise overlaid on blur. Portilla & Simoncelli (2000) formalize the required statistics; Walton et al. (2021) demonstrate real-time computation in CUDA.
 
 3. **Phase alignment across scales.** Edges require phase coherence across frequency bands. Without it, synthesized edges look "painterly." This is lower priority than magnitude correlation but matters for content with strong structure (text blocks, UI panels).
 
-4. **Eccentricity-graded blending.** The fovea sees the original image. The far periphery sees pure synthesis. The transition should be gradual — not a hard boundary. The current `smoothstep` blend (Tier 1) provides this for MIP pooling; Tier 3 needs an equivalent for synthesis output.
+4. **Eccentricity-graded blending.** The foveal region shows the original image. The far periphery shows pure synthesis. The transition should be gradual. The current `smoothstep` blend (Tier 1) provides this for MIP pooling; Tier 3 needs an equivalent for synthesis output.
 
 ### Performance target
 
@@ -81,7 +81,7 @@ Output
 
 ### What this would look like
 
-Text becomes horizontal stripes with matching density and color. Faces become blobs with correct skin tone and approximate shape. Logos become colored regions matching the original's spatial frequency profile. Navigation bars become stripey regions with correct orientation. This matches Rosenholtz's published mongrel images — peripheral vision's actual representation, not a simulation of its effects.
+Text becomes horizontal stripes with matching density and color. Faces become blobs with correct skin tone and approximate shape. Logos become colored regions matching the original's spatial frequency profile. Navigation bars become stripey regions with correct orientation. This matches Rosenholtz's published mongrel images, which are TTM's synthesized estimate of the information peripheral vision preserves.
 
 ## Key files
 
@@ -91,17 +91,17 @@ Text becomes horizontal stripes with matching density and color. Faces become bl
 | `renderer/webgpu-crowding-compute.js` | Tier 2.5: WebGPU compute pipeline manager |
 | `renderer/shaders/crowding-stats.wgsl` | Tier 2.5 pass 1: tile statistics extraction |
 | `renderer/shaders/crowding-synth.wgsl` | Tier 2.5 pass 2: oriented noise synthesis |
-| `renderer/webgpu-pyramid-compute.js` | Tier 2.75: pyramid pipeline manager (untracked) |
-| `renderer/shaders/pyramid-decompose.wgsl` | Tier 2.75: Laplacian pyramid decomposition (untracked) |
-| `renderer/shaders/pyramid-stats.wgsl` | Tier 2.75: cross-scale statistics extraction (untracked) |
-| `renderer/shaders/pyramid-synth.wgsl` | Tier 2.75: spectrum-matching synthesis (untracked) |
+| `renderer/webgpu-pyramid-compute.js` | Tier 2.75: pyramid pipeline manager |
+| `renderer/shaders/pyramid-decompose.wgsl` | Tier 2.75: Laplacian pyramid decomposition |
+| `renderer/shaders/pyramid-stats.wgsl` | Tier 2.75: cross-scale statistics extraction |
+| `renderer/shaders/pyramid-synth.wgsl` | Tier 2.75: spectrum-matching synthesis |
 | `renderer/webgpu-safety.js` | Frame budget monitor with auto-fallback |
 | `shared/modes.json` | Mode definitions (mode 10 = compute mongrel, mode 12 = isotropic default, mode 14 = pyramid mongrel) |
 | `tests/unit/isotropic-sectors.test.js` | 19-test geometry validation suite |
-| `tests/unit/pyramid-decompose.test.js` | 511-line pyramid decomposition test suite (untracked) |
-| `docs/specs/isotropic_cortical_sampling.md` | Isotropic grid math and verification |
-| `docs/specs/wave7_pyramid_validation.md` | Wave 7 validation spec (pyramid + crowding) |
-| `docs/specs/tier3_ttm_synthesis_plan.md` | Detailed Tier 3 implementation plan |
+| `tests/unit/pyramid-decompose.test.js` | 511-line pyramid decomposition test suite |
+| `docs/specs/implemented/isotropic_cortical_sampling.md` | Isotropic grid math and verification |
+| `docs/specs/implemented/wave7_pyramid_validation.md` | Wave 7 validation spec (pyramid + crowding) |
+| `docs/specs/implemented/tier3_ttm_synthesis_plan.md` | Detailed Tier 3 implementation plan |
 
 ## References
 

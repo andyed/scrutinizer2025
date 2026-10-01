@@ -12,7 +12,7 @@ Three sub-waves validating the Laplacian pyramid → statistics → synthesis pi
 |----------|------------------|---------|---------------|
 | **7a** | Pyramid decomposition fidelity | `capture-pyramid-subbands.js`, `validate-pyramid.js` | Tier 1: reconstruction MSE < 0.005 |
 | **7b** | Statistics extraction accuracy | `analyze-pyramid-stats.js` | Tier 1: band magnitude within 5% |
-| **7c** | Crowding asymmetry (scientific milestone) | `capture-crowding-tier3.js`, `validate-crowding-tier3.js` | Tier 1: isolated recognized, flanked crowded |
+| **7c** | Crowding asymmetry | `capture-crowding-tier3.js`, `validate-crowding-tier3.js` | Tier 1: isolated recognized, flanked crowded |
 
 ## Wave 7a: Pyramid Fidelity
 
@@ -41,7 +41,7 @@ npm run wave7a:validate
 
 ### Blog artifact
 
-Tiled subband visualization — 4 band + residual decomposition of a web page screenshot. Caption: "What the peripheral visual system decomposes before pooling."
+Tiled subband visualization: 4 band + residual decomposition of a web page screenshot. Caption: "Laplacian pyramid subbands: the multi-scale decomposition the model computes before pooling."
 
 ## Wave 7b: Statistics Accuracy
 
@@ -65,15 +65,15 @@ npm run wave7b:validate
 
 ### Blog artifact
 
-Cross-scale correlation heatmap overlaid on original page. Hot = edges/text, cold = flat. Caption: "Where the visual system detects structure across spatial scales."
+Cross-scale correlation heatmap overlaid on original page. Hot = edges/text, cold = flat. Caption: "Cross-scale correlation computed by the model: high where structure persists across spatial scales."
 
 ## Wave 7c: Crowding Asymmetry
 
-**Goal:** Determine if synthesis-based rendering produces crowding asymmetry. This is the scientific milestone — simulation limitation #1 from `simulation-limitations.md`.
+**Goal:** Determine if synthesis-based rendering produces crowding asymmetry. This addresses simulation limitation #1 in `simulation-limitations.md`.
 
 ### Rationale
 
-Displacement (Bender+Cutter) degrades isolated and flanked letters identically — each pixel is displaced independently regardless of neighbors. If summary-statistic pooling (Tier 2.75/3) degrades flanked letters MORE than isolated letters, the asymmetry is an emergent consequence of the pooling mechanism — not a tuned parameter.
+Displacement (Bender+Cutter) degrades isolated and flanked letters identically, because each pixel is displaced independently regardless of neighbors. If summary-statistic pooling (Tier 2.75/3) degrades flanked letters MORE than isolated letters, the asymmetry is an emergent consequence of the pooling mechanism. No parameter is tuned to produce it.
 
 ### Checks
 
@@ -91,7 +91,7 @@ The validation captures the same stimulus through three pipelines:
 - **Mode 10** (Tier 2.5): Expected ratio ≈ 1.0 (oriented noise, no cross-scale)
 - **Mode 14** (Tier 2.75): Expected ratio > 2.0 (pooling produces crowding)
 
-If mode 14 shows the asymmetry and mode 12 does not, the result is diagnostic.
+If mode 14 shows the asymmetry and mode 12 does not, the asymmetry can be attributed to statistical pooling rather than displacement.
 
 ### Run
 
@@ -102,7 +102,7 @@ npm run wave7c:validate
 
 ### Blog artifact
 
-The money shot: same letter, same eccentricity, isolated vs flanked, through all three modes. Side-by-side strip.
+Same letter, same eccentricity, isolated vs flanked, through all three modes, as a side-by-side strip.
 
 ## npm Scripts
 

@@ -4,7 +4,7 @@
 
 ## Overview: Scientific Accuracy Audit + Feature Congestion
 
-This release has two themes. First, a **scientific accuracy audit** tightening the biology behind the DoG band decomposition — replacing geometric cutoffs with linear M-scaling, recalibrating E2, and qualifying the "Laplacian pyramid" terminology across all documentation and shader comments. Second, **Feature Congestion** (Rosenholtz et al. 2007) lands as a new analytical capability: a dual-worker pipeline that computes visual clutter scores in real-time, displayed through an interactive ComplexityHUD overlay.
+This release has two themes. First, a **scientific accuracy audit** tightening the biology behind the DoG band decomposition: replacing geometric cutoffs with linear M-scaling, recalibrating E2, and qualifying the "Laplacian pyramid" terminology across all documentation and shader comments. Second, **Feature Congestion** (Rosenholtz et al. 2007) lands as a new analytical capability: a dual-worker pipeline that computes visual clutter scores in real-time, displayed through an interactive ComplexityHUD overlay.
 
 ---
 
@@ -18,7 +18,7 @@ The v1.6 DoG band cutoffs used a geometric 2x series (0.3, 0.6, 1.2, 2.4 × E2),
 s_min(e) = s_0 × (1 + e/E2)  — Rovamo & Virsu 1979
 ```
 
-New cutoffs derived from M-scaling: `E2 × (2^k − 1)`, giving **1, 3, 7, 15 × E2**. The perceptual effect: coarse structure (bands 2–3) now persists far into the periphery — you see *where* a button is but can't read its label. Fine detail (band 0) drops at the same rate as before.
+New cutoffs derived from M-scaling: `E2 × (2^k − 1)`, giving **1, 3, 7, 15 × E2**. In perceptual terms, coarse structure (bands 2–3) now persists far into the periphery, so you see *where* a button is but can't read its label. Fine detail (band 0) drops at the same rate as before.
 
 ### E2 Recalibration
 
@@ -31,7 +31,7 @@ E2 values were recalibrated to preserve the band-0 onset point under the new lin
 
 ### Approximate Laplacian Pyramid
 
-Hardware MIP levels use box/bilinear downsampling, not Gaussian convolution. Every doc, shader comment, and paper reference that said "Laplacian pyramid" without qualification now says **"approximate Laplacian pyramid"** and notes the distinction. Band differences are Difference-of-Boxes with spectral leakage, not true Difference-of-Gaussians as in Burt & Adelson (1983). Added Burt & Adelson 1983 to `references.bib`.
+Hardware MIP levels use box/bilinear downsampling. A true Laplacian pyramid uses Gaussian convolution. Every doc, shader comment, and paper reference that said "Laplacian pyramid" without qualification now says **"approximate Laplacian pyramid"** and notes the distinction. Band differences are Difference-of-Boxes with spectral leakage, where Burt & Adelson (1983) produce Difference-of-Gaussians. Added Burt & Adelson 1983 to `references.bib`.
 
 ### Output Clamping
 
@@ -45,7 +45,9 @@ Final color output is now clamped to [0,1] to prevent negative-going band artifa
 
 Simplified Rosenholtz et al. (2007) Feature Congestion computed in Oklab color space: local variance across L (lightness), |a| (red-green), and |b| (yellow-blue) channels using separable Gaussian blur. Combined with Sobel edge density for a composite complexity score.
 
-**Fixed σ=2.5** — the key discovery. Auto-scaling σ with resolution (the standard approach for natural images) fails on web content because web pages at different resolutions are the same layout at different pixel densities, not the same scene at different zoom levels. Scaling σ up smears text, borders, and UI into indistinguishable blobs. Fixed σ keeps the neighborhood matched to the feature scale that matters.
+**Fixed σ=2.5.** Auto-scaling σ with resolution (the standard approach for natural images) fails on web content because a web page at a different resolution is the same layout at a different pixel density. Natural-image scaling assumes the same scene at a different zoom level. Scaling σ up smears text, borders, and UI into indistinguishable blobs. With fixed σ, the neighborhood stays matched to the scale of web-page features (text, borders, UI).
+
+*(Correction 2026-10-01: the sweep downscaled the same native screenshots to each resolution, so the inputs were scaled copies of one another and auto-scaled σ covered the same page area at every resolution. What differed between the auto and fixed runs was neighborhood size: fixed σ=2.5 pools over a 2–4× smaller neighborhood at 512–1024 px, closer to the reference's σ=3 px pooling on native-resolution images. See `docs/scrutinizer-v1.8-congestion.md`.)*
 
 | Resolution | Auto σ | Spearman ρ | Fixed σ=2.5 | Spearman ρ |
 |---|---|---|---|---|
@@ -68,16 +70,16 @@ The saliency map texture is now RGB-packed: R=saliency, G=congestion, B=edge den
 score = sqrt(congestion_p90 × 0.7 + edgeDensity_p90 × 0.3) × 100
 ```
 
-- **p90 percentile** captures the busy regions, ignores whitespace. A page with one cluttered hero and clean whitespace elsewhere has low mean but high p90 — the p90 answers "how bad are the busy parts?"
+- **p90 percentile** reflects the busy regions and ignores whitespace. A page with one cluttered hero and clean whitespace elsewhere has low mean but high p90. The p90 measures how bad the busy parts are.
 - **sqrt scaling** spreads [0,1] into a discriminative [0,100] range
-- **70/30 weighting** — empirically tuned against test corpus; edge density alone over-weights text-heavy pages
+- **70/30 weighting:** empirically tuned against test corpus; edge density alone over-weights text-heavy pages
 
 ### Validation
 
-Three-script pipeline against Rosenholtz's reference implementation:
-- `validate-congestion.py` — Python extraction via `visual-clutter` package
-- `extract-congestion.js` — Scrutinizer's `congestion-core.js` in headless Node.js
-- `compare-congestion.js` — Spearman rank correlation + per-pixel SSIM
+Three-script pipeline against `visual-clutter`, a third-party Python port of Rosenholtz's Feature Congestion measure:
+- `validate-congestion.py`: Python extraction via `visual-clutter` package
+- `extract-congestion.js`: Scrutinizer's `congestion-core.js` in headless Node.js
+- `compare-congestion.js`: Spearman rank correlation + per-pixel SSIM
 
 **Result:** Spearman ρ = 0.93 at 768px. All fixed-σ resolutions pass (ρ ≥ 0.85). All auto-scaled resolutions fail.
 
@@ -87,9 +89,9 @@ Three-script pipeline against Rosenholtz's reference implementation:
 
 Interactive draggable overlay panel replacing the toolbar URL-bar approach:
 
-- **Score tab** — live congestion score with color-coded badge
-- **Stats tab** — p50/p75/p90 breakdowns for congestion and edge density
-- **Spatial tab** — congestion heatmap overlay on TEXTURE4 (blue → yellow → red)
+- **Score tab:** live congestion score with color-coded badge
+- **Stats tab:** p50/p75/p90 breakdowns for congestion and edge density
+- **Spatial tab:** congestion heatmap overlay on TEXTURE4 (blue → yellow → red)
 
 Scroll and navigation-aware: heatmap hides immediately on scroll/nav to prevent stale overlay, restores when fresh worker results arrive. Amber throbber on the eye icon during congestion processing.
 
@@ -99,13 +101,13 @@ Entry detection uses the `browser:mousemove` IPC stream (reliable when the overl
 
 ## 🧪 Mode 9: Congestion-Gated Pooling
 
-New mode that modulates peripheral pooling by local visual clutter. The shader multiplies `coupledEccentricity` by `1.0 + lgn.congestion` when active — high-congestion regions get up to 2× the MIP pooling level, making cluttered periphery degrade faster than sparse regions.
+New mode that modulates peripheral pooling by local visual clutter. The shader multiplies `coupledEccentricity` by `1.0 + lgn.congestion` when active. High-congestion regions get up to 2× the MIP pooling level, making cluttered periphery degrade faster than sparse regions.
 
 Selecting mode 9 auto-starts the high-res congestion worker (no need to enable the ComplexityHUD overlay separately). Congestion data recomputes on scroll and navigation, same as the HUD pipeline.
 
-This tests Rosenholtz's (2012) prediction that visual clutter and crowding are manifestations of the same summary-statistic computation. On a cluttered news page, dense text columns and image-heavy sidebars pool more aggressively in the periphery than clean whitespace — matching the degraded feature access that occurs when peripheral receptive fields pool over diverse, competing features.
+This tests Rosenholtz's (2012) prediction that visual clutter and crowding are manifestations of the same summary-statistic computation. On a cluttered news page, dense text columns and image-heavy sidebars pool more aggressively in the periphery than clean whitespace. This is intended to model the degraded feature access that occurs when peripheral receptive fields pool over diverse, competing features.
 
-Tagged as `experimental` — the pipeline is functional, perceptual validation is ongoing.
+Tagged as `experimental`: the pipeline is functional, and perceptual validation is ongoing.
 
 ---
 
@@ -113,7 +115,7 @@ Tagged as `experimental` — the pipeline is functional, perceptual validation i
 
 The removal of the parafoveal saturation boost (`mix(vec3(luma), col, 1.2)`) exposed a dead zone in the V1 displacement path. Two compounding issues:
 
-1. **Flat eccentricityScale in the parafovea**: Every pixel between fovea_radius and 2.5× fovea_radius received `eccentricityScale = 0.15` — a flat 15% of full displacement. Noise mode's 800-cycle simplex noise at that strength produces 1–5px of nearly-random per-pixel jitter, indistinguishable from gaussian blur. Rayner (1998) establishes that parafoveal processing enables word-length perception and saccade planning — blurring those cues is biologically wrong.
+1. **Flat eccentricityScale in the parafovea**: Every pixel between fovea_radius and 2.5× fovea_radius received `eccentricityScale = 0.15`, a flat 15% of full displacement. Noise mode's 800-cycle simplex noise at that strength produces 1–5px of nearly-random per-pixel jitter, indistinguishable from gaussian blur. Rayner (1998) establishes that parafoveal processing enables word-length perception and saccade planning, so blurring those cues is biologically wrong.
 
 2. **Abrupt fovea-to-pooled blend**: The MIP-pooled color blend completed within 10% of fovea radius (~15px), creating a visible step from sharp to soft.
 
@@ -125,16 +127,16 @@ The removal of the parafoveal saturation boost (`mix(vec3(luma), col, 1.2)`) exp
 
 ## 🧹 Housekeeping
 
-- **Golden captures** (348MB accumulated across v1.2.0–v1.6.0) removed from git tracking and gitignored. Curated mode-comparison captures live in `docs/golden/` instead.
+- **Golden captures** (348MB accumulated across v1.2.0–v1.6.0) removed from git tracking and gitignored. Curated mode-comparison captures are in `docs/golden/` instead.
 - **.claude config** checked in: `settings.json` (permission allow-list), `skills/release/SKILL.md` (release workflow), `agent-memory/vision-scientist/` (DoG review findings, shader verification notes).
 
 ---
 
 ## What's Next
 
-- **Per-channel chromatic pooling** — Peripheral color is pooled, not lost (Rosenholtz TTM): large colored regions preserve mean chromaticity far into the periphery, while small chromatic features lose color identity. The DoG bands already separate content by spatial scale — per-band RG/YV attenuation models both size-dependent preservation and the differential channel rates (RG foveal specialization fades ~2.5× faster than YV). Spec: `docs/specs/implemented/chromatic_pooling.md`. Key references: castleCSF (Ashraf et al. 2024), Jiang, Shooner & Mullen (2022), Abramov et al. (1991).
-- **Oriented DoG bands (Oblique Effect)** — Cardinal (H/V) edges get M-scaling cutoffs pushed ~50% further, modeling the 30–50% acuity advantage for horizontal and vertical edges over oblique ones (Appelle 1972). Spec: `docs/specs/implemented/oriented_dog_bands.md`
-- **Validation corpus expansion** — Current corpus is 10 images. Expanding to 20+ for statistical confidence in the Spearman correlation.
+- **Per-channel chromatic pooling:** Peripheral color is pooled (Rosenholtz TTM): large colored regions preserve mean chromaticity far into the periphery, while small chromatic features lose color identity. The DoG bands already separate content by spatial scale, and per-band RG/YV attenuation models both size-dependent preservation and the differential channel rates (RG foveal specialization fades ~2.5× faster than YV). Spec: `docs/specs/implemented/chromatic_pooling.md`. Key references: castleCSF (Ashraf et al. 2024), Jiang, Shooner & Mullen (2022), Abramov et al. (1991).
+- **Oriented DoG bands (Oblique Effect):** Cardinal (H/V) edges get M-scaling cutoffs pushed ~50% further, modeling the 30–50% acuity advantage for horizontal and vertical edges over oblique ones (Appelle 1972). Spec: `docs/specs/implemented/oriented_dog_bands.md`
+- **Validation corpus expansion:** Current corpus is 10 images. Expanding to 20+ for statistical confidence in the Spearman correlation.
 
 ---
 

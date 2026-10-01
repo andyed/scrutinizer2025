@@ -7,11 +7,11 @@
 
 ## Summary
 
-The v1 task link runs exactly one task. A moderated usability session almost never has one task: it has three to six, run in order, on the same participant, in the same sitting. Today the moderator holds that queue themselves — a sheet of separate Study Links fired by hand between tasks — and Scrutinizer has no concept that the tasks belong together (`activeStudy` in `main.js` is a single object; a second link *replaces* the first).
+The v1 task link runs exactly one task. A moderated usability session almost never has one task: it has three to six, run in order, on the same participant, in the same sitting. Today the moderator holds that queue themselves (a sheet of separate Study Links fired by hand between tasks), and Scrutinizer has no concept that the tasks belong together (`activeStudy` in `main.js` is a single object; a second link *replaces* the first).
 
-This spec adds a **session link**: one deep link carrying an ordered list of 2–8 tasks. Clicking it enters Study mode once; **Done** advances to the next task instead of exiting; the toolbar shows real progress ("Task 2 of 5"); the final Done exits, restores the pre-session runtime state, and writes a small local session summary. Between tasks, a neutral interstitial screen presents the next task's instructions at full size before the stimulus loads.
+This spec adds a **session link**: one deep link containing an ordered list of 2–8 tasks. Clicking it enters Study mode once; **Done** advances to the next task instead of exiting; the toolbar shows real progress ("Task 2 of 5"); the final Done exits, restores the pre-session runtime state, and writes a small local session summary. Between tasks, a neutral interstitial screen presents the next task's instructions at full size before the stimulus loads.
 
-This is deliberately smaller than the Phase 3 `ExperimentRunner` (P3-1). It is ordered sequencing for a moderated session — no conditions × trials expansion, no counterbalancing math, no `ScanpathData` capture. Those remain P3 work. What this shares with P3 is the boundary: when ExperimentRunner lands, it should *emit* session launches in this format rather than inventing a second sequencing path.
+This is deliberately smaller than the Phase 3 `ExperimentRunner` (P3-1). It is ordered sequencing for a moderated session. Conditions × trials expansion, counterbalancing math, and `ScanpathData` capture remain P3 work. When ExperimentRunner lands, it should *emit* session launches in this format rather than invent a second sequencing path.
 
 Example:
 
@@ -32,18 +32,17 @@ scrutinizer://v1/session/start?session_id=nav-study-p04&mode=12&fovea_radius_px=
 
 ## Non-goals
 
-- Counterbalancing, condition expansion, or randomized task order — ExperimentRunner (P3-1).
-- Behavioral/gaze capture, `ScanpathData` recording — DataCollector (P3-2).
-- Consent/debrief screens — P3-5 (the interstitial framework here is where they will eventually mount, but they are not in this spec).
+- Counterbalancing, condition expansion, or randomized task order: ExperimentRunner (P3-1).
+- Behavioral/gaze capture, `ScanpathData` recording: DataCollector (P3-2).
 - Remote manifest loading. `scrutinizer://v1/study/run?config=<https-url>` remains reserved for studies too large or too dynamic for a self-contained link. This spec does not implement it.
 - Branching, skip logic, or timed auto-advance.
 - Unmoderated/self-serve operation guarantees. A session link *can* be run alone, but nothing here schedules, reminds, or uploads.
 
-## Why inline task blocks, not a hosted manifest
+## Why inline task blocks instead of a hosted manifest
 
 The reserved manifest route requires the researcher to host a JSON file at a stable HTTPS URL. That is fine for a lab and fatal for the scrappy path: a PM or designer with no infrastructure should be able to build a five-task session in the hosted Study Link Builder and paste one link into an instruction sheet. A session of ≤8 tasks with ≤500-char instructions each fits in a link that Safari, Chrome, and Edge all deliver reliably (enforced cap below). Studies that outgrow the cap are exactly the studies that need ExperimentRunner, and they get the manifest route then.
 
-The existing prohibition on encoding fixation arrays in links is unaffected — task blocks are small, human-auditable, and validated field-by-field like every v1 parameter.
+The existing prohibition on encoding fixation arrays in links is unaffected, because task blocks are small, human-auditable, and validated field-by-field like every v1 parameter.
 
 ---
 
@@ -93,16 +92,16 @@ Task parameters are prefixed `t<index>.` with 1-based, contiguous indices: `t1.u
 ### Structural rules
 
 - Minimum 2 task blocks, maximum 8. One task is a `task/start` link; use that route. (`TOO_FEW_TASKS` / `TOO_MANY_TASKS`)
-- Indices start at 1 and must be contiguous — `t1`, `t2`, `t4` fails with `NON_CONTIGUOUS_TASKS`. Order in the link is presentation order.
+- Indices start at 1 and must be contiguous: `t1`, `t2`, `t4` fails with `NON_CONTIGUOUS_TASKS`. Order in the link is presentation order.
 - Every declared index must include `t<i>.url` (`MISSING_TARGET_URL`, message names the task index).
-- Unknown parameters — including unknown prefixed names like `t1.speed` and malformed prefixes like `t0.url` or `t01.url` — fail with `UNKNOWN_PARAMETER`.
+- Unknown parameters, including unknown prefixed names like `t1.speed` and malformed prefixes like `t0.url` or `t01.url`, fail with `UNKNOWN_PARAMETER`.
 - Duplicates fail with `DUPLICATE_PARAMETER`, as in v1.
 - Validation is atomic across the whole link: task 6 having a bad mode ID means nothing launches. Error messages identify the failing task index so an 8-task link is debuggable ("Task 6: the requested Scrutinizer mode is not supported.").
 - All v1 parsing rules (case-sensitive names, single decode, strict integers/booleans, plain-text instructions) carry over unchanged.
 
 ### Parser shape
 
-Extend `shared/study-deep-link.js` with the route; per-field validation is shared with the v1 code paths, not duplicated. Normalized success value:
+Extend `shared/study-deep-link.js` with the route; per-field validation reuses the v1 code paths. Normalized success value:
 
 ```js
 {
@@ -139,17 +138,17 @@ New error codes: `LINK_TOO_LONG`, `TOO_FEW_TASKS`, `TOO_MANY_TASKS`, `NON_CONTIG
 }
 ```
 
-`outcome` is `'done'` (participant/moderator pressed Done) or `'session_ended'` (session terminated early from the menu during this task). `'done'` records a procedural end trigger, not whether the participant achieved the task goal; effectiveness requires a separate outcome rubric and analyst adjudication. Timestamps are wall-clock ISO strings plus `performance.now()`-style monotonic offsets so later tooling can compute durations without timezone hazards.
+`outcome` is `'done'` (participant/moderator pressed Done) or `'session_ended'` (session terminated early from the menu during this task). `'done'` records a procedural end trigger. It does not record whether the participant achieved the task goal; effectiveness requires a separate outcome rubric and analyst adjudication. Timestamps are wall-clock ISO strings plus `performance.now()`-style monotonic offsets so later tooling can compute durations without timezone hazards.
 
 ### Lifecycle
 
-1. **Launch** (cold or warm — same rules as v1): validate atomically, snapshot runtime state once, enter Study mode, show the **consent screen** (`phase: 'consent'`; see §Consent and debrief). Agreeing records consent and shows the **interstitial for task 1**; declining shows a "nothing was recorded" screen and writes nothing.
-2. **Interstitial**: the content view shows a bundled neutral screen — task counter ("Task 1 of 5"), full instructions at readable size, and a single **Begin** button. No stimulus loads yet. This is app chrome loaded from the packaged app (never a `data:`/remote URL), and it is where the moderator resets site state, checks the participant is ready, or answers questions. The toolbar already shows Study mode with the same counter and instruction.
+1. **Launch** (cold or warm, same rules as v1): validate atomically, snapshot runtime state once, enter Study mode, show the **consent screen** (`phase: 'consent'`; see §Consent and debrief). Agreeing records consent and shows the **interstitial for task 1**; declining shows a "nothing was recorded" screen and writes nothing.
+2. **Interstitial**: the content view shows a bundled neutral screen with a task counter ("Task 1 of 5"), full instructions at readable size, and a single **Begin** button. No stimulus loads yet. This is app chrome loaded from the packaged app (never a `data:`/remote URL), and it is where the moderator resets site state, checks the participant is ready, or answers questions. The toolbar already shows Study mode with the same counter and instruction.
 3. **Begin**: reset Visual Memory, apply the task's resolved runtime state (`snapshot ← session defaults ← task overrides`) through the existing `study:apply-runtime-settings` path, stamp `startedAt`, navigate the content view to `targetUrl`.
-4. **Task runs**: identical to v1 Study mode — locked toolbar, compressed origin, read-only ⌘L, in-page navigation allowed and reflected.
-5. **Done** (task N of M, N < M): stamp `endedAt`/`finalUrl`/`outcome: 'done'`, advance `taskIndex`, show the interstitial for task N+1. **No runtime restore happens here** — the session is still active.
-6. **Done** (task M of M): stamp the final record, write the session summary, and enter `phase: 'complete'` — **still in Study mode**. The completion interstitial ("Session complete — you can hand the machine back to the moderator") shows unfoveated (same rule as other interstitials; restoring the participant's baseline here would re-foveate the completion text), and the toolbar instruction reads "Session complete — press Done to finish." Pressing **Done** on the completion screen performs the deferred restore of `previousRuntimeState` and exits Study mode to Browse.
-7. **End Session early**: the existing application-menu escape (**Exit Study Mode**) is relabeled **End Study Session** when `kind === 'session'`. It stamps the current task `outcome: 'session_ended'`, writes the summary with the tasks completed so far, and enters the same completion state as step 6 (Done then restores and exits; the menu escape on the completion screen exits directly). Skipping a single task without ending the session is not supported in this version — the moderator's recourse is Done (recorded as done) or ending the session.
+4. **Task runs**: identical to v1 Study mode: locked toolbar, compressed origin, read-only ⌘L, in-page navigation allowed and reflected.
+5. **Done** (task N of M, N < M): stamp `endedAt`/`finalUrl`/`outcome: 'done'`, advance `taskIndex`, show the interstitial for task N+1. **No runtime restore happens here**, because the session is still active.
+6. **Done** (task M of M): stamp the final record, write the session summary, and enter `phase: 'complete'` while **still in Study mode**. The completion interstitial ("Session complete", "You can hand the computer back to the moderator.") shows unfoveated (same rule as other interstitials; restoring the participant's baseline here would re-foveate the completion text), and the toolbar instruction reads "Session complete — press Done to finish." Pressing **Done** on the completion screen performs the deferred restore of `previousRuntimeState` and exits Study mode to Browse.
+7. **End Session early**: the existing application-menu escape (**Exit Study Mode**) is relabeled **End Study Session** when `kind === 'session'`. It stamps the current task `outcome: 'session_ended'`, writes the summary with the tasks completed so far, and enters the same completion state as step 6 (Done then restores and exits; the menu escape on the completion screen exits directly). Skipping a single task without ending the session is not supported in this version; the moderator's recourse is Done (recorded as done) or ending the session.
 
 ### Link collision rules
 
@@ -159,7 +158,7 @@ New error codes: `LINK_TOO_LONG`, `TOO_FEW_TASKS`, `TOO_MANY_TASKS`, `NON_CONTIG
 
 ### Persistence rules
 
-Identical to v1: no task or session setting ever reaches `settingsManager`; quitting mid-session leaves `settings.json` untouched. Quitting mid-session also writes the partial session summary during shutdown if the window is still alive; if the process dies uncleanly, in-memory records are lost (documented limitation — durable journaling is DataCollector territory).
+Identical to v1: no task or session setting ever reaches `settingsManager`; quitting mid-session leaves `settings.json` untouched. Quitting mid-session also writes the partial session summary during shutdown if the window is still alive; if the process dies uncleanly, in-memory records are lost (documented limitation; durable journaling is DataCollector territory).
 
 ---
 
@@ -184,21 +183,21 @@ Study mode gains a progress counter in the leading label position:
 
 - Bundled with the app (packaged resource, loaded into the content view like other app chrome); never remote, never a `data:` URL, no network access.
 - Shows: task counter, full instruction text (rendered with `textContent`), target origin (so the moderator can confirm the right stimulus is next), Begin button.
-- Foveated rendering is **disabled on the interstitial** regardless of task settings — instructions are meta-task text, and the participant should read them unimpeded. Task settings apply at Begin. The completion state gets the same exemption: the session's runtime restore is deferred until Done is pressed on the completion screen, so "Session complete" is never rendered foveated.
+- Foveated rendering is **disabled on the interstitial** regardless of task settings, because instructions are meta-task text, and the participant should read them unimpeded. Task settings apply at Begin. The completion state gets the same exemption: the session's runtime restore is deferred until Done is pressed on the completion screen, so "Session complete" is never rendered foveated.
 - Keyboard: Begin is focused by default; Enter activates. The screen is fully readable by assistive technology.
-- Consent (before task 1) and debrief (after task M) are states of this same screen, not a separate surface. See §Consent and debrief.
+- Consent (before task 1) and debrief (after task M) are states of this same screen. See §Consent and debrief.
 
 ## Consent and debrief
 
-*Implemented 2026-09-30 (P3-5).* Pure logic lives in `shared/study-consent.js`. The screens are the `consent`, `declined`, and `complete` states of `renderer/study-interstitial.html`.
+*Implemented 2026-09-30 (P3-5).* Pure logic is in `shared/study-consent.js`. The screens are the `consent`, `declined`, and `complete` states of `renderer/study-interstitial.html`.
 
 - **Consent opens every session link.** The screen states what Scrutinizer records during tasks (pointer, clicks, scrolling, page addresses with a screenshot each, masked key presses, timing, screen size, settings), that nothing is recorded on interstitial screens, that data stays on the machine under a participant code, and that the moderator may record with their own equipment. Unfoveated, like every non-task phase.
-- **Participant code.** If the link carries `participant_id`, the screen shows it read-only and it wins. Otherwise the screen requires one (same rule as `participant_id`: 1–128 of `A–Z a–z 0–9 . _ -`). This lets one link serve a walk-up queue with a distinct code per participant.
+- **Participant code.** If the link includes `participant_id`, the screen shows it read-only and it takes precedence. Otherwise the screen requires one (same rule as `participant_id`: 1–128 of `A–Z a–z 0–9 . _ -`). This lets one link serve a walk-up queue with a distinct code per participant.
 - **Agree** navigates to the sentinel `https://consent.study.scrutinizer.invalid/?participant=<code>`; **decline** to `https://decline.study.scrutinizer.invalid/`. main.js acts on them only in `phase: 'consent'` and only when the bundled interstitial is the navigating page.
 - **No consent, no record.** `writeSessionSummary` writes nothing for a session without a consent record. That covers a decline, Done or End Study Session during consent (both exit directly), a replacing link, and a quit. Begin also refuses without consent, so capture cannot start.
 - **Consent record.** The capture envelope gains an optional `consent` block: `{ textVersion, consentedAt, participantIdSource: 'link' | 'consent_screen' }`. `textVersion` (`scrutinizer-consent/1`) names the exact wording shown. A unit test pins a digest of the wording to its version, so editing the copy without bumping the version fails CI. Envelopes captured before 2026-09-30 have no `consent` key and stay valid.
 - **Debrief.** The `complete` state shows what was tested, what the software did, the participant code, and, in small print for the moderator, the saved session folder name, so a withdrawal request can be honoured by deleting that folder.
-- **Paper forms still apply.** `docs/templates/consent.md` covers what the app cannot know: who runs the study, retention, recordings made with the moderator's own equipment, and signatures.
+- **Paper forms still apply.** `docs/templates/consent.md` covers information outside the app: who runs the study, retention, recordings made with the moderator's own equipment, and signatures.
 
 ## Session summary artifact
 
@@ -234,8 +233,8 @@ On session end (complete, early-ended, replaced, or clean quit), write one JSON 
 ```
 
 - Local-only, never uploaded, no PII beyond the researcher-supplied IDs (which the docs direct to be anonymous codes).
-- `finalUrl` can contain sensitive query strings from the participant's own navigation; the docs must say so, and the file lands in the researcher-controlled app-data directory, not a shared location.
-- This is deliberately *not* DataCollector: no samples, no events, no per-fixation data. It exists because time-on-task per task is nearly free here and is the single most-requested quant number in a moderated study. DataCollector (P3-2) will supersede and embed it, keyed by the same `sessionId`/`taskId`.
+- `finalUrl` can contain sensitive query strings from the participant's own navigation; the docs must say so, and the file lands in the researcher-controlled app-data directory.
+- This is deliberately *not* DataCollector: no samples, no events, no per-fixation data. It exists because time-on-task per task is nearly free here and is a standard quantitative measure in moderated studies. DataCollector (P3-2) will supersede and embed it, keyed by the same `sessionId`/`taskId`.
 
 ## Study Link Builder
 
@@ -261,7 +260,7 @@ All v1 rules apply per task block (scheme/route whitelist, http(s)-only targets,
 
 ## Test plan
 
-**Unit — parser** (extend `tests/unit/study-deep-link.test.js`):
+**Unit (parser)** (extend `tests/unit/study-deep-link.test.js`):
 - Minimal 2-task link; maximal 8-task link with every field.
 - Cap: 8193-char link fails `LINK_TOO_LONG`; 1 task fails `TOO_FEW_TASKS`; 9 fails `TOO_MANY_TASKS`.
 - `t1`,`t3` fails `NON_CONTIGUOUS_TASKS`; `t0.url`, `t01.url`, `t1.speed` fail `UNKNOWN_PARAMETER`.
@@ -269,11 +268,11 @@ All v1 rules apply per task block (scheme/route whitelist, http(s)-only targets,
 - Session defaults + per-task override resolution produces the documented layering.
 - v1 `task/start` links still parse byte-identically (regression).
 
-**Unit — runtime state**: `buildStudyRuntimeState` layered twice (snapshot ← defaults ← task) matches expected resolution for all override combinations.
+**Unit (runtime state)**: `buildStudyRuntimeState` layered twice (snapshot ← defaults ← task) matches expected resolution for all override combinations.
 
-**Unit — toolbar contract** (extend `tests/unit/study-toolbar-contract.test.js`): counter text for `kind: 'session'`, static label for `kind: 'task'`, live-region string includes counter + instruction.
+**Unit (toolbar contract)** (extend `tests/unit/study-toolbar-contract.test.js`): counter text for `kind: 'session'`, static label for `kind: 'task'`, live-region string includes counter + instruction.
 
-**Integration — main**:
+**Integration (main)**:
 - Done on task N<M advances without touching `previousRuntimeState` or `settings.json`; Done on task M restores and exits.
 - Visual Memory reset fires at every Begin.
 - Early End Session stamps `session_ended` and writes a partial summary.
@@ -288,14 +287,14 @@ All v1 rules apply per task block (scheme/route whitelist, http(s)-only targets,
 - [x] Raw links over 8192 chars are rejected before parsing.
 - [x] One snapshot at entry, one restore at exit; Done mid-session never restores or persists.
 - [x] Interstitial gates every task; foveation off on the interstitial; Visual Memory resets at every Begin.
-- [x] Toolbar shows "Task N of M" for sessions and remains 40px with unchanged geometry.
+- [x] Toolbar shows "Task N of M" for sessions and keeps the 104px Study toolbar geometry (40px control row, 48px instruction row).
 - [x] End Study Session menu escape ends early with a partial summary.
 - [x] Session summary JSON is written on every exit path (complete, early, replaced, clean quit) and contains per-task timestamps, durations, outcomes, and final URLs.
 - [x] v1 single-task links behave exactly as before (full regression on existing 28 tests).
 - [x] Study Link Builder authors, validates, and length-guards session links without code.
 - [x] No macOS-specific assumptions in parser, state, or summary paths.
 
- implementation order
+## Implementation order
 
 1. Parser route + structural validation + exhaustive unit tests (pure, no Electron).
 2. Session state machine in `main.js` (`kind`, `taskIndex`, `taskRecords`) + advance/exit logic + integration tests.

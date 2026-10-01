@@ -21,28 +21,23 @@ untracked; regenerate them from the two source captures if needed.
 
 Both captures come from the committed reference page
 `tests/reference-pages/border-suppression.html` at 1920×1080, center fixation
-(0.5, 0.5), radius 45, mobile off — see `.capture-manifest.json` for the exact
-spec and `specHash` of each shot. To regenerate:
+(0.5, 0.5), radius 45, mobile off. See `.capture-manifest.json` for the exact
+spec and `specHash` of each shot.
 
-```
-node scripts/capture-golden.js --url file://$PWD/tests/reference-pages/border-suppression.html \
-  --mode 14 --width 1920 --height 1080 --radius 45 \
-  --out tests/golden-captures/length-tuning-ab/border_mode14_baseline.png
-node scripts/capture-golden.js --url file://$PWD/tests/reference-pages/border-suppression.html \
-  --mode 17 --width 1920 --height 1080 --radius 45 \
-  --out tests/golden-captures/length-tuning-ab/border_mode17_lengthtuned.png
-```
-
-(Confirm flag names against `scripts/capture-golden.js` — the capture runner's
-CLI is the source of truth. Captures are display-DPR-dependent until the
-deterministic DPR pin lands, P2-4.)
+`scripts/capture-golden.js` takes no per-shot flags (it accepts only
+`v=<version>`, `--force`, `--all-modes` and `--require-tier=N`). To regenerate,
+pass the two `spec` objects from `.capture-manifest.json` to `run()` in
+`scripts/lib/capture-runner.js` with `outputDir` set to this directory and
+`force: true`. Each spec's `url` and `outputDir` are absolute paths on the
+machine that made the captures, so rewrite them for your checkout. Captures are
+display-DPR-dependent until the deterministic DPR pin lands, P2-4.
 
 ## Status
 
 Mode 17's quantitative bio claim (Cavanaugh-Bair-Movshon 2002 length-tuning
-curve) is **NOT yet validated** — the CBM-2002 harness does not exist (see
+curve) is **NOT yet validated**. The CBM-2002 harness does not exist (see
 P0-3). These captures demonstrate the *qualitative* A/B effect (long structural
-edges suppressed, short edges preserved) on one reference page; they are not a
+edges suppressed, short edges preserved) on one reference page. They are not a
 quantitative validation. Empirical notes on the effect (contrast-gating of the
-edge probe, 1-px light borders bypassing it) live in
+edge probe, 1-px light borders bypassing it) are in
 `docs/specs/length_tuned_edge_suppression.md`.

@@ -6,7 +6,7 @@ Date: 2026-03-03
 Status: IMPLEMENTED (v1.9.0)
 Commits: a9051e3, aad22cf, 276e8de
 Dependencies: DoG band decomposition (v1.6, implemented), Oklab color pipeline (v1.4+, implemented)
-Validation: **Wave 1 — Chromatic Decay** (`docs/specs/wave1_feature_search_validation.md`). Tier 1: 7/7 PASS, Tier 2: 3/3 PASS. Green tracks the RG decay curve, not BY — confirming Oklab opponent channel assignment. Published data: `tests/validation/published-data/hansen2009_color_naming.json`, `mullen_kingdom2002_rg_by.json`.
+Validation: **Wave 1, Chromatic Decay** (`docs/specs/implemented/wave1_feature_search_validation.md`). Tier 1: 7/7 PASS, Tier 2: 3/3 PASS. Green tracks the RG decay curve. This confirms the Oklab opponent channel assignment. Published data: `tests/validation/published-data/hansen2009_color_naming.json`, `mullen_kingdom2002_rg_by.json`.
 
 ## 1. Problem Statement
 
@@ -25,9 +25,9 @@ lab.z *= (1.0 - fade);  // b (blue-yellow)
 
 This is wrong in two ways:
 
-1. **Red-green and blue-yellow don't decay at the same rate.** L-M (red-green) opponency is a foveal specialization — it drops ~2x faster than achromatic sensitivity with eccentricity. S-(L+M) (blue-yellow) tracks close to achromatic, persisting far into the periphery. Treating them equally over-attenuates blue-yellow and under-attenuates red-green.
+1. **Red-green and blue-yellow don't decay at the same rate.** L-M (red-green) opponency is a foveal specialization. It drops ~2x faster than achromatic sensitivity with eccentricity. S-(L+M) (blue-yellow) tracks close to achromatic, persisting far into the periphery. Treating them equally over-attenuates blue-yellow and under-attenuates red-green.
 
-2. **The decay ignores feature size.** A small red letter and a large red hero background get the same chrominance reduction at the same eccentricity. But peripheral color perception is strongly size-dependent (Abramov et al. 1991): large color fields retain mean chromaticity out to 20+ degrees — the visual system pools color over larger regions (Rosenholtz TTM), preserving average hue while losing spatial chromatic detail. Small chromatic stimuli lose color identity rapidly because they fall within a single pooling region. The current shader treats a full-width colored banner the same as 12px colored text.
+2. **The decay ignores feature size.** A small red letter and a large red hero background get the same chrominance reduction at the same eccentricity. But peripheral color perception is strongly size-dependent (Abramov et al. 1991): large color fields retain mean chromaticity out to 20+ degrees. The visual system pools color over larger regions (Rosenholtz TTM), preserving average hue while losing spatial chromatic detail. Small chromatic stimuli lose color identity rapidly because they fall within a single pooling region. The current shader treats a full-width colored banner the same as 12px colored text.
 
 ### What This Causes
 
@@ -41,39 +41,39 @@ This is wrong in two ways:
 
 ### Biological Reality
 
-The three post-receptoral channels have fundamentally different eccentricity profiles:
+The three post-receptoral channels have different eccentricity profiles:
 
-**L-M (Red-Green) — Foveal Specialization**
+**L-M (Red-Green): Foveal Specialization**
 - Depends on 1:1 midget ganglion cell wiring that only exists in the fovea
 - As dendritic fields grow with eccentricity, midget cells receive mixed L and M input → opponency collapses
 - 50% sensitivity loss at ~5° (temporal field)
 - 90% loss by ~17°
-- At detection threshold, falloff is essentially independent of spatial frequency (castleCSF: k_ef ≈ 0)
+- At detection threshold, falloff is nearly independent of spatial frequency (castleCSF: k_ef ≈ 0)
 - At suprathreshold contrasts, larger stimuli benefit from spatial summation over more receptive fields → weak frequency dependence (k_ef = 0.003)
-- This is a wiring problem, not an optical one
+- This is a wiring problem. Optics do not account for it
 
-**S-(L+M) (Blue-Yellow) — Retina-Wide**
+**S-(L+M) (Blue-Yellow): Retina-Wide**
 - S-cones have dedicated bistratified ganglion cells with retina-wide coverage
-- Under purifying selection for 500+ million years — the oldest color channel
+- Under purifying selection for 500+ million years (the oldest color channel)
 - 50% sensitivity loss at ~26° (at 1 cpd)
 - Tracks close to achromatic falloff
 - Spatial-frequency dependent: large blue fields persist much further than small ones
 
-**Achromatic (L+M) — Reference**
+**Achromatic (L+M): Reference**
 - 50% sensitivity at ~7° (1 cpd)
 - Already modeled by the DoG band decomposition (M-scaling)
 - Spatial resolution falls linearly with eccentricity
 
 ### The Size Dependence
 
-Abramov, Gordon & Chan (1991) measured "perceptive fields" — the stimulus size needed to achieve fovea-like color appearance at each eccentricity. Key findings:
+Abramov, Gordon & Chan (1991) measured "perceptive fields": the stimulus size needed to achieve fovea-like color appearance at each eccentricity. They reported that:
 
 - All chromatic perceptive fields **increase with eccentricity**
 - With sufficiently large stimuli, fovea-like color vision is achievable to **20 degrees**
 - Even the largest stimuli fail to produce fully saturated hues at **40 degrees**
-- Perceptive fields for color are **larger than anatomical receptive field estimates** — the neural pooling required for color appearance exceeds what single-cell measurements predict
+- Perceptive fields for color are **larger than anatomical receptive field estimates**. The neural pooling required for color appearance exceeds what single-cell measurements predict
 
-For web rendering, this means: a full-width colored banner (spanning 30°+ of visual angle) retains its chromatic identity much further into the periphery than a 14px colored label. The DoG bands already decompose content by spatial frequency — the same decomposition can drive per-band chromatic attenuation.
+For web rendering, a full-width colored banner (spanning 30°+ of visual angle) retains its chromatic identity much further into the periphery than a 14px colored label. The DoG bands already decompose content by spatial frequency, and the same decomposition can be used for per-band chromatic attenuation.
 
 ## 2. Quantitative Parameters
 
@@ -92,7 +92,7 @@ S(ecc, ρ) = S_foveal × 10^(-(k_e + ρ × k_ef) × ecc)
 
 The RG channel decays 2.5× faster than achromatic and **15× faster** than YV at low spatial frequencies.
 
-**Note:** These are *detection threshold* parameters (pre-v2.0 detection threshold). The implementation defaults use suprathreshold-corrected values derived from Bowers et al. (2025) appearance measurements: `u_rg_decay = 0.085` (from 29% at 15°), `u_yv_decay = 0.014` (from 79% at 15°). See §3 Uniforms table.
+**Note:** These are *detection threshold* parameters (pre-v2.0 detection threshold). The implementation defaults use suprathreshold-corrected values derived from Bowers et al. (2025) contrast-sensitivity (detection threshold) data, with the 0.5 suprathreshold exponent applied: `u_rg_decay = 0.085` (from 29% at 15°), `u_yv_decay = 0.014` (from 79% at 15°). See §3 Uniforms table.
 
 ### Derived Half-Life Eccentricities
 
@@ -105,7 +105,7 @@ The RG channel decays 2.5× faster than achromatic and **15× faster** than YV a
 | **Ach** 50% | 9.0° | 7.0° | 4.9° | 3.0° |
 | **Ach** 90% loss | 29.9° | 23.3° | 16.2° | 10.0° |
 
-Both channels have frequency-dependent decay, but at different rates. YV decay is strongly frequency-dependent (k_ef = 0.008) — large blue-yellow patterns persist far into the periphery while small ones fade. RG has a weaker frequency dependence (k_ef = 0.003) — castleCSF reports k_ef ≈ 0 at detection threshold, but suprathreshold spatial summation means larger red-green stimuli integrate over more receptive fields, yielding better color constancy than small ones. This gives size-dependent color preservation for both channels.
+Both channels have frequency-dependent decay, but at different rates. YV decay is strongly frequency-dependent (k_ef = 0.008): large blue-yellow patterns persist far into the periphery while small ones fade. RG has a weaker frequency dependence (k_ef = 0.003). castleCSF reports k_ef ≈ 0 at detection threshold, but suprathreshold spatial summation means larger red-green stimuli integrate over more receptive fields, yielding better color constancy than small ones. This gives size-dependent color preservation for both channels.
 
 ### Empirical Confirmation (Bowers, Gegenfurtner & Goettker 2025)
 
@@ -147,10 +147,10 @@ The spec doesn't need an explicit "stimulus size" measurement. The DoG band deco
 | band3 | 8-16px | Buttons, cards |
 | residual | 16px+ | Backgrounds, hero sections, large color fields |
 
-Large color fields live in the residual and band3. Small chromatic details live in band0-1. By applying different chromatic decay rates per band, the size-dependent color preservation falls out naturally:
+Large color fields are in the residual and band3. Small chromatic details are in band0-1. By applying different chromatic decay rates per band, the size-dependent color preservation falls out naturally:
 
 - **Residual (large fields):** YV barely attenuates at all. RG attenuates but slowly (large RG patches are partly rescued by spatial summation).
-- **Band0 (fine detail):** Both RG and YV attenuate aggressively — matching the psychophysics that small chromatic stimuli lose identity fast.
+- **Band0 (fine detail):** Both RG and YV attenuate aggressively, matching the psychophysics that small chromatic stimuli lose identity fast.
 
 ### Shader Pseudocode
 
@@ -243,9 +243,9 @@ Expose in `modes.json` per-mode, alongside existing `dog_e2` and `dog_sharpness`
 
 Two independent biological mechanisms reduce peripheral chrominance. The shader models them as separate pipeline stages that multiply:
 
-1. **Opponent channel resolution loss** (per-band chromatic pooling, in `sampleDoGReconstructed`). Midget ganglion cells lose 1:1 L/M wiring with eccentricity → L-M opponency collapses. S-cone bistratified cells have retina-wide coverage → S-(L+M) barely fades. This is a spatial resolution problem in the opponent channels — modeled by castleCSF decay constants per band.
+1. **Opponent channel resolution loss** (per-band chromatic pooling, in `sampleDoGReconstructed`). Midget ganglion cells lose 1:1 L/M wiring with eccentricity → L-M opponency collapses. S-cone bistratified cells have retina-wide coverage → S-(L+M) barely fades. This is a spatial resolution problem in the opponent channels, modeled by castleCSF decay constants per band.
 
-2. **Cone-to-rod population shift** (base desaturation, in V4 pipeline). Rods outnumber cones increasingly with eccentricity. Rod signals are achromatic. Even if the remaining cones could resolve chrominance perfectly, there are fewer of them relative to rods — overall chromatic signal strength drops. This is a photoreceptor density problem — modeled by the smoothstep ramp on Oklab `a` and `b`.
+2. **Cone-to-rod population shift** (base desaturation, in V4 pipeline). Rods outnumber cones increasingly with eccentricity. Rod signals are achromatic. Even if the remaining cones could resolve chrominance perfectly, there are fewer of them relative to rods, so overall chromatic signal strength drops. This is a photoreceptor density problem, modeled by the smoothstep ramp on Oklab `a` and `b`.
 
 These multiply because they're independent: a peripheral pixel can have both degraded opponent-channel resolution (per-band) AND reduced cone contribution (base desat). At 10° with suprathreshold defaults (k_rg=0.085, k_yv=0.014):
 
@@ -255,11 +255,11 @@ These multiply because they're independent: a peripheral pixel can have both deg
 | Base desat (cone/rod) | ~80% | ~80% |
 | **Combined** | **~34%** | **~69%** |
 
-The RG/YV asymmetry comes entirely from per-band. Base desat is channel-uniform — it reduces overall saturation without changing the RG/YV ratio. This means the per-band stage determines the *shape* of peripheral color (blue shift, warm fade) and base desat controls the *floor* (how much total chrominance remains).
+The RG/YV asymmetry comes entirely from per-band. Base desat is channel-uniform: it reduces overall saturation without changing the RG/YV ratio. This means the per-band stage determines the *shape* of peripheral color (blue shift, warm fade) and base desat controls the *floor* (how much total chrominance remains).
 
-**Red Kill Switch** is gated off when chromatic pooling is active — per-band RG decay handles red suppression without the blunt 95% kill.
+**Red Kill Switch** is gated off when chromatic pooling is active. Per-band RG decay handles red suppression without the blunt 95% kill.
 
-**Rod-vision path** (eigengrau tint, Purkinje shift) runs after V4 pooling and handles the far periphery where scotopic vision dominates.
+**Rod-vision path** (eigengrau tint, Purkinje shift) runs after the V4 pooling stage and handles the far periphery where scotopic vision dominates.
 
 When `u_chromatic_pooling = 0`, behavior is identical to legacy (uniform chrominance reduction + Red Kill Switch).
 
@@ -267,15 +267,15 @@ When `u_chromatic_pooling = 0`, behavior is identical to legacy (uniform chromin
 
 With chromatic pooling enabled, the simulation should produce these perceptual effects:
 
-1. **A red "Buy Now" button at 10° eccentricity** — button shape preserved (DoG band3 persists), but the red-green opponent signal is attenuated (RG appearance at 10° ≈ 51% with suprathreshold correction). The button retains some redness but you may not be confident it's red vs. another warm color without foveating.
+1. **A red "Buy Now" button at 10° eccentricity:** button shape preserved (DoG band3 persists), but the red-green opponent signal is attenuated (RG appearance at 10° ≈ 51% with suprathreshold correction). The button retains some redness but you may not be confident it's red vs. another warm color without foveating.
 
-2. **A blue hero background at 10°** — the blue is clearly visible (YV channel at 10° for the residual band ≈ 97% preserved). Large blue fields don't need foveal fixation to perceive.
+2. **A blue hero background at 10°:** the blue is clearly visible (YV channel at 10° for the residual band ≈ 97% preserved). Large blue fields don't need foveal fixation to perceive.
 
-3. **Teal sidebar navigation at 15°** — the blue-green hue shifts toward blue. The green component (L-M) has collapsed (29% remaining), but the blue component (S-cone) persists. This matches the common subjective experience that peripheral colors "look blue."
+3. **Teal sidebar navigation at 15°:** the blue-green hue shifts toward blue. The green component (L-M) has collapsed (29% remaining), but the blue component (S-cone) persists. This matches the common subjective experience that peripheral colors "look blue."
 
-4. **Red text on white at 5°** — the text is readable (DoG band1-2 preserved at 5°) but the red color is ambiguous (RG at 5° ≈ 50%). You might not be sure if it's red or dark gray without foveating.
+4. **Red text on white at 5°:** the text is readable (DoG band1-2 preserved at 5°) but the red color is ambiguous (RG at 5° ≈ 50%). You might not be sure if it's red or dark gray without foveating.
 
-5. **A large green navigation bar spanning the viewport** — green is preserved substantially because the large spatial extent means it lives in the residual/band3 where YV attenuation is minimal, and even the RG component benefits from spatial summation at that scale.
+5. **A large green navigation bar spanning the viewport:** green is preserved substantially because, at that spatial extent, it falls in the residual/band3 where YV attenuation is minimal, and even the RG component benefits from spatial summation at that scale.
 
 ## 5. Performance Considerations
 
@@ -293,17 +293,17 @@ At 1024px analysis resolution: ~1M fragments × 150 ops = 150M extra ops. On int
 
 3. **Parameter sweep:** Vary `u_rg_decay` from 0.03 to 0.09 and `u_yv_decay` from 0.002 to 0.01. Verify the crossover behavior matches the published ratios (RG opponent should attenuate 2-3× faster than YV).
 
-4. **Suprathreshold correction (IMPLEMENTED):** The castleCSF parameters are detection thresholds — the minimum visible chromatic contrast. At suprathreshold contrasts (saturated web colors), perceived saturation follows a compressive power-law (Jiang, Shooner & Mullen 2022, exponent ~0.5). The `u_supra_exponent` uniform (default 0.5) applies this compression: `appearance_atten = pow(threshold_atten, supra)`. This is the key distinction between "how sensitive is the system" and "how colorful does it look" — peripheral color is pooled over larger regions with reduced chromatic spatial resolution, not simply desaturated (Rosenholtz TTM).
+4. **Suprathreshold correction (IMPLEMENTED):** The castleCSF parameters are detection thresholds: the minimum visible chromatic contrast. At suprathreshold contrasts (saturated web colors), perceived saturation follows a compressive power-law (Jiang, Shooner & Mullen 2022, exponent ~0.5). The `u_supra_exponent` uniform (default 0.5) applies this compression: `appearance_atten = pow(threshold_atten, supra)`. This separates "how sensitive is the system" from "how colorful does it look". Peripheral color is pooled over larger regions with reduced chromatic spatial resolution (Rosenholtz TTM). Uniform desaturation does not capture this.
 
 ## 7. References
 
-- **Abramov, Gordon & Chan (1991)** — "Color appearance in the peripheral retina: effects of stimulus size." *JOSA A* 8:404-414. [DOI](https://doi.org/10.1364/JOSAA.8.000404)
-- **Ashraf et al. (2024)** — "castleCSF — A contrast sensitivity function of color, area, spatiotemporal frequency, luminance and eccentricity." *Journal of Vision* 24(4):5. [DOI](https://doi.org/10.1167/jov.24.4.5)
-- **Bowers, Gegenfurtner & Goettker (2025)** — "Chromatic and achromatic contrast sensitivity in the far periphery." *Journal of Vision*, 25(11):7. [DOI](https://doi.org/10.1167/jov.25.11.7)
-- **Hansen, Pracejus & Gegenfurtner (2009)** — "Color perception in the intermediate periphery of the visual field." *Journal of Vision* 9(4):26. [DOI](https://doi.org/10.1167/9.4.26)
-- **Jiang, Shooner & Mullen (2022)** — "Achromatic and chromatic perceived contrast are reduced in the visual periphery." *Journal of Vision*. [PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC9639675/)
+- **Abramov, Gordon & Chan (1991):** "Color appearance in the peripheral retina: effects of stimulus size." *JOSA A* 8:404-414. [DOI](https://doi.org/10.1364/JOSAA.8.000404)
+- **Ashraf et al. (2024):** "castleCSF — A contrast sensitivity function of color, area, spatiotemporal frequency, luminance and eccentricity." *Journal of Vision* 24(4):5. [DOI](https://doi.org/10.1167/jov.24.4.5)
+- **Bowers, Gegenfurtner & Goettker (2025):** "Chromatic and achromatic contrast sensitivity in the far periphery." *Journal of Vision*, 25(11):7. [DOI](https://doi.org/10.1167/jov.25.11.7)
+- **Hansen, Pracejus & Gegenfurtner (2009):** "Color perception in the intermediate periphery of the visual field." *Journal of Vision* 9(4):26. [DOI](https://doi.org/10.1167/9.4.26)
+- **Jiang, Shooner & Mullen (2022):** "Achromatic and chromatic perceived contrast are reduced in the visual periphery." *Journal of Vision*. [PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC9639675/)
   <!-- NOTE: BibTeX (references.bib) has title "Suprathreshold chromatic contrast perception across the visual field" (JoV 22(14):4319) which may be the ARVO abstract. The PMC-linked title here may be the full paper. Verify which is authoritative and reconcile. -->
-- **Mullen (1985)** — "The contrast sensitivity of human colour vision to red-green and blue-yellow chromatic gratings." *Journal of Physiology* 359:381-400.
-- **Mullen (1991)** — "Colour vision as a post-receptoral specialization of the central visual field." *Vision Research* 31:119-130.
-- **Mullen & Kingdom (2002)** — "Differential distributions of red-green and blue-yellow cone opponency across the visual field." *Visual Neuroscience* 19:109-118.
-- **Mullen & Kingdom (2005)** — "Does L/M cone opponency disappear in human periphery?" *Perception* 34:475-483.
+- **Mullen (1985):** "The contrast sensitivity of human colour vision to red-green and blue-yellow chromatic gratings." *Journal of Physiology* 359:381-400.
+- **Mullen (1991):** "Colour vision as a post-receptoral specialization of the central visual field." *Vision Research* 31:119-130.
+- **Mullen & Kingdom (2002):** "Differential distributions of red-green and blue-yellow cone opponency across the visual field." *Visual Neuroscience* 19:109-118.
+- **Mullen & Kingdom (2005):** "Does L/M cone opponency disappear in human periphery?" *Perception* 34:475-483.

@@ -10,7 +10,7 @@ Simulation accuracy improved (Oklab, MIP pooling). UX polished (better visual ov
 
 ### 🔄 Auto-Updates
 Scrutinizer now checks for updates on startup and notifies you when a new version is available.
-- **Non-intrusive**: No automatic downloads — you choose when to update
+- **Non-intrusive**: No automatic downloads. You choose when to update
 - **GitHub Releases**: Opens your browser to download the latest DMG
 
 ### 🎨 Visual Overlay Refinement
@@ -22,22 +22,22 @@ The debug boundary system has been overhauled and renamed to **Visual Overlay**.
 
 ### 🌈 Oklab Saliency (Biological Accuracy)
 The feature extraction engine for our Saliency Maps now uses the **Oklab** color space instead of RGB.
-- **Why?**: Standard RGB is not perceptually uniform. Oklab separates Lightness (L) from Color (a, b) in a way that perfectly mimics the human eye's Magnocellular (Luminance) and Parvocellular (Color) pathways.
+- **Why?**: Standard RGB is not perceptually uniform. Oklab separates Lightness (L) from Color (a, b). It is a perceptual color space and does not model the magnocellular or parvocellular pathways.
 - **Benefit**: Saliency detection is now more stable and matches the "rod vision" simulation used in the main renderer.
 
-📚 *Learn more: [Saliency Map & Fidelity Bias](foveated-vision-model.md#saliency-map--fidelity-bias)*
+📚 *Learn more: [Saliency Map & Fidelity Bias](https://github.com/andyed/scrutinizer2025/blob/v1.4.0/docs/foveated-vision-model.md#saliency-map--fidelity-bias)*
 
 ### 🚫 Inhibition of Return
 A new Visual Memory mode that mimics the brain's tendency to de-prioritize recently visited locations.
 - **New Mode**: Available under `Visual Memory > Inhibition of Return (10 fixations)`.
-- **Function**: Recently fixated areas become **suppressed** (more distorted) rather than cleared, simulating a drop in saliency. This encourages the user to seek new information rather than re-fixating on old content.
+- **Function**: Recently fixated areas become **suppressed** (more distorted) rather than cleared, simulating a drop in saliency. The user is encouraged to seek new information.
 
 ### 🧠 MIP-Based Peripheral Pooling (Mongrel Tier 1)
 Replaced the previous 5-tap Gaussian blur with **hardware MIP-map pooling**, which more accurately simulates how the peripheral visual system compresses information.
-- **Biological Accuracy**: Based on Rosenholtz et al.'s pooling model—receptive field size doubles with eccentricity, which maps naturally to MIP levels.
+- **Biological Accuracy**: Based on Rosenholtz et al.'s pooling model: receptive field size doubles with eccentricity, which maps naturally to MIP levels. *(Correction 2026-10-01: receptive field and pooling-region size grow linearly with eccentricity, about 0.5 × eccentricity (Bouma 1970). The v1.4 shader raised MIP level linearly with eccentricity, so its pooling size grew exponentially.)*
 - **Performance**: ~5x faster than previous blur (hardware-accelerated `textureLod()` vs. 5 texture samples).
 - **Smooth Transitions**: A 10% blend zone at the fovea edge eliminates visible boundaries.
-- **Intensity Modulation**: The "Peripheral Intensity" slider now correctly modulates pooling strength—low intensity = less aggressive pooling.
+- **Intensity Modulation**: The "Peripheral Intensity" slider now correctly modulates pooling strength (low intensity = less aggressive pooling).
 
 **Technical Details:**
 ```glsl
@@ -47,9 +47,9 @@ vec4 pooled = textureLod(u_texture, uv, mipLevel);
 ```
 
 📚 *Learn more:*
-- *[MIP-Based Pooling (v1.4)](foveated-vision-model.md#mip-based-pooling-v14) — Technical implementation details*
-- *[Rosenholtz et al. — Mongrel Theory](scientific_literature_review.md#vision-science--cognitive-psychology) — Scientific foundation*
-- *[Mongrel Textures Spec](specs/implemented/mongrel_textures.md) — Tiered implementation strategy*
+- *[MIP-Based Pooling (v1.4)](https://github.com/andyed/scrutinizer2025/blob/v1.4.0/docs/foveated-vision-model.md#mip-based-pooling-v14): technical implementation details*
+- *[Rosenholtz et al.: Mongrel Theory](https://github.com/andyed/scrutinizer2025/blob/v1.4.0/docs/scientific_literature_review.md#vision-science--cognitive-psychology): scientific foundation*
+- *[Mongrel Textures Spec](specs/implemented/mongrel_textures.md): tiered implementation strategy*
 
 **Visual Evolution: v1.3 → v1.4**
 
@@ -72,35 +72,35 @@ The following comparisons show the improvement in peripheral rendering:
 
 ### 💅 UI Polish
 - **Less Distracting URL Bar**: The toolbar URL input is now dimmer and semi-transparent by default, reducing visual competition with the canvas. It automatically brightens on hover or focus.
-- ~~**Menu Terminology**: "Mongrel Mode" renamed to "Effect Type". Removed in v2.2 — mongrelMode is now set per-mode via modes.json.~~
+- ~~**Menu Terminology**: "Mongrel Mode" renamed to "Effect Type". Removed in v2.2: mongrelMode is now set per-mode via modes.json.~~
 - **Visual Fidelity (v1.4.1)**:
   - **Coupled Warp + MIP Pooling (Tier 1.5)**: Physically simulates peripheral crowding by scaling position jitter with the integration field size.
   - **Unbound Color (Tier 1.6)**: Simulates Parvocellular resolution loss by blurring chromatic fringes ("watercolor bleed") and ensuring radial offset direction.
 
 ## Developer Notes
 - **Custom Overlays Guide**: Added a new section to `docs/developers_guide.md` explaining how to implement high-performance custom overlays using the new Group Translation pattern.
-- **MIP Pooling Documentation**: See [MIP-Based Pooling (v1.4)](foveated-vision-model.md#mip-based-pooling-v14) for implementation details.
+- **MIP Pooling Documentation**: See [MIP-Based Pooling (v1.4)](https://github.com/andyed/scrutinizer2025/blob/v1.4.0/docs/foveated-vision-model.md#mip-based-pooling-v14) for implementation details.
 - **Golden Image Process**: Updated [Golden Methodology](developers_guide.md#golden-methodology-regression-prevention) with per-release tagging requirements.
 
 ## In Consideration: Linguistic Pre-Attentive Layer 🔮
 
-We've completed the v2 specification for **Semantic Guidance & Linguistic Priming** — a major upgrade to how Scrutinizer models goal-directed attention.
+We've completed the v2 specification for **Semantic Guidance & Linguistic Priming**, a major upgrade to how Scrutinizer models goal-directed attention.
 
 > [!TIP]
-> **The Core Idea:** Instead of just simulating *where* you look (bottom-up saliency), we simulate *what* you're looking *for* (top-down attention). By running sentence embeddings via **Transformers.js + ONNX Runtime**, the engine computes semantic similarity between user goals and page content in real-time.
+> The spec simulates *what* you're looking *for* (top-down attention) alongside *where* you look (bottom-up saliency). By running sentence embeddings via **Transformers.js + ONNX Runtime**, the engine computes semantic similarity between user goals and page content in real-time.
 
-**Key Innovations in v2 Spec:**
+**In the v2 spec:**
 - **Integrated Embedding Computation**: all-MiniLM-L6-v2 runs in-browser via WebGPU/WASM
 - **Legibility Gating**: Semantic signals suppressed in areas where font size × eccentricity makes text unreadable
 - **Dynamic Exploration/Exploitation**: Weighting automatically shifts based on detected "information scent"
 - **Icon Dictionary**: Maps `fa-shopping-cart`, `material-icons-*` to semantic keywords (no more "icon blindness")
 - **Distractor Analysis**: Identifies high-V, low-S elements competing for attention
 
-📚 *Read the full spec: [Linguistic Pre-Attentive Layer v2](Linguistic%20Pre-Attentive%20Layer.md)*
+📚 *Read the full spec: [Linguistic Pre-Attentive Layer v2](https://github.com/andyed/scrutinizer2025/blob/v1.4.0/docs/Linguistic%20Pre-Attentive%20Layer.md)*
 
 ---
 
 ## Further Reading
-- [Foveated Vision Model](foveated-vision-model.md) — Complete technical documentation of spatial zones, strength curves, and pipeline stages
-- [Scientific Literature Review](scientific_literature_review.md) — Academic foundations including Rosenholtz's Mongrel Theory
-- [Mongrel Textures Spec](specs/implemented/mongrel_textures.md) — Roadmap for Tier 2 (contrast-preserving) and Tier 3 (WebGPU) pooling
+- [Foveated Vision Model](foveated-vision-model.md): Complete technical documentation of spatial zones, strength curves, and pipeline stages
+- [Scientific Literature Review](scientific_literature_review.md): Academic foundations including Rosenholtz's Mongrel Theory
+- [Mongrel Textures Spec](specs/implemented/mongrel_textures.md): Roadmap for Tier 2 (contrast-preserving) and Tier 3 (WebGPU) pooling

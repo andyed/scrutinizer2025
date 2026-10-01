@@ -9,9 +9,9 @@ Dependencies: Per-channel chromatic pooling (v1.9.0, implemented), DoG band deco
 
 ## Problem
 
-The v1.9.0 chromatic pooling implementation attenuates chrominance per DoG band — 4 discrete spatial frequency buckets with step-function transitions. A full-width banner and a 200px button both land in the same low-frequency band and get identical chromatic treatment. The biology is continuous: chromatic spatial resolution degrades smoothly with eccentricity, and the pooling region size grows smoothly with stimulus scale.
+The v1.9.0 chromatic pooling implementation attenuates chrominance per DoG band: 4 discrete spatial frequency buckets with step-function transitions. A full-width banner and a 200px button both land in the same low-frequency band and get identical chromatic treatment. The biology is continuous: chromatic spatial resolution degrades smoothly with eccentricity, and the pooling region size grows smoothly with stimulus scale.
 
-The 4-band approach gets the channel asymmetry right (RG fast, YV slow) but gets the size dependence wrong — it's a step function where it should be a smooth curve.
+The 4-band approach gets the channel asymmetry right (RG fast, YV slow) but gets the size dependence wrong. It is a step function where it should be a smooth curve.
 
 ## Failed Approach: Cross-Resolution Oklab Composition
 
@@ -28,7 +28,7 @@ vec3 finalLab = vec3(achLab.x, rgLab.y * rgAtten, yvLab.z * yvAtten);
 
 ### Why it failed
 
-**Out-of-gamut Oklab triples.** The valid range of `a` and `b` in Oklab depends on `L`. Taking L from one spatial resolution and chrominance from different resolutions creates (L, a, b) triples that don't correspond to any real sRGB color. After `oklabToRgb` and clamping, the result washes toward white — especially where the DoG reconstruction's averaged luminance (moderate-to-high L) is paired with chrominance from differently-blurred samples.
+**Out-of-gamut Oklab triples.** The valid range of `a` and `b` in Oklab depends on `L`. Taking L from one spatial resolution and chrominance from different resolutions creates (L, a, b) triples that don't correspond to any real sRGB color. After `oklabToRgb` and clamping, the result washes toward white, especially where the DoG reconstruction's averaged luminance (moderate-to-high L) is paired with chrominance from differently-blurred samples.
 
 The color spectrum page went almost entirely white. The dashboard retained layout but lost nearly all peripheral effects.
 
@@ -44,13 +44,13 @@ Investigation of the "understated desaturation" in the v1.9.0 comparison reveale
 
 ### Bug 1: `pow(negative, 1.0/3.0)` is undefined in GLSL
 
-`chromaticAttenuate()` is called on DoG bands — differences between adjacent MIP levels (e.g., `band0 = mip0 - mip1`). These have negative RGB components. The Oklab conversion (`linearSrgbToOklab`, line 367) computes LMS via matrix multiply, then takes cube roots: `pow(l, 1.0/3.0)`. When `l < 0`, this is **undefined behavior** per GLSL ES 3.0 spec §8.2.
+`chromaticAttenuate()` is called on DoG bands, which are differences between adjacent MIP levels (e.g., `band0 = mip0 - mip1`). These have negative RGB components. The Oklab conversion (`linearSrgbToOklab`, line 367) computes LMS via matrix multiply, then takes cube roots: `pow(l, 1.0/3.0)`. When `l < 0`, this is **undefined behavior** per GLSL ES 3.0 spec §8.2.
 
-On macOS Metal, `pow(negative, fractional)` likely returns 0 or NaN. Either way, `chromaticAttenuate()` returns black (or garbage) for all band inputs. **Only the residual (mip4) actually contributes chrominance.** The per-band frequency-dependent attenuation — the entire architectural premise of v1.9.0 chromatic pooling — is a no-op.
+On macOS Metal, `pow(negative, fractional)` likely returns 0 or NaN. Either way, `chromaticAttenuate()` returns black (or garbage) for all band inputs. **Only the residual (mip4) contributes chrominance.** The per-band frequency-dependent attenuation (the entire architectural premise of v1.9.0 chromatic pooling) is a no-op.
 
 **Fix:** Use sign-preserving cube root: `sign(x) * pow(abs(x), 1.0/3.0)` in `linearSrgbToOklab`. Or restructure to avoid Oklab on band differences entirely.
 
-### Bug 2: YV decay calibrated to detection threshold, not appearance
+### Bug 2: YV decay calibrated to detection threshold
 
 `u_yv_decay = 0.004` is castleCSF's detection threshold k_e for the S-(L+M) channel. At suprathreshold contrasts (saturated UI colors), chromatic appearance decays faster than detection threshold predicts.
 
@@ -62,7 +62,7 @@ Bowers, Gegenfurtner & Goettker (2025) measured suprathreshold YV at **79% at 15
 k_yv = 0.014
 ```
 
-The suprathreshold-corrected YV decay should be **~0.014**, not 0.004 — a 3.5× increase.
+The suprathreshold-corrected YV decay should be **~0.014**, a 3.5× increase over 0.004.
 
 | Eccentricity | k_yv=0.004 (current) | k_yv=0.014 (corrected) |
 |-------------|---------------------|----------------------|
@@ -102,7 +102,7 @@ float l_ = pow(l, 1.0 / 3.0);
 float l_ = sign(l) * pow(abs(l), 1.0 / 3.0);
 ```
 
-Apply to all three components (l, m, s). This makes `chromaticAttenuate()` actually work on band data for the first time. The per-band frequency-dependent attenuation that was designed in v1.9.0 will finally take effect.
+Apply to all three components (l, m, s). With this fix, `chromaticAttenuate()` works on band data for the first time. The per-band frequency-dependent attenuation that was designed in v1.9.0 will finally take effect.
 
 **Risk:** Enabling band chrominance may make the output MORE colorful (more chrominance sources contributing). Need to recapture and evaluate before Phase 2 tuning.
 
@@ -129,7 +129,7 @@ Modest increase: 0.059 → 0.072. The RG channel was already reasonably aggressi
 
 ### Phase 3: Continuous size dependence (deferred)
 
-The original motivation — size-dependent chromatic pooling — remains valid. But the cross-resolution Oklab approach is ruled out. Two viable alternatives:
+The original motivation, size-dependent chromatic pooling, remains valid. But the cross-resolution Oklab approach is ruled out. Two viable alternatives:
 
 **Option A: Per-MIP-level attenuation (pre-band)**
 
@@ -169,10 +169,10 @@ Cost: 1 Oklab round-trip (down from 5). Significant perf win.
 
 - DoG band decomposition and M-scaling weights (achromatic spatial resolution)
 - V1 distortion, LGN gating, saliency modulation
-- Base desaturation in V4 (smoothstep ramp, complementary to per-channel)
+- Base desaturation in the V4 stage (smoothstep ramp, complementary to per-channel)
 - Saccadic blindness
-- `u_chromatic_pooling` toggle — still gates per-channel vs legacy
-- Red Kill Switch gating logic (disabled when chromatic pooling ON — revisit if Phase 1+2 insufficient)
+- `u_chromatic_pooling` toggle (still gates per-channel vs legacy)
+- Red Kill Switch gating logic (disabled when chromatic pooling ON; revisit if Phase 1+2 insufficient)
 
 ## Predictions After Phase 1+2
 
@@ -181,7 +181,7 @@ Cost: 1 Oklab round-trip (down from 5). Significant perf win.
 | Red text at 10° | Mild desaturation (residual only) | Stronger: band-level RG attenuation now functional |
 | Blue sidebar at 15° | Almost full color (YV=91%) | Moderate: YV=79% (matches Bowers measurement) |
 | Full-width banner vs 200px button | Nearly identical | Still similar (Phase 3 needed for size dependence) |
-| Overall peripheral color | Feels understated | Closer to calibrated — between legacy gray and current overshoot |
+| Overall peripheral color | Feels understated | Closer to calibrated, between legacy gray and current overshoot |
 
 ## Validation
 
@@ -193,8 +193,8 @@ Cost: 1 Oklab round-trip (down from 5). Significant perf win.
 
 ## References
 
-- Abramov, Gordon & Chan (1991) — perceptive fields for color: size-dependent appearance
-- Ashraf et al. (2024) — castleCSF: k_e and k_ef parameters per channel (detection threshold)
-- Bowers, Gegenfurtner & Goettker (2025) — chromatic CSF to 90°, biphasic RG decay (suprathreshold)
-- Jiang, Shooner & Mullen (2022) — suprathreshold compression exponent
-- GLSL ES 3.0 spec §8.2 — pow(x, y) undefined for x < 0, non-integer y
+- Abramov, Gordon & Chan (1991): perceptive fields for color, size-dependent appearance
+- Ashraf et al. (2024): castleCSF k_e and k_ef parameters per channel (detection threshold)
+- Bowers, Gegenfurtner & Goettker (2025): chromatic CSF to 90°, biphasic RG decay (suprathreshold)
+- Jiang, Shooner & Mullen (2022): suprathreshold compression exponent
+- GLSL ES 3.0 spec §8.2: pow(x, y) undefined for x < 0, non-integer y

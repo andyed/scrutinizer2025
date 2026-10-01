@@ -11,7 +11,7 @@ Upgraded peripheral vision color processing from RGB to **Oklab**, a perceptuall
 
 **Why Oklab?**
 - **Perceptually uniform desaturation** - Eliminates "muddy" artifacts when converting colors to grayscale
-- **Biologically accurate** - Separates Luminance (L) from Chrominance (a, b), matching the Magno (luminance) and Parvo (color) pathways in the visual cortex
+- **Luminance/chroma separation** - Separates Luminance (L) from Chrominance (a, b). Oklab is a perceptual color space and does not model the magnocellular or parvocellular pathways
 - **Natural rod vision** - Better simulation of scotopic (low-light) vision with accurate cyan sensitivity at 505nm peak
 
 **Technical Implementation:**
@@ -38,7 +38,7 @@ Fixed abrupt visual transition at the parafovea boundary (2.5x fovea radius).
 - **Blur discontinuity** - Replaced piecewise linear/exponential function with continuous exponential curve
 - **Contrast preservation jump** - Replaced hard 0.6 → 0.3 switch with smooth `smoothstep` gradient
 
-**Result:** Seamless visual transition from parafovea to far periphery with no visible "kink" or boundary artifacts.
+The transition from parafovea to far periphery is now continuous, with no visible "kink" or boundary artifacts.
 
 ---
 
@@ -65,10 +65,10 @@ Significant improvements to rendering performance and capture fidelity.
 - Better iconography clarity
 
 **Memory Optimization:**
-- Pre-allocated ImageData buffer eliminates 60 allocations/sec
-- Reduced allocations from 60/sec to ~4/sec (75% reduction)
+- Pre-allocated ImageData buffer replaces the per-frame allocation (60/sec at 60 fps)
+- Reduced allocations from 60/sec to ~4/sec (93% reduction; the saliency worker still receives a copy every 15 frames)
 - Lower GC pressure for smoother frame times
-- 5-10% frame time improvement
+- 5-10% frame time improvement (estimated)
 
 **Critical Bug Fixes:**
 - **Mouse Position Offset (v1.2 regression)** - Fixed ~40px vertical offset in cursor hover detection
@@ -85,7 +85,7 @@ Significant improvements to rendering performance and capture fidelity.
 ### Perceptually Uniform Color Processing
 - **Oklab desaturation** - Chrominance (a, b) reduction while preserving lightness (L)
 - **Rod sensitivity** - Cyan (505nm) retains slightly more saturation in periphery
-- **Helmholtz-Kohlrausch effect** - Saturated colors appear brighter, properly modeled in Oklab space
+- **Helmholtz-Kohlrausch effect** - Saturated colors appear brighter, approximated as a lightness boost proportional to Oklab chroma (`L × (1 + 0.15·C)`)
 
 ### Improved Blur Curve
 - **Continuous exponential** - Formula: `blur = 8.0 * (e^(2.0 * eccentricity) - 1.0)`
@@ -125,7 +125,7 @@ Significant improvements to rendering performance and capture fidelity.
 ## 🔮 Upcoming Roadmap
 
 ### v1.4 (Next Release)
-- ✅ **Performance Optimizations** - 1:1 capture fidelity and allocation reduction (COMPLETE)
+- ✅ **Performance Optimizations** - 1:1 capture fidelity and allocation reduction (COMPLETE; shipped in v1.3)
 - **Shader Optimization** - Reduce texture lookups and simplify Oklab conversions
 - **Build System** - Configure electron-builder for multi-platform releases
 

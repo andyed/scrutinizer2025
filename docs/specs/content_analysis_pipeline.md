@@ -1,4 +1,4 @@
-# Content Analysis Pipeline — Architecture & Performance
+# Content Analysis Pipeline: Architecture & Performance
 
 > **Last updated:** 2026-03-10
 
@@ -9,9 +9,9 @@
 
 ## Overview
 
-ContentAnalysis handles all asynchronous content understanding — extracting structure, saliency, and congestion data from the captured page frame and delivering it to the GPU as textures. It runs two Web Workers and a synchronous structure map pipeline, all gated by dirty-checking and throttling to avoid redundant computation on static pages.
+ContentAnalysis handles all asynchronous content understanding: extracting structure, saliency, and congestion data from the captured page frame and delivering it to the GPU as textures. It runs two Web Workers and a synchronous structure map pipeline, all gated by dirty-checking and throttling to avoid redundant computation on static pages.
 
-The system solves a fundamental tension: the shader needs fresh content data every frame for responsive rendering, but computing that data (saliency heatmaps, congestion statistics) is expensive and the content rarely changes between frames. The pipeline decouples computation frequency from render frequency through a worker → canvas → smoothing → GPU upload architecture.
+The shader needs fresh content data every frame for responsive rendering, but computing that data (saliency heatmaps, congestion statistics) is expensive and the content rarely changes between frames. The pipeline decouples computation frequency from render frequency through a worker → canvas → smoothing → GPU upload architecture.
 
 ## Data Flow
 
@@ -46,7 +46,7 @@ processFrame() ─── Pre-allocated ImageData buffer (zero-alloc reuse)
 
 ### Structure Map (synchronous)
 
-Structure data flows differently — it's not pixel-derived but DOM-derived:
+Structure data is DOM-derived, so it flows differently:
 
 ```
 Content script (DOM analysis via IPC)
@@ -71,9 +71,9 @@ this.saliencyFrameCounter++;
 if (this.saliencyFrameCounter % 15 !== 0) return;  // ~250ms at 60fps
 ```
 
-Saliency is submitted every 15th frame. At 60fps, this means a new saliency computation starts at most 4x/second. The smoothing loop (60 frames) ensures the texture transitions gradually even though the source updates infrequently.
+Saliency is submitted every 15th frame. At 60fps, this means a new saliency computation starts at most 4x/second. With the 60-frame smoothing loop, the texture transitions gradually even though the source updates infrequently.
 
-Congestion has no frame throttle — it's event-driven (scroll, DOM mutation, navigation), not continuous.
+Congestion has no frame throttle. It is event-driven (scroll, DOM mutation, navigation).
 
 ### 2. Checksum Dirty-Check (both workers)
 
@@ -89,7 +89,7 @@ for (let i = 0; i < length; i += stride) {
 return ((sumA & 0xFFFF) << 16) | (sumB & 0xFFFF);
 ```
 
-Samples ~1024 evenly-spaced pixels from the raw buffer. Two 16-bit sums (RG + B channels) packed into a 32-bit integer. Cost is negligible (~10μs on 1920×1080). If the checksum matches the last submission, the worker call is skipped entirely — no BGRA→RGBA copy, no `createImageBitmap`, no `postMessage`.
+Samples ~1024 evenly-spaced pixels from the raw buffer. Two 16-bit sums (RG + B channels) packed into a 32-bit integer. Cost is negligible (~10μs on 1920×1080). If the checksum matches the last submission, the worker call is skipped entirely, with no BGRA→RGBA copy, `createImageBitmap`, or `postMessage`.
 
 On a static page, this eliminates 100% of worker submissions after the first computation settles.
 
@@ -106,7 +106,7 @@ this._congestionWorkerBusy = true;
 
 The congestion worker processes one frame at a time. If a new submission arrives while it's still computing, it's silently dropped. This prevents queue buildup on slow hardware or high-resolution settings.
 
-The saliency worker lacks this guard — multiple submissions can queue in the message channel. This is acceptable because the 15-frame throttle limits submission rate, but a future improvement could add the same guard.
+The saliency worker lacks this guard, so multiple submissions can queue in the message channel. This is acceptable because the 15-frame throttle limits submission rate, but a future improvement could add the same guard.
 
 ### 4. Smoothing Countdown (both workers)
 
@@ -131,7 +131,7 @@ this.congestionUpdateCountdown--;
 
 The smoothing serves two purposes:
 - **Anti-flicker**: Raw worker output can shift abruptly between frames (different downscale, different content visible). Blending prevents visible pops.
-- **CPU amortization**: The canvas `drawImage` + `texImage2D` upload runs only during the countdown window, not indefinitely. Once the countdown expires, the early return skips both operations — zero cost on static content.
+- **CPU amortization**: The canvas `drawImage` + `texImage2D` upload runs only during the countdown window. Once the countdown expires, the early return skips both operations, so static content costs nothing.
 
 ### 5. Saccadic Suppression (frame level)
 
@@ -143,7 +143,7 @@ if (this.gazeModel.getVelocity() > this.config.saccadicSuppressionThreshold
 }
 ```
 
-During fast mouse movement (simulating a saccade), the entire `processFrame()` is skipped — no texture upload, no worker submission. The biological analog: the visual system suppresses input during saccades because the retinal image is a blur anyway.
+During fast mouse movement (simulating a saccade), the entire `processFrame()` is skipped, including texture upload and worker submission. The skip is modeled on saccadic suppression. In human vision, sensitivity drops during saccades through an active extraretinal suppression that mainly affects low-spatial-frequency luminance signals (Burr, Morrone & Ross 1994) plus masking by the pre- and post-saccadic images.
 
 ## Worker Resolution Settings
 
@@ -156,7 +156,7 @@ Both workers downsample the captured frame before processing. Configurable via m
 
 Both settings persist across launches via `settingsManager`.
 
-Higher resolution improves spatial accuracy of the congestion/saliency heatmap at the cost of worker compute time. The congestion worker at 1024px on a 1920×1080 viewport produces a 1024×576 texture — the smoothing step (`drawImage` + GPU upload) at this resolution is the primary per-frame cost when active.
+Higher resolution improves spatial accuracy of the congestion/saliency heatmap at the cost of worker compute time. The congestion worker at 1024px on a 1920×1080 viewport produces a 1024×576 texture, and the smoothing step (`drawImage` + GPU upload) at this resolution is the primary per-frame cost when active.
 
 ### Perf Test Results (1024×576, worst case)
 
@@ -177,7 +177,7 @@ Pass threshold: p95 delta < 2ms. The smoothing path adds negligible cost even at
 
 ## Congestion Submission Triggers
 
-The congestion worker is event-driven, not continuous. Submissions happen on:
+The congestion worker is event-driven. Submissions happen on:
 
 | Trigger | Debounce | Force | Source |
 |---------|----------|-------|--------|
@@ -188,7 +188,7 @@ The congestion worker is event-driven, not continuous. Submissions happen on:
 | Resolution change | Immediate | Yes | `setCongestionResolution()` |
 | Congestion report toggle | Immediate | No | `setShowCongestion()` |
 
-The `force` flag bypasses the checksum dirty-check — scroll and mutation change the viewport content even if the pixel buffer happens to match a previous frame (e.g., scrolling back to a previously-seen position with identical pixel content but different logical position).
+The `force` flag bypasses the checksum dirty-check, because scroll and mutation change the viewport content even if the pixel buffer happens to match a previous frame (e.g., scrolling back to a previously-seen position with identical pixel content but different logical position).
 
 ## Texture Slots
 
@@ -234,6 +234,6 @@ Live stats visible in ComplexityHUD > Perf tab: FPS, frame time (avg/p95/max), a
 
 ## Known Gaps
 
-- **Saliency worker has no busy guard** — if the worker is slow and submissions queue, multiple BGRA→RGBA copies are wasted. Low priority because the 15-frame throttle limits this to ~4 submissions/second.
-- **BGRA→RGBA swap is O(n)** — both workers copy the entire buffer and swap channels before `createImageBitmap`. A WebGL-side swap (shader uniform or readback format) would eliminate this copy. Blocked on Electron's `capturePage` returning BGRA.
-- **Checksum is approximate** — 1024 samples can miss small localized changes (e.g., a blinking cursor). Acceptable because saliency/congestion are spatial summaries — a few changed pixels don't meaningfully alter the heatmap.
+- **Saliency worker has no busy guard.** If the worker is slow and submissions queue, multiple BGRA→RGBA copies are wasted. Low priority because the 15-frame throttle limits this to ~4 submissions/second.
+- **BGRA→RGBA swap is O(n).** Both workers copy the entire buffer and swap channels before `createImageBitmap`. A WebGL-side swap (shader uniform or readback format) would eliminate this copy. Blocked on Electron's `capturePage` returning BGRA.
+- **Checksum is approximate.** 1024 samples can miss small localized changes (e.g., a blinking cursor). Acceptable because saliency/congestion are spatial summaries, and a few changed pixels don't meaningfully alter the heatmap.

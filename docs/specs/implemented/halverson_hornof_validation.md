@@ -2,16 +2,15 @@
 
 > **Last updated:** 2026-03-08
 
-**Status:** v2.1 — stimulus built, automated pipeline complete, **density gate granularity gap identified**
-**Priority:** High — behavioral validation of density gate and peripheral processing
+**Status:** v2.1, stimulus built, automated pipeline complete, **density gate granularity gap identified**
+**Priority:** High (behavioral validation of density gate and peripheral processing)
 **Contact:** Tim Halverson pinged (Mar 2026); Air Force Research Laboratory, Applied Neuroscience Branch
 **Tracks:** Wave 5 (UI visual search behavioral validation)
 
 ### What ships in v2.1
-- `tests/reference-pages/halverson-mixed-density.html` — stimulus (interactive + static modes, seeded PRNG)
-- `scripts/capture-halverson.js` — 3 conditions × 3 modes (Mode 0, Mode 9, bypass) with configurable radius
-- `scripts/analyze-halverson.js` — per-group SSIM, edge density, OCR legibility (ground-truth word pool matching)
-- `scripts/analyze-halverson.js` — per-group SSIM, edge density, text contrast, availability score
+- `tests/reference-pages/halverson-mixed-density.html`: stimulus (interactive + static modes, seeded PRNG)
+- `scripts/capture-halverson.js`: 3 conditions × 3 modes (Mode 0, Mode 9, bypass) with configurable radius
+- `scripts/analyze-halverson.js`: per-group SSIM, edge density, text contrast, OCR legibility (ground-truth word pool matching), availability score
 - Tier 1-3 validation criteria defined and auto-checked
 
 ### What ships later
@@ -21,25 +20,25 @@
 - Eye tracking integration (WebGazer or external tracker)
 - EPIC × Scrutinizer integration study
 
-## Why This Paper Matters
+## Relation to Halverson & Hornof (2011)
 
-Halverson & Hornof (2011) "A Computational Model of Active Vision for Visual Search in Human-Computer Interaction" (*HCI Journal* 26:285-314, DOI: 10.1080/07370024.2011.625237) is the closest existing work to what Scrutinizer does — but from the cognitive architecture side rather than the rendering side. They model what the visual system *can perceive* at each eccentricity during UI search; Scrutinizer renders what the visual system *would see* at each eccentricity. The predictions should converge.
+Halverson & Hornof (2011) "A Computational Model of Active Vision for Visual Search in Human-Computer Interaction" (*HCI Journal* 26:285-314, DOI: 10.1080/07370024.2011.625237) is the closest existing work to what Scrutinizer does, approached from the cognitive architecture side. They model what the visual system *can perceive* at each eccentricity during UI search; Scrutinizer renders an approximation of peripheral appearance at each eccentricity. The predictions should converge.
 
-Their EPIC-based model answers four questions about active vision during UI search:
+Their EPIC-based model addresses four questions about active vision during UI search:
 1. **When do the eyes move?** → process-monitoring: saccade after perceptual encoding completes
 2. **What can be perceived?** → density-dependent encoding within a fixed 1° region
 3. **Where do the eyes move?** → fixate-nearby: lowest eccentricity unfixated object
 4. **What is integrated between fixations?** → coarse spatial memory of group locations
 
-Each answer has a direct analog in Scrutinizer's pipeline. This is not a coincidence — both systems are instantiating the same perceptual constraints. The difference is that Halverson validated against eye-tracking behavioral data from real UI search tasks (24 participants, 3 experiments), while Scrutinizer validated against psychophysical stimuli (Waves 1-4). This spec bridges the two.
+Questions 2 and 4 have analogs in Scrutinizer's pipeline (the density gate and `visual-memory.js`). Questions 1 and 3 do not: Scrutinizer has no temporal model and no saccade model (see the parameter table below). The difference is that Halverson validated against eye-tracking behavioral data from real UI search tasks (24 participants, 3 experiments), while Scrutinizer validated against psychophysical stimuli (Waves 1-4). This spec bridges the two.
 
 ## Parameter Mapping: EPIC → Scrutinizer
 
 | EPIC Parameter | Value | Scrutinizer Analog | Current Value | Match? |
 |---------------|-------|-------------------|---------------|--------|
-| Text availability radius | 1° visual angle | Foveal radius | ~2° (calibration-dependent) | Scrutinizer is wider — includes parafovea |
+| Text availability radius | 1° visual angle | Foveal radius | ~2° (calibration-dependent) | Scrutinizer is wider (includes parafovea) |
 | Color availability radius | 7.5° visual angle | Chromatic pooling onset | ~5° (castleCSF RG/BY decay) | Similar order of magnitude |
-| Dense recoding threshold | nearest neighbor < 0.15° → 150ms | Density gate threshold | structure map density > threshold | Conceptually identical — density modulates processing |
+| Dense recoding threshold | nearest neighbor < 0.15° → 150ms | Density gate threshold | structure map density > threshold | Conceptually identical: density modulates processing |
 | Sparse recoding time | 50ms (neighbor ≥ 0.15°) | — | — | Scrutinizer doesn't model temporal encoding |
 | Dense recoding time | 150ms (neighbor < 0.15°) | — | — | 3× slower for dense = more fixations needed |
 | Effective field of view | 1° radius (constant) | Foveal MIP level 0 region | ~2° radius | — |
@@ -48,27 +47,27 @@ Each answer has a direct analog in Scrutinizer's pipeline. This is not a coincid
 | Saccade destination | lowest eccentricity unfixated object | — | No saccade model (mouse-driven) | Scrutinizer shows what's available; search strategy is the user's |
 | Working memory | coarse spatial: which groups visited | Visual memory module | `visual-memory.js`: fixation history with decay | Both track group-level, not item-level |
 
-### The Critical Mapping: TEE Model ↔ Density Gate
+### TEE Model ↔ Density Gate
 
-Halverson's **Text-Encoding Error (TEE) model** (p.299) is the key finding:
+In Halverson's **Text-Encoding Error (TEE) model** (p.299):
 - All objects within 1° of fixation are perceived (constant region)
 - But the **probability of correct encoding** varies: 90% if nearest neighbor ≥ 0.15°, 50% if < 0.15°
 - This beat the Reduced Region model (which shrank the perception area for dense text) with AAE 8.8% vs 21.1%
-- The insight: **the field of view doesn't shrink with density — encoding accuracy drops**
+- In the TEE model, **encoding accuracy drops with density, and the field of view stays the same size**
 
 Scrutinizer's density gate does conceptually the same thing:
 - The rendered region doesn't change with density
 - But the **distortion applied** varies with local structure density
-- Dense regions get more aggressive V1 crowding (higher displacement, more scramble)
-- The effect: dense peripheral content is less "readable" without the perception region shrinking
+- Dense regions get more aggressive crowding distortion in the V1 stage (higher displacement, more scramble)
+- Dense peripheral content is therefore less "readable" without the perception region shrinking
 
-**The TEE model validates the density gate architecture.** Both say: fixed spatial extent, variable encoding quality as a function of local density. Halverson showed this predicts real search behavior better than shrinking the perceptual window.
+**The TEE model and the density gate share a design.** Both use a fixed spatial extent with encoding quality varying as a function of local density. Halverson showed this predicts real search behavior better than shrinking the perceptual window. *(Correction 2026-10-01: the shared design did not produce shared predictions. v2.1 testing found no sparse/dense discrimination from the density gate; see v2.1 Findings below.)*
 
 ### The Semantic Gap
 
-Halverson's Section 4 validation (semantic grouping task, 18 participants) revealed a limit: the model fails when semantic structure is present (AAE = 42.6% for search time, 37.3% for fixations). People pass over semantically coherent groups with a single fixation — they read "nuts: cashew, peanut, almond" and skip the group without searching item-by-item.
+Halverson's Section 4 validation (semantic grouping task, 18 participants) revealed a limit: the model fails when semantic structure is present (AAE = 42.6% for search time, 37.3% for fixations). People pass over semantically coherent groups with a single fixation. They read "nuts: cashew, peanut, almond" and skip the group without searching item-by-item.
 
-Scrutinizer has no semantic model and shouldn't try to build one. But this finding is important for interpreting validation results: on layouts where semantic grouping is strong (nav menus, labeled sections), Scrutinizer's purely visual predictions will overestimate the number of fixations needed. This is a known architectural limit, not a bug.
+Scrutinizer has no semantic model and shouldn't try to build one. On layouts where semantic grouping is strong (nav menus, labeled sections), its purely visual predictions will therefore overestimate the number of fixations needed, and validation results on such layouts need to be read with this architectural limit in mind.
 
 ## Three Experiments, Three Stimulus Types
 
@@ -79,7 +78,7 @@ Scrutinizer has no semantic model and shouldn't try to build one. But this findi
 - **Three conditions:** all sparse (6 groups), all dense (6 groups), mixed (3 sparse + 3 dense)
 - **Total layout:** ~7.5° visual angle wide
 - **Participants:** 24
-- **Key finding:** Sparse groups searched first and faster. Fixation duration: ~250ms sparse, ~350ms dense.
+- **Result:** Sparse groups searched first and faster. Fixation duration: ~250ms sparse, ~350ms dense.
 - **Scrutinizer prediction:** Dense groups should show higher MIP-level degradation + stronger density-gate distortion at any given eccentricity → less peripheral "availability" → model predicts sparse-first search
 
 ### Experiment 2: CVC Search (Figure 4)
@@ -87,21 +86,21 @@ Scrutinizer has no semantic model and shouldn't try to build one. But this findi
 - **Groups:** 5 items each, labeled with digits flanked by Xs (e.g., "X1X")
 - **Layout size:** scales with group count
 - **Participants:** 16
-- **Key finding:** Mean saccade distance increases with layout size (1.5° for 1 group → 2.5° for 6 groups). People fixate nearby objects. Scanpath A→B→D→C observed 30% of time in 6-group layouts.
+- **Result:** Mean saccade distance increases with layout size (1.5° for 1 group → 2.5° for 6 groups). People fixate nearby objects. Scanpath A→B→D→C observed 30% of time in 6-group layouts.
 - **Scrutinizer prediction:** At central fixation, groups closer to center should have lower MIP levels and more preserved structure → model predicts fixate-nearby as the rational strategy given peripheral degradation
 
 ### Experiment 3: Semantic Grouping (Figure 10)
 - **Layout:** 8 groups of 5 words, with/without semantic cohesion, with/without labels, with/without metagroups
 - **Layout size:** ~5.77° wide, ~1.54° between groups, ~0.76° within groups
 - **Participants:** 18
-- **Key finding:** Semantic cohesion substitutes for labels (single fixation to assess group relevance). Metagroups don't affect behavior.
+- **Result:** Semantic cohesion substitutes for labels (single fixation to assess group relevance). Metagroups don't affect behavior.
 - **Scrutinizer prediction:** No semantic model → can only predict spatial search patterns on the random-grouping condition. For random layouts, model predicted AAE < 10% on all measures.
 
 ## Validation Protocol
 
 ### Phase 1: Stimulus Recreation
 
-Build HTML reference pages reproducing the three experiment layouts at correct visual angles. The stimuli are simple — words in groups on a white background — easily reproducible in HTML/CSS.
+Build HTML reference pages reproducing the three experiment layouts at correct visual angles. The stimuli are simple (words in groups on a white background) and easily reproducible in HTML/CSS.
 
 **`reference-pages/halverson-mixed-density.html`**
 - Query params: `?condition=sparse|dense|mixed&trial=N`
@@ -140,7 +139,7 @@ For each stimulus × condition:
 **Mixed density experiment:**
 - Predict: sparse groups have higher availability scores than dense groups at matched eccentricity
 - Predict: in mixed layouts, the availability gap between sparse and dense groups should predict the observed search-order preference (sparse first)
-- Compare: Halverson's fixation-count data (Figure 7) — does availability score correlate with number of fixations needed?
+- Compare: Halverson's fixation-count data (Figure 7). Does availability score correlate with number of fixations needed?
 
 **CVC experiment:**
 - Predict: availability score decreases with eccentricity from fixation center
@@ -162,14 +161,14 @@ For each stimulus × condition:
 | Mean saccade distance (6 groups) | ~2.5° | ~2.5° (AAE 4.2%) | ? | Figure 8 |
 | Top scanpath (6 groups) | A→B→D→C (30%) | A→B→D→C (30%) | ? | Figure 9 |
 
-Scrutinizer can't predict fixation duration (no temporal model) or fixation count directly (no search termination model). But it CAN predict:
+Scrutinizer can't predict fixation duration (no temporal model) or fixation count directly (no search termination model). It can predict:
 - **Relative difficulty** (dense > sparse) from degradation magnitude
 - **Search order** (sparse first, nearby first) from availability gradients
 - **Saccade distance** from the eccentricity profile of available information
 
 ## v2.1 Findings: Density Gate Granularity Gap
 
-Automated capture-analyze pipeline (Mode 0, Mode 9 "Congestion-Gated", and baseline at multiple foveal radii) reveals a structural limitation:
+Results from the automated capture-analyze pipeline (Mode 0, Mode 9 "Congestion-Gated", and baseline at multiple foveal radii) show a structural limitation:
 
 ### The problem: block-level vs word-level density
 
@@ -183,17 +182,17 @@ Automated capture-analyze pipeline (Mode 0, Mode 9 "Congestion-Gated", and basel
 
 ### Root cause
 
-H&H's TEE model computes density at **individual word level** — nearest-neighbor distance < 0.15° triggers 50% encoding error. Scrutinizer's density gate operates at **DOM structure block level** — the structure map sees "a group of text" regardless of whether it contains 5 widely-spaced words or 10 tightly-packed words.
+H&H's TEE model computes density at **individual word level**: nearest-neighbor distance < 0.15° triggers 50% encoding error. Scrutinizer's density gate operates at **DOM structure block level**: the structure map records "a group of text" regardless of whether it contains 5 widely-spaced words or 10 tightly-packed words.
 
 The congestion map (which feeds Mode 9) aggregates structure blocks into a spatial density field. A sparse group (5 words, 0.65° spacing) and a dense group (10 words, 0.33° spacing) occupy similar spatial extent and produce similar congestion values. The intra-group text density that H&H found critical is below the resolution of the structure map.
 
 ### Implications
 
-1. **The density gate validates at the macro level** (whole page regions of varying content density) but not at the micro level (word-level spacing within a single text block).
+1. **The density gate passes validation at the macro level** (whole page regions of varying content density) but not at the micro level (word-level spacing within a single text block).
 2. **A word-level density signal** would require either: (a) OCR/text detection in the content analysis pipeline, or (b) a pixel-level edge density computation in the shader itself, bypassing the DOM structure map.
 3. **The eccentricity gradient is the dominant signal.** The MIP chain correctly degrades periphery > center. But density-within-eccentricity discrimination is absent.
 
-This is a v2.2+ enhancement target, not a v2.1 blocker. The finding is honestly reported in the arxiv paper's Open Problems section.
+This is a v2.2+ enhancement target and does not block v2.1. The finding is reported in the arxiv paper's Open Problems section. *(Correction 2026-10-01: the paper has never reported the Halverson test. Its nearest statement is the strength-vs-spacing limit of density-gated crowding, now in Section 3.2, Known Limitations, of `docs/arxiv-paper/scrutinizer-system-paper.tex`.)*
 
 ## Success Criteria (revised)
 
@@ -206,26 +205,26 @@ This is a v2.2+ enhancement target, not a v2.1 blocker. The finding is honestly 
 
 If Tim Halverson is responsive:
 
-1. **Share the original stimuli** — exact word lists, pixel coordinates, timing parameters. Saves recreation effort and ensures exact reproduction.
-2. **Share raw eye-tracking data** — fixation sequences per participant per trial. Enables per-trial comparison rather than just aggregate means.
-3. **Run Scrutinizer on his stimuli** — show him what the pipeline produces on his layouts. The visual output alone would be a compelling demonstration.
-4. **Co-author potential** — a paper showing that a real-time rendering pipeline and a cognitive architecture make convergent predictions about UI visual search, validated against the same behavioral data, would be a strong contribution. Bridges the graphics/perception gap that both communities acknowledge.
-5. **EPIC integration** — Halverson's Section 5.3 explicitly calls for replacing the step-function availability functions with continuous eccentricity-dependent degradation. Scrutinizer's shader IS that continuous function. Could Scrutinizer's output serve as the "retinal image" input to EPIC's visual processor?
+1. **Share the original stimuli:** exact word lists, pixel coordinates, timing parameters. Saves recreation effort and ensures exact reproduction.
+2. **Share raw eye-tracking data:** fixation sequences per participant per trial. Enables per-trial comparison.
+3. **Run Scrutinizer on his stimuli:** show him what the pipeline produces on his layouts.
+4. **Co-author potential:** a paper showing that a real-time rendering pipeline and a cognitive architecture make convergent predictions about UI visual search, validated against the same behavioral data, would connect graphics and perception research on the same problem.
+5. **EPIC integration:** Halverson's Section 5.3 explicitly calls for replacing the step-function availability functions with continuous eccentricity-dependent degradation. Scrutinizer's shader approximates that continuous function with discrete MIP levels. Could Scrutinizer's output serve as the "retinal image" input to EPIC's visual processor?
 
 ## Architectural Implications for Scrutinizer
 
 ### What H&H validates
-- **Density gate concept:** TEE model proves encoding quality (not perception region) varies with density
-- **Structure map value:** Their model only needs object location — Scrutinizer's structure map provides exactly this
-- **Coarse spatial memory:** Their working memory model matches `visual-memory.js` — group-level tracking
-- **Fixate-nearby strategy:** When saliency is uniform, proximity drives search — Scrutinizer's eccentricity gradient already models this
+- **Density gate concept:** the TEE model's better fit (AAE 8.8% vs 21.1% for the Reduced Region model) supports a fixed perception region with encoding quality varying with density
+- **Structure map value:** Their model only needs object location, which Scrutinizer's structure map provides
+- **Coarse spatial memory:** Their working memory model matches `visual-memory.js` (group-level tracking)
+- **Fixate-nearby strategy:** When saliency is uniform, proximity drives search. Scrutinizer's eccentricity gradient already models this.
 
 ### What H&H reveals as missing
 - **Word-level density resolution (v2.1 finding):** The density gate operates at DOM block level. H&H's TEE model requires word-level nearest-neighbor distance (< 0.15° threshold). A sparse group and a dense group register as similar-sized structure blocks. Fix path: pixel-level edge density in the shader, or OCR/text-detection in content analysis.
-- **No temporal model:** Scrutinizer renders a static frame; H&H model fixation duration and saccade timing. Adding process-monitoring would let Scrutinizer predict not just what's visible but when it becomes visible.
+- **No temporal model:** Scrutinizer renders a static frame; H&H model fixation duration and saccade timing. Adding process-monitoring would let Scrutinizer predict when content becomes visible.
 - **No search termination:** Scrutinizer can't predict how many fixations a task needs. This requires task models (SNIF-ACT, CogTool) beyond rendering.
-- **No semantic processing:** H&H model fails on semantic layouts (AAE 42.6%). Scrutinizer's DOM structure map captures visual hierarchy (headers, labels) but not semantic content. Both systems share this limit.
-- **Horizontal/vertical asymmetry:** Ojanpää et al. (2002, cited in paper) found horizontal word lists searched differently from vertical. Scrutinizer's radially symmetric model doesn't capture this. The polar sector R:T ratio (2:1 radial:tangential) partially addresses this but wasn't designed for reading direction effects.
+- **No semantic processing:** H&H model fails on semantic layouts (AAE 42.6%). Scrutinizer's DOM structure map records visual hierarchy (headers, labels) but not semantic content. Both systems share this limit.
+- **Horizontal/vertical asymmetry:** Ojanpää et al. (2002, cited in paper) found horizontal word lists searched differently from vertical. Scrutinizer's model is radially symmetric and does not represent this asymmetry. The polar sector R:T ratio (2:1 radial:tangential) partially addresses this but wasn't designed for reading direction effects.
 
 ## Future Direction: EPIC × Scrutinizer
 
@@ -233,7 +232,7 @@ Section 5.3 (p.310) describes exactly the integration path:
 
 > "The default availability of text is that text can be perceived up to 1° of visual angle from the center of gaze, but this could be replaced with a continuous function in which the availability of text (or some other feature) degrades continuously as a function of eccentricity — a more veridical account of how human perception really works."
 
-Scrutinizer's fragment shader IS this continuous function. The MIP chain provides continuous (well, 5-band discrete) eccentricity-dependent degradation. The density gate modulates it by local density. The chromatic pooling adds feature-specific (color) degradation.
+Scrutinizer's fragment shader approximates this continuous function. The MIP chain provides eccentricity-dependent degradation in discrete levels. The density gate modulates it by local density. The chromatic pooling adds feature-specific (color) degradation.
 
 A future integration could:
 1. Feed Scrutinizer's rendered output as the "retinal image" into EPIC's visual processor
@@ -241,7 +240,7 @@ A future integration could:
 3. This would replace EPIC's step-function availability with Scrutinizer's continuous rendering
 4. Predictions would automatically inherit both the spatial degradation (from Scrutinizer) and the cognitive strategy (from EPIC)
 
-This is a research project, not an implementation task — but it's the intellectually honest next step if the validation in Phase 3 shows convergent predictions.
+This is a research project. It would be the next step if the validation in Phase 3 shows convergent predictions.
 
 ## References
 

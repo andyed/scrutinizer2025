@@ -1,16 +1,16 @@
-# MIP/Polar Sampling Analysis — Foveal Boundary LOD Fix
+# MIP/Polar Sampling Analysis: Foveal Boundary LOD Fix
 
 > **Last updated:** 2026-03-14
 
 **Status**: SHIPPED (commit a5982dc, branch `claude/fix-webgl-mip-sampling-3kHXs`)
 **File**: `renderer/shaders/peripheral.frag` (processV4, sampleSourceGrad, sampleMIPPooledGrad)
-**Related**: `docs/specs/cmf_mip_derivation.md`, `docs/specs/isotropic_cortical_sampling.md`
+**Related**: `docs/specs/implemented/cmf_mip_derivation.md`, `docs/specs/implemented/isotropic_cortical_sampling.md`
 
 ## Problem Statement
 
-The peripheral blur uses a MIP chain for spatial frequency decomposition, but the `textureGrad` callers in `processV4` were passing screen-space derivatives of the **undistorted** UV while sampling at the **V1-distorted** UV. This is a Jacobian mismatch: the hardware LOD selection doesn't see the UV stretching introduced by the V1 crowding warp.
+The peripheral blur uses a MIP chain for spatial frequency decomposition, but the `textureGrad` callers in `processV4` were passing screen-space derivatives of the **undistorted** UV while sampling at the **V1-distorted** UV. This is a Jacobian mismatch: the hardware LOD selection does not account for the UV stretching introduced by the V1-stage crowding warp.
 
-Near the foveal boundary where V1 distortion ramps in (the `parafoveaRamp` smoothstep), radial gradients diverge from tangential gradients. The undistorted `dFdx(uv)` / `dFdy(uv)` are spatially uniform, but the actual rate of change across screen pixels for `v1.distortedUV` is anisotropic — stretched radially by crowding. The hardware `textureGrad` picks LOD from the maximum gradient magnitude (per the OpenGL ES 3.0 spec §3.8.9), so it selects based on the wrong Jacobian.
+Near the foveal boundary where V1 distortion ramps in (the `parafoveaRamp` smoothstep), radial gradients diverge from tangential gradients. The undistorted `dFdx(uv)` / `dFdy(uv)` are spatially uniform, but the actual rate of change across screen pixels for `v1.distortedUV` is anisotropic, stretched radially by crowding. The hardware `textureGrad` picks LOD from the maximum gradient magnitude (per the OpenGL ES 3.0 spec §3.8.9), so it selects based on the wrong Jacobian.
 
 **Symptom**: Over-blurring in the radial direction (toward/away from fixation) and under-blurring in the tangential direction at the foveal boundary annulus.
 
@@ -29,7 +29,7 @@ mip[1] = textureLod(u_texture, uv, 0.5);
 
 **LOD method**: Explicit `textureLod` at fixed half-octave LOD values (0.0, 0.5, 1.0, ..., 4.0). Hardware LOD selection is bypassed entirely. Band weights are computed from scalar eccentricity via `computeMipLevel()`.
 
-**Isotropy**: **Not affected.** The 9 samples are all point-sampled at known LODs. The isotropic eccentricity→weight mapping is biologically correct — retinal ganglion cell receptive field sizes scale isotropically with eccentricity. Radial/tangential anisotropy in crowding is handled upstream in V1, not in the band decomposition.
+**Isotropy**: **Not affected.** The 9 samples are all point-sampled at known LODs. The isotropic eccentricity→weight mapping approximates retinal ganglion cell receptive field scaling, which depends mainly on eccentricity. Radial/tangential anisotropy in crowding is handled upstream in the V1 stage.
 
 ### Path 2: Legacy MIP pooling (`u_dog_enabled=0`, no gradient mode)
 
@@ -65,7 +65,7 @@ vec3 foveaCol = sampleSourceGrad(v1.distortedUV, duvdx, duvdy).rgb;
 
 **LOD method**: `textureGrad` with raw screen-space derivatives. Hardware picks LOD from `max(|duvdx|, |duvdy|)`.
 
-**Isotropy**: **AFFECTED.** This is the most impactful case. The foveal color is blended with the peripheral color via `mix(foveaCol, pooledCol, blendFactor)`. If `foveaCol` has incorrect LOD, the blend creates visible artifacts at the foveal boundary — the one region users look at most carefully.
+**Isotropy**: **AFFECTED.** This is the most impactful case. The foveal color is blended with the peripheral color via `mix(foveaCol, pooledCol, blendFactor)`. If `foveaCol` has incorrect LOD, the blend creates visible artifacts at the foveal boundary, the one region users look at most carefully.
 
 ## The Fix
 
@@ -83,14 +83,14 @@ vec2 distDuvdy = dFdy(v1.distortedUV);
 vec3 foveaCol = sampleSourceGrad(v1.distortedUV, distDuvdx, distDuvdy).rgb;
 ```
 
-`dFdx(v1.distortedUV)` computes the screen-space derivative of the *distorted* UV, which correctly captures the Jacobian of the V1 crowding warp. Since `v1.distortedUV` is computed per-fragment in `processV1`, the GLSL `dFdx`/`dFdy` intrinsics automatically differentiate through the entire distortion pipeline — no manual Jacobian computation needed.
+`dFdx(v1.distortedUV)` computes the screen-space derivative of the *distorted* UV, which gives the Jacobian of the V1-stage crowding warp. Since `v1.distortedUV` is computed per-fragment in `processV1`, the GLSL `dFdx`/`dFdy` intrinsics automatically differentiate through the entire distortion pipeline. No manual Jacobian computation is needed.
 
 **Affected callers** (all in `processV4`):
 1. Foveal reference sample (`sampleSourceGrad`)
 2. Legacy gradient MIP path (`sampleMIPPooledGrad`)
 3. Oklab chromatic attenuation neighbor samples (V4 style 6)
 
-**Performance**: Zero cost. `dFdx`/`dFdy` on a varying is a single instruction on all GPUs (reads from the 2×2 quad helper lanes). Replacing one `dFdx(uv)` with `dFdx(v1.distortedUV)` changes which register is differenced, not the instruction count.
+**Performance**: Zero cost. `dFdx`/`dFdy` on a varying is a single instruction on all GPUs (reads from the 2×2 quad helper lanes). Replacing one `dFdx(uv)` with `dFdx(v1.distortedUV)` changes which register is differenced. The instruction count stays the same.
 
 ## What Was NOT Changed (and Why)
 
@@ -106,19 +106,19 @@ float computeMipLevel(float eccentricity, float fovea_radius) {
 }
 ```
 
-This is intentionally isotropic. Retinal ganglion cell receptive field sizes grow with eccentricity without radial/tangential bias. The anisotropy in peripheral vision comes from cortical crowding (V1/V2), not from resolution limits (retinal). Scrutinizer correctly separates these:
-- **V1** (`processV1`): Applies directional crowding with `u_crowding_radial_bias` (2:1 radial:tangential, Toet & Levi 1992)
+This is intentionally isotropic. Retinal ganglion cell receptive field sizes grow with eccentricity without radial/tangential bias. The anisotropy in peripheral vision comes from cortical crowding (V1/V2). Scrutinizer correctly separates these:
+- **V1 stage** (`processV1`): Applies directional crowding with `u_crowding_radial_bias` (2:1 radial:tangential, Toet & Levi 1992)
 - **DoG** (`sampleDoGReconstructed`): Applies isotropic resolution loss via band attenuation
 
 Introducing radial/tangential asymmetry into the band weights would conflate two distinct biological mechanisms.
 
 ### The `coupledEccentricity` indirection
 
-`processV4` feeds `coupledEccentricity = v1.distortionStrength * u_intensity * fovea_radius * blurMult` into the DoG/MIP functions. This means the effective blur depends on how much V1 distorted the UV, not on raw eccentricity. This is an intentional design choice (attention-gated resolution, not purely position-dependent), though it diverges from strict retinal biology. See `dog-review-findings.md` item 4.
+`processV4` feeds `coupledEccentricity = v1.distortionStrength * u_intensity * fovea_radius * blurMult` into the DoG/MIP functions. This means the effective blur depends on how much the V1 stage distorted the UV. The DoG/MIP functions do not receive raw eccentricity. This is an intentional design choice (attention-gated resolution), though it diverges from strict retinal biology. See `.claude/agent-memory/vision-scientist/dog-review-findings.md` item 4.
 
-### Hardware MIP chain is box-filtered, not Gaussian
+### Hardware MIP chain is box-filtered
 
-`gl.generateMipmap()` uses bilinear (box) downsampling, not Gaussian convolution. Band differences are "Difference of Boxes," not true DoG. This introduces spectral leakage between bands but is qualitatively acceptable. True Gaussian pyramids (Burt & Adelson 1983) would require a custom FBO downsample chain. This is a known limitation, not a bug to fix here.
+`gl.generateMipmap()` uses bilinear (box) downsampling. The band differences are therefore a "Difference of Boxes" that approximates a true DoG. This introduces spectral leakage between bands but is qualitatively acceptable. True Gaussian pyramids (Burt & Adelson 1983) would require a custom FBO downsample chain. This is a known limitation and is out of scope for this fix.
 
 ## Validation
 
@@ -133,13 +133,13 @@ Introducing radial/tangential asymmetry into the band weights would conflate two
    ```
    The M-scaling curve in far periphery should be unchanged (the fix only affects `textureGrad` callers, and the DoG path uses `textureLod`). Near the boundary (1–2° eccentricity), the effective resolution should improve slightly.
 
-3. **Gaussian comparison control**: Toggle `u_gaussian_blur_mode=1.0`. This path uses `sampleMIPPooled` (explicit `textureLod`), bypassing `textureGrad` entirely. If boundary artifacts are present in DoG mode but absent in Gaussian mode at the same eccentricity, the issue was in gradient handling, not band weighting.
+3. **Gaussian comparison control**: Toggle `u_gaussian_blur_mode=1.0`. This path uses `sampleMIPPooled` (explicit `textureLod`), bypassing `textureGrad` entirely. If boundary artifacts are present in DoG mode but absent in Gaussian mode at the same eccentricity, the issue was in gradient handling.
 
-4. **Debug overlay**: Enable `u_debug_boundary=1.0` to render the band-weight diagnostic. The fix does not change band weights — only the foveal reference sample LOD — so the debug overlay should be identical pre/post.
+4. **Debug overlay**: Enable `u_debug_boundary=1.0` to render the band-weight diagnostic. The fix does not change band weights (only the foveal reference sample LOD), so the debug overlay should be identical pre/post.
 
 ### Confirming against Rovamo & Virsu (1979) data
 
-The `scripts/analyze-dog-bands.js` validation harness computes band weights at fine eccentricity steps and reports `equivalentMipLevel()` — the effective Gaussian blur if bands were replaced with a single sample. This should match the cortical magnification prediction:
+The `scripts/analyze-dog-bands.js` validation harness computes band weights at fine eccentricity steps and reports `equivalentMipLevel()`, the effective Gaussian blur if bands were replaced with a single sample. This should match the cortical magnification prediction:
 
 ```
 M(e) = M(0) / (1 + e/E₂)
@@ -151,11 +151,11 @@ where E₂ ≈ 2.5° for grating acuity (Rovamo & Virsu 1979, Table 1). Run:
 node scripts/analyze-dog-bands.js --e2=2.5 --cmf
 ```
 
-The `equivalentMipLevel` column should produce a smooth, monotonically increasing curve. If the fix introduced any band-weight discontinuity (it shouldn't — band weights are computed in `sampleDoGReconstructed` from scalar eccentricity, unaffected by gradient changes), it would appear as a step or plateau in this output.
+The `equivalentMipLevel` column should produce a smooth, monotonically increasing curve. If the fix introduced any band-weight discontinuity (it shouldn't, because band weights are computed in `sampleDoGReconstructed` from scalar eccentricity, unaffected by gradient changes), it would appear as a step or plateau in this output.
 
 ## Future Work
 
-- **Isotropic cortical sampling** (`docs/specs/isotropic_cortical_sampling.md`): Replace the ad-hoc `computePolarSector()` geometry with CMF-derived ring/spoke boundaries. This is orthogonal to the gradient fix but addresses a related concern — the current polar grid has fixed 2:1 aspect ratio instead of eccentricity-dependent isotropic cells.
+- **Isotropic cortical sampling** (`docs/specs/implemented/isotropic_cortical_sampling.md`): Replace the ad-hoc `computePolarSector()` geometry with CMF-derived ring/spoke boundaries. This is orthogonal to the gradient fix but addresses a related concern: the current polar grid has fixed 2:1 aspect ratio instead of eccentricity-dependent isotropic cells.
 
 - **Per-axis gradient scaling** in `sampleMIPPooledGrad`: The current `pow(2.0, mipLevel)` scaling is isotropic. A future enhancement could project gradients onto radial/tangential axes and scale independently, though this would only benefit the legacy (non-DoG) path.
 
@@ -166,4 +166,4 @@ The `equivalentMipLevel` column should produce a smooth, monotonically increasin
 - Rovamo, J., & Virsu, V. (1979). An estimation and application of the human cortical magnification factor. *Experimental Brain Research*, 37(3), 495–510.
 - Toet, A., & Levi, D. M. (1992). The two-dimensional shape of spatial interaction zones in the parafovea. *Vision Research*, 32(7), 1349–1357.
 - Blauch, N. M., Alvarez, G. A., & Konkle, T. (2026). FOVI: A biologically-inspired foveated interface for deep vision models. *arXiv:2602.03766*.
-- OpenGL ES 3.0 Specification, §3.8.9 — Texture Minification (LOD selection from implicit derivatives).
+- OpenGL ES 3.0 Specification, §3.8.9, Texture Minification (LOD selection from implicit derivatives).

@@ -2,45 +2,45 @@
 
 > **Last updated:** 2026-03-11
 
-**Status:** Saliency comparison complete and integrated into arxiv paper (Section 4.4, Table 5). Oriented DoG (v2.2) adds orientation-selective differentiation not yet captured in comparison data.
-**Priority:** Medium — core saliency finding is published; oriented DoG comparison is the remaining gap
+**Status:** Saliency comparison complete and integrated into arxiv paper (now Section 3.1, Table 4). Oriented DoG (v2.2) adds orientation-selective differentiation not yet captured in comparison data.
+**Priority:** Medium (core saliency finding is published; oriented DoG comparison is the remaining gap)
 **Tracks:** v2.1 validation gap → v2.2 oriented DoG extension
 
 ## The Problem
 
 The arxiv paper's central differentiation claim is that Scrutinizer's DoG band decomposition produces **frequency-selective** peripheral degradation (high frequencies attenuate before low), unlike Gaussian blur which degrades **uniformly** across all spatial frequencies. Wave 2 (spatial acuity) confirmed the pipeline is frequency-selective. But we never rendered the same stimuli through a matched Gaussian blur pipeline and measured the difference.
 
-Without this comparison, the claim rests on theoretical argument ("Gaussian blur is uniform, our DoG is selective") rather than empirical measurement on identical stimuli.
+Without this comparison, the claim rests on theoretical argument ("Gaussian blur is uniform, our DoG is selective") without empirical measurement on identical stimuli.
 
 ## What "Matched" Means
 
-The Gaussian blur comparison must be **perceptually matched**, not parameter-matched:
+The Gaussian blur comparison must be **perceptually matched**:
 
-1. **Same total information loss** — at each eccentricity, the Gaussian blur kernel should remove approximately the same total contrast energy as the DoG pipeline. Otherwise we're comparing "a lot of blur" to "a little of selective degradation."
-2. **Same eccentricity scaling** — blur radius should grow with eccentricity following the same M-scaling curve the DoG bands use (Rovamo & Virsu 1979).
-3. **Same stimuli** — use the Wave 2 spatial-acuity reference page (sine gratings at 0.25, 0.5, 1.0, 2.0, 4.0 cpd).
+1. **Same total information loss:** at each eccentricity, the Gaussian blur kernel should remove approximately the same total contrast energy as the DoG pipeline. Otherwise we're comparing "a lot of blur" to "a little of selective degradation."
+2. **Same eccentricity scaling:** blur radius should grow with eccentricity following the same M-scaling curve the DoG bands use (Rovamo & Virsu 1979).
+3. **Same stimuli:** use the Wave 2 spatial-acuity reference page (sine gratings at 0.25, 0.5, 1.0, 2.0, 4.0 cpd).
 
 ## Measurement Protocol
 
 ### Stimuli
-- `spatial-acuity.html` — 5 spatial frequencies × 5 eccentricity rings
-- `color-search.html` — colored singletons (tests whether blur preserves chromatic identity differently)
+- `spatial-acuity.html`: 5 spatial frequencies × 5 eccentricity rings
+- `color-search.html`: colored singletons (tests whether blur preserves chromatic identity differently)
 - 1-2 real web pages (dashboard, article) for ecological validity
 
 ### Conditions
-1. **DoG pipeline** (current Scrutinizer Mode 0) — capture at each eccentricity ring
-2. **Matched Gaussian blur** — same eccentricity-scaled degradation as a single Gaussian kernel per ring
-3. **Unfiltered baseline** — bypass mode
+1. **DoG pipeline** (current Scrutinizer Mode 0): capture at each eccentricity ring
+2. **Matched Gaussian blur:** same eccentricity-scaled degradation as a single Gaussian kernel per ring
+3. **Unfiltered baseline:** bypass mode
 
 ### Metrics (per eccentricity ring, per spatial frequency)
-- **DFT contrast retention** — ratio of output amplitude to input amplitude at each grating frequency (reuse `analyze-spatial-acuity.js` infrastructure)
-- **Chromatic retention** — Oklab chroma ratio (reuse `analyze-color-search.js`)
-- **SSIM** — structural similarity between filtered and baseline
-- **Cross-frequency discrimination** — the key metric: at each eccentricity, does the DoG pipeline show a steeper slope across frequencies than Gaussian? If both produce the same slope, the claim fails.
+- **DFT contrast retention:** ratio of output amplitude to input amplitude at each grating frequency (reuse `analyze-spatial-acuity.js` infrastructure)
+- **Chromatic retention:** Oklab chroma ratio (reuse `analyze-color-search.js`)
+- **SSIM:** structural similarity between filtered and baseline
+- **Cross-frequency discrimination**: at each eccentricity, does the DoG pipeline show a steeper slope across frequencies than Gaussian? If both produce the same slope, the claim fails.
 
 ### Expected Results
-- **DoG**: step-function attenuation — high frequencies drop to 0 at nearer eccentricities than low frequencies (already confirmed in Wave 2)
-- **Gaussian**: all frequencies attenuate together — the slope across frequencies should be flatter at each eccentricity
+- **DoG**: step-function attenuation. High frequencies drop to 0 at nearer eccentricities than low frequencies (already confirmed in Wave 2)
+- **Gaussian**: all frequencies attenuate together, so the slope across frequencies should be flatter at each eccentricity
 - **The difference**: DoG preserves low-frequency structure (edges, large shapes) at eccentricities where Gaussian has already destroyed them
 
 ## Implementation
@@ -66,10 +66,10 @@ Expose via `modes.json` as a hidden comparison mode or via env var for capture s
 Apply Gaussian blur to baseline captures using ImageMagick/Sharp at matched kernel sizes. Less controlled because the blur happens in sRGB not linear, and doesn't go through the same MIP chain.
 
 ### Capture Script
-`scripts/capture-gaussian-comparison.js` — renders each stimulus through both pipelines at 5 eccentricity fixation points, outputs paired captures for analysis.
+`scripts/capture-gaussian-comparison.js`: renders each stimulus through both pipelines at 5 eccentricity fixation points, outputs paired captures for analysis.
 
 ### Analysis Script
-`scripts/analyze-gaussian-comparison.js` — runs DFT contrast retention on both conditions, produces:
+`scripts/analyze-gaussian-comparison.js`: runs DFT contrast retention on both conditions, produces:
 - Per-frequency × per-eccentricity contrast retention curves (DoG vs Gaussian)
 - Cross-frequency slope comparison at each eccentricity
 - Summary: "At X° eccentricity, DoG preserves Y% of 0.25 cpd contrast while Gaussian preserves Z%"
@@ -77,36 +77,36 @@ Apply Gaussian blur to baseline captures using ImageMagick/Sharp at matched kern
 ## Success Criteria
 
 The comparison succeeds if:
-1. **DoG shows frequency-selective attenuation** (already confirmed) — high frequencies drop before low
-2. **Gaussian shows uniform attenuation** — all frequencies drop together
-3. **The difference is measurable** — at intermediate eccentricities (5-15°), DoG retains significantly more low-frequency contrast than Gaussian at matched total information loss
+1. **DoG shows frequency-selective attenuation** (already confirmed): high frequencies drop before low
+2. **Gaussian shows uniform attenuation:** all frequencies drop together
+3. **The difference is measurable:** at intermediate eccentricities (5-15°), DoG retains significantly more low-frequency contrast than Gaussian at matched total information loss
 4. **Real web content** shows visible structural preservation under DoG that Gaussian destroys
 
 ## Findings: Spatial Frequency Alone Is Insufficient
 
 **2026-03-08**: First capture run (48 screenshots, 5 frequencies × 5 E2 values × {DoG, Gaussian, baseline}) shows DoG and Gaussian produce **near-identical** contrast retention slopes on achromatic gratings. At ring 4 (10°): DoG slope = -0.4675, Gaussian slope = -0.4675. At ring 5 (13.1°): DoG = -0.3592, Gaussian = -0.3601.
 
-**Root cause**: The MIP chain is itself a Gaussian pyramid. `sampleMIPPooled()` (Gaussian mode) and `sampleDoGReconstructed()` (DoG mode) both sample from the same MIP levels — the band decomposition and reconstruction produces effectively the same total attenuation as a single MIP sample at the same eccentricity-scaled level. The difference between them is one of pathway (8 weighted bands vs 1 MIP sample) not of information content on single-frequency stimuli.
+**Root cause**: The MIP chain is itself a Gaussian pyramid. `sampleMIPPooled()` (Gaussian mode) and `sampleDoGReconstructed()` (DoG mode) both sample from the same MIP levels. The band decomposition and reconstruction produces effectively the same total attenuation as a single MIP sample at the same eccentricity-scaled level. The two differ in pathway (8 weighted bands vs 1 MIP sample). On single-frequency stimuli, their information content is the same. *(Correction 2026-10-01: hardware MIP levels are box/bilinear filtered, so the chain only approximates a Gaussian pyramid; see Section 2.1 of `docs/arxiv-paper/scrutinizer-system-paper.tex`. The conclusion that both modes sample the same MIP chain is unaffected.)*
 
 **Implication**: The differentiation argument cannot rest on spatial frequency selectivity alone. It must include the dimensions where the full Scrutinizer pipeline differs from pure Gaussian blur:
 
-1. **Chromatic channel separation** — per-band RG/YV decay rates (castleCSF) that Gaussian blur cannot reproduce
-2. **Saliency protection** — eccentricity modulated by saliency map, reducing degradation at salient regions
-3. **Density-gated crowding** — V1 distortion strength modulated by DOM structure map density
-4. **Congestion pooling** — Rosenholtz Feature Congestion boosting pooling in cluttered regions
-5. **Orientation selectivity** (v2.2) — oriented DoG bands preserve cardinal-aligned edges ~50% further than oblique edges, and tangential edges persist further than radial ones (Toet & Levi 1992). Gaussian blur is isotropic and cannot reproduce any of this.
+1. **Chromatic channel separation:** per-band RG/YV decay rates (castleCSF) that Gaussian blur cannot reproduce
+2. **Saliency protection:** eccentricity modulated by saliency map, reducing degradation at salient regions
+3. **Density-gated crowding:** V1 distortion strength modulated by DOM structure map density
+4. **Congestion pooling:** Rosenholtz Feature Congestion boosting pooling in cluttered regions
+5. **Orientation selectivity** (v2.2): oriented DoG bands preserve cardinal-aligned edges ~50% further than oblique edges, and tangential edges persist further than radial ones (Toet & Levi 1992). Gaussian blur is isotropic and cannot reproduce any of this.
 
 ## Expanded Comparison: Multi-Dimensional
 
 ### Capture Scripts (updated)
-- `capture-color-search.js` — now includes `gaussian` condition alongside `filtered` and `baseline`
+- `capture-color-search.js`: now includes `gaussian` condition alongside `filtered` and `baseline`
   - Run `--gaussian-only` to add Gaussian captures to existing dataset
-- `capture-saliency.js` — now includes `popout_gaussian` and `face_gaussian` conditions
+- `capture-saliency.js`: now includes `popout_gaussian` and `face_gaussian` conditions
   - Run `--gaussian-only` for incremental capture
 
 ### Analysis Scripts (updated)
-- `analyze-color-search.js` — now parses `gaussian` condition, outputs DoG vs Gaussian chroma retention comparison table
-- `analyze-saliency.js` — now computes DoG vs Gaussian deviation from baseline at each stimulus region
+- `analyze-color-search.js`: now parses `gaussian` condition, outputs DoG vs Gaussian chroma retention comparison table
+- `analyze-saliency.js`: now computes DoG vs Gaussian deviation from baseline at each stimulus region
 
 ### Expected Multi-Dimensional Results
 | Dimension | DoG pipeline | Gaussian | Why Gaussian fails |
@@ -115,7 +115,7 @@ The comparison succeeds if:
 | Saliency (popout/face) | Salient regions get reduced degradation | Same blur everywhere | No saliency gating |
 | Crowding (halverson) | Dense text gets stronger V1 distortion | Same blur regardless | No DOM awareness |
 | Congestion (halverson, congestion-gated) | High-clutter = stronger pooling | Same blur everywhere | No congestion signal |
-| Orientation (v2.2) | Cardinal edges preserved ~50% further; radial edges fade faster than tangential | Isotropic — all orientations degraded equally | No V1 simple cell selectivity |
+| Orientation (v2.2) | Cardinal edges preserved ~50% further; radial edges fade faster than tangential | Isotropic (all orientations degraded equally) | No orientation channels |
 
 ## Results: Saliency Protection (2026-03-08)
 
@@ -133,7 +133,7 @@ Deviation from unfiltered baseline, measured as mean absolute pixel difference a
 | Control | — | 4.9 | 15.5 | 0.318 | 3.2× better |
 | Background (center) | — | 0.0 | 0.0 | N/A | Both preserve fovea |
 
-**Key finding**: The full Scrutinizer pipeline preserves salient content 5–10× better than eccentricity-matched Gaussian blur. This is not a tuning difference — Gaussian blur has no saliency signal, so it cannot modulate degradation by content importance.
+The full Scrutinizer pipeline preserves salient content 5.6–10.8× better than eccentricity-matched Gaussian blur. Gaussian blur has no saliency signal, so it cannot modulate degradation by content importance. *(Correction 2026-10-01: the control region, which has no saliency signal, already shows 3.2×, so the Gaussian condition deviated more from baseline overall and was not matched in total information loss (item 1 under "What 'Matched' Means"). Only the excess over the control, salient ratio ÷ control ratio ≈ 1.8–3.4×, can be attributed to saliency gating.)*
 
 The control region also shows a 3.2× advantage, which is expected: the control region sits in the periphery where mode 0's V1 distortion and chromatic pooling produce less total deviation than Gaussian's uniform MIP blur at the same eccentricity. The control advantage is smaller than the high-saliency advantage, confirming the saliency gating is doing differential work.
 
@@ -146,7 +146,7 @@ Direct DoG-vs-Gaussian pixel comparison (not deviation from baseline):
 | Face center | 107.7 |
 | Background | 111.5 |
 
-Both show large deltas, confirming the two pipelines produce visibly different output. The face delta is slightly smaller than background, suggesting the DoG pipeline preserved more face structure — but without a baseline this is not a clean protection metric.
+Both show large deltas, confirming the two pipelines produce visibly different output. The face delta is slightly smaller than background, suggesting the DoG pipeline preserved more face structure. Without a baseline, this is not a clean protection metric.
 
 ### Validation checks (all PASS)
 
@@ -158,7 +158,7 @@ Both show large deltas, confirming the two pipelines produce visibly different o
 
 ## arxiv Integration
 
-Integrated into `scrutinizer-system-paper.tex` at lines 244–265 (Section 4.4, after Table 5). The LaTeX below is the published version.
+Integrated into `scrutinizer-system-paper.tex` at lines 244–265 (Section 4.4, after Table 5). The LaTeX below is the published version. *(Note 2026-10-01: superseded. The current paper text is Section 3.1, "Gaussian Blur Comparison" (Table 4), in `docs/arxiv-paper/scrutinizer-system-paper.tex`. It no longer contains the paragraphs below the table, including the spatial-frequency equivalence paragraph.)*
 
 ```latex
 \textbf{Gaussian comparison.} A matched eccentricity-scaled Gaussian blur
@@ -207,20 +207,20 @@ pipeline stages that Gaussian blur lacks entirely.
 ### Paper integration status
 
 - [x] Table 5 + text inserted after saliency protection discussion (lines 244–265)
-- [x] Abstract softened — differentiation framed as pipeline architecture, not DoG bands alone
+- [x] Abstract softened: the differentiation claim moved from DoG bands to the pipeline architecture as a whole
 - [x] Introduction claim ("uniformly destroying spatial structure") now empirically supported (5–10×)
 - [x] Open Problems notes DoG/Gaussian spatial-frequency equivalence as characterized limitation
 
 ### Remaining work
-- [ ] **Oriented DoG comparison** — v2.2's radial-tangential anisotropy and cardinal edge bonus need a Gaussian comparison capture run. This is the strongest structural differentiator: Gaussian blur is isotropic by definition.
+- [ ] **Oriented DoG comparison:** v2.2's radial-tangential anisotropy and cardinal edge bonus need a Gaussian comparison capture run. This is the strongest structural differentiator: Gaussian blur is isotropic by definition.
 - [ ] Chromatic comparison reframing (DoG+chromatic pooling produces differential RG/YV decay; Gaussian does not)
 - [ ] Visual figure: side-by-side DoG vs Gaussian on popout stimulus
 
 ## Failure Modes
 
-- If the MIP chain's discrete bands make DoG effectively Gaussian between band boundaries, the difference may be smaller than claimed — **CONFIRMED on spatial frequency stimuli**
+- If the MIP chain's discrete bands make DoG effectively Gaussian between band boundaries, the difference may be smaller than claimed. **CONFIRMED on spatial frequency stimuli.**
 - If "matched total information loss" is hard to define, the comparison becomes apples-to-oranges
-- If Gaussian with eccentricity-scaled radius already produces decent frequency selectivity (large Gaussian kernels naturally attenuate high frequencies more), the difference may be one of degree rather than kind — **CONFIRMED: both use MIP chain, so both are inherently Gaussian**
+- If Gaussian with eccentricity-scaled radius already produces decent frequency selectivity (large Gaussian kernels naturally attenuate high frequencies more), the difference may be only a matter of degree. **CONFIRMED: both use MIP chain, so both are inherently Gaussian.**
 - The multi-dimensional comparison avoids these failure modes because saliency gating, chromatic separation, density-gated crowding, and orientation selectivity (v2.2) are architectural features that Gaussian blur lacks by design
 
 ## References
@@ -229,4 +229,4 @@ pipeline stages that Gaussian blur lacks entirely.
 - Geisler, W.S. & Perry, J.S. (1998). A real-time foveated multiresolution system for low-bandwidth video communication. *SPIE Human Vision*.
 - Itti, L., Koch, C. & Niebur, E. (1998). A model of saliency-based visual attention. *IEEE Trans PAMI*, 20(11), 1254-1259.
 - Toet, A. & Levi, D.M. (1992). The two-dimensional shape of spatial interaction zones in the parafovea. *Vision Research*, 32(7), 1349-1357.
-- `scrutinizer-system-paper.tex` Section 4.4 (saliency comparison, Table 5) and Section 5 (open problems)
+- `scrutinizer-system-paper.tex` Section 3.1 (Gaussian Blur Comparison, Table 4)

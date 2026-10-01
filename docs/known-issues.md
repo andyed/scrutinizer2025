@@ -1,11 +1,12 @@
 # Known Issues
 
+> **Status (2026-10-01):** Last revised for v1.4.2 (2025-12-15) and not re-verified against v2.x. The popup section predates the WebContentsView migration (commit `3b553c9`, 2025-11-23), which replaced the `<webview>` tag and removed `docs/webcontentsview-migration.md`. The `--debug-saliency` / `--debug-structure` flags no longer exist; the debug views are now Simulation → Utility → Show Structure Map / Show Saliency Map.
+
 ## 🛑 Critical Issues
 *   **Saliency Map Persistence (Google -> YouTube)**:
     *   **Symptoms**: Saliency map may fail to re-initialize when navigating from Google Search Results to a YouTube video.
     *   **Status**: Partially Mitigated (Force-Scan added), but race condition persists in this specific Single-Page App (SPA) flow.
     *   **Workaround**: Reloading the page restores the map.
- - Scrutinizer v1.0
 
 ## Popup Windows Don't Inherit Foveal Effect
 
@@ -48,7 +49,7 @@ The `<webview>` tag creates a separate process for each window, making state syn
 **Effort to fix now**: High (complex race condition handling, still fragile)  
 **Effort after WebContentsView**: Low (direct state control)
 
-See `docs/webcontentsview-migration.md` for full migration plan.
+The migration plan (`docs/webcontentsview-migration.md`) was removed when the migration landed in commit `3b553c9`.
 
 ### Workaround for Users
 
@@ -62,8 +63,6 @@ See `docs/webcontentsview-migration.md` for full migration plan.
 
 - `main.js` - Creates new windows and sends init state
 - `renderer/app.js` - Receives init state and applies settings
-- `ROADMAP.md` - Popup Handling section
-- `docs/webcontentsview-migration.md` - v2.0 architecture plan
 
 ---
 
@@ -83,16 +82,16 @@ See `docs/webcontentsview-migration.md` for full migration plan.
     - Foveal Distortion
     - Visual Memory / Inhibition of Return
     - LGN Gating
-    - **Reason**: This ensures developers see the ground-truth data entering the pipeline, rather than the processed simulation state.
+    - **Reason**: Developers see the ground-truth data as it enters the pipeline.
 
 ---
 
 ## 4. Resolved Issues (v1.2+)
 
 ### Fixed in v1.2
-- **Native Select Dropdown Tracking**: Resolved misalignment issues with native HTML `<select>` dropdowns. The polling fallback system now correctly accounts for window offsets and zoom levels, ensuring the foveal bubble tracks the mouse accurately even when the OS intercepts events.
-- **Peripheral Movie Artifacts**: ADDRESSED via **Pixel Saliency Map**. The new high-performance saliency system (running in a background Web Worker) now detects high-saliency content (like moving faces in video) and modulates the peripheral distortion to prevent distracting "breathing" artifacts.
-- **Saliency Map Oscillation**: Fixed a conflict where the legacy structure-based saliency generation was fighting with the new pixel-based system. The application now uses the Saliency Worker exclusively.
+- **Native Select Dropdown Tracking**: Resolved misalignment issues with native HTML `<select>` dropdowns. The polling fallback system now correctly accounts for window offsets and zoom levels, so the foveal bubble tracks the mouse accurately even when the OS intercepts events.
+- **Peripheral Movie Artifacts**: ADDRESSED via **Pixel Saliency Map**. The new saliency system (running in a background Web Worker) now detects high-saliency content (like moving faces in video) and modulates the peripheral distortion to prevent distracting "breathing" artifacts.
+- **Saliency Map Oscillation**: Fixed a conflict where the legacy structure-based saliency generation conflicted with the new pixel-based system. The application now uses the Saliency Worker exclusively.
 
 
 ---
@@ -107,10 +106,6 @@ See `docs/webcontentsview-migration.md` for full migration plan.
     - [x] Fix crash on launch (Syntax Error)
     - [ ] Verify calibration flow (User Testing) - **PAUSED (See Known Issues)**
     - [ ] Confirm PostHog data capture - **Ready for Validation**
-- [x] Verify Implementation <!-- id: 3 -->
-    - [x] Check visual correctness.
-    - [x] Verify functionality (Browser flow active).
-- [x] Refine Content <!-- id: 7 -->
 - **Status**: Improved but still laggy in Electron compared to browser.
 
 ### UI State Initialization
@@ -126,7 +121,7 @@ See `docs/webcontentsview-migration.md` for full migration plan.
 
 ### Calibration Display Scaling
 - **Issue**: On certain window sizes and aspect ratios (particularly on desktop), the calibration screen visuals may not perfectly fill the entire viewport, leaving small gaps or borders at the edges.
-- **Cause**: The calibration tool uses a smart resolution capping system to maintain performance (target ~2MP logic resolution). While the canvas is stretched via CSS to fill the screen (`width: 100%; height: 100%`), slight aspect ratio mismatches between the logical resolution and the physical viewport can occur.
+- **Cause**: The calibration tool caps its resolution to maintain performance (target ~2MP logic resolution). While the canvas is stretched via CSS to fill the screen (`width: 100%; height: 100%`), slight aspect ratio mismatches between the logical resolution and the physical viewport can occur.
 - **Impact**: Aesthetic only. The calibration functionality and accuracy are unaffected.
 - **Workaround**: Resizing the window slightly or using browser zoom often resolves the gaps.
 
@@ -139,7 +134,7 @@ See `docs/webcontentsview-migration.md` for full migration plan.
 ### Debug View "Holes"
 - **Issue**: Structure map debug view showed "holes" that moved with the mouse.
 - **Cause**: The debug view was visualizing the *processed* LGN signal (which includes Inhibition of Return) and mixing with Visual Memory (trails).
-- **Fix**: Debug shader now strictly samples the **Raw Structure Map** and disables Visual Memory, ensuring a consistent, improved verification tool.
+- **Fix**: Debug shader now strictly samples the **Raw Structure Map** and disables Visual Memory, so the debug view shows the raw map consistently.
 
 ### Red Saliency Map
 - **Issue**: Saliency debug view was solid red.

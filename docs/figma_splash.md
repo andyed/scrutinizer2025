@@ -2,23 +2,23 @@ Built on the latest in the cognitive science of vision, Scrutinizer Pro uses a r
 
 🧠 Core Value Proposition: Test Visual Reality (The "Why")
 
-Scrutinizer Pro is not a simple filter—it is a real-time simulation powered by a custom WebGL Fragment Shader. We model the physiological constraints of the retina to help you optimize how humans navigate your design.
+Scrutinizer Pro is a real-time simulation powered by a custom WebGL fragment shader. We simulate constraints of the retina and visual cortex to help you optimize how humans navigate your design.
 
 1. Optimize Visual Trajectories (Saccadic Planning)
 
-Did you know the blur in the periphery dictates the effort of every eye jump?
+Peripheral vision has low resolution and is prone to crowding, so finding an element away from the point of gaze often takes several fixations.
 
-The Consequence: OBJECTS CROWD, SPACING IS NOT OPTIONAL. Due to low acuity (Box Sampling) and positional uncertainty (Domain Warping), peripheral elements become distorted and hard to target. This forces users into slow, corrective eye movements.
+Spacing matters because objects crowd. Acuity falls with eccentricity (simulated with box sampling). Crowding is a separate limit: closely spaced peripheral elements jumble together (simulated as positional uncertainty with domain warping). Crowded elements are hard to identify, so users need more fixations to find them.
 
-The Fix: Use the Foveal Pointer to simulate a fixation point and confirm that your grouping and whitespace provide enough perceptual separation to allow the eye to land accurately.
+Use the Foveal Pointer to simulate a fixation point and confirm that your grouping and whitespace provide enough perceptual separation to allow the eye to land accurately.
 
 2. Ensure Structural Hierarchy (Luminance Contrast)
 
-Did you know the entire color spectrum is useless for guiding the eye in certain conditions?
+Color guides visual search, but chromatic sensitivity falls off in the periphery, red-green faster than blue-yellow (Mullen & Kingdom, 2002).
 
-The Consequence: HIERARCHY MUST BE STRUCTURAL. If your design relies on color, peripheral vision may not be able to discriminate and scan paths will be impaired.
+Hierarchy therefore has to be structural. If your design relies on color, peripheral vision may not be able to discriminate and scan paths will be impaired.
 
-The Fix: Simulate the reduced color perception and view your design in a luminance-mostly world. Ensure your CTAs and visual hierarchy are maintained purely by contrast and size.
+Simulate the reduced color perception and view your design in a luminance-mostly world. Ensure your CTAs and visual hierarchy are maintained purely by contrast and size.
 
 ⚙️ Key Plugin Features & Controls (The "How")
 
@@ -26,7 +26,7 @@ Scrutinizer gives you developer-grade controls to fine-tune your analysis:
 
 Real-Time Simulation (60fps): Apply the full visual model to any frame or element at 60 frames per second for immediate, interactive feedback.
 
-Intuitive Controls: Adjust Fovea Size and Peripheral Blur intensity (Low, Medium, High) to model different user groups and visual needs, directly from the plugin toolbar .
+Intuitive Controls: Adjust Fovea Size and Peripheral Blur intensity (Low, Medium, High) directly from the plugin toolbar.
 
 Exportable Artifacts: Use the "Save to Canvas" feature to instantly bake the current simulated view into a new Figma frame. Perfect for design critiques, documentation, and handover to engineering.
 

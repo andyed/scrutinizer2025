@@ -10,7 +10,7 @@ Dependencies: DoG band decomposition (v1.6, implemented), V1 crowding pipeline (
 
 ### The Isotropic Assumption
 
-The current DoG band decomposition in `peripheral.frag:92-143` treats all orientations equally — each band's weight is a single scalar rolloff based on eccentricity:
+The current DoG band decomposition in `peripheral.frag:92-143` treats all orientations equally. Each band's weight is a single scalar rolloff based on eccentricity:
 
 ```glsl
 float w0 = 1.0 - smoothstep(c0 - c0*transMult, c0 + c0*transMult, normEcc);
@@ -18,17 +18,17 @@ float w1 = 1.0 - smoothstep(c1 - c1*transMult, c1 + c1*transMult, normEcc);
 // ... same function, same cutoffs, regardless of edge orientation
 ```
 
-This means a **horizontal text stroke** (H/V-aligned, informationally dense) loses fidelity at the same eccentricity as **diagonal noise** (oblique, informationally sparse). That's biologically wrong.
+This means a **horizontal text stroke** (H/V-aligned, informationally dense) loses fidelity at the same eccentricity as **diagonal noise** (oblique, informationally sparse).
 
 ### Biological Reality: Orientation Selectivity
 
-V1 simple cells are orientation-tuned (Hubel & Wiesel, 1962). Key facts:
+V1 simple cells are orientation-tuned (Hubel & Wiesel, 1962).
 
 1. **The Oblique Effect** (Appelle, 1972): Humans have ~30-50% better acuity for cardinal (H/V) orientations than oblique (45/135°). This is measurable even in contrast sensitivity functions (Campbell et al., 1966).
 
 2. **Cortical Magnification Anisotropy**: More cortical area is devoted to cardinal orientations (Furmanski & Engel, 2000). Cardinal-tuned neurons are more numerous and have smaller receptive fields.
 
-3. **Crowding Asymmetry**: The V1 distortion code already models horizontal crowding asymmetry — `fractalWarp.x *= 2.0` at `peripheral.frag:401`. But the V4 DoG pooling path doesn't match. A horizontal word boundary that survives V1 distortion gets isotropically blurred in V4, negating the asymmetry.
+3. **Crowding Asymmetry**: The V1 distortion code already models horizontal crowding asymmetry (`fractalWarp.x *= 2.0` at `peripheral.frag:401`). But the V4-stage DoG pooling path doesn't match. A horizontal word boundary that survives V1 distortion gets isotropically blurred in the V4 stage, negating the asymmetry.
 
 4. **Radial-Tangential Anisotropy** (Toet & Levi, 1992): Crowding is stronger for flankers arranged along the radial axis (toward/away from fovea) than the tangential axis. Content aligned tangentially to the fovea persists further into the periphery.
 
@@ -60,7 +60,7 @@ V1 simple cells are orientation-tuned (Hubel & Wiesel, 1962). Key facts:
 
 ## 3. Tiered Implementation
 
-### Phase 0: Current Baseline (v1.6) — No Changes
+### Phase 0: Current Baseline (v1.6, No Changes)
 
 Isotropic DoG as implemented. Serves as comparison target.
 
@@ -181,17 +181,17 @@ vec4 sampleDoGOriented(vec2 uv, float eccentricity, float fovea_radius,
 }
 ```
 
-**Key design decisions**:
+**Design decisions**:
 - **MIP level 1 for gradient**: Level 0 is noisy (individual pixels). Level 1 averages 2x2 blocks, giving stroke-level orientation without aliasing artifacts.
 - **Luminance-only gradient**: Color gradients (e.g. red→green) shouldn't trigger orientation bonus. Only luminance edges (structural) matter.
-- **Double-angle trick**: `cos(2θ)` maps both 0° and 90° to the same value (1.0), and 45°/135° to 0.0. This avoids needing to distinguish H from V — both get the same bonus.
-- **Gradient magnitude gate**: Critical. Without this, flat regions (sky, backgrounds) would get random orientation from noise and receive undeserved bonuses.
+- **Double-angle trick**: `cos(2θ)` maps both 0° and 90° to the same value (1.0), and 45°/135° to 0.0. This avoids needing to distinguish H from V. Both get the same bonus.
+- **Gradient magnitude gate**: Without this, flat regions (sky, backgrounds) would get random orientation from noise and receive undeserved bonuses.
 
 ---
 
-### Phase 2: 4-Orientation Channels (V1 Simple Cell Model)
+### Phase 2: 4-Orientation Channels (approximating V1 orientation selectivity)
 
-**Goal**: Distinguish H, V, and two diagonal orientations independently. This enables asymmetric treatment: H edges (text lines) can get a stronger bonus than V edges (column borders).
+**Goal**: Distinguish H, V, and two diagonal orientations independently. Asymmetric treatment then becomes possible: H edges (text lines) can get a stronger bonus than V edges (column borders).
 
 ```glsl
 // Replace the single cos2theta with 4-channel energy decomposition.
@@ -222,7 +222,7 @@ float boost = 1.0 + orientBonus * mix(0.5, 0.1, float(k) / 7.0);
 // ... (same cascade)
 ```
 
-**Why this matters**: Text-heavy pages have predominantly horizontal edges (text baselines, ascender/descender lines). Phase 2 keeps the 4-channel decomposition for debug visualization and future asymmetric H/V weighting, matching the asymmetric crowding data (Pelli et al., 2007).
+**Relevance to text**: Text-heavy pages have predominantly horizontal edges (text baselines, ascender/descender lines). Phase 2 keeps the 4-channel decomposition for debug visualization and future asymmetric H/V weighting, matching the asymmetric crowding data (Pelli et al., 2007).
 
 ---
 
@@ -260,16 +260,16 @@ float c0 = c0_base * boost0 * radialBias;
 // ... same for c1, c2, c3
 ```
 
-**Key considerations**:
+**Considerations**:
 - `radialDir` can be computed in `main()` and passed in, since `u_mouse` and `uv` are already available.
-- The radial bias is multiplicative with the orientation bonus, not additive. A tangential H edge gets both the cardinal bonus AND the tangential bonus.
+- The radial bias is multiplicative with the orientation bonus. A tangential H edge gets both the cardinal bonus AND the tangential bonus.
 - `u_dog_radial_bias` defaults to 0.0 (off) to allow incremental validation.
 
 ---
 
 ### Eccentricity-Dependent Fade
 
-The oblique effect diminishes with retinal eccentricity — fine spatial frequencies lose the cardinal advantage by ~10° (Berkley, Kitterle & Watkins 1975), while coarse frequencies retain it to ~25° (Essock 1990). The implementation applies a per-band fade:
+The oblique effect diminishes with retinal eccentricity: fine spatial frequencies lose the cardinal advantage by ~10° (Berkley, Kitterle & Watkins 1975), while coarse frequencies retain it to at least 40° (Pointer 1996). The implementation applies a per-band fade, ending the coarse-band fade at 25° as a conservative estimate:
 
 ```glsl
 // Convert pixel eccentricity to visual degrees
@@ -293,7 +293,7 @@ for (int k = 0; k < 8; k++) {
 }
 ```
 
-Without this fade, the orient bonus would apply uniformly from fovea to far periphery — biologically wrong and visually distracting at high eccentricities where the visual system has no orientation selectivity to speak of.
+Without this fade, the orient bonus would apply uniformly from fovea to far periphery, which is biologically wrong and visually distracting at high eccentricities, where the cardinal advantage has faded for fine spatial frequencies.
 
 ---
 
@@ -306,7 +306,7 @@ Without this fade, the orient bonus would apply uniformly from fovea to far peri
 | `u_dog_radial_bias` | float | 0.0 | 0.0-1.0 | Radial-tangential anisotropy strength (Phase 3, 0=off) |
 
 **Design rationale**:
-- `u_dog_oriented` as a float (not bool) allows smooth transition between isotropic and oriented modes during A/B testing.
+- `u_dog_oriented` as a float allows smooth transition between isotropic and oriented modes during A/B testing.
 - `u_dog_orient_bias` at 1.0 gives ~50% cutoff extension for cardinal edges, matching psychophysical data. Values >1.0 exaggerate the effect for presentation/demonstration.
 - All three default to off/neutral to preserve backward compatibility.
 
@@ -329,7 +329,7 @@ vec4 sampleDoGOriented(vec2 uv, float eccentricity, float fovea_radius,
                         float orient_enabled, float orient_bias);
 ```
 
-When `orient_enabled ≈ 0.0`, `orientBonus` is zero and all cutoff boosts are 1.0 — the function produces identical output to the current `sampleDoGReconstructed`. This means the replacement is safe even before modes.json is updated.
+When `orient_enabled ≈ 0.0`, `orientBonus` is zero and all cutoff boosts are 1.0, so the function produces identical output to the current `sampleDoGReconstructed`. This means the replacement is safe even before modes.json is updated.
 
 ### 5.2 `renderer/webgl-renderer.js`
 
@@ -391,7 +391,7 @@ Add to `highkey` and `biological` pipeline blocks:
 | Delta | — | +0.2ms | +0.05ms | +0.05ms |
 | FPS impact (60fps budget) | — | -1.2% | -0.3% | -0.3% |
 
-The 4 extra MIP-1 lookups dominate cost. MIP level 1 texels are 4x smaller than level 0, so cache behavior is excellent. The ALU overhead is negligible on modern GPUs (shader-bound at the texture unit, not ALU).
+The 4 extra MIP-1 lookups dominate cost. MIP level 1 texels are 4x smaller than level 0, so cache behavior is excellent. The ALU overhead is negligible on modern GPUs (the shader is bound by the texture unit).
 
 ---
 
@@ -514,24 +514,24 @@ The gradient computation and orientation classification can be tested independen
 
 ## 9. References
 
-1. **Hubel, D. H. & Wiesel, T. N.** (1962). Receptive fields, binocular interaction and functional architecture in the cat's visual cortex. *Journal of Physiology*, 160(1), 106-154. — V1 orientation selectivity.
+1. **Hubel, D. H. & Wiesel, T. N.** (1962). Receptive fields, binocular interaction and functional architecture in the cat's visual cortex. *Journal of Physiology*, 160(1), 106-154. V1 orientation selectivity.
 
-2. **Appelle, S.** (1972). Perception and discrimination as a function of stimulus orientation: the "oblique effect" in man and animals. *Psychological Bulletin*, 78(4), 266-278. — Cardinal superiority in acuity.
+2. **Appelle, S.** (1972). Perception and discrimination as a function of stimulus orientation: the "oblique effect" in man and animals. *Psychological Bulletin*, 78(4), 266-278. Cardinal superiority in acuity.
 
-3. **Campbell, F. W., Kulikowski, J. J. & Levinson, J.** (1966). The effect of orientation on the visual resolution of gratings. *Journal of Physiology*, 187(2), 427-436. — Orientation-dependent contrast sensitivity.
+3. **Campbell, F. W., Kulikowski, J. J. & Levinson, J.** (1966). The effect of orientation on the visual resolution of gratings. *Journal of Physiology*, 187(2), 427-436. Orientation-dependent contrast sensitivity.
 
-4. **Furmanski, C. S. & Engel, S. A.** (2000). An oblique effect in human primary visual cortex. *Nature Neuroscience*, 3(6), 535-536. — fMRI evidence for cardinal overrepresentation in V1.
+4. **Furmanski, C. S. & Engel, S. A.** (2000). An oblique effect in human primary visual cortex. *Nature Neuroscience*, 3(6), 535-536. fMRI evidence for cardinal overrepresentation in V1.
 
-5. **Toet, A. & Levi, D. M.** (1992). The two-dimensional shape of spatial interaction zones in the parafovea. *Vision Research*, 32(7), 1349-1357. — Radial-tangential crowding asymmetry.
+5. **Toet, A. & Levi, D. M.** (1992). The two-dimensional shape of spatial interaction zones in the parafovea. *Vision Research*, 32(7), 1349-1357. Radial-tangential crowding asymmetry.
 
-6. **Pelli, D. G., Tillman, K. A., Freeman, J., Su, M., Berger, T. D., & Majaj, N. J.** (2007). Crowding and eccentricity determine reading rate. *Journal of Vision*, 7(2), 20. — Crowding destroys letter recognition in periphery.
+6. **Pelli, D. G., Tillman, K. A., Freeman, J., Su, M., Berger, T. D., & Majaj, N. J.** (2007). Crowding and eccentricity determine reading rate. *Journal of Vision*, 7(2), 20. Crowding destroys letter recognition in periphery.
 
-7. **Rosenholtz, R., Huang, J. & Ehinger, K. A.** (2012). Rethinking the role of top-down attention in vision: effects attributable to a lossy representation in peripheral vision. *Frontiers in Psychology*, 3, 13. — Pooling model of peripheral vision.
+7. **Rosenholtz, R., Huang, J. & Ehinger, K. A.** (2012). Rethinking the role of top-down attention in vision: effects attributable to a lossy representation in peripheral vision. *Frontiers in Psychology*, 3, 13. Pooling model of peripheral vision.
 
-8. **Freeman, J. & Simoncelli, E. P.** (2011). Metamers of the ventral stream. *Nature Neuroscience*, 14(9), 1195-1201. — Texture synthesis based on pooled statistics.
+8. **Freeman, J. & Simoncelli, E. P.** (2011). Metamers of the ventral stream. *Nature Neuroscience*, 14(9), 1195-1201. Texture synthesis based on pooled statistics.
 
-9. **Greenwood, J. A., Szinte, M., Sayim, B. & Cavanagh, P.** (2017). Variations in crowding, saccadic precision, and spatial localization reveal the shared topology of spatial vision. *PNAS*, 114(17), E3573-E3582. — Unified crowding model linking radial/tangential anisotropy to cortical architecture.
+9. **Greenwood, J. A., Szinte, M., Sayim, B. & Cavanagh, P.** (2017). Variations in crowding, saccadic precision, and spatial localization reveal the shared topology of spatial vision. *PNAS*, 114(17), E3573-E3582. Unified crowding model linking radial/tangential anisotropy to cortical architecture.
 
-10. **Berkley, M. A., Kitterle, F. & Watkins, D. W.** (1975). Grating visibility as a function of orientation and retinal eccentricity. *Vision Research*, 15(2), 239-244. — Oblique effect diminishes with eccentricity; fine gratings lose cardinal advantage by ~10°.
+10. **Berkley, M. A., Kitterle, F. & Watkins, D. W.** (1975). Grating visibility as a function of orientation and retinal eccentricity. *Vision Research*, 15(2), 239-244. Oblique effect diminishes with eccentricity; fine gratings lose cardinal advantage by ~10°.
 
-11. **Essock, E. A.** (1990). The influence of stimulus length on the oblique effect of contrast sensitivity. *Vision Research*, 30(8), 1243-1246. — Coarse spatial frequencies retain cardinal advantage to higher eccentricities (~25–40°).
+11. **Pointer, J. S.** (1996). Evidence of a global oblique effect in human extrafoveal vision. *Perception*, 25(5), 523-530. doi:10.1068/p250523. Low and medium spatial frequencies retain a cardinal advantage to at least 40°. (Earlier versions cited Essock (1990), a study of stimulus length, for this finding.)

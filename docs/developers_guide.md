@@ -3,20 +3,20 @@
 This guide outlines the process for implementing and testing new peripheral vision models (visual transforms) in Scrutinizer.
 
 > [!TIP]
-> **Extensibility by Design**: Scrutinizer's pipeline is intentionally modular. Aesthetic modes are not just visual filters—they are **functional test cases** that validate the architecture. If you need to "hack" the shader to achieve a look, that hack often reveals a missing capability that should become an official feature.
+> **Extensibility by Design**: Scrutinizer's pipeline is intentionally modular. Aesthetic modes also serve as **functional test cases** that validate the architecture. If you need to "hack" the shader to achieve a look, that hack often reveals a missing capability that should become an official feature.
 
 ## Architecture Overview
 
-Scrutinizer uses a custom WebGL renderer (`webgl-renderer.js`) to apply fragment shaders to captured browser content. The core logic resides in the fragment shader's `main` function, which determines how pixels are processed based on their distance from the fovea (mouse cursor).
+Scrutinizer uses a custom WebGL renderer (`webgl-renderer.js`) to apply fragment shaders to captured browser content. The core logic is in the fragment shader's `main` function, which determines how pixels are processed based on their distance from the fovea (mouse cursor).
 
 ### Key Components
 
 1.  **`webgl-renderer.js`**: The main WebGL class. Loads shaders from `renderer/shaders/` and handles uniform binding.
-2.  **`scrutinizer.js`**: The **Pipeline Orchestrator** — a thin controller (~535 lines) that wires together the extracted domain modules (see below) and manages the render loop.
-3.  **`gaze-model.js`**: **Oculomotor System Proxy** — velocity tracking, fixation detection, saccadic suppression, hysteresis smoothing.
-4.  **`visual-memory.js`**: **Visuospatial Working Memory** — fixation buffer, mask rendering, memory decay.
-5.  **`content-analysis.js`**: **Pre-Cortical Feature Extraction** — structure map scanning, saliency computation, DOM observation.
-6.  **`menu-template.js`**: Defines the critical application menu, including simulation settings.
+2.  **`scrutinizer.js`**: The **Pipeline Orchestrator**, a controller that wires together the extracted domain modules (see below) and manages the render loop.
+3.  **`gaze-model.js`**: **Oculomotor System Proxy** (velocity tracking, fixation detection, saccadic suppression, hysteresis smoothing).
+4.  **`visual-memory.js`**: **Visuospatial Working Memory Proxy** (fixation buffer, mask rendering, memory decay).
+5.  **`content-analysis.js`**: **Pre-Cortical Feature Extraction Proxy** (structure map scanning, saliency computation, DOM observation).
+6.  **`menu-template.js`**: Defines the application menu, including simulation settings.
 7.  **`docs/architecture-module-pattern.md`**: **CRITICAL** - Explains the hybrid CommonJS/Window module pattern used to prevent `ReferenceError`s. Read this before refactoring any class files.
 8.  **`docs/coordinate_systems.md`**: **CRITICAL** - Explains the complex mapping between Screen, Window, WebGL, and SVG coordinate spaces. Read this if overlays are drifting or jumping.
 
@@ -26,17 +26,17 @@ Scrutinizer uses a custom WebGL renderer (`webgl-renderer.js`) to apply fragment
 
 ```
 overlay.js
-  └─→ scrutinizer.js (Pipeline Orchestrator, ~535 lines)
-        ├─→ gaze-model.js (Oculomotor System, ~166 lines)
+  └─→ scrutinizer.js (Pipeline Orchestrator, ~1,400 lines)
+        ├─→ gaze-model.js (Oculomotor System proxy, ~166 lines)
         │     └── Tracks mouse/gaze velocity, fixation vs saccade state
         │     └── Swappable: mouse proxy → eye tracker (Tobii, WebGazer)
         │
-        ├─→ visual-memory.js (Visuospatial Sketchpad, ~254 lines)
+        ├─→ visual-memory.js (Visuospatial Sketchpad proxy, ~254 lines)
         │     └── Records fixation locations with dwell-time gating
         │     └── Renders soft mask texture (u_maskTexture) for distortion bypass
         │     └── Time-decay & inhibition of return
         │
-        ├─→ content-analysis.js (Pre-Cortical Feature Extraction, ~356 lines)
+        ├─→ content-analysis.js (Pre-Cortical Feature Extraction proxy, ~356 lines)
         │     ├── structure-map.js → DOM scanning → u_structureMap
         │     ├── gestalt-processor.js → Proximity/similarity grouping
         │     └── color-saliency-map.js → Chromatic attention → u_saliencyMap
@@ -46,14 +46,14 @@ overlay.js
 ```
 
 **Design principles:**
-- Each module maps to a distinct biological subsystem (oculomotor, working memory, pre-cortical)
-- Modules communicate via the orchestrator, not directly with each other
+- Each module is a proxy for a distinct biological subsystem (oculomotor, working memory, pre-cortical)
+- Modules communicate only via the orchestrator
 - `scrutinizer.js` exposes backward-compatible property proxies (e.g., `this.velocity` delegates to `this.gazeModel.velocity`) so existing callers (`overlay.js`, test harnesses) don't need changes
-- Each module is independently testable — see `tests/unit/` for 258 tests across 11 suites
+- Each module is independently testable (see `tests/unit/` and [Unit Tests (Jest)](#unit-tests-jest))
 
-**Swapping a module:** To replace the gaze input (e.g., eye tracker instead of mouse), implement the same interface as `GazeModel` (`update(mouseX, mouseY, timestamp)`, `getPosition()`, `getVelocity()`, `isSaccade()`) and inject it in the orchestrator constructor.
+**Swapping a module:** To replace the gaze input (e.g., eye tracker instead of mouse), implement the same interface as `GazeModel` (`handleMouseMove(event)`, `update(now)` returning `{ isSaccading }`, `getPosition()`, `getVelocity()`, `getVelocityComponents()`, `getScale()`) and construct it where the orchestrator constructor selects the gaze model. `ScanpathPlayer` (`renderer/scanpath-player.js`) is the existing drop-in replacement, used to replay imported eye-tracking data.
 
-### 4. Visual Memory & Input Layers
+### Visual Memory & Input Layers
 Scrutinizer now supports a **Visual Memory** system. This uses a secondary texture (`u_maskTexture`) to represent areas the user has "fixated" on, which bypass distortion.
 
 **Lesson Learned (The "Blue Tint" Incident):**
@@ -65,14 +65,14 @@ Implement a dedicated **Input Normalization** stage at the very beginning of the
 *   **Coordinate Correction**: Flip Y-axis if needed.
 *   **Range Normalization**: Ensure all inputs are 0.0-1.0.
 
-This ensures that the LGN, V1, and V4 stages operate on **ideal, platform-agnostic data**. If we switch capture methods or engines later, we only update the Normalization Layer, not the visual effects.
+With normalization done first, the LGN, V1, and V4 stages operate on **ideal, platform-agnostic data**. If we switch capture methods or engines later, we only update the Normalization Layer.
 
-3.  **Debug Visualization Principles**:
-    *   **NO Foveation**: Debug views should *never* exhibit foveal distortion or blur. The background must be the clean, undistorted source image (`sampleSource`).
-    *   **Raw Data Only**: Debug overlays (Saliency, Structure) must visualize the **Raw Input Texture**, bypassing all LGN gating, inhibition, and visual memory logic.
-    *   **Goal**: The debug view answers "What does the scanner see?", not "What does the user perceive?".
+### Debug Visualization Principles
+*   **NO Foveation**: Debug views should *never* exhibit foveal distortion or blur. The background must be the clean, undistorted source image (`sampleSource`).
+*   **Raw Data Only**: Debug overlays (Saliency, Structure) must visualize the **Raw Input Texture**, bypassing all LGN gating, inhibition, and visual memory logic.
+*   **Goal**: The debug view shows the scanner's raw output. It does not show what the user perceives.
 
-### 5. Dual Mouse Listening Strategy
+### Dual Mouse Listening Strategy
 **Problem**:
 Relying solely on DOM `mousemove` events fails when the cursor hovers over native UI elements (like `<select>` dropdowns), system menus, or when the main thread is blocked. This causes the fovea to "stick" or disappear.
 
@@ -92,9 +92,9 @@ We implement a **Dual Strategy** in `main.js`:
     *   **Cons**: Lower fidelity, requires manual coordinate mapping.
     *   **Critical Detail**: When calculating Y-coordinate, we MUST subtract the `TOOLBAR_HEIGHT` (40px) because the visual overlay's origin is offset from the window's content origin.
 
-### 6. HUD Display Layer Stack (v1.4.2)
+### HUD Display Layer Stack (v1.4.2)
 
-The HUD overlay window (`overlay.html`) uses a z-indexed layer stack for rendering. Understanding this is critical when adding new overlays:
+The HUD overlay window (`overlay.html`) uses a z-indexed layer stack for rendering:
 
 | Layer | Element | z-index | Purpose |
 | :--- | :--- | :---: | :--- |
@@ -102,7 +102,7 @@ The HUD overlay window (`overlay.html`) uses a z-indexed layer stack for renderi
 | **Debug SVG** | `#debug-overlay` | 101 | Vector overlays (fovea ring, radial grid) |
 | **Annotations** | `#structure-annotations` | 102 | DOM text labels (lineHeight annotations) |
 
-**Key Points:**
+**Layer behavior:**
 - All layers are `position: fixed` and `pointer-events: none`
 - Canvas is set to `display: none` initially (enabled by Scrutinizer)
 - SVG overlay is managed by `svg-overlay.js` (Group Translation pattern)
@@ -116,7 +116,7 @@ The HUD overlay window (`overlay.html`) uses a z-indexed layer stack for renderi
 ## Neuro-Architecture Pipeline
 
 
-The shader uses a modular architecture inspired by the human visual system to organize visual effects. While we use biological terms (LGN, V1, V4) as convenient labels for the pipeline stages, this is a **software architecture pattern**, not a rigorous biological simulation.
+The shader uses a modular architecture inspired by the human visual system to organize visual effects. While we use biological terms (LGN, V1, V4) as convenient labels for the pipeline stages, this is a **software architecture pattern**. It is not a rigorous biological simulation.
 
 ### The Pipeline Stages
 
@@ -129,29 +129,29 @@ The shader uses a modular architecture inspired by the human visual system to or
 2.  **Stage 2: V1 (Geometry & Distortion)**
     *   **Role**: The "Feature Extractor". Handles geometric displacement.
     *   **Function**: `processV1`
-    *   **Logic**: Determines *how* the image is warped. It uses the signal from the LGN to apply displacement.
+    *   **Logic**: Determines *how* the image is warped. It uses the signal from the LGN stage to apply displacement.
     *   **Types**:
         *   **Noise (0)**: Fluid, continuous distortion with animation. Used by Drunken Reading mode.
         *   **Shatter (1)**: Slow wave distortion (legacy "Mongrel Approximation"). Used by default modes.
         *   **None (2)**: No geometric change. Used by Blueprint mode.
-        *   **Pixelate (3)**: CMF-driven block quantization. Used by Minecraft/Wireframe.
+        *   **Pixelate (3)**: CMF-driven block quantization. Used by Minecraft.
 
 3.  **Stage 3: V4 (Aesthetics & Style)**
     *   **Role**: The "Interpreter". Handles color, pooling, and stylistic rendering.
     *   **Function**: `processV4`
     *   **Logic**: Determines *what* the final pixel looks like. Includes peripheral spatial filtering and aesthetic processing.
     *   **Key Feature (v1.4)**: Hardware MIP-map sampling simulates biological receptive field growth.
-    *   **Key Feature (v1.6)**: **DoG Band Decomposition** — decomposes MIP chain into approximate Laplacian pyramid bands (box/bilinear, not true Gaussian) with per-band M-scaling rolloff. Preserves low-frequency structure (layout, buttons) while filtering high-frequency detail (serifs, fine textures). Gated by `dog_enabled` uniform. See `foveated-vision-model.md` Section 5.1.
+    *   **Key Feature (v1.6)**: **DoG Band Decomposition**: decomposes the MIP chain into approximate Laplacian pyramid bands (box/bilinear filtering instead of a true Gaussian) with per-band M-scaling rolloff. Preserves low-frequency structure (layout, buttons) while filtering high-frequency detail (serifs, fine textures). Gated by `dog_enabled` uniform. See `foveated-vision-model.md` Section 5.1.
     *   **Examples**: High-Key ghosting, Neon colors, Wireframe overlays.
 
 ### Philosophy: Aesthetic Modes as Test Cases
-In Scrutinizer, an "Aesthetic Mode" is not just a visual filter—it is a **functional test case** for the modularity of the pipeline. We encourage keeping "Work In Progress" (WIP) or experimental modes in the codebase because they often reveal missing architectural features.
+In Scrutinizer, each "Aesthetic Mode" also serves as a **functional test case** for the modularity of the pipeline. We encourage keeping "Work In Progress" (WIP) or experimental modes in the codebase because they often reveal missing architectural features.
 
-*   **Drunken Reading (Mode 5)** is a test for **Stream Integration**. By bypassing LGN gating (`lgn_use_structure_mask = false`), it proves the pipeline can handle raw, ungated input without breaking.
-*   **Blueprint (Mode 3)** is a test for **Edge Detection**. It forces V1 to use pixelated UVs (`Type 3`) and tests if V4 can run a Sobel filter on that distorted coordinate space.
-*   **Minecraft (Mode 4)** is a test for **CMF Block Sizing**. Blocks sized to MIP level at each eccentricity (4-64px) with channel-independent neighbor averaging in Oklab. Demonstrates customizing the baseline — same CMF math, visible as block geometry.
+*   **Drunken Reading (Mode 5)** is a test for **Stream Integration**. By bypassing LGN gating (`lgn_use_structure_mask = false`), it tests whether the pipeline handles raw, ungated input without breaking.
+*   **Blueprint (Mode 3)** is a test for **Structure-Map Decoding**. It forces V1 off (`Type 2`, no distortion) and tests whether the V4 stage can decode ARIA role IDs from the structure map's alpha channel and edge-detect the map into role-colored bounding boxes.
+*   **Minecraft (Mode 4)** is a test for **CMF Block Sizing**. Blocks sized to MIP level at each eccentricity (4-64px) with channel-independent neighbor averaging in Oklab. Demonstrates customizing the baseline: the same CMF math, made visible as block geometry.
 
-**Guideline:** If you need to "hack" the shader to achieve a specific look, **do it**. If the hack persists, it likely means the V1 or V4 stage needs a new official capability (like a new `distortion_type` or `uniform`). Use the mode to drive the architecture, not the other way around.
+**Guideline:** If you need to "hack" the shader to achieve a specific look, **do it**. If the hack persists, it likely means the V1 or V4 stage needs a new official capability (like a new `distortion_type` or `uniform`).
 
 ### Adding a New Aesthetic Mode
 
@@ -159,12 +159,12 @@ Modes are now defined declaratively in `shared/modes.json`. This eliminates magi
 
 #### Step 1: Define the Mode in `modes.json`
 
-Add a new entry to the `modes` object:
+Add a new entry to the `modes` object. Pick an `id` and a `v4_style_id` that `modes.json` and `peripheral.frag` do not already use:
 
 ```json
 {
     "my_new_mode": {
-        "id": 6,
+        "id": 21,
         "label": "My New Mode",
         "shortLabel": "NewMode",
         "category": "research",
@@ -176,7 +176,7 @@ Add a new entry to the `modes` object:
             "v1_distortion_type": 0,
             "v1_strength_mult": 2.0,
             "v1_animate": false,
-            "v4_style_id": 6,
+            "v4_style_id": 9,
             "dog_enabled": false,
             "dog_e2": 2.5,
             "dog_sharpness": 0.0
@@ -197,7 +197,7 @@ Add a new entry to the `modes` object:
 {
     label: 'My New Mode',
     type: 'radio',
-    click: () => sendToOverlays('menu:set-aesthetic-mode', 6)
+    click: () => sendToOverlays('menu:set-aesthetic-mode', 21)
 }
 ```
 
@@ -206,7 +206,7 @@ Add a new entry to the `modes` object:
 Add rendering logic in the `processV4` function:
 
 ```glsl
-} else if (config.v4_style_id == 6) { // My New Mode
+} else if (config.v4_style_id == 9) { // My New Mode
     // Custom style logic
     vec3 tint = vec3(1.0, 0.5, 0.0); // Orange
     return mix(col, tint, effectFactor);
@@ -215,7 +215,7 @@ Add rendering logic in the `processV4` function:
 
 #### Mode Registry Reference
 
-The full mode registry lives in `shared/modes.json` and includes:
+The full mode registry is in `shared/modes.json` and includes:
 - **Pipeline configuration** (LGN, V1, V4 parameters)
 - **Test cases** (what architectural capability this mode validates)
 - **Citation metadata** (academic references embedded in exports)
@@ -249,25 +249,23 @@ The following table details the rendering characteristics of each built-in mode 
 
 **Problem**: The 3-5° parafovea should preserve geometric cues and luminance contrast (magnocellular pathway), but applying the same distortion strength as the far periphery (>8°) destroys underlines, contrast, and low-frequency features.
 
-**Solution**: In `processV1`, distortion strength is scaled by visual eccentricity:
+**Solution**: In `processV1`, distortion strength is a continuous function of eccentricity in degrees (`corticalStrength`), with no zone boundaries. Here `fovea_radius` serves as the pixels-per-degree converter:
 
 ```glsl
-// Parafovea (3-5°): 85% reduction in strength
-// Far Periphery (>8°): Full strength
-float eccentricityScale = isFarPeriphery ? 1.0 : 0.15;
+float ecc_deg = max(0.0, dist) / max(fovea_radius, 0.001);
+float ecc_max = u_cortical_max > 0.1
+    ? u_cmf_a * (exp(u_cortical_max) - 1.0)  // derived from viewport extent
+    : 25.0;
+float corticalStrength = clamp(ecc_deg / ecc_max, 0.0, 1.0);
+// Quadratic onset keeps displacement near zero at the fovea
+float eccentricityScale = corticalStrength * corticalStrength * ecc_max * 0.4;
 float strength = lgn.suppressionFactor * config.v1_strength_mult * eccentricityScale;
 ```
 
 **Tuning for Research**:
-- eccentricityScale ramps from 0.0 (inner parafovea, at 1.5× fovea_radius) to 0.15 (outer parafovea boundary) via smoothstep, then 0.15→1.0 into far periphery
-- The 0.15 ceiling controls maximum parafoveal distortion — lower values preserve more geometry but reduce crowding simulation; higher values increase distortion but may destroy critical cues like underlines
-- MIP pooling blend completes at 0.5× fovea_radius past the fovea edge (~75px) — adjust to control how quickly the sharp foveal sample fades
-
-Additionally, jitter amplitude is reduced in parafovea to prevent dissolution of linear features:
-
-```glsl
-float baseJitter = isParafovea ? 0.008 : 0.04; // 5x reduction
-```
+- The 0.4 coefficient sets far-periphery strength. It was calibrated against the earlier zone-based profile (about 3.7 at 15° with `ecc_max` ≈ 24°, where the zone-based version gave 4.0).
+- Block modes (`v4_style_id` 4 and 8) fix `eccentricityScale` at 1.0.
+- The V4 fovea-to-pooled blend (`ecc.masterT` in `processV4`) completes at 4× `fovea_radius` past the fovea edge. Adjust it to control how quickly the sharp foveal sample fades.
 
 **Second Pass Softening (v1.2)**:
 The "Shatter" mode now uses a **Slow Wave** distortion (0.1Hz sine wave) instead of random jitter to reduce motion sickness.
@@ -286,22 +284,22 @@ vec4 pooled = textureLod(u_texture, uv, mipLevel);
 ```
 
 **Benefits over previous blur approach:**
-- True spatial averaging (not weighted samples)
+- True spatial averaging (the previous blur used weighted samples)
 - Hardware-accelerated (~0.1ms vs ~0.5ms)
-- Biologically accurate receptive field doubling per MIP level
+- Pooling footprint doubles per MIP level (box-filtered), a coarse model of receptive-field growth with eccentricity
 
-**DoG Band Decomposition (v1.6, replaces simple MIP in research modes)**:
-The simple MIP approach uniformly blurs all spatial frequencies together. The DoG upgrade decomposes the same hardware MIP chain into an approximate Laplacian pyramid (hardware mipmaps use box/bilinear filtering, not Gaussian convolution, so band isolation has some spectral leakage) and attenuates each frequency band independently based on eccentricity (M-scaling). This preserves low-frequency structure (buttons, layout blocks) while filtering high-frequency detail (serifs, thin strokes).
+**DoG Band Decomposition (introduced in v1.6 with 8 bands; 12 bands since v2.5)**:
+The simple MIP approach uniformly blurs all spatial frequencies together. The DoG upgrade decomposes the same hardware MIP chain into an approximate Laplacian pyramid (hardware mipmaps use box/bilinear filtering instead of Gaussian convolution, so band isolation has some spectral leakage) and attenuates each frequency band independently based on eccentricity (M-scaling). This preserves low-frequency structure (buttons, layout blocks) while filtering high-frequency detail (serifs, thin strokes).
 
 ```glsl
-// 8 half-octave DoG bands from 9 MIP levels (LOD 0.0 to 4.0 in 0.5 steps)
-vec4 band[8];
-band[0] = mip[0] - mip[1];  // ~5.66 cpd: serifs
-band[1] = mip[1] - mip[2];  // ~4.0 cpd:  thin strokes
-// ... band[2] through band[7] at √2-spaced frequencies down to 0.5 cpd
+// 12 half-octave DoG bands from 13 MIP levels (LOD 0.0 to 6.0 in 0.5 steps)
+vec4 band[12];
+band[0]  = mip[0]  - mip[1];   // ~5.66 cpd: serifs
+band[1]  = mip[1]  - mip[2];   // ~4.0 cpd:  thin strokes
+// ... band[2] through band[11] at √2-spaced frequencies down to ~0.125 cpd
 // Per-band smoothstep rolloff: cutoff_k = E2 × (2^(k/2) - 1)
-result = mip[8]; // residual (DC, always preserved)
-for (int k = 0; k < 8; k++) { result += band[k] * w[k]; }
+result = mip[12]; // residual (~0.088 cpd, always preserved)
+for (int k = 0; k < 12; k++) { result += band[k] * w[k]; }
 ```
 
 Controlled by three `modes.json` fields: `dog_enabled`, `dog_e2`, `dog_sharpness`. See `foveated-vision-model.md` Section 5.1 for full details.
@@ -319,9 +317,10 @@ gl.generateMipmap(gl.TEXTURE_2D);
 **Magnocellular Contrast Preservation**: In `processV4`, luminance contrast is boosted to simulate the M-cell pathway:
 
 ```glsl
-// 60% in parafovea, 30% in far periphery
-float contrastPreservation = dist < 1.35 * fovea_radius ? 0.6 : 0.3;
-col *= mix(1.0, lumaRatio, contrastPreservation);
+// t = ecc.masterT (0 at the fovea edge, 1 at 4x fovea_radius beyond it)
+float cp_inner = (u_compute_tier >= 3.0) ? 0.3 : 0.6;
+float contrastPreservation = mix(cp_inner, 0.1, t);
+col *= mix(1.0, lumaRatio, contrastPreservation * t);
 ```
 
 ### Performance Optimizations
@@ -332,18 +331,18 @@ col *= mix(1.0, lumaRatio, contrastPreservation);
 **Solution**: We implement **Saccadic Suppression** in `scrutinizer.js`.
 *   **Mechanism**: We track mouse velocity via `GazeModel`. If `velocity > 2.5 px/ms`, we skip the entire `processFrame()` render cycle.
 *   **Exception**: When **Saccadic Blindness** is enabled (menu toggle), the performance skip is bypassed so the shader can render the fovea-shrink effect at high velocities.
-*   **Result**: The system remains responsive during movement. The foveal image may briefly pause (simulating biological saccadic masking), but the critical "fixation" moment is processed instantly.
+*   **Result**: The system remains responsive during movement. The foveal image may briefly pause (simulating biological saccadic masking), but the "fixation" moment is processed instantly.
 
-#### 1b. Saccadic Blindness (v1.9 — Shader Feature)
-**Problem**: The performance skip above produces a frozen frame during fast movement, but doesn't simulate the biological reality: during a saccade, foveal processing is actively suppressed.
+#### 1b. Saccadic Blindness (v1.9, Shader Feature)
+**Problem**: The performance skip above produces a frozen frame during fast movement. It does not simulate what happens during a saccade, when foveal processing is actively suppressed.
 
-**Solution**: The shader shrinks `fovea_radius` and `parafovea_radius` proportionally to velocity via `smoothstep(4.0, 10.0, u_velocity)`. At 10+ px/ms, the fovea collapses to near-zero — the entire viewport renders as periphery.
-*   **Menu**: Simulation → Saccadic Blindness (checkbox, off by default)
-*   **Files**: `peripheral.frag`, `peripheral.frag` (uniform + fovea shrink), `webgl-renderer.js` (uniform binding), `scrutinizer.js` (`toggleSaccadicBlindness()` + suppression bypass)
-*   **Limitation**: Mouse velocity is a noisy proxy for saccadic state. Real saccades are ballistic (200-500°/s, 30-80ms). The velocity thresholds are tuned for visual effect, not biological fidelity.
+**Solution**: The shader shrinks `fovea_radius` and `parafovea_radius` proportionally to velocity via `smoothstep(4.0, 10.0, u_velocity)`. At 10+ px/ms, the fovea collapses to near-zero and the entire viewport renders as periphery.
+*   **Menu**: Simulation → Saccadic Blindness (checkbox, on by default since v2.4.0)
+*   **Files**: `peripheral.frag` (uniform + fovea shrink), `webgl-renderer.js` (uniform binding), `scrutinizer.js` (`toggleSaccadicBlindness()` + suppression bypass)
+*   **Limitation**: Mouse velocity is a noisy proxy for saccadic state. Real saccades are ballistic (200-500°/s, 30-80ms). The velocity thresholds are tuned for visual effect.
 
 #### 1c. Velocity-Gated Metamer Freeze (v2.3.1)
-**Problem**: The WebGPU compute metamer (Tier 2.5) resynthesizes oriented noise every 2nd frame. The noise is spatially deterministic (`hash21(px)`), but synthesis depends on gaze position — when gaze shifts, tile eccentricities change, producing a visibly different peripheral texture. During slow mouse movement this creates shimmer in the frequency band the peripheral magnocellular pathway detects (high temporal, low spatial). The tool generates false peripheral salience.
+**Problem**: The WebGPU compute metamer (Tier 2.5) resynthesizes oriented noise every 2nd frame. The noise is spatially deterministic (`hash21(px)`), but synthesis depends on gaze position. When gaze shifts, tile eccentricities change, producing a visibly different peripheral texture. During slow mouse movement this creates shimmer in the frequency band the peripheral magnocellular pathway detects (high temporal, low spatial). The tool generates false peripheral salience.
 
 **Biology**: During fixation and smooth pursuit, the peripheral representation is **stable**. During saccades, visual processing is **suppressed** and the representation is rebuilt at landing (Sperry 1950, Burr 1994).
 
@@ -351,7 +350,7 @@ col *= mix(1.0, lumaRatio, contrastPreservation);
 *   **Saccade landing detection**: Velocity crosses above `saccadicSuppressionThreshold` (2.5 px/ms) then drops below → `saccadeLanded = true` → resynthesize.
 *   **Drift safety valve**: If gaze moves > 2× `fovealRadius` from last synthesis position, force resynthesis regardless of velocity. Handles sustained smooth pursuit that slowly accumulates displacement.
 *   **First frame**: Always synthesize on initialization (`_metamerInitialized` flag).
-*   **During fixation/pursuit**: Compute dispatch is skipped entirely — the last synthesized texture persists in TEXTURE5. The fragment shader's eccentricity ramp continues blending it smoothly.
+*   **During fixation/pursuit**: Compute dispatch is skipped entirely, and the last synthesized texture persists in TEXTURE5. The fragment shader's eccentricity ramp continues blending it smoothly.
 
 **State fields** (initialized in constructor):
 ```javascript
@@ -361,11 +360,11 @@ this._lastSynthGazeX = 0;          // half-res gaze at last synthesis
 this._lastSynthGazeY = 0;
 ```
 
-**Performance benefit**: Compute dispatch drops from every-2nd-frame to only on saccade landing or drift exceeded — measurable GPU reduction during reading/browsing. The `shouldCompute()` frame-skip in `webgpu-crowding-compute.js` remains as a secondary pacing gate (both conditions are `&&`-conjoined on the dispatch line). The saccade-landing flag is cleared *inside* the dispatch block so it persists across frame-skip frames.
+**Performance benefit**: Compute dispatch drops from every-2nd-frame to only on saccade landing or drift exceeded, a measurable GPU reduction during reading/browsing. The `shouldCompute()` frame-skip in `webgpu-crowding-compute.js` remains as a secondary pacing gate (both conditions are `&&`-conjoined on the dispatch line). The saccade-landing flag is cleared *inside* the dispatch block so it persists across frame-skip frames.
 
-**Saccade tracking and early return**: The `_metamerSaccading` flag is set *above* the saccadic suppression early return in `processFrame()`, so it tracks velocity even when the rest of the frame is skipped. This ensures saccade landing is detected on the first frame after velocity drops.
+**Saccade tracking and early return**: The `_metamerSaccading` flag is set *above* the saccadic suppression early return in `processFrame()`, so it tracks velocity even when the rest of the frame is skipped. As a result, saccade landing is detected on the first frame after velocity drops.
 
-**Why no cross-dissolve**: The fragment shader already blends the compute texture with a smooth eccentricity ramp. The foveal region always shows original source; the compute texture only appears in the periphery where change detection is poor. Hard swap during saccade landing is invisible (saccadic suppression). Hard swap from drift exceeded happens after sustained pursuit — the boundary texture is low-resolution enough that the swap is below perceptual threshold.
+**Why no cross-dissolve**: The fragment shader already blends the compute texture with a smooth eccentricity ramp. The foveal region always shows original source; the compute texture only appears in the periphery where change detection is poor. Hard swap during saccade landing is invisible (saccadic suppression). Hard swap from drift exceeded happens after sustained pursuit, and the boundary texture is low-resolution enough that the swap is below perceptual threshold.
 
 #### 2. Web Worker Saliency
 **Problem**: Computing saliency maps (pixel-by-pixel color analysis) on the main thread blocks the UI, causing stutter even during slow movements.
@@ -404,13 +403,13 @@ const scaledBox = {
 
 **Reuse Opportunity**: If other features (e.g., text detection, logo detection) need higher resolution, they can share the 640px canvas created for face detection.
 
-### 4. UI Protection (Scrollbars)
+### UI Protection (Scrollbars)
 **Problem**: Applying heavy geometric distortion (like the "Shatter" or "Drunken Reading" modes) to the entire window renders the native scrollbar unusable, as the user cannot accurately target the thumb or track.
 
 **Solution**: The shader pipeline includes a hard **Scrollbar Override** controlled by the `u_scrollbarWidth` uniform (default: 20px).
 
 *   **Logic**: This check occurs at the very end of the fragment shader. If `pixel_x > window_width - scrollbar_width`, we force the output to be the clean, undistorted source image (`sampleSource`).
-*   **Robustness**: This overrides ALL other effects (LGN inhibition, V1 distortion, V4 styling, Visual Memory).
+*   **Precedence**: This overrides ALL other effects (LGN inhibition, V1 distortion, V4 styling, Visual Memory).
 *   **Uniforms**:
     *   `u_scrollbarWidth`: Float, pixel width from right edge (configurable in `scrutinizer.js`).
 
@@ -422,19 +421,19 @@ We plan to abstract the "Peripheral Model" into a pluggable system where shaders
 
 ## Working with Texture-Based Pipelines
 
-Scrutinizer provides auxiliary texture maps that encode semantic and perceptual information about the content. These textures can be sampled in your shader to create content-aware effects.
+Scrutinizer provides auxiliary texture maps that hold semantic and perceptual information about the content. These textures can be sampled in your shader to create content-aware effects.
 
 ### Available Texture Uniforms
 
 #### 1. Structure Map (`u_structureMap`)
 
-**Purpose**: Encodes layout semantics (rhythm, mass, element type) for content-aware distortion.
+**Purpose**: Holds layout semantics (rhythm, mass, element type) for content-aware distortion.
 
 **RGBA Channels:**
 - **Red**: `lineHeight / 100.0` - Vertical rhythm of text
 - **Green**: `density (0.0-1.0)` - Visual weight (font weight, image brightness)
 - **Blue**: `semantics` - Element type: Text (1.0), Image (0.5), UI (0.0)
-- **Alpha**: `1.0` for content, `0.0` for whitespace
+- **Alpha**: `ariaRole / 12.0` - ARIA role ID (0–12) of the block; `0.0` in whitespace (decoded by Blueprint mode)
 
 **Usage Example:**
 ```glsl
@@ -454,12 +453,14 @@ float warpStrength = mass * 5.0;
 
 **Source**: Generated by `DomAdapter` (web) or `FigmaAdapter` (Figma plugin) via structure map pipeline.
 
-#### 2. Saliency Map (`u_saliencyMap`) - *Coming Soon*
+#### 2. Saliency Map (`u_saliencyMap`)
 
-**Purpose**: Bottom-up attention map for clutter-driven distortion and creative effects.
+**Purpose**: Bottom-up attention map for clutter-driven distortion and creative effects. Computed in `renderer/saliency-worker.js`.
 
-**Channel:**
-- **Red**: `saliency (0.0-1.0)` - High = distinctive features, Low = visual clutter
+**RGB Channels:**
+- **Red**: `saliency (0.0-1.0)` - High = distinctive features
+- **Green**: Feature Congestion (local variance; high = clutter)
+- **Blue**: Edge density
 
 **Usage Example:**
 ```glsl
@@ -479,7 +480,7 @@ vec3 spotlight = col + glowColor * saliency * 0.3;
 
 **Dual Purpose:**
 1. **Design Tool**: Visual emphasis layer for designers and researchers
-2. **Core Simulation**: Biophysical accuracy (attention-driven distortion)
+2. **Core Simulation**: Saliency-gated (attention-driven) distortion
 
 ### Best Practices for Texture Sampling
 
@@ -535,7 +536,7 @@ When developing new models that use these textures:
 3. **Test both web and Figma** to ensure unified pipeline works
 4. **Consider performance** - texture lookups are fast, but avoid redundancy
 
-See `ROADMAP.md` for upcoming saliency map integration details.
+See `ROADMAP.md` for the saliency pipeline's version history and planned work.
 
 ---
 
@@ -628,7 +629,7 @@ xcrun notarytool log "YOUR_SUBMISSION_ID" --keychain-profile "YourNotaryProfile"
 
 ## Testing
 
-Scrutinizer includes an automated visual smoke test to ensure the renderer is functioning correctly and producing expected visual output.
+Scrutinizer includes an automated visual smoke test that checks whether the renderer is functioning correctly and producing expected visual output.
 
 ### Automated Visual Suite (Golden Images)
 For reliable regression testing, we use a dedicated suite that spawns isolated Electron instances:
@@ -637,9 +638,9 @@ For reliable regression testing, we use a dedicated suite that spawns isolated E
 npm run capture-golden
 ```
 
-This generates 19 screenshots across 5 reference pages (`dashboard`, `article`, `ecommerce`, `techmeme`, `grid`) in `tests/golden-captures/vX.X.X/`.
+This captures every task in `CAPTURE_TASKS` (`scripts/capture-golden.js`) to `tests/golden-captures/vX.X.X/`. The core reference pages are `dashboard`, `article`, `ecommerce`, `techmeme` and `grid`; the task list also covers stimulus pages (`color-spectrum`, `crowding`, `crowding-stimulus`). `dashboard`, `article` and `techmeme` run the `DEBUG_VARIANTS` list (mode 0, modes 12/14/15, saliency, structure, congestion overlay and solo) plus the iPhone 14 and iPad Air variants. `--all-modes` adds every rendering mode on `dashboard` and `article`. Each task's `variants` list in the script is authoritative.
 
-**Capture matrix (v1.6):**
+**Capture matrix (v1.6, the original core set):**
 
 | Page | Standard | Saliency | Structure | iPhone 14 | iPad Air |
 |------|----------|----------|-----------|-----------|----------|
@@ -716,7 +717,7 @@ node scripts/capture-fullpage-gazeplot.js --data=/path/to/AdSERP/data --trial=p0
 
 **Output:** `output/adserp-fullpage-gazeplots/{trialId}_fullpage_gazeplot.png`
 
-**Batch vs standard mode:** Standard mode dwells at each fixation long enough for the velocity-based fixation detector to register it (~500ms+ per fixation). Batch mode bypasses the detector entirely — it writes fixation coordinates directly into `vm.buffer` and sets `vm.maskDirty = true`, triggering a single render pass. For a trial with 50 fixations, standard takes ~30s; batch takes ~5s.
+**Batch vs standard mode:** Standard mode dwells at each fixation long enough for the velocity-based fixation detector to register it (~500ms+ per fixation). Batch mode bypasses the detector entirely. It writes fixation coordinates directly into `vm.buffer` and sets `vm.maskDirty = true`, triggering a single render pass. For a trial with 50 fixations, standard takes ~30s; batch takes ~5s.
 
 **Coordinate pipeline:**
 
@@ -738,7 +739,7 @@ stitching: 2× DPR tiles → 1× canvas, crop to documentHeight
 
 ### Saliency & Congestion Export CLI
 
-Export per-coordinate saliency and Rosenholtz feature congestion values from Scrutinizer's vision pipeline — without Electron or GPU. Reuses `congestion-core.js` (Oklab DoG + local variance) directly in Node.js.
+Export per-coordinate saliency and Rosenholtz feature congestion values from Scrutinizer's vision pipeline, without Electron or a GPU. Reuses `congestion-core.js` (Oklab DoG + local variance) directly in Node.js.
 
 ```bash
 # Single image with coordinate file
@@ -781,25 +782,31 @@ npm run capture-smoke           # Incremental — skips unchanged shots (<1s)
 npm run capture-smoke -- --force  # Full recapture (~40s)
 ```
 
-6 shots across 3 Electron batches covering the critical paths:
+12 shots (the `SMOKE_SPECS` list in `scripts/capture-smoke.js`):
 
 | Shot | What it tests |
 |------|---------------|
-| `smoke_dashboard_mode0` | Basic render — does the pipeline produce output? |
-| `smoke_dashboard_mode6` | Mode switch — does switching to Log-Polar MIP work? (triggers variance validation) |
-| `smoke_dashboard_saliency` | Saliency debug — does the saliency map toggle work? |
-| `smoke_dashboard_mode12` | Isotropic cortical sampling — does FOVI grid render? (V1 type 5, 50 rings) |
-| `smoke_article_scrolled` | Scroll — does capturing at scrollY=600 work? |
-| `smoke_article_topleft` | Off-center fixation — does gaze positioning at (0.2, 0.2) work? |
+| `smoke_dashboard_mode0` | Basic render: does the pipeline produce output? |
+| `smoke_dashboard_mode6` | Mode switch: does switching to Log-Polar MIP work? (triggers variance validation) |
+| `smoke_dashboard_saliency` | Saliency debug: does the saliency map toggle work? |
+| `smoke_dashboard_mode10` | Tier 2.5 compute texture synthesis (mode 10) renders |
+| `smoke_dashboard_mode14` | Pyramid Mongrel (mode 14, Tier 2.75) renders |
+| `smoke_dashboard_mode12` | Isotropic cortical sampling: does FOVI grid render? (V1 type 5, 50 rings) |
+| `smoke_dashboard_mode15` | TTM Cortical Pooling (mode 15, Tier 3 research) renders |
+| `smoke_noise_mode12` | Radially uniform noise at the default mode 12; `validate-radial-profile.js` asserts a monotonic decline |
+| `smoke_flatgray_mode12` | Flat gray field at mode 12; peripheral-injection check (RC-2.6) |
+| `smoke_article_scrolled` | Scroll: does capturing at scrollY=600 work? |
+| `smoke_article_topleft` | Off-center fixation: does gaze positioning at (0.2, 0.2) work? |
+| `smoke_gray_chromatic` | Mode 0 with chromatic pooling on a gray field; checks for color shift on an achromatic surface |
 
-Uses local `file://` reference pages — no network dependency. Output in `tests/smoke-captures/` (gitignored). If all 6 pass, the Electron → WebGL → capture → PNG pipeline is intact.
+Uses local `file://` reference pages, so there is no network dependency. Output in `tests/smoke-captures/` (gitignored). If all 12 pass, the Electron → WebGL → capture → PNG pipeline is intact.
 
 ### Manual Testing
-To run the standard smoke test:
+To run the visual smoke test:
 ```bash
-npm test
+npm run test:visual
 ```
-This executes the `tests/visual-test.html` logic in a headless mode.
+This runs the `tests/visual-test.html` logic in a hidden, offscreen Electron window. `npm test` runs the unit, visual, memory and integration suites in sequence.
 
 ### Generating Screenshots
 To automatically generate screenshots of every test case (useful for visual regression testing or documentation):
@@ -821,20 +828,23 @@ SCREENSHOT_MODE=update SAVE_SCREENSHOTS=true npm test
 To run full app integration tests (e.g., loading external sites):
 
 ```bash
-# Test loading Figma.com, capturing modes 0 (Default) and 3 (Blueprint)
-TEST_URL=https://www.figma.com TEST_MODES=0,3 npm start
+# Test loading Figma.com, capturing modes 0 (High-Key) and 3 (Blueprint)
+TEST_MODE=true TEST_URL=https://www.figma.com TEST_MODES=0,3 npm start
 ```
 
+The `TEST_*` variables are read only when `TEST_MODE=true` (`npm run test:integration` sets it).
+
 **Parameters:**
-- `TEST_URL`: The URL to load (Required)
+- `TEST_URL`: The URL to load (defaults to `tests/visual-test.html`)
 - `TEST_MODES`: Comma-separated list of modes to capture:
   - `0`: High-Key Ghosting
-  - `1`: Lab Mode
+  - `1`: Biological (Purkinje Darkening)
   - `2`: Frosted Glass
   - `3`: Blueprint
   - `4`: Minecraft (Block Pooling)
-  - `5`: Trippy (Psychedelic + Curvy)
-  - `disabled`: Effects off — captures raw page content from the content view (not the HUD). Equivalent to the eye icon toggle. Useful for unfiltered baseline screenshots.
+  - `5`: Drunken Reading (Trippy)
+  - any other numeric mode `id` from `shared/modes.json` (the app's default mode is 12, FOVI Cortical Grid; `TEST_MODES` itself defaults to `0`)
+  - `disabled`: Effects off. Captures raw page content from the content view instead of the HUD. Equivalent to the eye icon toggle. Useful for unfiltered baseline screenshots.
   - `saliency`: Saliency debug heatmap
   - `structure`: Structure map debug overlay
   - `congestion_overlay`: Feature Congestion overlay
@@ -844,23 +854,21 @@ TEST_URL=https://www.figma.com TEST_MODES=0,3 npm start
 - `TEST_MOBILE_EMULATION`: Device profile name (`iphone_14_pro`, `ipad_air_landscape`, etc.) or `true`/`false`
 - `SCREENSHOT_MODE`: `date` (default) or `update`
 
-**Custom Launch:**
-You can also use these parameters to launch the app in a specific state without running the test loop:
-```bash
-TEST_URL=https://google.com TEST_RADIUS=50 npm start
-```
+A plain `npm start` ignores these variables, so they cannot set the launch state outside test mode.
 
-**Debug Flags:**
-You can force debug overlays from the command line:
-- `--debug-saliency`: Shows the Saliency Heatmap (Blue->Red)
-- `--debug-structure`: Shows the Structure Map (Red/Green Density)
+**Debug Views:**
+Toggle the debug overlays from the **Simulation** menu:
+- **Show Saliency Map** (`Ctrl+Shift+S`): the Saliency Heatmap (Blue->Red)
+- **Show Structure Map** (`Ctrl+Shift+D`): the Structure Map (Red/Green Density)
+
+In test mode, capture them with `TEST_MODES`:
 
 ```bash
-# Launch with Saliency Map Debug
-npm start -- --debug-saliency
+# Capture the Saliency Map debug view
+TEST_MODE=true TEST_URL=https://example.com TEST_MODES=saliency npm start
 
-# Launch with Structure Map Debug
-npm start -- --debug-structure
+# Capture the Structure Map debug view
+TEST_MODE=true TEST_URL=https://example.com TEST_MODES=structure npm start
 ```
 
 
@@ -869,8 +877,8 @@ npm start -- --debug-structure
 The test suite performs the following checks:
 
 1.  **Basic Visibility**: Verifies that the renderer produces non-black pixels (i.e., the shader is compiling and drawing).
-2.  **Distortion Application**: Verifies that changing the `intensity` parameter significantly alters the rendered image (ensures effects are being applied).
-3.  **Motion Responsiveness**: Verifies that moving the mouse position significantly alters the rendered image (ensures the fovea is tracking).
+2.  **Distortion Application**: Verifies that changing the `intensity` parameter significantly alters the rendered image (checks that effects are being applied).
+3.  **Motion Responsiveness**: Verifies that moving the mouse position significantly alters the rendered image (checks that the fovea is tracking).
 
 ### Adding New Visual Tests
 
@@ -887,27 +895,27 @@ npm run test:unit          # Run all unit tests
 npx jest tests/unit/visual-memory.test.js  # Run a specific suite
 ```
 
-15 test suites covering core renderer logic. Tests run in Node (`testEnvironment: "node"`) with minimal DOM mocks — no jsdom dependency.
+`tests/unit/` holds 40 suites (789 tests as of 2026-10-01). The table lists the suites for the renderer and vision-model logic; the rest cover study sessions, capture, DOM primitive classification, input gating, menus, release checks, the Mind2Web pipeline and other app logic. Tests run in Node (`testEnvironment: "node"`) with minimal DOM mocks and no jsdom dependency. Several vision-model suites test a JS reference implementation that mirrors shader code, since Jest cannot run GLSL or WGSL.
 
 | Suite | Module | Tests | What it covers |
 |-------|--------|-------|----------------|
 | `visual-memory.test.js` | `renderer/visual-memory.js` | 25 | Fixation detection, FIFO eviction, infinite mode, bulk-load (batch gazeplot), merge-on-proximity, mask rendering, inhibition-of-return, resize |
 | `config.test.js` | `renderer/config.js` | — | Default settings, calibration URL |
-| `cortical-strength.test.js` | `renderer/cortical-strength.js` | — | Eccentricity-to-strength mapping |
-| `oriented-dog.test.js` | `renderer/oriented-dog.js` | — | Oriented DoG filter coefficients |
-| `isotropic-sectors.test.js` | `renderer/isotropic-sectors.js` | — | V1 sector assignment |
-| `pyramid-decompose.test.js` | `renderer/pyramid-decompose.js` | — | Laplacian pyramid math |
+| `cortical-strength.test.js` | JS mirror of `processV1` eccentricity scaling (`peripheral.frag`) | — | Eccentricity-to-strength mapping |
+| `oriented-dog.test.js` | JS mirror of `peripheral.frag` + `shared/modes.json` | — | Oriented DoG filter coefficients |
+| `isotropic-sectors.test.js` | JS reference of the cortical sector math + `shared/modes.json` | — | V1 sector assignment |
+| `pyramid-decompose.test.js` | JS reference vs pyrtools data (`tests/validation/pyramid-reference/`); mirrors `pyramid-decompose.wgsl` | — | Laplacian pyramid math |
 | `oklab-utils.test.js` | `renderer/oklab-utils.js` | — | sRGB↔Oklab color conversion |
-| `stimulus-domain.test.js` | `renderer/stimulus-domain.js` | — | Stimulus domain detection |
+| `stimulus-domain.test.js` | `shared/modes.json` parameters | — | Transfer gap between lab-stimulus parameters and screen/UI content |
 | `color-saliency-map.test.js` | `renderer/color-saliency-map.js` | — | Chromatic saliency computation |
-| `mip-fidelity.test.js` | `renderer/mip-fidelity.js` | — | MIP chain fidelity metrics |
-| `cmf-lod.test.js` | `renderer/cmf-lod.js` | — | Color matching function LOD |
+| `mip-fidelity.test.js` | JS mirror of `peripheral.frag` + `shared/modes.json` | — | DoG band reconstruction vs MIP sampling fidelity |
+| `cmf-lod.test.js` | JS mirror of `computeMipLevel` (`peripheral.frag`) | — | Cortical magnification factor (CMF) → MIP level mapping |
 | `gestalt-processor.test.js` | `renderer/gestalt-processor.js` | — | Gestalt grouping |
-| `pyramid-sector-assignment.test.js` | `renderer/pyramid-sector-assignment.js` | — | Pyramid↔sector mapping |
-| `validation-regression.test.js` | Various | — | Cross-module regression checks |
+| `pyramid-sector-assignment.test.js` | JS replica of `_computeSectorLayout` (`renderer/webgpu-pyramid-compute.js`) | — | Pyramid↔sector mapping |
+| `validation-regression.test.js` | `shared/modes.json` + Bowers chromatic data | — | Regression against the psychophysical validation results |
 | `logger.test.js` | `renderer/logger.js` | — | Logging utilities |
 
-**Adding unit tests:** Place new test files in `tests/unit/` matching `*.test.js`. Jest config: `jest.config.js`. Setup file: `tests/setup.js` (mocks `localStorage`). For renderer modules that reference `window`/`document`, mock the minimal API surface — see `visual-memory.test.js` for the pattern.
+**Adding unit tests:** Place new test files in `tests/unit/` matching `*.test.js`. Jest config: `jest.config.js`. Setup file: `tests/setup.js` (mocks `localStorage`). For renderer modules that reference `window`/`document`, mock the minimal API surface (see `visual-memory.test.js` for the pattern).
 
 ---
 
@@ -924,7 +932,7 @@ To prevent "AI Hubris" and accidental regressions (like the "Blue Tint" or "Sali
 1.  **Establish Baseline**:
     Before making *any* changes to the renderer, run the integration test to capture the current state:
     ```bash
-    TEST_URL=https://www.figma.com TEST_MODES=0,saliency,structure npm start
+    TEST_MODE=true TEST_URL=https://www.figma.com TEST_MODES=0,saliency,structure npm start
     ```
     This saves screenshots to `tests/screenshots/`.
 
@@ -957,8 +965,8 @@ To prevent "AI Hubris" and accidental regressions (like the "Blue Tint" or "Sali
 1. Before tagging a release, regenerate all golden images:
    ```bash
    # Capture all modes for reference sites
-   TEST_URL=https://www.figma.com TEST_MODES=0,saliency,structure SCREENSHOT_MODE=update SAVE_SCREENSHOTS=true npm start
-   TEST_URL=https://techmeme.com TEST_MODES=0,1,2,3,4,5 SCREENSHOT_MODE=update SAVE_SCREENSHOTS=true npm start
+   TEST_MODE=true TEST_URL=https://www.figma.com TEST_MODES=0,saliency,structure SCREENSHOT_MODE=update SAVE_SCREENSHOTS=true npm start
+   TEST_MODE=true TEST_URL=https://techmeme.com TEST_MODES=0,1,2,3,4,5 SCREENSHOT_MODE=update SAVE_SCREENSHOTS=true npm start
    
    # Run visual tests
    SAVE_SCREENSHOTS=true SCREENSHOT_MODE=update npm test
@@ -987,9 +995,9 @@ To prevent "AI Hubris" and accidental regressions (like the "Blue Tint" or "Sali
 
 ---
 
-## scrutinizer-audit — Headless Visual Complexity CLI & MCP Server
+## scrutinizer-audit: Headless Visual Complexity CLI & MCP Server
 
-`cli/scrutinizer-audit.js` runs the same Feature Congestion + edge density pipeline that powers the ComplexityHUD, but headless — no Electron, no display server. It uses Playwright to capture pages in Chromium and `congestion-core.js` to score them.
+`cli/scrutinizer-audit.js` runs the same Feature Congestion + edge density pipeline as the ComplexityHUD in headless mode, without Electron or a display server. It uses Playwright to capture pages in Chromium and `congestion-core.js` to score them.
 
 ### Quick Start
 
@@ -1176,7 +1184,7 @@ Example from Claude Desktop or Cursor:
 > Capture the vision of techmeme.com looking at the top-left logo (0.15, 0.15)
 ```
 
-The MCP server launches headless Chromium, captures screenshots, runs the congestion pipeline, and returns structured JSON — same scores as the CLI and HUD.
+The MCP server launches headless Chromium, captures screenshots, runs the congestion pipeline, and returns structured JSON with the same scores as the CLI and HUD.
 
 ### Scoring Formula
 
@@ -1188,16 +1196,16 @@ $$\text{score} = \text{round}\!\left(\sqrt{\text{congestion}_{p90} \times 0.7 + 
 |-------|--------|---------|
 | 0–25 | Low | 404/empty pages (0), minimal landing pages |
 | 26–50 | Medium | wikipedia.org (31), apple.com (46), blog posts |
-| 51–75 | High | persci.mit.edu (53), news aggregators, dense dashboards |
-| 76–100 | Extreme | arngren.net (~71), competing visual systems everywhere |
+| 51–75 | High | persci.mit.edu (53), arngren.net (~71), news aggregators, dense dashboards |
+| 76–100 | Extreme | competing visual systems everywhere |
 
 ### Dependencies
 
 The CLI has its own `package.json` in `cli/`:
 
-- `playwright` — headless Chromium capture
-- `@modelcontextprotocol/sdk` — MCP server
-- `pngjs` — PNG decode (same as parent project)
+- `playwright`: headless Chromium capture
+- `@modelcontextprotocol/sdk`: MCP server
+- `pngjs`: PNG decode (same as parent project)
 
 No native binary dependencies. Runs on macOS, Linux, and Windows CI runners.
 

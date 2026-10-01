@@ -5,10 +5,10 @@
 
 ## In This Release
 
-1. [12-Band DoG Decomposition](#12-band-dog-decomposition) — Extended from 8 to 12 half-octave bands (LOD 0.0–6.0), covering panel backgrounds and page-level color regions where peripheral color perception is strongest.
-2. [Chromatic Pipeline Calibration](#chromatic-pipeline-calibration) — RG decay tuned to Bowers et al. (2025), base desaturation ramp widened from 1°–2° to 1°–6°, swatch-aware chromatic preservation.
-3. [Color Search Validation](#color-search-validation) — Three-tier validation suite against published psychophysics. Tier 1: 9/9, Tier 2: 2/3, Tier 3: 3/3.
-4. [Capture & Test Infrastructure](#capture--test-infrastructure) — Smoke test pipeline, manifest-based capture caching, 258 unit tests across 11 suites.
+1. [12-Band DoG Decomposition](#12-band-dog-decomposition): Extended from 8 to 12 half-octave bands (LOD 0.0–6.0), covering panel backgrounds and page-level color regions where peripheral color perception is strongest.
+2. [Chromatic Pipeline Calibration](#chromatic-pipeline-calibration): RG decay tuned to Bowers et al. (2025), base desaturation ramp widened from 1°–2° to 1°–6°, swatch-aware chromatic preservation.
+3. [Color Search Validation](#color-search-validation): Three-tier validation suite against published psychophysics. Tier 1: 9/9, Tier 2: 2/3, Tier 3: 3/3.
+4. [Capture & Test Infrastructure](#capture--test-infrastructure): Smoke test pipeline, manifest-based capture caching, 258 unit tests across 11 suites.
 
 ---
 
@@ -50,7 +50,7 @@ Three changes to the chromatic attenuation pipeline, each addressing a specific 
 
 ### Swatch-Aware Preservation
 
-`mip[12]` at LOD 6.0 averages ~64×64 source pixels. Its Oklab chrominance magnitude distinguishes large uniform color regions (high chroma) from mixed/text content (low chroma). Swatches retain up to 30% more color than text at the same eccentricity. The boost applies only to frequency bands — not the DC residual — to prevent color halos at region boundaries.
+`mip[12]` at LOD 6.0 averages ~64×64 source pixels. Its Oklab chrominance magnitude distinguishes large uniform color regions (high chroma) from mixed/text content (low chroma). Swatches retain up to 30% more color than text at the same eccentricity. The boost applies only to the frequency bands. The DC residual is not boosted, so region boundaries do not get color halos.
 
 ### Files
 
@@ -83,7 +83,7 @@ The Tier 2 miss (rendered-vs-model pixel agreement) reflects MIP chain quantizat
 
 ### Smoke Test Pipeline
 
-`npm run capture-smoke` — 6-shot sanity check across 3 Electron batches (~40s full, <1s incremental). Covers: basic render, mode switch, saliency debug, scroll, off-center fixation.
+`npm run capture-smoke`: 6-shot sanity check across 3 Electron batches (~40s full, <1s incremental). Covers: basic render, mode switch, saliency debug, scroll, off-center fixation.
 
 ### Capture Infrastructure
 
@@ -95,8 +95,8 @@ The Tier 2 miss (rendered-vs-model pixel agreement) reflects MIP chain quantizat
 
 258 unit tests across 11 suites (was 138 in v1.6). New suites:
 
-| Suite | Tests | Coverage |
-|-------|-------|----------|
+| Suite | Coverage |
+|-------|----------|
 | `mip-fidelity.test.js` | DoG band reconstruction vs pure rect sampling |
 | `isotropic-sectors.test.js` | Cortical grid geometry, mode 12 config |
 | `stimulus-domain.test.js` | Spectral mismatch, color gamut, crowding geometry |
@@ -104,16 +104,16 @@ The Tier 2 miss (rendered-vs-model pixel agreement) reflects MIP chain quantizat
 
 ### New Reference Pages
 
-- `color-spectrum-v2.html` — improved spectrum with floating color patches
-- `chroma-uniform.html` — uniform chromaticity stimulus for BY/RG testing
-- `grid-comparison.html` — MIP vs cortical grid side-by-side
-- `ocr-text-grid.html` — text grid for OCR readability measurement
+- `color-spectrum-v2.html`: improved spectrum with floating color patches
+- `chroma-uniform.html`: uniform chromaticity stimulus for BY/RG testing
+- `grid-comparison.html`: MIP vs cortical grid side-by-side
+- `ocr-text-grid.html`: text grid for OCR readability measurement
 
 ---
 
 ## References
 
-- Bowers, N. R., Boehm, A. E., Tuten, W. S., Roorda, A., Gegenfurtner, K. R. & Goettker, A. (2025). Spatial contrast sensitivity across the visual field. *Journal of Vision*, 25(3):15.
+- Bowers, N. R., Gegenfurtner, K. R. & Goettker, A. (2025). Chromatic and achromatic contrast sensitivity in the far periphery. *Journal of Vision*, 25(11):7.
 - Mullen, K. T. & Kingdom, F. A. A. (2002). Differential distributions of red-green and blue-yellow cone opponency across the visual field. *Visual Neuroscience*, 19, 109–118.
 - Hansen, T., Pracejus, L. & Gegenfurtner, K. R. (2009). Color perception in the intermediate periphery of the visual field. *Journal of Vision*, 9(4):26.
-- Reynaud, A. & Hess, R. F. (2023). castleCSF — A comprehensive model for contrast sensitivity. *Journal of Vision*, 23(1):7.
+- Ashraf, M., Mantiuk, R. K., Chapiro, A. & Wuerger, S. (2024). castleCSF — A contrast sensitivity function of color, area, spatiotemporal frequency, luminance and eccentricity. *Journal of Vision*, 24(4):5.

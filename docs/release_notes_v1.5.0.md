@@ -2,13 +2,13 @@
 
 **Release Date:** January 30, 2026
 
-## 🚀 Major Release: Mobile & Simulation Overhaul
-This release represents a significant milestone, combining powerful new **Mobile Emulation** capabilities with a major overhaul of the **Simulation Engine** (formerly scheduled for v1.4). It also introduces new tools specifically for **Academic Research**.
+## 🚀 Major Release: Mobile Emulation & Academic Research Tools
+This release is a significant milestone, combining new **Mobile Emulation** capabilities with new tools for **Academic Research**.
 
 ---
 
 ## 📱 Mobile Emulation Mode
-We've added a powerful new **Mobile Emulation** feature (accessible via `View > Mobile Emulation`). 
+We've added a new **Mobile Emulation** feature (accessible via `View > Mobile Emulation`). 
 - **Device Profiles**: Instantly toggle between common mobile viewports including:
   - **iPhone 14 Pro** (390x844) / **Pro Max** (430x932)
   - **Pixel 7 Pro** (412x915) / **Galaxy S23 Ultra** (412x915)
@@ -16,9 +16,9 @@ We've added a powerful new **Mobile Emulation** feature (accessible via `View > 
 - **High-DPI Simulation**: All profiles use appropriate device scale factors (2x-3.5x).
 - **User Agent Override**: Automatically switches the User Agent to a mobile Safari string, ensuring responsive sites load their mobile views.
 - **Window Locking**: The window automatically resizes and locks to the phone's aspect ratio to prevent accidental resizing during testing.
-- **Touch Simulation (Alpha)**: Hold `Option` (Alt) + Click to simulate genuine touch events.
+- **Touch Simulation (Alpha)**: Hold `Option` (Alt) + Click to simulate touch events.
 
-![Mobile Emulation Example](../tests/golden-captures/v1.5.0/article_center_iphone14.png)
+![Mobile Emulation Example](https://raw.githubusercontent.com/andyed/scrutinizer2025/v1.5.0/tests/golden-captures/v1.5.0/article_center_iphone14.png)
 
 ## 🎓 Academic Research Tools
 
@@ -34,8 +34,8 @@ Aesthetic modes are now centrally defined in `shared/modes.json`, making it easi
 
 ## 🛠️ UI & Architecture
 - **Responsive Toolbar**: Redesigned to support narrow mobile viewports; features a compact URL button and dedicated address dialog.
-- **Visual Overlay 2.0**: The debug grid has been refined with linear spacing and variable stroke width for better visibility.
-- **Auto-Updates**: Scrutinizer now checks for updates on startup and notifies you of new releases.
+- **Visual Overlay 2.0**: The debug grid has been refined with linear spacing and variable stroke width for better visibility (from v1.4.0).
+- **Auto-Updates**: Scrutinizer now checks for updates on startup and notifies you of new releases (from v1.4.0).
 - **Version Display**: Current version is now visible on the splash screen and toolbar (from v1.4.4).
 
 ## 🐛 Bug Fixes

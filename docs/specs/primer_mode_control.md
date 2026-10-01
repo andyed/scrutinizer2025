@@ -2,7 +2,7 @@
 
 ## Problem
 
-The primer explains peripheral vision by showing static screenshots of each pipeline stage. But the reader might be browsing the primer *through Scrutinizer itself*. The page should detect this and offer live mode switching — "see crowding applied to this page right now" instead of "here's a screenshot of crowding."
+The primer explains peripheral vision by showing static screenshots of each pipeline stage. But the reader might be browsing the primer *through Scrutinizer itself*. The page should detect this and offer live mode switching, so the reader sees crowding applied to the page they are reading.
 
 ## Concept
 
@@ -21,7 +21,7 @@ The primer explains peripheral vision by showing static screenshots of each pipe
    - Biology section → High-Key (default research mode)
    - LGN section → shows saliency overlay
    - V1 Crowding → shows Crowding mode with displacement
-   - V1 Minecraft → switches to Block Pooling (Minecraft) — pooling regions visible as blocks
+   - V1 Minecraft → switches to Block Pooling (Minecraft), with pooling regions visible as blocks
    - DoG section → Log-Polar MIP (pure spatial frequency attenuation)
    - V4 section → switches between High-Key and Purkinje to show color processing difference
    - Full Mapping → Pyramid Mongrel (the default Tier 2.75)
@@ -74,7 +74,7 @@ Each section gets:
 
 ## Security
 
-- API is read/write for mode and radius only — no access to DOM, file system, or other Scrutinizer internals.
+- API is read/write for mode and radius only. It has no access to DOM, file system, or other Scrutinizer internals.
 - Only works from pages loaded in the Scrutinizer content view (not arbitrary web pages injecting script).
 - Mode names are validated against modes.json before applying.
 
@@ -90,5 +90,5 @@ Each section gets:
 |------|--------|
 | `renderer/preload.js` | Expose `window.scrutinizer` API |
 | `renderer/scrutinizer.js` | Handle `page:set-mode` IPC |
-| `shared/modes.json` | Already has shortLabels — used for lookup |
+| `shared/modes.json` | Already has shortLabels, used for lookup |
 | `scrutinizer-www/src/primer/index.html` | Add "See it live" buttons + detection script |

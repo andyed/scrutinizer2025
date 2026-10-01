@@ -1,42 +1,42 @@
-# Wave Plan — Usability Pivot (2026-07-16)
+# Wave Plan: Usability Pivot (2026-07-16)
 
 Sequencing plan from the 2026-07-16 four-track audit (usability-readiness, docs
 roadmap, competitive landscape, brand positioning). Organizing goal: **from
 "launcher shipped" (v2.8.1 Study Links) to "first real study run cleanly,
 producing artifacts, with the public story matching the product."**
 
-Amends, does not replace, the phase docs in this directory. Phase numbering
+This plan amends the phase docs in this directory, which stay in effect. Phase numbering
 below refers to `phase-2-automation-ergonomics.md` / `phase-3-usability-foundation.md`.
 
-## Wave 0 — Unblock the pilot (DONE 2026-07-16)
+## Wave 0: Unblock the pilot (DONE 2026-07-16)
 
-- [x] Study toolbar contrast to the 8:1 floor (Done 3.98→11.18, origin 7.01→8.49,
-      browse URL 4.43→8.52; hover/active verified) — `renderer/toolbar.css`
-- [x] Exit Study Mode menu command (spec §229 escape path) — `menu-template.js`, `main.js`
-- [x] Deep-link ready-race fix + activate-consumes-pending-link — `main.js`
-- [x] Unknown-parameter echo capped at 64 chars — `shared/study-deep-link.js`
-- [x] Release-notes honesty: Windows deep links are unimplemented, not "being verified"
+- [x] Study toolbar contrast to the 8:1 floor in `renderer/toolbar.css` (Done 3.98→11.18,
+      origin 7.01→8.49, browse URL 4.43→8.52; hover/active verified)
+- [x] Exit Study Mode menu command (spec §229 escape path) in `menu-template.js`, `main.js`
+- [x] Deep-link ready-race fix + activate-consumes-pending-link in `main.js`
+- [x] Unknown-parameter echo capped at 64 chars in `shared/study-deep-link.js`
+- [x] Release notes now state that Windows deep links are unimplemented (they had said "being verified")
 
 Exit: v2.8.1 release notes updated; release itself gated on Wave 1 verification.
 
-## Wave 1 — Verify the delivery path, build the study kit, run the pilot (1–2 days)
+## Wave 1: Verify the delivery path, build the study kit, run the pilot (1–2 days)
 
-- [x] **Signed/notarized DMG** — exists (confirmed by Andy 2026-09-30). The
+- [x] **Signed/notarized DMG:** exists (confirmed by Andy 2026-09-30). The
       Safari + Chrome, cold + warm launch, Browse-toolbar-flash results are not
       recorded here.
-- [x] In-app consent + debrief screens (P3-5) — DONE 2026-09-30. Unblocks
+- [x] In-app consent + debrief screens (P3-5). DONE 2026-09-30. Unblocks
       walk-up sessions, so a playtest queue can be the pilot.
 - [x] `docs/templates/consent.md` + `debrief.md` (P3-5 partial; referenced by
-      `human_subjects_data_collection.md`) — DONE 2026-07-16
+      `human_subjects_data_collection.md`). DONE 2026-07-16.
 - [x] Study Link builder page on scrutinizer-www (`src/study-link-builder.html`;
       parser vendored to `src/js/study-deep-link.js`, verified output-identical
-      to the app's) — DONE 2026-07-16; doubles as the parameter cookbook
+      to the app's). DONE 2026-07-16. It doubles as the parameter cookbook.
 - [ ] **Pilot study: 2–3 participants, moderated**, using the practitioner guide
       and worksheet. Findings memo doubles as a case-study blog post.
 
 Exit: completed pilot with findings memo.
 
-## Wave 2 — Align the public story (1 day, parallel with Wave 1)
+## Wave 2: Align the public story (1 day, parallel with Wave 1)
 
 - [ ] scrutinizer-www off v2.7.0; Study Links get landing-page presence
 - [ ] Demote the headline overclaim ("See what your users actually see" →
@@ -44,33 +44,33 @@ Exit: completed pilot with findings memo.
       language implying tiers and services that don't exist
 - [ ] One lead per surface: www = design-team story, README = researcher story,
       guides = practitioner story
-- [ ] Blog post: "Usability testing with a Restricted Focus Viewer" —
+- [ ] Blog post "Usability testing with a Restricted Focus Viewer":
       category-teaching vs static predictors (Attention Insight et al.) and
       uniform blur (DevTools/NoCoffee)
 
 Push timing: no GitHub pushes weekdays 10:00–15:00 PT.
 
-## Wave 3 — The platform (Phase 3, weeks)
+## Wave 3: The platform (Phase 3, weeks)
 
 Order deliberately inverts the P3 ticket numbering:
 
-1. [ ] **P3-2 DataCollector first** — session JSON/CSV (task metadata, config
+1. [ ] **P3-2 DataCollector first:** session JSON/CSV (task metadata, config
        snapshot, ScanpathData cursor trail, timestamps, Done event). Turns the
        existing single-task flow into something that produces artifacts.
-2. [ ] **P3-1 ExperimentRunner** — multi-task sequencing/counterbalancing via the
+2. [ ] **P3-1 ExperimentRunner:** multi-task sequencing/counterbalancing via the
        reserved `scrutinizer://v1/study/run?config=<url>` manifest route.
-3. [ ] **P3-3 BubbleView** — flagship no-hardware paradigm; ship WITH its tutorial.
-4. [ ] **P3-6 Study Workbench (WB-1 first)** — browser-based session library +
+3. [ ] **P3-3 BubbleView:** flagship no-hardware paradigm; ship WITH its tutorial.
+4. [ ] **P3-6 Study Workbench (WB-1 first):** browser-based session library +
        CIF measures in a new `scrutinizer-moderator` sub-repo (www stays
        marketing/science); no thick client for moderator/analyst work
        (`docs/specs/study-workbench-webapp.md`). WB-1 can ride the pilot.
 5. [ ] Docs riding along: known-issues.md rewrite for v2.8.x, practitioner hub
        index, release-notes consolidation into CHANGELOG, glossary fix (8→12 bands).
 
-Double payoff: P3-2/P3-3 are also the instrument for the human-subjects
+P3-2/P3-3 are also the instrument for the human-subjects
 validation work (biological-plausibility roadmap in TODO.md).
 
-## Wave 4 — Reach (backlog)
+## Wave 4: Reach (backlog)
 
 jsPsych plugin (academic wedge vs MouseView.js) → scanpath replay
 (complement-to-eye-tracking positioning) → Windows deep-link support
@@ -78,11 +78,11 @@ jsPsych plugin (academic wedge vs MouseView.js) → scanpath replay
 
 ## Open decisions
 
-1. **Phase 2 gate:** recommend Phase-2-lite — pull the deterministic DPR pin
-   forward (capture reproducibility), defer control plane/MCP until after P3-2.
+1. **Phase 2 gate:** recommend Phase-2-lite: pull the deterministic DPR pin
+   forward (capture reproducibility) and defer control plane/MCP until after P3-2.
    Renegotiates the "do not start P3 until Phase 2 exits" rule in `README.md` here.
 2. **P3-2 before P3-1** (as sequenced above).
 3. **Pilot as Wave 1 exit criterion** (commits to recruiting 2–3 people).
 4. **Link builder vs cookbook-only** (builder recommended, ~1 extra day).
-5. **Naming:** Plixer Scrutinizer / scrutinizer-ci.com collisions noted; parked —
-   don't deepen marketing spend on the name until decided.
+5. **Naming:** Plixer Scrutinizer / scrutinizer-ci.com collisions noted and parked.
+   Don't deepen marketing spend on the name until decided.

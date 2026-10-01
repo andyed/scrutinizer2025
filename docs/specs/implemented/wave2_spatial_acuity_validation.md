@@ -8,7 +8,7 @@
 
 ## Context
 
-Scrutinizer's peripheral shader decomposes the rendered page into 5 spatial frequency bands via Difference-of-Gaussians (MIP chain subtraction) and attenuates each band based on eccentricity using M-scaling (Rovamo & Virsu 1979). Wave 2 validates that this band-selective blur matches published contrast sensitivity falloff data — does the shader correctly predict which spatial frequencies survive at each eccentricity?
+Scrutinizer's peripheral shader decomposes the rendered page into 5 spatial frequency bands via Difference-of-Gaussians (MIP chain subtraction) and attenuates each band based on eccentricity using M-scaling (Rovamo & Virsu 1979). Wave 2 validates that this band-selective blur matches published contrast sensitivity falloff data. Does the shader correctly predict which spatial frequencies survive at each eccentricity?
 
 ## 1. Falsifiable Predictions
 
@@ -42,7 +42,7 @@ At each eccentricity ring, higher spatial frequencies should show lower contrast
 
 ### Prediction B: M-scaling cutoff eccentricities
 
-Each band's contrast should cross the 50% retention threshold near the predicted cutoff eccentricity (within ±30%). The transition should be gradual (`dog_sharpness=0.0`), not a cliff.
+Each band's contrast should cross the 50% retention threshold near the predicted cutoff eccentricity (within ±30%). The transition should be gradual (`dog_sharpness=0.0`).
 
 ### Prediction C: Residual band always preserved
 
@@ -63,16 +63,16 @@ Normalized contrast retention at each frequency should correlate (Spearman r > 0
 
 ## 2. Stimulus Design
 
-### `spatial-acuity.html` — Sine-wave grating annuli
+### `spatial-acuity.html`: Sine-wave grating annuli
 
 Concentric annuli (like Wave 1 bands mode) but each ring displays a sine-wave grating at a specific spatial frequency, rendered via `<canvas>`.
 
 **Layout**: 5 concentric rings at distances [100, 200, 300, 420, 560] px from fixation. Each ring is a 60px-wide annulus filled with a horizontal sine-wave grating.
 
 **Modes**:
-- `?mode=single&freq=2` — All rings show the same frequency (for measuring retention vs eccentricity at one freq)
-- `?mode=ladder` — Ring 1 = 4 cpd, Ring 2 = 2 cpd, Ring 3 = 1 cpd, Ring 4 = 0.5 cpd, Ring 5 = 0.25 cpd (frequency ladder, tests band selectivity)
-- `?mode=bands` — Same as ladder but with foveal reference grating at center
+- `?mode=single&freq=2`: All rings show the same frequency (for measuring retention vs eccentricity at one freq)
+- `?mode=ladder`: Ring 1 = 4 cpd, Ring 2 = 2 cpd, Ring 3 = 1 cpd, Ring 4 = 0.5 cpd, Ring 5 = 0.25 cpd (frequency ladder, tests band selectivity)
+- `?mode=bands`: Same as ladder but with foveal reference grating at center
 
 **Parameters**: `?freq=2&contrast=1.0&orientation=0&chromatic=achromatic`
 - `freq`: spatial frequency in cpd (0.25, 0.5, 1, 2, 4)
@@ -101,7 +101,7 @@ Extends the Wave 1 analysis pattern:
 3. Compare filtered vs baseline contrast at each ring
 4. Compute **contrast retention** = filtered_RMS / foveal_RMS
 
-Key difference from Wave 1: instead of measuring chroma, we measure **luminance contrast** (or chromatic contrast for RG/BY gratings). Sample a horizontal line of pixels through each ring's center, compute the amplitude of the sinusoidal modulation via FFT or peak-to-trough measurement.
+Wave 1 measured chroma. Wave 2 measures **luminance contrast** (or chromatic contrast for RG/BY gratings). Sample a horizontal line of pixels through each ring's center, compute the amplitude of the sinusoidal modulation via FFT or peak-to-trough measurement.
 
 ### Spatial frequency verification
 
@@ -109,21 +109,21 @@ Before comparing filtered vs baseline, verify that the grating spatial frequency
 
 ## 4. Published Comparison Data
 
-### Rovamo & Virsu (1979) — Contrast sensitivity vs eccentricity
+### Rovamo & Virsu (1979): Contrast sensitivity vs eccentricity
 
 `tests/validation/published-data/rovamo_virsu1979_csf.json`
 
 Contrast sensitivity (relative to fovea) at 0.5, 1, 2, 4 cpd as a function of eccentricity (0-30°). Digitized from Figure 3.
 
-### Watson & Ahumada (2005) — Parametric CSF
+### Watson & Ahumada (2005): Parametric CSF
 
 `tests/validation/published-data/watson_ahumada2005_csf.json`
 
 The standard CSF parameterization. Peak sensitivity, bandwidth, and cutoff frequency as a function of eccentricity.
 
-### castleCSF (Ashraf et al. 2024) — The model itself
+### castleCSF (Ashraf et al. 2024): The model itself
 
-Since Scrutinizer implements castleCSF, we can compare our discrete DoG band decomposition against castleCSF's continuous predictions to verify the approximation quality.
+Since Scrutinizer's chromatic decay uses castleCSF constants, we can compare our discrete DoG band decomposition against castleCSF's continuous predictions to verify the approximation quality.
 
 ## 5. Validation: `validate-spatial-acuity.js`
 
@@ -164,14 +164,14 @@ Smoke test first: 1 cpd achromatic (2 screenshots), then expand.
 
 | File | Action | Lines |
 |------|--------|-------|
-| `tests/reference-pages/spatial-acuity.html` | Create — canvas-based grating annuli | ~250 |
-| `scripts/analyze-spatial-acuity.js` | Create — contrast measurement from screenshots | ~200 |
-| `scripts/capture-spatial-acuity.js` | Create — capture automation | ~80 |
-| `scripts/validate-spatial-acuity.js` | Create — comparison orchestrator | ~150 |
-| `scripts/report-spatial-acuity.js` | Create — visual HTML report | ~100 (extend Wave 1 template) |
-| `tests/validation/published-data/rovamo_virsu1979_csf.json` | Create — digitized data | ~30 |
-| `scripts/chromatic-attenuation-table.js` | Extend — `--spatial-acuity` flag for per-band predictions | ~50 |
-| `menu-template.js` | Extend — Experimental Stimulus submenu entries | ~20 |
+| `tests/reference-pages/spatial-acuity.html` | Create: canvas-based grating annuli | ~250 |
+| `scripts/analyze-spatial-acuity.js` | Create: contrast measurement from screenshots | ~200 |
+| `scripts/capture-spatial-acuity.js` | Create: capture automation | ~80 |
+| `scripts/validate-spatial-acuity.js` | Create: comparison orchestrator | ~150 |
+| `scripts/report-spatial-acuity.js` | Create: visual HTML report | ~100 (extend Wave 1 template) |
+| `tests/validation/published-data/rovamo_virsu1979_csf.json` | Create: digitized data | ~30 |
+| `scripts/chromatic-attenuation-table.js` | Extend: `--spatial-acuity` flag for per-band predictions | ~50 |
+| `menu-template.js` | Extend: Experimental Stimulus submenu entries | ~20 |
 
 ## 8. Success Criteria
 
@@ -183,7 +183,7 @@ Smoke test first: 1 cpd achromatic (2 screenshots), then expand.
 
 - Rovamo, J. & Virsu, V. (1979). An estimation and application of the human cortical magnification factor. *Experimental Brain Research*, 37, 495-510.
 - Watson, A.B. & Ahumada, A.J. (2005). A standard model for foveal detection of spatial contrast. *Journal of Vision*, 5(9), 6.
-- Ashraf, M., et al. (2024). castleCSF — A contrast sensitivity function of color, area, spatiotemporal frequency, luminance and eccentricity. *bioRxiv*.
+- Ashraf, M., et al. (2024). castleCSF — A contrast sensitivity function of color, area, spatiotemporal frequency, luminance and eccentricity. *Journal of Vision*, 24(4):5. doi:10.1167/jov.24.4.5
 - Burt, P.J. & Adelson, E.H. (1983). The Laplacian pyramid as a compact image code. *IEEE Transactions on Communications*, 31(4), 532-540.
 - Levi, D.M., Klein, S.A. & Aitsebaomo, A.P. (1985). Vernier acuity, crowding and cortical magnification. *Vision Research*, 25(7), 963-977.
 - Campbell, F.W. & Robson, J.G. (1968). Application of Fourier analysis to the visibility of gratings. *The Journal of Physiology*, 197(3), 551-566.

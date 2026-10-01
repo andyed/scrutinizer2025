@@ -52,7 +52,7 @@ graph TB
   end
 
   subgraph Shader["Fragment Shader"]
-    Periph[peripheral.frag<br/>2388 lines<br/>LGN/V1/V4]
+    Periph[peripheral.frag<br/>~2620 lines<br/>LGN/V1/V4]
   end
 
   subgraph Headless
@@ -94,7 +94,7 @@ graph TB
   Scripts -.drives.-> Main
 ```
 
-**The single orchestrator is `renderer/scrutinizer.js`** — it wires the gaze model, visual memory, content analysis, and WebGPU compute into the WebGL render loop. The fragment shader (`renderer/shaders/peripheral.frag`, 2388 lines) is where the LGN → V1 → V4 model actually executes.
+**The single orchestrator is `renderer/scrutinizer.js`** — it wires the gaze model, visual memory, content analysis, and WebGPU compute into the WebGL render loop. The fragment shader (`renderer/shaders/peripheral.frag`, ~2,620 lines) is where the LGN → V1 → V4 model actually executes.
 
 **The Electron shell uses a two-window architecture**: `scrutinizerView` (BrowserView holding the page being analyzed) and `scrutinizerHud` (transparent overlay holding the canvas + toolbar). All navigation/capture flows through main.js IPC channels.
 
@@ -106,7 +106,7 @@ graph TB
 
 ```
 scrutinizer2025/
-├── main.js                          # Electron main (28k tokens, ~880 LOC)
+├── main.js                          # Electron main (~4,900 LOC)
 ├── menu-template.js                 # Native menu builder (9k tokens)
 ├── settings-manager.js              # User-settings persistence + migrations
 ├── package.json, jest.config.js, pyproject.toml
@@ -131,7 +131,7 @@ scrutinizer2025/
 │   ├── foveal-calibration.{html,js}
 │   ├── complexity-hud.js, frame-timer.js, citation-export.js
 │   ├── shaders/                    # 7f, 56k tokens
-│   │   ├── peripheral.frag         # 2388 lines: LGN/V1/V4 model
+│   │   ├── peripheral.frag         # ~2,620 lines: LGN/V1/V4 model
 │   │   ├── peripheral.vert         # Fullscreen quad
 │   │   ├── crowding-stats.wgsl     # Tier 2.5 pass 1
 │   │   ├── crowding-synth.wgsl     # Tier 2.5 pass 2
@@ -150,7 +150,7 @@ scrutinizer2025/
 │
 ├── shared/                         # Cross-process constants
 │   ├── constants.json              # RADIUS / ASPECT / INTENSITY / DEVICE_PROFILES
-│   └── modes.json                  # 16 aesthetic modes (declarative pipeline config)
+│   └── modes.json                  # 17 aesthetic modes (declarative pipeline config)
 │
 ├── cli/                            # Headless audit + MCP server
 │   ├── scrutinizer-audit.js        # CLI entry (Lighthouse-for-clutter)
@@ -160,7 +160,7 @@ scrutinizer2025/
 │   │   ├── reporter.js             # JSON / HTML / table
 │   │   ├── scroll-strategy.js, url-resolver.js, sitemap-parser.js
 │   │   └── viewport-profiles.js
-│   ├── mcp/server.js               # MCP stdio: analyze_url, compare_pages, capture_vision
+│   ├── mcp/server.js               # MCP stdio: analyze_url, analyze_urls, compare_pages, capture_vision
 │   └── templates/                  # HTML report templates
 │
 ├── scripts/                        # ~100 files, 280k tokens — research toolchain
@@ -190,7 +190,7 @@ scrutinizer2025/
 │
 ├── data/                           # coco-search18, mind2web-summaries (skipped from scan)
 │
-├── docs/                           # 128+ markdown files, see §11
+├── docs/                           # 128+ markdown files, see Doc Inventory
 │   ├── foveated-vision-model.md    # ★ intellectual core
 │   ├── developers_guide.md         # ★ onboarding
 │   ├── architecture-layer-stack.md, architecture-module-pattern.md
@@ -211,7 +211,7 @@ scrutinizer2025/
 
 ## The Three-Stage Vision Model (Intellectual Core)
 
-The shader pipeline implements neuro-inspired cortical staging. Every parameter maps to a citation; refactoring should preserve this traceability.
+The shader pipeline implements neuro-inspired cortical staging. Most parameters map to a citation (gaps such as `foveaAspectRatio` are noted below); refactoring should preserve this traceability.
 
 **Stage 1 — LGN (Lateral Geniculate Nucleus): Gating**
 - Spatial attention via structure-map masking (`renderer/structure-map.js`)
@@ -223,7 +223,7 @@ The shader pipeline implements neuro-inspired cortical staging. Every parameter 
 - **Cortical magnification (Blauch FOVI):** log-polar mapping with `a = 2.78°`
   - `mip_level = max_mip × [ln(r + a) − ln(a)] / [ln(r_max + a) − ln(a)]`
   - Implemented at `webgl-renderer.js:888-901` and `peripheral.frag:551-565`
-- **DoG band decomposition:** 13 MIP levels at half-octave spacing (5.66 → 0.125 cpd)
+- **DoG band decomposition:** 13 MIP levels at half-octave spacing, giving 12 bands + residual (5.66 → 0.088 cpd)
 - **M-scaling rolloff:** per-band cutoff `c[k] = cmf_a × (exp(k × scale) − 1)` (CMF) or `c[k] = E2 × (2^(k/2) − 1)` (linear)
 - **Oriented DoG (Phase 2):** cardinal vs oblique energy decomposition from MIP-1 gradients (`peripheral.frag:203-242`)
 - **Radial-tangential anisotropy (Phase 3):** crowding 2× stronger radial than tangential (`peripheral.frag:244-273`)
@@ -242,7 +242,7 @@ The shader pipeline implements neuro-inspired cortical staging. Every parameter 
 **Three texture pipelines feed the shader:**
 1. **WebGL (Tier 1.x–2.0)** — fragment shader computes all distortion per-pixel using MIP-maps
 2. **WebGPU crowding compute (Tier 2.5)** — half-res stats + synth → uploaded to `TEXTURE5`, sampled as a layer
-3. **WebGPU pyramid compute (Tier 2.75, "Pyramid Mongrel"** — DEFAULT mode id=14) — extended 18-float-per-tile stats including skewness, optional CMF sector binning
+3. **WebGPU pyramid compute (Tier 2.75, "Pyramid Mongrel"** — mode id=14; the default since v2.8.0 is mode 12, FOVI Cortical Grid) — extended 18-float-per-tile stats including skewness, optional CMF sector binning
 
 The shader is also seam-aware: source frames arrive in BGRA byte order, so `peripheral.frag:205-209` uses `0.299 × .b + 0.587 × .g + 0.114 × .r` (note the `.b = Red` mapping — easy to break in a refactor).
 
@@ -270,7 +270,7 @@ Capture-frame log sampling is hardcoded to 5% to avoid spam (~100 frames/sec). N
 - v1: clamp radius `180 → 45` (was 4° on Retina MBP; should be 1°)
 - v2: fovea degree correction `2.0 → 1.0`, halve stored radius (preserves ppd)
 
-**`menu-template.js`** — declarative menu builder consuming current state. Radio groups for Radius (6 sizes), Aspect (4 ratios), Intensity (5 levels), Mobile Emulation (iPhone/Pixel/Pixel-Pro/iPad/Galaxy), Visual Memory (Off/Limited/Extended/Infinite/Fixation Buffer), Congestion Mode, Eccentricity Mode, plus Go menu with reference-page bookmarks.
+**`menu-template.js`** — declarative menu builder consuming current state. Radio groups for Radius (6 sizes), Aspect (4 ratios), Intensity (5 levels), Mobile Emulation (iPhone/Pixel/Pixel-Pro/iPad/Galaxy), Visual Memory (Off/Limited/Extended/Infinite/Inhibition of Return), Congestion Mode, Eccentricity Mode, plus Go menu with reference-page bookmarks.
 
 ### Renderer Pipeline
 
@@ -291,15 +291,15 @@ Critical state-machine traps:
 - `_metamerSaccading` / `_metamerInitialized` track across the saccadic-suppression early-return (`scrutinizer.js:389`) to catch landing events. Removing the early-return without removing these flags will permanently freeze metamer state.
 - Compute texture refresh is time-throttled via `refreshTimeout` in `shouldResynth` (default 100ms, see `CONFIG.metamerContentRefreshMs`). The freeze holds during fixation/pursuit on static content; periodic ticks catch CSS animations and hovers without re-firing the synth every frame.
 - Congestion heatmap is hidden during scroll (`:264-267`) and restored on fresh data (`:603-607`) — if fresh data arrives but the restore condition doesn't fire, the overlay stays hidden permanently.
-- Canvas dimensions ≠ frame dimensions (toolbar chrome eats vertical pixels). Scaling for compute is applied manually at `:654-656` as `gazeFrameX = gaze.x × (frameW / canvas.width)`. Coordinate spaces (canvas CSS, canvas physical, frame, compute half-res) deserve a diagram.
+- Canvas dimensions ≠ frame dimensions (toolbar chrome eats vertical pixels). Scaling for compute is applied manually at `:709-710` as `gazeFrameX = gaze.x × (frameW / canvas.width)`. Coordinate spaces (canvas CSS, canvas physical, frame, compute half-res) deserve a diagram.
 
 **`renderer/webgl-renderer.js`** — single `WebGLRenderer` class, GPU context manager. All 8 texture slots allocated at init; per-frame uniform dispatch at `:815-946`. Mongrel-pooling MIPs uploaded with `UNPACK_PREMULTIPLY_ALPHA = false` (line 514) to preserve channel semantics in structure/primitive maps.
 
-`foveaAspectRatio = 1.33` (`:789-791`) lacks an inline citation. Plausibly Rayner reading-span or horizontal raphe asymmetry — but **also hardcoded** in `webgpu-crowding-compute.js:173` and `crowding-stats.wgsl:27`. Any change must hit all three sites.
+`foveaAspectRatio = 1.33` (`:789-791`) lacks an inline citation. Plausibly Rayner reading-span or horizontal raphe asymmetry. Centralized as `FOVEA_ASPECT_RATIO_DEFAULT` in `renderer/config.js` (see Gotcha #1).
 
 **`renderer/webgpu-crowding-compute.js`** (Tier 2.5): half-res, two-pass. Frame skipping at `FRAME_INTERVAL = 2` (compute every 2nd frame → 30Hz dispatch). Temporal smoothing EMA `0.3` (30% blend with previous frame).
 
-**`renderer/webgpu-pyramid-compute.js`** (Tier 2.75, DEFAULT — "Pyramid Mongrel"): 5-level pyramid, extended-stride accumulator (24 i32/tile including `sum x³` for skewness), optional sector binning via `sectorConfig`. `CMF_A = 2.78` must match `webgl-renderer.js:895`. Synth seed pinned at `42` for stability.
+**`renderer/webgpu-pyramid-compute.js`** (Tier 2.75, mode 14 — "Pyramid Mongrel"): 5-level pyramid, extended-stride accumulator (24 i32/tile including `sum x³` for skewness), optional sector binning via `sectorConfig`. `CMF_A = 2.78` must match `webgl-renderer.js:895`. Synth seed pinned at `42` for stability.
 
 **Worker fleet:**
 - `saliency-worker.js` — 256/512px DoG + face-api (Tiny Face Detector, scoreThreshold=0.3, inputSize=224). Loads face model synchronously at worker init — adds startup latency.
@@ -310,7 +310,7 @@ Critical state-machine traps:
 
 | File | Stage | Math |
 |---|---|---|
-| `peripheral.frag` (2388 lines) | LGN/V1/V4 main pass | DoG reconstruction × 13 bands, oriented-DoG phases 2-3, CMF MIP level, chromatic pooling, Bender+Cutter distortions |
+| `peripheral.frag` (~2,620 lines) | LGN/V1/V4 main pass | DoG reconstruction × 12 bands + residual, oriented-DoG phases 2-3, CMF MIP level, chromatic pooling, Bender+Cutter distortions |
 | `peripheral.vert` | full-screen quad | Pass-through |
 | `crowding-stats.wgsl` | Tier 2.5 pass 1 | Oklab + 4-direction orientation energy per tile, temporal EMA |
 | `crowding-synth.wgsl` | Tier 2.5 pass 2 | Oriented sine gratings weighted by tile energy_{h,v,d45,d135} |
@@ -327,7 +327,7 @@ Critical state-machine traps:
 - Rosenholtz et al. (2012, TTM) → `pyramid-stats` + `pyramid-synth` + `crowding-stats` + `crowding-synth`
 - Schwartz (1980) → `peripheral.frag:551-565`, `pyramid-stats.wgsl:160-191`
 - Walton et al. (2021, real-time variance matching) → `pyramid-synth.wgsl`
-- Blauch, Konkle & Alvarez (2026, FOVI) → CMF_A constant + sector pooling throughout
+- Blauch, Alvarez & Konkle (2026, FOVI) → CMF_A constant + sector pooling throughout
 - Bahill et al. (1975, main sequence) → `coordinate-utils.js:81-83`
 - Bowers et al. (2025) → chromatic decay constants in `peripheral.frag:456-457`
 
@@ -508,14 +508,14 @@ There are **four** top-level coordinate spaces, plus a fanout of sub-spaces insi
 | **Physical** | WebGL canvas top-left | Device px (DPR-scaled) | WebGL textures, shader uniforms | `× devicePixelRatio` from Local Visual |
 | **Stimulus** | Captured frame top-left | Source content px | DoG, saliency heatmap, structure map | `+ scrollY` offset from Physical |
 
-Inside Physical, four sub-grids must stay synchronized: **canvas CSS**, **canvas Physical**, **frame buffer**, and **compute half-res**. The load-bearing compensation lives at `renderer/scrutinizer.js:660-661`:
+Inside Physical, four sub-grids must stay synchronized: **canvas CSS**, **canvas Physical**, **frame buffer**, and **compute half-res**. The load-bearing compensation lives at `renderer/scrutinizer.js:709-710`:
 
 ```js
 const gazeFrameX = gaze.x * (frameW / this.canvas.width);
 const gazeFrameY = gaze.y * (frameH / this.canvas.height);
 ```
 
-If you map gaze to frame coordinates anywhere else (mask, overlays, debug rings), apply the same `frameW / canvas.width` ratio. See `coordinate_systems.md` §7 for the full table.
+If you map gaze to frame coordinates anywhere else (mask, overlays, debug rings), apply the same `frameW / canvas.width` ratio. See the "Sub-Spaces Inside the Physical Tier" section of `coordinate_systems.md` for the full table.
 
 For scanpath data, additional dataset-specific transforms apply (`renderer/scanpath/coordinate-utils.js`):
 - AdSERP: page-space ↔ screen-space via interpolated scroll timeline
@@ -529,19 +529,19 @@ For scanpath data, additional dataset-specific transforms apply (`renderer/scanp
 | Parameter | Value | Where | Rationale |
 |---|---|---|---|
 | `fovealRadius` | 45 px | `config.js` | ~1° @ 20" viewing on Retina MBP |
-| `foveaAspectRatio` | 1.33 | `webgl-renderer.js:789` (+ 2 duplicates) | Plausibly Rayner reading-span; citation gap |
+| `foveaAspectRatio` | 1.33 | `config.js:10` (`FOVEA_ASPECT_RATIO_DEFAULT`) | Plausibly Rayner reading-span; citation gap |
 | `maskSmoothness` | 1.0 (TEST) / <1.0 (live) | `config.js` | Mouse smoothing alpha; 1=instant |
 | `saccadicSuppressionThreshold` | 2.5 px/ms | `config.js` | Skip heavy processing above this velocity |
 | `fixationVelocityThreshold` | 20 px/ms | `config.js` | High vs typical ~5 px/ms eye-tracking — chosen for slow reading |
-| `dwellTimeThreshold` | 150 ms | `config.js:29` | Min dwell to record fixation |
+| `dwellTimeThreshold` | 50 ms | `config.js:64` | Min dwell to record fixation |
 | `velocityDecayMove` | 0.003 | `config.js:31` | EMA decay while moving |
 | `velocityDecayStop` | 0.04 | `config.js:32` | EMA decay while stopped |
 | `TEMPORAL_SMOOTHING` | 0.3 | `webgpu-crowding-compute.js:19` | 30% blend with previous frame |
 | `FRAME_INTERVAL` | 2 | `webgpu-crowding-compute.js:17` | Compute every 2nd frame |
 | `CMF_A` | 2.78 | `webgl-renderer.js:895` + `webgpu-pyramid-compute.js:36` | Blauch FOVI cortical magnification |
 | `TILE_SIZE` | 8 px | `crowding-stats.wgsl:16`, `pyramid-stats.wgsl:32` | Workgroup size |
-| `rg_decay` | 0.072 | `webgl-renderer.js:169` | Bowers 2025 RG suprathreshold: 29% retention at 15° |
-| `yv_decay` | 0.014 | `webgl-renderer.js:171` | Bowers 2025 YV suprathreshold: 79% retention at 15° |
+| `rg_decay` | 0.072 | `webgl-renderer.js:174` | Fit to Bowers 2025 RG detection sensitivity: 29% of the 5° value at 15° |
+| `yv_decay` | 0.014 | `webgl-renderer.js:176` | Fit to Bowers 2025 YV detection sensitivity: 79% of the 5° value at 15° |
 | Saliency σ | 2.5 | `congestion-core.js` (inferred) | DoG center-surround |
 | Face detection `scoreThreshold` | 0.3 | `saliency-worker.js:38` | Tiny Face Detector — low/liberal |
 | Face detection `inputSize` | 224 | `saliency-worker.js:38` | Speed vs accuracy balance |
@@ -569,7 +569,7 @@ For scanpath data, additional dataset-specific transforms apply (`renderer/scanp
 - **Determinism:** `SEED = 42` hardcoded across capture scripts; must match stimulus-page defaults (e.g., `color-search.html?seed=42`). Synth seed pinned at 42 in pyramid-synth WGSL.
 - **Filename schemes:** golden captures live in `tests/golden-captures/v{major.minor}/{site}_{mode}.png`; analysis JSONs use predictable keys (`ecc_deg`, `ring`, `freq`, `condition`, `ssim`, `delta_c`).
 - **TEST_MODE convention:** Scripts spawn Electron with `TEST_MODE=true` + a batch JSON spec; Electron emits PNG paths on success via IPC. Manifest skip is opt-out via `--force`.
-- **Citation discipline:** every magic number in shader code should map to a published source. When it doesn't (e.g. `foveaAspectRatio=1.33`), `docs/CLAIM_VERIFICATION.md` tracks the gap.
+- **Citation discipline:** every magic number in shader code should map to a published source. When it doesn't (e.g. `foveaAspectRatio=1.33`), the gap belongs in `docs/arxiv-paper/CLAIM_VERIFICATION.md`.
 
 ---
 
@@ -580,7 +580,7 @@ For scanpath data, additional dataset-specific transforms apply (`renderer/scanp
 3. ~~**Compute texture invalidation race** at `scrutinizer.js:735-739`. After upload, `_metamerInitialized` is set false to force resynthesis on next content change. Sustained pursuit during hover effects can leave old tiles lingering until next saccade. Consider velocity-gated re-invalidation instead.~~ **Fixed 2026-05-25.** Underlying bug was bigger than the original framing: the blanket post-upload `_metamerInitialized = false` defeated the intended freeze entirely — `shouldResynth` flipped to true every 2 frames (every `FRAME_INTERVAL`), so resynth ran at ~30Hz during stationary gaze regardless of saccade/drift. Replaced with a **time-throttled refresh gate** in `shouldResynth`: `refreshTimeout = (now − _lastSynthTimestamp) > METAMER_CONTENT_REFRESH_MS` (default 100ms via new `CONFIG.metamerContentRefreshMs`). Compute frequency on stationary gaze drops ~30Hz → ~10Hz (3× reduction). CSS animations / hover effects caught within the refresh window (≈ peripheral flicker-fusion threshold). True freeze restored during fixation. Removed the blanket post-upload reset; saccade landing, drift > 5°, and the periodic refresh tick now drive resynth. `console.debug` reason tag distinguishes `saccade`/`drift`/`refresh`/`init` for diagnostics.
 4. ~~**Face-model synchronous load** at `saliency-worker.js:48`. Workers stall on startup if the face-api model fetch hangs. Defer to first-frame request; fail gracefully if unavailable.~~ **Fixed 2026-05-25.** Original framing was half-right: the model fetch (`loadFromUri`) was already async/fire-and-forget, and per-frame code at line 260 already gated on `faceModelLoaded` for graceful degradation. The actual worker-boot blocker was the **synchronous `importScripts('./lib/face-api.min.js')` of a 1.3 MB library** at line 10. Restructured to lazy-load both the library and the model on the first `onmessage` saliency frame via a new `ensureFaceApi()` with a `faceLoadInFlight` re-entry guard. The face channel joins the saliency composite when ready; saliency (DoG + Oklab opponency) works immediately on the first frame regardless. If the library import or model fetch throws, the worker continues without face detection and avoids retry storms via the `faceLoadInFlight` flag. Import time is now logged via `performance.now()` deltas for future profiling. Smoke (`saliency` mode on dashboard.html) and unit suites pass.
 5. ~~**`blur-worker.js` is probably dead code.** Multi-octave fractal jitter appears superseded by WebGPU compute in Tier 2.5+. Audit the shader code path before removing.~~ **Fixed 2026-05-25.** Confirmed dead via grep — zero `new Worker(...blur-worker...)` references in active code. Removed `renderer/blur-worker.js` (191 lines) + its only consumer `renderer/image-processor.js` (329 lines, 520 lines total). Removed the `<script src="image-processor.js">` tag from `renderer/index.html`. Annotated the historical recommendation in `docs/beta_gemini3_discussion.md` to point at the shader successors (Bender + Cutter in `peripheral.frag`; Tier 2.5/2.75 WebGPU compute).
-6. ~~**Canvas-vs-frame dimension mismatch.** Canvas can be taller than frame (toolbar chrome). Manual scaling at `scrutinizer.js:654-656` for compute dispatch only — if the same scaling isn't applied to mask texture or overlays, artifacts appear. Add a coordinate-space diagram.~~ **Fixed 2026-05-25.** `docs/coordinate_systems.md` extended with a §7 "Sub-Spaces Inside the Physical Tier" — explicit table of canvas-CSS / canvas-Physical / frame buffer / compute half-res grids, two mermaid diagrams showing the data flow, and a diagnostic recipe for alignment drift. Cites the `gazeFrameX = gaze.x × (frameW / canvas.width)` ratio at `scrutinizer.js:660-661` as the load-bearing compensation.
+6. ~~**Canvas-vs-frame dimension mismatch.** Canvas can be taller than frame (toolbar chrome). Manual scaling at `scrutinizer.js:654-656` for compute dispatch only — if the same scaling isn't applied to mask texture or overlays, artifacts appear. Add a coordinate-space diagram.~~ **Fixed 2026-05-25.** `docs/coordinate_systems.md` extended with a "Sub-Spaces Inside the Physical Tier" section — explicit table of canvas-CSS / canvas-Physical / frame buffer / compute half-res grids, two mermaid diagrams showing the data flow, and a diagnostic recipe for alignment drift. Cites the `gazeFrameX = gaze.x × (frameW / canvas.width)` ratio at `scrutinizer.js:709-710` as the load-bearing compensation.
 7. **Magic 5-second congestion cooldown** at `scrutinizer.js:275`. Hardcoded 5000ms between congestion recomputes on DOM mutation. Should be configurable or tied to worker throughput.
 8. ~~**Congestion heatmap manual hide/restore** at `scrutinizer.js:264-267, 603-607`. If fresh data arrives but doesn't trigger restore logic, overlay stays hidden permanently. Tie visibility to a flag that survives edge cases.~~ **Fixed 2026-05-25.** Same bug class as #3: the restore at line 614 was nested inside the `gen !== _lastCongestionGeneration` gate, so if the congestion worker hung or the page never let congestion compute (broken DOM, crashed worker), the heatmap stayed hidden forever. Hoisted the restore out of the gen-gate and added a **stuck-timeout fallback** (default 10s, configurable via new `CONFIG.congestionHeatmapStuckTimeoutMs`). Restore now fires on either fresh data (preferred) or the timeout (last-resort). Hide paths at lines 271-275 and 344-349 record `_heatmapHiddenAt = performance.now()` so the timeout can compute elapsed. Stuck-timeout fires a `console.warn` so the recovery is visible in diagnostics.
 9. ~~**BGRA byte order in `peripheral.frag`**~~ **Fixed 2026-05-25.** `u_texture` is BGRA-byte-ordered (Electron capture quirk). Raw `textureLod(u_texture, ...).rgb` returns `(B, G, R)` in semantic terms; the `sampleSource*` helpers internally swap to true RGBA. Two channel-order regimes now documented in a contract block at the top of `peripheral.frag`. The two inconsistent sites in `sampleDomAwarePrimitive()` (pooledCol reads at L_categorical non-text branch + procedural-stripe text branch) routed through `sampleSourceLod()` so both `meanLum` and the downstream `applyChromaticEccentricityDecay` Oklab path see correct channels. Capture verification: A/B before/after on ecommerce.html across 5 fixations under Mode 20 → measurable diff (0.30% pixels @ max channel-delta 11/765 at fixation (0.5, 0.15), exactly where chromatic primitives sit in the parafoveal band 2-8°). Diff PNGs at `tests/golden-captures/bgra-audit/`. Comparison driver: `scripts/compare-bgra-audit.js`.
@@ -615,7 +615,7 @@ For scanpath data, additional dataset-specific transforms apply (`renderer/scanp
 1. Locate the uniform in `peripheral.frag` (or .wgsl)
 2. Find the JS-side write site in `webgl-renderer.js:815-946` or `webgpu-*.js`
 3. Check whether it's also in `shared/modes.json` `pipeline` block
-4. Update `docs/CLAIM_VERIFICATION.md` if the value maps to a citation
+4. Update `docs/arxiv-paper/CLAIM_VERIFICATION.md` if the value maps to a citation
 5. Re-run affected validation waves
 
 **To add an MCP tool:**
@@ -648,7 +648,7 @@ node scripts/report-color-search.js   # → tests/validation/reports/color-searc
 
 **Coordination notes:**
 - TTM (perceptual metamers) vs FOVI (computational geometry transform) are both implemented; both use linearly-growing pooling regions per Bouma's law but diverge in architecture.
-- Scrutinizer's modes registry enables side-by-side mode toggling between acuity-loss (MIP/DoG), cortical-pooling (sector), and Brown-metamer proxy paths — no prior tool enables this comparison.
+- Scrutinizer's modes registry enables side-by-side mode toggling between acuity-loss (MIP/DoG), cortical-pooling (sector), and Brown-metamer proxy paths.
 - `docs/meeting-prep-rosenholtz-blauch.md` tracks ongoing discussion.
 
 ---
@@ -659,7 +659,7 @@ node scripts/report-color-search.js   # → tests/validation/reports/color-searc
 
 Already-fixed errors: Curcio photoreceptor count (now corrected to 130M → 1.2M ratio); SNIF-ACT mechanism (cosine similarity, not spreading activation); oblique-effect citations split per author.
 
-Removed fabrications: "Zhang et al. 2015" → Pelli, Palomares & Majaj (2004); a hallucinated PNAS MT-cortex citation.
+Removed fabrications: "Zhang et al. 2015" → Pelli, Palomares & Majaj (2004). The previously uncited PNAS MT-cortex claim (cardinal preference of 10.1% in central vs 3.6% in peripheral MT) is now cited as Xu, Collins, Khaytin, Kaas & Casagrande (2006), PNAS 103:17490.
 
 ---
 

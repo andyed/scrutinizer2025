@@ -3,15 +3,15 @@
 > **Last updated:** 2026-03-08
 
 **Status:** Research phase
-**Priority:** High — bottom-up saliency is non-functional for UI elements <60px
+**Priority:** High. Bottom-up saliency is non-functional for UI elements <60px.
 **Tracks:** v2.2+ validation expansion
 **Depends on:** Saliency resolution upgrade (currently 256px DoG can't resolve small UI elements)
 
 ## The Problem
 
-Wave 4 validated saliency using basic psychophysics stimuli (color singletons, faces). The face detector (640px input) works — 4.79× protection ratio. But the bottom-up DoG saliency (256px input) cannot resolve individual UI elements smaller than ~60px. For non-face content, there is **no validated protection mechanism**.
+Wave 4 validated saliency using basic psychophysics stimuli (color singletons, faces). The face detector (640px input) works, with a 4.79× protection ratio. But the bottom-up DoG saliency (256px input) cannot resolve individual UI elements smaller than ~60px. For non-face content, there is **no validated protection mechanism**.
 
-This means: nav items, notification badges, status indicators, CTAs, and most interactive UI elements are invisible to the current saliency pipeline. The pipeline protects faces and large color pop-outs, not the things designers actually need protected.
+Nav items, notification badges, status indicators, CTAs, and most interactive UI elements are invisible to the current saliency pipeline, which protects only faces and large color pop-outs.
 
 ## Two Gaps to Close
 
@@ -22,7 +22,7 @@ The 256px DoG downscale destroys spatial information needed to detect UI element
 - Hybrid: DoG for color/luminance pop-out, structure map for layout-semantic saliency
 
 ### Gap 2: Validation Against Real UI Behavior
-No ground truth for "which UI elements should be protected." Need datasets where eye tracking or click behavior on real UIs reveals what users actually attend to peripherally.
+No ground truth for "which UI elements should be protected." Need datasets where eye tracking or click behavior on real UIs reveals what users attend to peripherally.
 
 ## Available Datasets & Studies
 
@@ -42,7 +42,7 @@ No ground truth for "which UI elements should be protected." Need datasets where
 
 | Study | What They Found | Validation Opportunity |
 |-------|-----------------|----------------------|
-| **Halverson & Hornof (2011)** | Dense text processed within 0.5° vs sparse within 1°. Sparse groups searched first. EPIC retinal availability: text within 1°, color within 7.5°. | Render their mixed-density layouts through Scrutinizer — does peripheral degradation predict sparse-first search pattern? |
+| **Halverson & Hornof (2011)** | Dense text processed within 0.5° vs sparse within 1°. Sparse groups searched first. EPIC retinal availability: text within 1°, color within 7.5°. | Render their mixed-density layouts through Scrutinizer: does peripheral degradation predict sparse-first search pattern? |
 | **Mairena et al. (2019)** | Peripheral notification detection up to 62°. Motion + color > either alone. Task interference degrades detection. | Test Scrutinizer's saliency map on notification-like stimuli at measured eccentricities. |
 | **SalChartQA (2024)** | Same chart → different fixations depending on question asked. | Task-driven saliency is beyond current pipeline (no task model), but useful as a ceiling comparison. |
 
@@ -52,7 +52,7 @@ No ground truth for "which UI elements should be protected." Need datasets where
 |------|-------------|------------|
 | **AIM (Aalto)** | 17 computational GUI metrics including saliency, clutter | Feed Scrutinizer output through AIM as independent quality check |
 | **CogTool-Explorer** | ACT-R visual search prediction for UIs | Compare Scrutinizer's structure-map-based search difficulty against CogTool predictions |
-| **GBVS** | Graph-Based Visual Saliency (Harel et al. 2006) | Baseline comparison — does Scrutinizer's DoG saliency at least match GBVS on UI content? |
+| **GBVS** | Graph-Based Visual Saliency (Harel et al. 2006) | Baseline comparison: does Scrutinizer's DoG saliency at least match GBVS on UI content? |
 
 ## Validation Protocol
 
@@ -69,7 +69,7 @@ No ground truth for "which UI elements should be protected." Need datasets where
    - Structure map contribution (if enabled)
 4. Report: "Scrutinizer saliency predicts X% of human fixations on UIs" with channel decomposition
 
-**Expected finding:** Face detector carries performance on portrait-heavy UIs; DoG underperforms on text/layout-heavy UIs; structure map (if enabled) may add value for navigation elements.
+**Expected finding:** Most of the performance on portrait-heavy UIs comes from the face detector; DoG underperforms on text/layout-heavy UIs; structure map (if enabled) may add value for navigation elements.
 
 ### Phase 2: Halverson Density Layouts
 
@@ -81,7 +81,7 @@ No ground truth for "which UI elements should be protected." Need datasets where
 4. Predict: sparse groups should have higher peripheral "availability" (lower degradation) than dense groups
 5. Compare against their eye-tracking finding: participants searched sparse groups first
 
-**This is the strongest behavioral validation available** — it directly tests whether Scrutinizer's density-gated peripheral model predicts real search behavior on structured layouts.
+Phase 2 tests directly whether Scrutinizer's density-gated peripheral model predicts real search behavior on structured layouts, which makes it the strongest behavioral validation available.
 
 ### Phase 3: Resolution Upgrade Validation
 

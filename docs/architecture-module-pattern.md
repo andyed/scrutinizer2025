@@ -7,7 +7,7 @@ This document defines the module loading strategy for the Scrutinizer renderer p
 Scrutinizer uses a hybrid approach because it runs in an Electron `BrowserWindow` with `nodeIntegration: true` but also relies on browser-style global access for some components.
 
 ### 1. CommonJS for Dependencies
-We use standard CommonJS `require()` to load dependencies. This ensures synchronous loading and proper order execution.
+We use standard CommonJS `require()` to load dependencies, so they load synchronously and execute in the proper order.
 
 **Correct:**
 ```javascript
@@ -23,7 +23,7 @@ const WebGLRenderer = require('./webgl-renderer'); // Must be required!
 ```
 
 ### 2. Class Exposure (The "Dual Export")
-Classes defined in separate files (like `WebGLRenderer.js`) must be exposed in **two ways** to satisfy both `require()` consumers and `<script>` tag consumers (like `overlay.html`).
+Classes defined in separate files (like `webgl-renderer.js`) must be exposed in **two ways** to satisfy both `require()` consumers and `<script>` tag consumers (like `overlay.html`).
 
 **Pattern for Class Files:**
 ```javascript
@@ -38,7 +38,7 @@ if (typeof module !== 'undefined' && module.exports) {
 window.MyClass = MyClass;
 ```
 
-**Why not `else`?** In Electron with `nodeIntegration: true`, the `module` object exists even in renderer processes. If you use `else`, the class exports to `module.exports` but never to `window`. Files loaded via `<script src="...">` (like in `overlay.html`) check `window.MyClass`, not `module.exports`.
+**Why not `else`?** In Electron with `nodeIntegration: true`, the `module` object exists even in renderer processes. If you use `else`, the class exports to `module.exports` but never to `window`. Files loaded via `<script src="...">` (like in `overlay.html`) read `window.MyClass` and cannot see `module.exports`.
 
 ### 3. The Entry Point (`overlay.js`)
 The main entry point (`overlay.js`) is loaded via `<script src="overlay.js">`. It does **not** export anything. Instead, it:

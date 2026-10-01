@@ -21,22 +21,22 @@ The application menu has been completely reorganized for better discoverability 
 *   **Direct Access**: Quick access to critical toggles like "Mongrel Mode" and "Aesthetic Mode".
 
 ### Saliency Map & Web Worker
-We've introduced a biologically-inspired **Saliency Map** to model bottom-up visual attention, now powered by a multi-threaded architecture.
+We've introduced a biologically-inspired **Saliency Map** to model bottom-up visual attention, now running on a multi-threaded architecture.
 *   **View Saliency Map**: New debug option to visualize the underlying saliency heatmap in real-time. See exactly which parts of the page are grabbing attention.
 *   **Web Worker Offloading**: Saliency computation (pixel-level color analysis) has been moved to a dedicated Web Worker (`saliency-worker.js`). This eliminates UI stutter during slow mouse movements by unblocking the main thread.
-*   **Saccadic Suppression**: Implemented a velocity-based optimization that skips heavy processing during rapid eye movements (saccades), mimicking the biological phenomenon of saccadic masking. This ensures the fovea remains responsive even during fast flicks.
+*   **Saccadic Suppression**: Implemented a velocity-based optimization that skips heavy processing during rapid eye movements (saccades), mimicking the biological phenomenon of saccadic masking. With the skip, the fovea stays responsive even during fast flicks.
 
 ### Visual Memory Refinements
 The visual memory system has been tuned for greater realism and usability.
-*   **Infinite Mode**: Now truly infinite, allowing you to "paint" the screen clear without decay.
-*   **Dwell-Time Persistence**: Memory accumulation is now proportional to dwell time—longer fixations create more lasting clarity.
+*   **Infinite Mode**: Now infinite, allowing you to "paint" the screen clear without decay.
+*   **Dwell-Time Persistence**: Memory accumulation is now proportional to dwell time. Longer fixations create more lasting clarity.
 *   **Mask Visualization**: Added a new Debug Mode (3) to visualize the visual memory mask buffer.
 
 ## 🧠 Biological Simulation
 
-*   **Rod Vision Aesthetic**: Implemented a true **Scotopic (Lab Mode)** aesthetic. It now correctly simulates rod vision characteristics:
+*   **Rod Vision Aesthetic**: Implemented a **Scotopic (Lab Mode)** aesthetic. It now simulates rod vision characteristics:
     *   **Monochromatic Tint**: Cyan-blue shift.
-    *   **Contrast Sensitivity**: Enhanced contrast in low-light conditions.
+    *   **Contrast Sensitivity**: Enhanced contrast in low-light conditions. *(Correction 2026-10-01: contrast sensitivity falls at scotopic light levels (van Nes & Bouman 1967). Rods have high absolute sensitivity to light, and rod-mediated contrast sensitivity is lower than cone-mediated, so the 1.2× contrast boost in this mode was a stylistic choice.)*
     *   **Film Grain**: Simulates neural noise in low-light signal processing.
 *   **Parafoveal Accuracy**: Corrected the parafoveal boundary to **2.5x** the foveal radius (approx. 5° visual angle), aligning with biological macula dimensions.
 *   **Eccentricity Scaling**: Distortion strength is now scaled based on eccentricity, preserving more geometric cues in the parafovea while maintaining crowding effects in the far periphery.

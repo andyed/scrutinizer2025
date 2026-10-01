@@ -1,6 +1,6 @@
 # Contributing to Scrutinizer
 
-Scrutinizer is a biologically-motivated foveated vision simulator for web interfaces. Contributions are welcome — whether you're fixing a bug, improving the simulation, or extending the architecture for your own research.
+Scrutinizer is a biologically-motivated foveated vision simulator for web interfaces. Contributions are welcome, whether you're fixing a bug, improving the simulation, or extending the architecture for your own research.
 
 ## Quick Start
 
@@ -23,7 +23,7 @@ scrutinizer.js (Pipeline Orchestrator)
   ├── visual-memory.js     → Visuospatial working memory
   ├── content-analysis.js  → Pre-cortical feature extraction (LGN)
   └── webgl-renderer.js    → V1/V4 shader pipeline
-        └── peripheral.frag (888-line GLSL fragment shader)
+        └── peripheral.frag (~2,600-line GLSL fragment shader)
 ```
 
 See [`docs/developers_guide.md`](docs/developers_guide.md) for the full module dependency graph, coordinate system docs, and the hybrid CommonJS/Window module pattern.
@@ -36,13 +36,13 @@ These are the designed-for places to plug in your own work:
 |---|---|---|
 | **Gaze input** | `update(x,y)` → position, velocity, fixation | Mouse proxy → Tobii SDK, WebGazer.js, scanpath replay |
 | **Saliency algorithm** | Frame bitmap → heatmap texture | Current Oklab DoG → Itti-Koch, DeepGaze II, ONNX model |
-| **Crowding model** | Integer uniform `u_v1_distortion_type` | Add Portilla-Simoncelli synthesis, oriented DoG filtering |
+| **Crowding model** | Integer uniform `u_v1_distortion_type` | Full Portilla-Simoncelli statistics (Tier 3), spacing-dependent crowding |
 | **Structure analysis** | DOM blocks → RGBA texture | Gestalt grouping → CV segmentation, semantic embedding |
 | **Pipeline config** | `shared/modes.json` | New rendering profiles with zero code changes |
 
 ## Research Projects
 
-See [`docs/research-opportunities.md`](docs/research-opportunities.md) — 17 open directions across vision science, HCI, accessibility, and systems, with research questions, deliverables, and publication venues.
+See [`docs/research-opportunities.md`](docs/research-opportunities.md) for 17 open directions across vision science, HCI, accessibility, and systems, with research questions, deliverables, and publication venues.
 
 ## How to Contribute
 
@@ -63,11 +63,11 @@ See [`docs/research-opportunities.md`](docs/research-opportunities.md) — 17 op
 
 ### Documentation and science
 
-The biological grounding matters. If you're adding or modifying a pipeline stage:
+If you're adding or modifying a pipeline stage:
 
 - Cite the relevant neuroscience in shader comments (see existing patterns in `peripheral.frag`)
 - Update [`docs/foveated-vision-model.md`](docs/foveated-vision-model.md) with the biology → computation mapping
-- Use the "compute demand management" framing — the system selectively allocates bandwidth, it doesn't degrade-then-restore
+- Use the "compute demand management" framing: the system selectively allocates bandwidth. Avoid describing it as degrading the page and then restoring detail.
 
 ## Key Files
 
@@ -100,10 +100,10 @@ Model provenance is recorded in `tests/validation/ocr-baseline.json` (`model` bl
 
 ## Code Style
 
-- Extensive inline comments explaining "why," not "what"
+- Extensive inline comments explaining why the code does what it does
 - Defensive: `isFinite()` checks, NaN guards in shader math
 - Biological terminology in module/variable names where it aids clarity
-- No unnecessary bundlers — direct ES6 modules via Electron
+- No unnecessary bundlers: scripts load directly in Electron through the hybrid CommonJS/Window pattern (see [`docs/architecture-module-pattern.md`](docs/architecture-module-pattern.md))
 
 ## License
 
@@ -111,4 +111,4 @@ MIT. The Figma plugin (`scrutinizer-figma/`) is excluded from the open-source re
 
 ## AI Disclosure
 
-Scrutinizer's architecture, documentation, scientific literature review, and grad student project backlog were developed through collaboration with Claude (Anthropic) via Claude Code. Human direction covers architectural decisions, conceptual framing, and perceptual validation. See the [arxiv system paper](docs/arxiv-paper/) for details on the AI-assisted development process.
+Scrutinizer's architecture, documentation, scientific literature review, and grad student project backlog were developed through collaboration with AI tools: Claude (Anthropic) via Claude Code, and Gemini (Google). Human direction covers architectural decisions, conceptual framing, and perceptual validation. See the [arxiv system paper](docs/arxiv-paper/) for details on the AI-assisted development process.

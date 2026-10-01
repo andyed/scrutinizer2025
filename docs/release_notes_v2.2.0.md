@@ -5,34 +5,34 @@
 
 ## In This Release
 
-1. [Oriented DoG Bands (Phase 1-3)](#oriented-dog-bands-phase-1-3) — Orientation-selective band attenuation across three phases: oblique effect, 4-channel V1 energy decomposition, radial-tangential anisotropy. 3 uniforms, 4-tap gradient.
-2. [Orientation Diagnostics](#orientation-diagnostics) — Debug levels 4 and 5 for visualizing orientation energy channels and band weights with fovea blend.
-3. [Static Page Optimization](#static-page-optimization) — Checksum-based dirty check eliminates redundant worker submissions on static pages.
-4. [Congestion-Gated Pooling Default](#congestion-gated-pooling-default) — Enabled by default in research modes with verified zero performance regression.
-5. [Resolution Controls](#resolution-controls) — Saliency and congestion resolution menus with persistent settings.
-6. [Menu Cleanup](#menu-cleanup) — Peripheral menu relabeled around simulation fidelity; Effect Type removed.
-7. [Performance Infrastructure](#performance-infrastructure) — FrameTimer, Perf HUD tab, automated A/B perf test.
-8. [Keyboard Shortcuts](#keyboard-shortcuts) — Direct keyboard access to visualization modes.
-9. [Test Harness Improvements](#test-harness-improvements) — Env vars for oriented DoG testing, scroll-to-top fix, A/B capture script.
-10. [Validation Report Format](#validation-report-format) — Claim/Basis/Result replacing Published/Validation/Result with badge pills.
-11. [Docs](#docs) — README restructure, arxiv paper reframe, content analysis pipeline spec.
-12. [MCP Server Expansion](#mcp-server-expansion) — Added new `capture_vision` tool for LLM agents to request foveated screenshots of URLs. Expanded setup documentation for Claude Desktop, Cursor, and Windsurf.
+1. [Oriented DoG Bands (Phase 1-4)](#oriented-dog-bands-phase-1-4): Orientation-selective band attenuation across four phases: oblique effect, 4-channel V1 energy decomposition, radial-tangential anisotropy, eccentricity-dependent fade. 3 uniforms, 4-tap gradient.
+2. [Orientation Diagnostics](#orientation-diagnostics): Debug levels 4 and 5 for visualizing orientation energy channels and band weights with fovea blend.
+3. [Static Page Optimization](#static-page-optimization): Checksum-based dirty check eliminates redundant worker submissions on static pages.
+4. [Congestion-Gated Pooling Default](#congestion-gated-pooling-default): Enabled by default in research modes with no measurable performance regression (p95 delta < 0.1 ms).
+5. [Resolution Controls](#resolution-controls): Saliency and congestion resolution menus with persistent settings.
+6. [Menu Cleanup](#menu-cleanup): Peripheral menu relabeled around simulation fidelity; Effect Type removed.
+7. [Performance Infrastructure](#performance-infrastructure): FrameTimer, Perf HUD tab, automated A/B perf test.
+8. [Keyboard Shortcuts](#keyboard-shortcuts): Direct keyboard access to visualization modes.
+9. [Test Harness Improvements](#test-harness-improvements): Env vars for oriented DoG testing, scroll-to-top fix, A/B capture script.
+10. [Validation Report Format](#validation-report-format): Claim/Basis/Result replacing Published/Validation/Result with badge pills.
+11. [Docs](#docs): README restructure, arxiv paper reframe, content analysis pipeline spec.
+12. [MCP Server Expansion](#mcp-server-expansion): Added new `capture_vision` tool for LLM agents to request foveated screenshots of URLs. Expanded setup documentation for Claude Desktop, Cursor, and Windsurf.
 
 ---
 
-## Oriented DoG Bands (Phase 1-3)
+## Oriented DoG Bands (Phase 1-4)
 
-The DoG peripheral reconstruction now modulates band attenuation by local edge orientation. Three phases, each adding a layer of biological fidelity:
+The DoG peripheral reconstruction now modulates band attenuation by local edge orientation. Four phases, each adding a layer of biological fidelity:
 
 ### Phase 1: Oblique Effect (Appelle 1972)
 
-Cardinal (horizontal/vertical) edges get their M-scaling cutoff eccentricities pushed ~50% further into the periphery than oblique edges. This matches the oblique effect — superior acuity for cardinal orientations, mediated by higher density of cardinally-tuned V1 simple cells (Appelle 1972).
+Cardinal (horizontal/vertical) edges get their M-scaling cutoff eccentricities pushed ~50% further into the periphery than oblique edges. *(Correction 2026-10-01: the v2.2.0 shader's cardinal fraction runs 0.33–0.67, so at the default bias of 1.0 the finest band's cutoff rises by at most ~33% for cardinal and ~17% for oblique edges, a cardinal advantage of ~14%. The coarsest band's advantage is ~3%.)* This matches the oblique effect: superior acuity for cardinal orientations, mediated by higher density of cardinally-tuned V1 simple cells (Appelle 1972).
 
 Implementation: 4-tap MIP-1 gradient samples with BGRA-corrected luminance. Gradient magnitude gate prevents noise amplification in flat regions. Orientation angle mapped to a cardinal bias factor via `cos(2*theta)`.
 
 ### Phase 2: 4-Channel V1 Energy Decomposition (Hubel & Wiesel 1962)
 
-Replaces the continuous `cos(2*theta)` orientation model with four discrete energy channels — horizontal, vertical, diagonal-45, diagonal-135 — matching V1 simple cell orientation columns.
+Replaces the continuous `cos(2*theta)` orientation model with four discrete energy channels (horizontal, vertical, diagonal-45, diagonal-135), a coarse approximation of V1 simple-cell orientation tuning.
 
 Cardinal fraction `max(E_H, E_V) / (max(E_H, E_V) + max(E_D45, E_D135))` replaces `cos(2θ)`. The max-of-pairs formulation avoids the degenerate case where summing overlapping projections yields a constant 0.5 regardless of orientation. Same 4 texture lookups, ~5 extra ALU ops.
 
@@ -42,9 +42,9 @@ Edges tangential to the gaze direction (running along eccentricity iso-contours)
 
 Implementation: edge orientation compared to the gaze-relative radial direction at each fragment. The radial-tangential bias modulates the cardinal/oblique bias from Phase 1.
 
-### Phase 4: Eccentricity-Dependent Fade (Berkley et al. 1975, Essock 1990)
+### Phase 4: Eccentricity-Dependent Fade (Berkley et al. 1975, Pointer 1996)
 
-The oblique effect diminishes with retinal eccentricity, and the rate depends on spatial frequency. Fine spatial frequencies lose the cardinal advantage by ~10° (Berkley et al. 1975 report disappearance at 8–18°). Coarse spatial frequencies retain a small advantage to 25°+ (Essock 1990).
+The oblique effect diminishes with retinal eccentricity, and the rate depends on spatial frequency. Fine spatial frequencies lose the cardinal advantage by ~10° (Berkley et al. 1975 report disappearance at 8–18°). Coarse spatial frequencies retain a small advantage to 25°+ (Pointer 1996, *Perception* 25:523, reports it out to at least 40°).
 
 Implementation: per-band `smoothstep` fade keyed to visual eccentricity in degrees. Fine bands (k=0) fade from 3° to 10°. Coarse bands (k=7) fade from 8° to 25°. Eccentricity in degrees derived from `fovea_radius / 1.0` (fovea ≈ 1° radius). When `u_px_per_deg` becomes available (see Roadmap: Calibrated Visual Angles), the approximation will be replaced.
 
@@ -53,7 +53,7 @@ Implementation: per-band `smoothstep` fade keyed to visual eccentricity in degre
 | Uniform | Default | Controls |
 |---------|---------|----------|
 | `u_dog_oriented` | 0.0 | Master enable for orientation-selective attenuation |
-| `u_dog_orient_bias` | 1.0 | Cardinal vs oblique bias strength (1.0=biological ~50%, 2.0=exaggerated) |
+| `u_dog_orient_bias` | 1.0 | Cardinal vs oblique bias strength (1.0=default, ~14% fine-band cardinal advantage; 2.0=exaggerated) |
 | `u_dog_radial_bias` | 0.0 | Radial-tangential anisotropy strength |
 
 Enabled by default in the primary visualization presets. Per-preset values configured in `modes.json`.
@@ -64,8 +64,8 @@ Enabled by default in the primary visualization presets. Per-preset values confi
 
 Two new debug visualization levels accessible via Simulation > Utility > Orientation Diagnostics:
 
-- **Debug 4 — 4-Channel Energy**: Renders orientation energy as color channels. R = horizontal, G = vertical, B = diagonal (mean of D45 + D135). Useful for verifying the gradient tap is picking up correct edge directions.
-- **Debug 5 — Band Weights + Orientation Tint**: Shows the per-band weight modulation with an orientation-dependent color tint, blended with a white fovea circle. Useful for verifying that cardinal edges retain weight further into the periphery than oblique edges.
+- **Debug 4 (4-Channel Energy)**: Renders orientation energy as color channels. R = horizontal, G = vertical, B = diagonal (mean of D45 + D135). Useful for verifying the gradient tap is picking up correct edge directions.
+- **Debug 5 (Band Weights + Orientation Tint)**: Shows the per-band weight modulation with an orientation-dependent color tint, blended with a white fovea circle. Useful for verifying that cardinal edges retain weight further into the periphery than oblique edges.
 
 ---
 
@@ -73,9 +73,9 @@ Two new debug visualization levels accessible via Simulation > Utility > Orienta
 
 Worker submissions are now gated by a fast pixel-sample checksum. On a static page, both saliency and congestion workers drop to zero submissions after the initial computation settles.
 
-`_computeFrameChecksum()` samples ~1024 evenly-spaced pixels from the raw buffer (~0.01ms). If the checksum matches the previous submission, the entire worker path is skipped — no BGRA→RGBA copy, no `createImageBitmap`, no `postMessage`. Independent checksums for each worker so resolution or mode changes on one path don't force recomputation on the other.
+`_computeFrameChecksum()` samples ~1024 evenly-spaced pixels from the raw buffer (~0.01ms). If the checksum matches the previous submission, the entire worker path is skipped, including the BGRA→RGBA copy, `createImageBitmap` and `postMessage`. Independent checksums for each worker so resolution or mode changes on one path don't force recomputation on the other.
 
-The congestion path accepts a `force` parameter — scroll, DOM mutation, and navigation events bypass the dirty check because viewport content may have changed even if sampled pixels happen to match.
+The congestion path accepts a `force` parameter: scroll, DOM mutation, and navigation events bypass the dirty check because viewport content may have changed even if sampled pixels happen to match.
 
 ---
 
@@ -114,11 +114,11 @@ Relabeled from percentage-based scale to simulation-fidelity anchored labels:
 | Strong (80%) | Amplified | 0.8 |
 | Maximum (100%) | Maximum | 1.0 |
 
-"Reference" is the anchor — the value that best approximates real peripheral vision degradation. Labels communicate deviation from the reference, not arbitrary intensity percentages.
+"Reference" is the anchor: the value intended to approximate real peripheral vision degradation (not calibrated against perceptual data). Labels communicate deviation from the reference.
 
-### Effect Type — Removed
+### Effect Type: Removed
 
-The Peripheral > Effect Type submenu has been removed. `mongrelMode` is set per-mode in `modes.json` — the manual toggle was overridden on every mode switch.
+The Peripheral > Effect Type submenu has been removed. `mongrelMode` is set per-mode in `modes.json`, and the manual toggle was overridden on every mode switch.
 
 ---
 

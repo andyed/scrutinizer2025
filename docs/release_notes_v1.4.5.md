@@ -2,6 +2,8 @@
 
 **Release Date:** 2026-01-19
 
+*(Note 2026-10-01: v1.4.5 was never tagged or published as a GitHub release. These changes first shipped in v1.5.0.)*
+
 ## Overview
 This release focuses on **academic extensibility**, making Scrutinizer a better platform for researchers and PhD students to hack on. It introduces a declarative mode registry and citation-ready image exports.
 

@@ -6,31 +6,32 @@ This document explains how Scrutinizer simulates human foveal / peripheral visio
 
 ## 1. The Biology: From Photoreceptors to Perception
 
-Before diving into shader parameters, it helps to understand *why* foveal and peripheral vision differ so dramatically. The answer lies in the architecture of the visual system itself—from the retina to the cortex.
+Foveal and peripheral vision differ because of the architecture of the visual system, from the retina to the cortex. This section covers that biology before the shader parameters.
 
 ### 1.1 The Retina: Two Receptor Systems
 
-The human retina contains two fundamentally different photoreceptor types, each optimized for different tasks:
+The human retina contains two photoreceptor types, each optimized for different tasks:
 
-#### Cones (The "What" System)
+#### Cones
 - **~6 million** total, concentrated in the **fovea** (central 2° of vision)
 - **Three types** (L, M, S) enable color vision
 - **High temporal resolution** for fine detail and motion
-- **1:1 wiring** in the fovea—each cone connects to its own ganglion cell
+- **1:1 wiring** in the fovea: each cone connects to its own ganglion cell
 - **Peak density**: ~200,000 cones/mm² at the foveal center
 
-#### Rods (The "Where" System)
+#### Rods
 - **~120 million** total, distributed across the **periphery**
 - **Single type** (no color discrimination)
-- **Peak sensitivity at 505nm** (cyan/blue-green)—blind to red light
+- **Peak sensitivity at ~505nm** (cyan/blue-green); very low sensitivity to long-wavelength (red) light
+- **Little role at display luminances**: screen viewing is photopic, so peripheral color loss on screen is a cone-pathway effect (Section 9)
 - **Convergent wiring**: ~100 rods share a single ganglion cell
 - **Peak density**: ~160,000 rods/mm² at ~20° eccentricity
 
-This distribution is not a design flaw — it's an optimization. The fovea sacrifices sensitivity for resolution (1:1 wiring). The periphery sacrifices resolution for sensitivity (100:1 convergence). You can't have both.
+The distribution reflects a trade-off between resolution and sensitivity. The fovea sacrifices sensitivity for resolution (1:1 wiring). The periphery sacrifices resolution for sensitivity (100:1 convergence).
 
 ### 1.2 The Wiring: Why Periphery is "Blurry"
 
-The critical difference isn't just receptor density—it's **how receptors connect to the brain**.
+The resolution each region can deliver depends on **how receptors connect to the brain** as well as on receptor density.
 
 ```
 FOVEA (1:1 Wiring)              PERIPHERY (Convergent Wiring)
@@ -48,7 +49,7 @@ In the periphery, **receptive fields grow with eccentricity**. A single ganglion
 - **Preserves statistical summaries** (average brightness, texture energy)
 - **Enables motion detection** (any rod in the pool triggers the cell)
 
-This is why peripheral vision sees "textures" rather than "letters"—the wiring physically prevents high-resolution readout.
+This retinal pooling limits peripheral acuity. The texture-like appearance of peripheral text comes mainly from crowding, which is cortical (Section 1.3; Pelli 2008).
 
 ### 1.3 The Pathway: Retina → LGN → V1 → V4
 
@@ -67,7 +68,7 @@ Visual information flows through a hierarchical pipeline, with each stage adding
 │        ↓                                                            │
 ├─────────────────────────────────────────────────────────────────────┤
 │  LGN (Lateral Geniculate Nucleus) — "The Gatekeeper"                │
-│  • Receives 10-20% input from retina, 30-40% from V1 FEEDBACK       │
+│  • Retina supplies ~5-10% of inputs; V1 FEEDBACK supplies ~30%      │
 │  • Implements attentional gating (what gets through to cortex)      │
 │  • Separates Magnocellular (motion/luminance) from Parvocellular    │
 │    (color/detail) streams                                           │
@@ -83,21 +84,19 @@ Visual information flows through a hierarchical pipeline, with each stage adding
 │  V4 (Visual Area 4) — "The Interpreter"                             │
 │  • Color constancy and surface perception                           │
 │  • Shape recognition (curves, contours)                             │
-│  • Aesthetic processing begins here                                 │
 │        ↓                                                            │
 │  Higher Areas (IT, FFA, PPA...) — Object/Face/Scene recognition     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 1.4 Cortical Magnification: The Fovea's Unfair Advantage
+### 1.4 Cortical Magnification
 
-Even though the fovea covers only **2° of visual angle** (~1% of the visual field), it commands **~50% of V1's cortical surface area**. This "cortical magnification" means:
+Cortical magnification is highest at the fovea and falls with eccentricity: the central 10° of the visual field occupies roughly half of V1's surface area (Horton & Hoyt 1991, *Archives of Ophthalmology*, doi:10.1001/archopht.1991.01080060080030). This "cortical magnification" means:
 
 - Foveal signals get more neurons, more processing, more bandwidth
 - Peripheral signals are compressed into fewer neurons
-- The brain literally allocates more "compute" to the center
 
-> **Scrutinizer's Pipeline Mirrors This**: Our LGN → V1 → V4 shader stages are named after these biological areas. While not a rigorous simulation, the architecture reflects the same principle: gating (LGN), geometric distortion (V1), and aesthetic rendering (V4).
+> **Scrutinizer's Pipeline Names**: Our LGN → V1 → V4 shader stages are named after these biological areas. The names are software labels for each stage's role: the LGN stage computes gating, the V1 stage geometric distortion, and the V4 stage color and style (see Section 13). The stages do not simulate those brain areas.
 
 ### 1.5 What This Means for Peripheral Vision
 
@@ -107,7 +106,7 @@ The biological architecture produces several emergent properties that Scrutinize
 |----------------------|-------|---------------------------|
 | **Resolution loss** | Receptor pooling (100:1) | Approximate DoG band decomposition (MIP-derived, box/bilinear not Gaussian) with M-scaling rolloff; legacy: simple MIP pooling |
 | **Chromatic pooling** | Reduced chromatic spatial resolution; mean chromaticity preserved over large regions (Rosenholtz TTM) | Per-channel RG/YV attenuation in DoG bands (castleCSF). Spec: `docs/specs/implemented/chromatic_pooling.md`. Validated: Wave 1 (Hansen 2009, Mullen 2002). |
-| **Crowding** | Receptive field overlap | Density-gated V1 distortion (sigmoid on structure density). Spec: `docs/specs/implemented/density_gated_crowding.md`. Validated: Wave 3 (Bouma 1970), Wave 5 (Halverson 2011). Future: mongrel texture synthesis (`docs/specs/implemented/mongrel_textures.md`). |
+| **Crowding** | Receptive field overlap | Density-gated V1 distortion (sigmoid on structure density). Spec: `docs/specs/implemented/density_gated_crowding.md`. Validated: Wave 3 (Bouma 1970). Wave 5 (Halverson & Hornof 2011): density discrimination not met, gate too coarse (`docs/specs/implemented/halverson_hornof_validation.md`). Future: mongrel texture synthesis (`docs/specs/implemented/mongrel_textures.md`). |
 | **Motion sensitivity** | Magnocellular pathway | Preserved contrast in periphery |
 | **Positional uncertainty** | Large receptive fields | Simplex noise displacement |
 
@@ -115,7 +114,7 @@ The biological architecture produces several emergent properties that Scrutinize
 
 ## 2. Coordinate System and Foveal Radius
 
-Now that we understand *why* foveal and peripheral vision differ, we can map these biological constraints to shader parameters.
+This section maps the biological constraints above to shader parameters.
 
 The WebGL renderer receives:
 
@@ -133,32 +132,34 @@ This allows us to express all zones as **fractions of the configured foveal radi
 
 Biologically, the fovea is approximately circular. For screen-based reading and text layouts, we deliberately apply an **elliptical aspect correction** (default 4:3) so that the "usable" sharp region better matches the horizontally biased saccades you make across lines of text.
 
-### Biological Calibration: The 5° Macular Region
+### Biological Calibration
 
-The **parafoveal region** (fovea + parafovea combined) corresponds to the **5° macular zone** in biological vision. On a high-density display at typical viewing distance (~60cm), this translates to approximately:
+At the default calibration (45 px ≈ 1° on a MacBook Pro Retina at ~50 cm; see [`foveal-calibration-logic.md`](foveal-calibration-logic.md) §7):
 
-- **Macular (0-5°) diameter**: ~462px
-- **Macular (0-5°) radius**: ~231px
-- **Foveal (0-2°) radius**: ~92px
-- **Ratio**: 231/92 = **2.5x**
+- **Foveal radius (1°)**: 45px (2° diameter)
+- **Parafovea boundary (5° eccentricity)**: ~225px radius. Reading research conventionally places the parafovea out to 5° from fixation (Rayner 1998).
+- **Shader parafovea boundary**: `parafovea_radius` is fixed at 2.5 × the foveal radius, which is ~113px (2.5°) at the default calibration. The shader's parafovea band (1°–2.5°) is narrower than the 5° reading-research parafovea.
 
-This ~462px diameter zone is where users can rapidly perceive holistic information and spatial cues without making a saccade. Parafoveal processing handles:
+The parafovea is where users can perceive holistic information and spatial cues without making a saccade. Parafoveal processing handles:
 - Word length perception (saccade planning)
 - Link detection (contrast + geometric cues)
 - Layout structure (spatial relationships)
 
-**Parafoveal Boundaries by Foveal Setting**:
+**Foveal Radius Presets** (Simulation > Foveal > Foveal Radius):
 
-| Foveal Setting | Foveal Radius | Parafoveal Boundary (2.5x) | Biological Mapping |
-|----------------|---------------|----------------------------|-------------------|
-| Extra Small    | 20px          | 50px                       | -                 |
-| Small          | 45px          | 113px                      | -                 | 
-| Medium         | 90px          | 225px                      | ~5° macula        |
-| **Large**      | **180px**     | **450px**                  | Exaggerated       |
-| Extra Large    | 300px         | 750px                      | Demo/presentation |
-| Huge           | 450px         | 1125px                     | Extreme demo      |
+| Preset | Foveal Radius | Shader Parafovea Boundary (2.5x) |
+|--------|---------------|----------------------------------|
+| Extra Small | 20px | 50px |
+| **Medium (default)** | **45px** | **113px** |
+| Relaxed | 70px | 175px |
+| Wide | 90px | 225px |
+| Large | 110px | 275px |
+| Extra Large | 130px | 325px |
+| Huge | 180px | 450px |
+| Extreme | 300px | 750px |
+| Full Screen | 450px | 1125px |
 
-**Recommended Setting**: **Medium (90px)** provides the closest match to biological reality (~231px macular boundary).
+**Recommended Setting**: **Medium (45px)**, the default, gives a 1° foveal radius at the reference calibration. Larger presets widen the clear zone for demos and design review.
 
 ---
 
@@ -171,7 +172,7 @@ All non‑foveal processing is defined in terms of three concentric zones, expre
   - Visual: crystal‑clear, full color, no positional warping or jitter.
 
 - **Parafovea**  
-  - Range: `1.0 × radius_norm → 2.5 × radius_norm` (biological macula: 0-5°)
+  - Range: `1.0 × radius_norm → 2.5 × radius_norm` (1°–2.5° at the default calibration)
   - Visual: increasing domain warp and high‑frequency jitter. Features are present but positions are uncertain ("heat‑haze crowding").
 
 - **Far periphery**  
@@ -183,7 +184,7 @@ Key constants in the shader:
 - `fovea_radius = radius_norm`
 - `parafovea_radius = radius_norm * 2.5`
 
-The parafoveal region (2-5°) represents the **macular zone** where users can perceive holistic information without direct fixation.
+At the default calibration the shader's parafovea band spans 1°–2.5° eccentricity, the inner part of the 5° reading-research parafovea.
 
 The **debug boundary overlay** is drawn exactly at `dist == fovea_radius`, so the visible grey ring matches the true edge of the sharp foveal zone.
 
@@ -191,44 +192,27 @@ The **debug boundary overlay** is drawn exactly at `dist == fovea_radius`, so th
 
 ## 4. Strength Masks (Distance → Effect Curves)
 
-The shader defines several scalar “strength” values derived from the distance `dist`. These are smoothstep curves that go from 0 to 1 across a band of radii.
+The V4 stage derives its effect strengths from one master curve over eccentricity beyond the foveal edge, `eccentricity = max(0, dist − fovea_radius)`:
 
-- **Warp strength** (positional warp envelope)
-  - Formula: `warpStrength = smoothstep(fovea_radius, parafovea_radius, dist)`
-  - Interpretation: 0 in the fovea, ramps up across the parafovea, and stays high into the periphery.
+- **Master blend** `t = smoothstep(0, 4 × fovea_radius, eccentricity)`
+  - Interpretation: the fovea-to-pooled spatial blend (`blendFactor = t × u_intensity`). 0 at the foveal edge, 1 at four foveal radii beyond it.
 
-- **Chromatic aberration strength**
-  - Uses a dithered distance: `distDithered = dist + noise * 0.3`.
-  - Formula: `caStrength = smoothstep(periphery_start, periphery_start + 0.25, distDithered)`
-  - Interpretation: chromatic splitting only beyond the near periphery. The added noise **breaks the perfectly geometric CA ring**, eliminating a “curtain effect” and creating an organic, ragged transition instead of a hard lens-filter edge.
+- **Color effects** `t²`
+  - Interpretation: onset of chromatic aberration (Section 8), deferred relative to the spatial blend.
 
-- **Rod vision strength** (desaturation / tint / grain)
-  - Formula: `rodStrength = smoothstep(fovea_radius, periphery_start, dist)`
-  - Interpretation: begins just outside the fovea, increases through parafovea, and saturates into periphery.
+- **Rod desaturation** `t³`
+  - Interpretation: base chroma reduction and tint, deferred further toward the far periphery.
 
-- **Scatter strength** (pixelation envelope)
-  - Formula: `scatterStrength = smoothstep(periphery_start, periphery_start + 0.2, dist)`
-  - Interpretation: only active in far periphery, where the visual field becomes noisy and blocky.
+V1 distortion strength follows a separate curve. In `processV1()`, `corticalStrength = clamp(ecc_deg / ecc_max, 0, 1)` (with `ecc_max` derived from the viewport extent through the CMF), and strength = LGN suppression factor × `v1_strength_mult` × `0.4 × corticalStrength² × ecc_max`, scaled further by the density gate (Section 5.2) and Visual Memory.
 
 Boolean helpers:
 
-- `isParafovea = dist > fovea_radius && dist <= periphery_start`
-- `isFarPeriphery = dist > periphery_start`
+- `isParafovea = dist_stable > fovea_radius && dist_stable <= parafovea_radius`
+- `isFarPeriphery = dist_stable > parafovea_radius`
 
 These flags are used to select different amplitudes for warp and jitter.
 
-For intuition, you can think of each effect as a 1D curve over radius:
-
-```text
-Effect strength
-1.0 |           _________ Rod Vision
-    |          /
-    |         /    _____ Scatter / Pixelation
-    |        /    /
-0.0 |_______/____/___________________________
-     0.0   1.0  1.2   1.35               dist
-        Fovea   Para   Transition → Periphery
-```
+For intuition: at mid-transition (`t = 0.5`), color effects are at 0.25 and rod desaturation at 0.125, so color and rod effects arrive later than the spatial blend.
 
 ---
 
@@ -238,10 +222,10 @@ The shader models the growth of receptive field size with eccentricity using **d
 
 1. A coarse multi‑octave noise field (`warpVector`) is sampled in an aspect‑corrected space.
 2. The amplitude of this warp is increased in the periphery but kept small and vertically “crushed” in the parafovea to preserve rough baselines and vertical strokes.
-3. This warp is multiplied by `warpStrength` and the global intensity.
+3. This warp is multiplied by the V1 distortion strength (Section 4) and the global intensity, with a 2:1 horizontal bias.
 
-**Crowding Simulation (Mipmap Bias Pooling)**:
-In v1.3+, we introduced **Mipmap Bias Pooling**. Instead of simply distorting pixel coordinates (which preserves high-frequency detail in the wrong place), the shader now increases the Texture LOD (Level of Detail) bias based on eccentricity. This forces the GPU to sample a lower-resolution 'summary statistic' of the texture. When combined with domain warping, this physically simulates **interactional crowding**: features from adjacent letters merge into a 'mongrel' texture, preserving the word shape while destroying legibility.
+**Mipmap Bias Pooling (fallback path)**:
+When `dog_enabled` is false, the shader increases the texture LOD (Level of Detail) bias with eccentricity, so the GPU samples a lower-resolution local average of the texture. Modes with `dog_enabled: true`, which include the default mode and most research modes, use DoG band decomposition instead (Section 5.1). A MIP level is a local mean. It is not a summary-statistic (TTM) representation. Combined with domain warping, it approximates crowding: features from adjacent letters merge, preserving word shape while destroying legibility.
 
 Intuition:
 
@@ -250,9 +234,9 @@ Intuition:
 
 ### 5.1 DoG Band Decomposition (v1.6+)
 
-The simple MIP pooling approach uniformly blurs content, progressively destroying spatial structure. Real peripheral vision is more selective: low-frequency structure (layout, button shapes, large text) persists while high-frequency detail (letter serifs, fine textures) drops off first. This is because retinal ganglion cells have **center-surround receptive fields** that are well-modeled by Difference-of-Gaussians (DoG) filters, and their size grows with eccentricity (**M-scaling**).
+The simple MIP pooling approach uniformly blurs content, progressively destroying spatial structure. Peripheral vision is more selective: low-frequency structure (layout, button shapes, large text) persists while high-frequency detail (letter serifs, fine textures) drops off first. This is because retinal ganglion cells have **center-surround receptive fields** that are well-modeled by Difference-of-Gaussians (DoG) filters, and their size grows with eccentricity (**M-scaling**).
 
-**Key insight**: The hardware MIP chain (generated every frame by `gl.generateMipmap()`) provides an approximate multi-scale decomposition using box/bilinear filtering (not true Gaussian convolution as in Burt & Adelson 1983). Subtracting adjacent MIP levels gives **approximate Laplacian pyramid bands** that function analogously to DoG, with some spectral leakage between bands:
+The hardware MIP chain (generated every frame by `gl.generateMipmap()`) provides an approximate multi-scale decomposition using box/bilinear filtering (not true Gaussian convolution as in Burt & Adelson 1983). Subtracting adjacent MIP levels gives **approximate Laplacian pyramid bands** that function analogously to DoG, with some spectral leakage between bands:
 
 ```glsl
 // 13 MIP levels at half-octave spacing (LOD 0.0 to 6.0 in 0.5 steps)
@@ -272,9 +256,9 @@ band[2] = mip[2] - mip[3];  // ~2.83 cpd: letter bodies
 // residual = mip[12]        // ~0.088 cpd: DC, always preserved
 ```
 
-Each band is attenuated by a **smoothstep rolloff** based on normalized eccentricity, with cutoff distances derived from **linear M-scaling** (Rovamo & Virsu 1979, Levi, Klein & Aitsebaomo 1985):
+Each band is attenuated by a **smoothstep rolloff** based on normalized eccentricity. On the linear path (`cmf_enabled: false`), cutoff distances are derived from **linear M-scaling** (Rovamo & Virsu 1979, Levi, Klein & Aitsebaomo 1985):
 
-The minimum resolvable spatial detail grows linearly with eccentricity: **s_min(e) = s₀ × (1 + e/E₂)**. Band k (spatial scale 2^k px) drops out when s_min(e) > 2^k, giving cutoff eccentricity = E₂ × (2^k − 1):
+The minimum resolvable spatial detail grows linearly with eccentricity: **s_min(e) = s₀ × (1 + e/E₂)**. Band k (0-indexed, spatial scale 2^((k+1)/2) px at half-octave spacing) drops out when s_min(e) exceeds that scale, giving cutoff eccentricity = E₂ × (2^((k+1)/2) − 1):
 
 | Band | Freq (cpd) | Cutoff (× E₂) | Content Preserved |
 |------|-----------|----------------|-------------------|
@@ -286,26 +270,32 @@ The minimum resolvable spatial detail grows linearly with eccentricity: **s_min(
 | band[5] | 1.0  | 7.0   | Word groups |
 | band[6] | 0.71 | 10.314 | Buttons, panels |
 | band[7] | 0.5  | 15.0  | Layout blocks |
-| residual | 0.35 | Always | DC: overall color/luminance |
+| band[8] | 0.354 | 21.627 | Large panels |
+| band[9] | 0.25 | 31.0 | Page sections |
+| band[10] | 0.177 | 44.255 | Half-page regions |
+| band[11] | 0.125 | 63.0 | Full-width color fields |
+| residual | 0.088 | Always | DC: overall color/luminance |
 
-The non-uniform spacing is biologically correct: coarse structure (bands 2–3) persists far into the periphery while fine detail (band 0) drops quickly. You can see *where* a button is without being able to read its label — matching the subjective experience of peripheral vision.
+When `cmf_enabled` is true (most shipped modes, including the default), the cutoffs follow the Schwartz log-CMF form instead: `c[k] = cmf_a × (exp((k+1) × 0.5 × scale) − 1) / fovea_deg`, with `scale` derived from the viewport's cortical extent (`u_cortical_max`) and `fovea_deg = 1`. `dog_e2` applies only to the linear path.
+
+The non-uniform spacing follows from M-scaling: coarse structure (bands 2–3) persists far into the periphery while fine detail (band 0) drops quickly. You can see *where* a button is without being able to read its label, which matches the subjective experience of peripheral vision.
 
 **Parameters** (configurable per mode in `modes.json`):
-- `dog_e2` — M-scaling half-rate eccentricity. The eccentricity (in normalized screen coordinates) at which the resolution threshold doubles. Operates in **normalized screen coordinates** (eccentricity / fovea_radius), not degrees of visual angle. Calibrated to the effective `normEcc` range (~0–0.8) produced by the V4 coupled eccentricity pipeline. Lower = more aggressive filtering. Default: 0.15 (High-Key), 0.12 (Biological).
-- `dog_sharpness` — Band transition sharpness. 0.0 = gradual rolloff (wider transitions), 1.0 = sharp cutoff (narrow transitions).
-- `dog_enabled` — Boolean gate. When false, falls back to legacy simple MIP pooling.
+- `dog_e2`: M-scaling half-rate eccentricity (linear path only). The eccentricity (in normalized screen coordinates) at which the resolution threshold doubles. Units are **normalized screen coordinates** (eccentricity / fovea_radius). The value is not in degrees of visual angle. Calibrated to the effective `normEcc` range (~0–0.8) produced by the V4 coupled eccentricity pipeline. Lower = more aggressive filtering. Default: 0.15 (High-Key), 0.12 (Biological).
+- `dog_sharpness`: Band transition sharpness. 0.0 = gradual rolloff (wider transitions), 1.0 = sharp cutoff (narrow transitions).
+- `dog_enabled`: Boolean gate. When false, falls back to legacy simple MIP pooling.
 
 **Caveats and design choices**:
-- The DoG input (`coupledEccentricity`) is modulated by V1 distortion strength and intensity, making it **attention-gated** rather than purely position-dependent. This diverges from biology (where RF size is fixed by retinal position) but produces a more usable result for the simulation's interactive context.
+- The DoG input (`coupledEccentricity`) is modulated by V1 distortion strength and intensity, making it **attention-gated** as well as position-dependent. This diverges from biology, where RF size is fixed by retinal position, but produces a more usable result for the simulation's interactive context.
 - Band differences (mip_k − mip_{k+1}) can be negative. The shader clamps the final reconstruction to [0,1] to prevent out-of-range artifacts.
 
-**Result**: Parafoveal text shows a "frosted glass" quality—letter shapes and word boundaries remain visible but unreadable—rather than the uniform fog of simple MIP pooling. This better matches the subjective experience of peripheral vision.
+With DoG bands, parafoveal text has a "frosted glass" quality: letter shapes and word boundaries remain visible, but the text cannot be read. Simple MIP pooling produces a uniform fog instead.
 
-### 5.2 Known Limitation: Density-Independent Crowding
+### 5.2 Density-Gated Crowding
 
-The V1 Lateral Smash (domain warping) and MIP pooling are both purely eccentricity-dependent. An isolated letter and a densely flanked letter at the same eccentricity receive identical displacement and pooling. In biological vision, the isolated letter remains identifiable while the flanked letter does not (Bouma 1970; Pelli & Tillman 2008).
+The V1 Lateral Smash (domain warping) and DoG pooling depend on eccentricity. Without a density term, an isolated letter and a densely flanked letter at the same eccentricity would receive identical displacement and pooling. In biological vision, the isolated letter remains identifiable while the flanked letter does not (Bouma 1970; Pelli & Tillman 2008).
 
-The structure map carries a density channel (`structure.g`) through the LGN signal, but it's currently used only for the whitespace gate (`density < 0.1 → suppressionFactor = 0`), not for scaling V1 distortion strength. A sigmoid gate now modulates V1 strength with a sigmoid transfer on density — dense content gets full Lateral Smash, isolated elements get reduced distortion (floor at 0.3 for residual acuity loss). Shipped in v1.9.1 with threshold=0.6, steepness=20.0.
+The structure map stores a density channel (`structure.g`), which the LGN signal passes on. Density gates the simulation twice: below 0.1 it sets the LGN suppression factor to 0 (the whitespace gate), and a sigmoid on blurred density scales V1 distortion strength, so dense content gets full Lateral Smash and isolated elements get reduced distortion (floor at 0.3 for residual acuity loss). Parameters are set per mode in `modes.json`: `crowding_density_threshold` 0.3 and `crowding_density_steepness` 20.0.
 
 - **Diagnostic pages:** `reference-pages/crowding.html` (crowded-vs-isolated letters), `reference-pages/crowding-stimulus.html` (orientation, color grouping, complexity)
 - **Spec:** [`docs/specs/implemented/density_gated_crowding.md`](specs/implemented/density_gated_crowding.md)
@@ -317,11 +307,11 @@ The structure map carries a density channel (`structure.g`) through the LGN sign
 
 ### Why the renderer reads the DOM
 
-Pixel-only foveated renderers treat a paragraph of 14px text and a solid-color banner identically at the same eccentricity — both are just luminance and chrominance values. The visual system does not. Rosenholtz's Texture Tiling Model (2012) predicts that peripheral vision computes summary statistics over pooling regions that grow with eccentricity. What matters is the *content* of those regions: a pooling region covering dense text contains high local feature variance (many edges, mixed orientations, heterogeneous spacing), while one covering a banner contains low variance. The summary statistics differ, so peripheral discriminability differs.
+Pixel-only foveated renderers treat a paragraph of 14px text and a solid-color banner identically at the same eccentricity, since both are luminance and chrominance values. The visual system does not. Rosenholtz's Texture Tiling Model (2012) predicts that peripheral vision computes summary statistics over pooling regions that grow with eccentricity. The statistics depend on the *content* of those regions. A pooling region covering dense text contains high local feature variance (many edges, mixed orientations, heterogeneous spacing), while one covering a banner contains low variance. The summary statistics differ, so peripheral discriminability differs.
 
-Scrutinizer exploits a structural advantage that pixel-only renderers lack: access to the DOM. The scanner knows that a block is text (not a texture), knows its line height, font weight, and spacing to neighbors. It groups adjacent text nodes into paragraph clusters using Gestalt proximity before the shader ever runs. This pre-grouping feeds the density channel that drives the V1 crowding gate — dense text clusters get full displacement, isolated elements are spared. The density signal is structural, computed from the node tree rather than inferred from pixel variance.
+Unlike pixel-only renderers, Scrutinizer has access to the DOM. The scanner reads whether a block is text, along with its line height, font weight, and spacing to neighbors. It groups adjacent text nodes into paragraph clusters using Gestalt proximity before the shader runs. The density channel is computed from these groups of DOM nodes and is the input to the V1 stage's crowding gate. Dense text clusters get full displacement, and isolated elements are spared.
 
-To unify this across the Open Web (DOM) and Figma (Scene Graph), v2.0 introduces an **Abstract Layout Provider** architecture. Instead of ad-hoc heuristics, the renderer consumes a normalized data stream of layout blocks.
+To unify this across the Open Web (DOM) and Figma (Scene Graph), v2.0 introduces an **Abstract Layout Provider** architecture. The renderer consumes a normalized data stream of layout blocks.
 
 ### The Data Model: `StructureBlock`
 Layout data is extracted into a flat array of lightweight objects:
@@ -342,10 +332,10 @@ The structure map must stay synchronized with content during scrolling. The impl
 - **Debounced final scan** (100ms): Guarantees capture of exact final scroll position
 - **Mutation throttle** (100ms): Efficient handling of DOM changes
 
-This ensures smooth visual tracking during scroll with no lag or "snap-to-position" artifacts when scrolling stops.
+With this approach, visual tracking stays smooth during scroll, with no lag or "snap-to-position" artifacts when scrolling stops.
 
 ### Element Detection: Semantic Approach
-Instead of maintaining brittle lists of HTML tags, the scanner detects elements by **semantic characteristics**:
+The scanner detects elements by **semantic characteristics**, which avoids maintaining brittle lists of HTML tags:
 
 **Text Detection** (TreeWalker):
 - Traverses all text nodes with non-empty content
@@ -361,17 +351,17 @@ Instead of maintaining brittle lists of HTML tags, the scanner detects elements 
 - Editable: `[contenteditable="true"]`
 - Custom interactivity: `[onclick]`, `[tabindex]:not([tabindex="-1"])`
 
-This approach is **framework-agnostic** and captures modern web patterns (e.g., `<div role="button">`) without maintaining exhaustive tag lists.
+This approach is **framework-agnostic** and detects modern web patterns (e.g., `<div role="button">`) without maintaining exhaustive tag lists.
 
 ### The Rasterizer: `StructureMap`
-These blocks are painted onto an off-screen `<canvas>` (50% resolution for Structure Map, 25% for Saliency Map) to create the `u_structureMap` texture. This texture encodes semantic data into RGBA channels:
+These blocks are painted onto an off-screen `<canvas>` (50% resolution for Structure Map, 25% for Saliency Map) to create the `u_structureMap` texture. Semantic data is encoded in its RGBA channels:
 
 | Channel | Data | Description |
 | :--- | :--- | :--- |
 | **Red** | **Rhythm** | `lineHeight / 100.0`. Defines the vertical cadence of the content. |
 | **Green** | **Mass** | `density` (0.0-1.0). Defines visual weight (font weight, image brightness). |
 | **Blue** | **Semantics** | **Legacy (Stable)**: Type ID: Text (1.0), Image (0.5), UI (0.0). <br> **Experimental (v1.4.2)**: Packed Type + Phase. *See warning below.* |
-| **Alpha** | **Interaction** | 1.0 = Content. Interaction is encoded in Blue (Text=1.0 vs UI=0.0). |
+| **Alpha** | **Role** | ARIA role ID (0–12) / 12, used by Blueprint mode. Interaction is encoded in Blue (Text=1.0 vs UI=0.0). |
 
 > ⚠️ **Implementation Warning: Blue Channel Packing**
 > In v1.4.2, we attempted to pack both **Type** and **Phase** (text y-alignment) into the Blue channel using 8-bit quantization (0-10 for Type, 11-255 for Phase).
@@ -379,16 +369,16 @@ These blocks are painted onto an off-screen `<canvas>` (50% resolution for Struc
 > **Lesson**: Do not overload 8-bit channels with discontinuous data types. Use a separate texture for Phase or ensure Type codes are completely distinct from Phase ranges with a large safety margin.
 
 ### Shader Consumption
-The fragment shader reads this map to drive two distinct modes:
+The fragment shader reads this map in two distinct modes:
 
-#### Mode A: Wireframe ("Blueprint" / "Cyberpunk")
-Uses the **Red Channel (Rhythm)** to generate procedural geometry.
--   **Logic**: `if (lineHeight > 0) draw_bar(height=lineHeight)`
--   **Result**: A "Terminator-vision" overlay that reveals the underlying grid structure, ignoring the actual pixels.
+#### Mode A: Wireframe ("Blueprint")
+Uses the **Alpha Channel (Role)** to color-code bounding boxes by ARIA role, with box outlines from edges in the Green (density) and Blue (type) channels.
+-   **Logic**: `roleId = int(structure.a * 12.0 + 0.5)` selects the color; `isEdge` comes from neighboring-texel differences in `structure.g` and `structure.b`.
+-   **Result**: A wireframe overlay that reveals the underlying layout structure over a blueprint grid. See [`tutorials/blueprint_case_study.md`](tutorials/blueprint_case_study.md).
 
 #### Mode B: Simulation ("Natural")
-Uses the **Green Channel (Mass)** to modulate the biological simulation.
--   **Logic**: `finalNoise = baseNoise * density`
+Uses the **Green Channel (Mass)** to gate the biological simulation.
+-   **Logic**: `density < 0.1` sets the LGN suppression factor to 0 (whitespace gate), and a sigmoid on density scales V1 distortion strength (Section 5.2).
 -   **Result**: Noise and blur are only applied where there is actual content. Empty whitespace remains clean, preventing the "dirty screen" effect and improving realism.
 
 ---
@@ -419,15 +409,15 @@ The peripheral field is divided into two distinct zones with linear progression:
         *   **Base Intensity**: 0.8% horizontal (reduced from 1.0%) for a balanced global profile.
 
 ### Regression Fixes & Refinements (v1.4.2)
-Based on user feedback, the following critical tunings were applied to stabilize the effect:
+Based on user feedback, the following tunings were applied to stabilize the effect:
 
 1.  **Static Mode (Animation Killed)**
     *   *Problem*: Previous versions used animated noise (`u_time`), creating a "boiling" or "broken TV" effect that attracted attention.
-    *   *Fix*: All time dependencies were removed from the distortion noise. The periphery is now spatially distorted but **temporally stable**. This allows the user to saccade to a "ghost" they saw, only to find it wasn't what they thought—a key property of peripheral vision.
+    *   *Fix*: All time dependencies were removed from the distortion noise. The periphery is now spatially distorted but **temporally stable**. This allows the user to saccade to a "ghost" they saw, only to find it wasn't what they thought, a key property of peripheral vision.
 
 2.  **Chromatic Aberration (CA) Suppression**
     *   *Problem*: High-contrast text edges, when scrambled, created thousands of artificial sharp edges. The CA shader applied color fringing to *every single cut*, turning the text into messy "glitch art."
-    *   *Fix*: CA is now **linearly suppressed** as the Scramble effect fades in. By the time the text is fully shredded, CA is zero. The result is monochromatic "texture" rather than colored noise.
+    *   *Fix*: CA is now **linearly suppressed** as the Scramble effect fades in. By the time the text is fully shredded, CA is zero. The result is a monochromatic texture.
 
 3.  **Linear Distortion Progression**
     *   *Problem*: "Inverse Valley" effect where the Parafovea (Wrap) felt stronger than the Periphery (Scramble).
@@ -453,7 +443,7 @@ Based on user feedback, the following critical tunings were applied to stabilize
 
 ## Overview
 
-The **Saliency Map** implements computational visual attention, predicting where the eye is drawn based on contrast, edges, and visual "attractiveness." This enables **saliency gating** — the LGN allocates more processing bandwidth to salient peripheral content, the same compute demand management strategy the biological visual system uses (retina captures ~10⁷ bits/sec, optic nerve transmits ~10⁶).
+The **Saliency Map** implements computational visual attention, predicting where the eye is drawn based on contrast, edges, and visual "attractiveness." The map is the input to **saliency gating**, in which the shader's LGN stage allocates more processing bandwidth to salient peripheral content. The design is loosely motivated by the limited bandwidth of the visual pathway (the human optic nerve is estimated to carry roughly 10⁷ bits/sec; Koch et al. 2006, *Current Biology*, doi:10.1016/j.cub.2006.05.056).
 
 ## Cognitive vs Retinal Constraint
 
@@ -461,25 +451,25 @@ The **Saliency Map** implements computational visual attention, predicting where
 - Filtering is **purely distance-based** (radial from fovea)
 - All content at same eccentricity receives equal filtering
 - Geometric, homogeneous "heat-haze" effect
-- **No cognitive priority** — logos treated same as body text
+- **No cognitive priority**: logos treated same as body text
 
 ### Cognitive Constraint (Saliency Modulation ON)
 - Filtering is **content-aware** and non-uniform
 - High-saliency areas (logos, icons, edges) receive **more bandwidth** in periphery
 - M-channel cues allocated for saccadic targeting
-- **Brain-like prioritization** — important elements receive more resources
+- **Brain-like prioritization**: important elements receive more resources
 
 ## Implementation
 
 ### 1. Gestalt Grouping (Proximity)
 **File**: `renderer/scrutinizer.js`
 
-Before the structure map is rasterized, raw layout blocks pass through a grouping stage that implements Gestalt proximity. This matters because the density channel — which drives the V1 crowding gate — should reflect perceptual groups, not individual DOM nodes. A paragraph is one dense cluster, not thirty separate text nodes.
+Before the structure map is rasterized, raw layout blocks pass through a grouping stage that implements Gestalt proximity. The density channel is the input to the V1 crowding gate, so it should reflect perceptual groups. A paragraph of thirty text nodes should count as one dense cluster.
 
 -   **Text Merging**: Vertically adjacent text blocks are merged into single "paragraph" clusters. Two text blocks merge when their vertical gap is within 1.5× the current line height and they are horizontally aligned (x within 20px, width within 50px). The merged block inherits the combined bounding box.
 -   **Quantization**: Block coordinates are snapped to a grid (1px for text, 10px for UI) to prevent sub-pixel jitter from causing "flicker" in the periphery during micro-layout shifts.
 
-The grouping runs on every structure map scan (~60fps during scroll). The merge criteria are deliberately loose — false merges (joining two unrelated text blocks) produce a slightly larger density region, which biases toward more crowding. False splits (failing to merge a paragraph) produce isolated blocks that get less crowding than they should. The asymmetry favors the conservative error.
+The grouping runs on every structure map scan (~60fps during scroll). The merge criteria are deliberately loose. False merges (joining two unrelated text blocks) produce a slightly larger density region, which biases toward more crowding. False splits (failing to merge a paragraph) produce isolated blocks that get less crowding than they should. Loose criteria make the conservative error, a false merge, more likely than a false split.
 
 ### 2. Saliency Map Generation (Phase 5: Gated Saliency)
 **File**: `renderer/saliency-worker.js`
@@ -487,29 +477,31 @@ The grouping runs on every structure map scan (~60fps during scroll). The merge 
 The Saliency Map system has been upgraded to a **Cognitive Alignment** model. It combines biophysical contrast detection with top-down semantic gating.
 
 **The Formula**:
-`FinalSaliency = (RawContrast * Inhibitor) + (Excitor * Boost)`
+`FinalSaliency = (RawContrast + 2.0 * Face) * (0.1 + 0.9 * Inhibitor) * (1 + 0.3 * Excitor)`
 
 1.  **Raw Contrast (Bottom-Up)**:
-    *   Uses **Difference-of-Gaussians** on Oklab channels (Intensity, Red-Green, Blue-Yellow).
+    *   Uses **Difference-of-Gaussians** on Oklab channels (Intensity, Red-Green, Blue-Yellow), weighted 0.3 / 0.35 / 0.35.
     *   Detects edges, color contrast, and luminance shifts.
 
 2.  **Inhibitor Mask (Silence Noise)**:
     *   Generated from the **Structure Map**.
-    *   **Logic**: If an area contains NO semantic structure (text or image), the Inhibitor is `0.1`.
+    *   **Logic**: The mask is 1.0 inside structure blocks and 0 elsewhere, so areas with NO semantic structure (text or image) keep only `0.1` of their saliency.
     *   **Effect**: Suppresses paper textures, compression artifacts, and distinct-but-irrelevant gradients.
 
-    *   **Logic**: Adds `+0.8` to the saliency signal.
-    *   **Effect**: Ensures low-contrast controls (e.g., light gray "Cancel" buttons) remain visible in the periphery, simulating the brain's knowledge of where tools are.
+3.  **Excitor Mask (Media and UI Gain)**:
+    *   Generated from the **Structure Map** (non-text blocks: images, media, UI controls).
+    *   **Logic**: Multiplies the saliency signal by `1.3` inside those blocks.
+    *   **Effect**: Raises the priority of media and controls relative to text of the same contrast. The gain is multiplicative, so featureless regions stay low.
 
 4.  **Face Channel (Social Bias)** (New in v1.4.2):
     *   **Detection**: Uses `face-api.js` (Tiny Face Detector) in a background worker.
-    *   **Logic**: Adds `+0.5` weighting to detected face regions.
-    *   **Effect**: Simulates the fusiform face area's (FFA) impact on attention—humans are hard-wired to look at faces, even in the periphery.
+    *   **Logic**: Adds `2.0 ×` a Gaussian blob over each detected face region.
+    *   **Effect**: Approximates the attentional priority of faces: observers fixate faces early and often in free viewing, even when they start in the periphery.
 
 **Key Properties**:
 - **Noise Suppression**: Blank pages now generate a blank saliency map (unlike v1.4 where noise created false positives).
-- **Scroll Synchronization**: Structure data is passed to the worker every frame effectively locking the heatmap to the content.
-- **Biologically Accurate**: Simulates "Predictive Coding" (the brain uses knowledge to filter retinal input).
+- **Scroll Synchronization**: Structure data is passed to the worker every frame, which keeps the heatmap aligned with the content.
+- **Structure Gating**: DOM structure suppresses saliency in empty regions. This is a top-down filter applied to a bottom-up map. It does not model predictive coding.
 
 **Performance**:
 - Separable Gaussian blur: O(2n) complexity
@@ -521,7 +513,7 @@ The Saliency Map system has been upgraded to a **Cognitive Alignment** model. It
 To prevent "flicker" and "dropouts" during rapid content updates (e.g., video playback), the saliency map uses a **double-buffered** approach with temporal blending.
 -   **Target Buffer**: Renders the new state immediately.
 -   **Current Buffer**: Blends towards the Target by ~15% per frame.
--   **Result**: Attention shifts feel organic and fluid, rather than snapping instantly.
+-   **Result**: Attention shifts blend in over several frames.
 
 **References**:
 - Itti, Koch, & Niebur (1998) - "A Model of Saliency-Based Visual Attention for Rapid Scene Analysis"
@@ -550,7 +542,7 @@ if (u_enable_saliency_modulation > 0.5) {
 -   `saliency = 1.0` (high) → suppression drops to 0.3 (70% bandwidth allocated)
 -   Smooth gradient between extremes
 
-### 5. Validation Results
+### 5. Observed Behavior (Informal)
 
 **Observed Behavior** :
 -   **Social media icons** (Twitter, etc.): Visibly clearer than surrounding text (pop-out effect)
@@ -558,13 +550,13 @@ if (u_enable_saliency_modulation > 0.5) {
 -   **UI elements**: Retain structural integrity for saccade guidance
 -   **Body text**: Full peripheral filtering applied (minimum bandwidth)
 
-**Interpretation**: Successfully demonstrates shift from optical model to cognitive model, reflecting the brain's resource allocation strategy for salient targets.
+**Interpretation**: These are informal observations from screenshots; they have not been validated against human data. They show the shift from a purely distance-based (optical) filter to a content-aware one.
 
 ## Usage
 
 ### Menu Controls
-- **Simulation > Content Signals > Show Saliency Map**: Visualize saliency heatmap (Blue→Cyan→Green→Yellow→Red)
-- **Simulation > Content Signals > Use Saliency Modulation**: Toggle saliency-based bandwidth allocation
+- **Simulation > Utility > Show Saliency Map**: Visualize saliency heatmap (Blue→Cyan→Green→Yellow→Red)
+- **Simulation > Behavior > Enable Saliency Modulation**: Toggle saliency-based bandwidth allocation
 
 ### Config
 ```javascript
@@ -575,7 +567,7 @@ if (u_enable_saliency_modulation > 0.5) {
 
 ### 6. Extended Modulation (V1 & V4)
 
-Beyond the LGN suppression factor, saliency now modulates additional pipeline stages **in the far periphery only**, leveraging temporal smoothing to prevent flicker on dynamic content.
+Beyond the LGN suppression factor, saliency now modulates additional pipeline stages **in the far periphery only**, with temporal smoothing to prevent flicker on dynamic content.
 
 **V1 (Geometry) Modulation**:
 ```glsl
@@ -597,8 +589,7 @@ warpVector *= saliencyWarpMod;
 ```
 
 **V4 (Aesthetics) Modulation**:
-**V4 (Aesthetics) Modulation**:
-> **Update (v1.4.3)**: Saliency modulation was removed from the color/chrominance stage. Rod-vision constraints apply regardless of saliency — rods are colorblind. A bright red logo in the periphery has its chrominance attenuated to match rod sensitivity, preventing it from artificially "popping" and competing with the fovea.
+> **Update (v1.4.3)**: Saliency modulation was removed from the color/chrominance stage. Peripheral chromatic attenuation applies regardless of saliency. A bright red logo in the periphery has its chrominance attenuated like any other content, preventing it from artificially "popping" and competing with the fovea.
 > **Update (v1.9)**: Per-channel chromatic pooling (castleCSF) replaces uniform chrominance reduction when enabled. RG and YV opponent channels attenuate at different rates with eccentricity, and attenuation is spatial-frequency-dependent (small features lose chromatic identity faster than large regions). Suprathreshold compression (exponent 0.5) corrects for the historical over-estimation of peripheral color loss from threshold-based studies.
 
 **Effect**: Salient areas (logos, icons, UI elements) in the far periphery retain slightly more geometric stability and color, making them more recognizable for saccade guidance without compromising illegibility.
@@ -636,17 +627,17 @@ To mitigate "breathing" artifacts on full-motion video, the Saliency Map is used
 
 ## 8. Chromatic Aberration (Lens Split)
 
-Chromatic aberration is modeled by sampling the warped position three times:
+Chromatic aberration is a lens effect (lateral chromatic aberration), used as a visual cue. It does not model a neural process. The V4 stage applies it to the processed output by shifting the fovea-to-periphery blend boundary per channel:
 
-- Red sample: shifted slightly **toward** the fovea.
-- Green sample: at the base warped position.
-- Blue sample: shifted slightly **away** from the fovea.
+- Red: blends toward the pooled image slightly **later** (boundary shifted outward).
+- Green: at the base boundary (master curve `t`).
+- Blue: blends slightly **earlier** (boundary shifted inward).
 
 The shift magnitude is:
 
-- `aberrationAmt = 0.02 * caStrength * u_intensity * u_ca_strength`
+- `offset = 0.005 * caFactor`, applied as `± offset * fovea_radius * 4.0` to the eccentricity, where `caFactor` is the color-effects curve (`t²`, Section 4) scaled by intensity and saliency/density protection.
 
-This creates colored fringes in the periphery, supporting illegibility without needing extremely large blurs.
+`caFactor` is multiplied by `1 − scrambleZone`, so CA fades out where the grid scramble takes over. It runs only in the High-Key and Biological V4 styles (`v4_style_id` 0 or 1). The result is a color fringe along the fovea/periphery transition, supporting illegibility without very large blurs.
 
 ---
 
@@ -655,24 +646,22 @@ This creates colored fringes in the periphery, supporting illegibility without n
 **v1.3:** Peripheral color processing upgraded from RGB to **Oklab** (perceptually uniform).
 **v1.9:** Per-channel RG/YV chromatic pooling replaces uniform chrominance reduction (see [`docs/specs/implemented/chromatic_pooling.md`](specs/implemented/chromatic_pooling.md)).
 
-### The Biological Reality
+### The Biology
 
-Peripheral color is **pooled, not lost** (Rosenholtz TTM). The visual system averages chromaticity over increasingly large regions with eccentricity, preserving mean color while losing spatial chromatic detail. The RG (red-green) opponent channel — a foveal specialization — loses spatial resolution faster than YV (blue-yellow), which persists into the far periphery. This is a wiring constraint (sparse L-M midget cells beyond the fovea), not an optical one.
+Peripheral color is **pooled** (Rosenholtz TTM). The visual system averages chromaticity over increasingly large regions with eccentricity, preserving mean color while losing spatial chromatic detail. The RG (red-green) opponent channel, a foveal specialization, loses spatial resolution faster than YV (blue-yellow), which persists into the far periphery. This is a wiring constraint (sparse L-M midget cells beyond the fovea).
 
-Historical claims of peripheral "color blindness" overstated the effect by conflating detection thresholds with suprathreshold appearance. Cone-opponent mechanisms persist to at least 50° eccentricity when stimuli are sufficiently large (Hansen, Pracejus & Gegenfurtner 2009 — threshold data only; Bowers, Gegenfurtner & Goettker 2025). At typical display contrasts, suprathreshold color appearance shows partial constancy — perceived saturation declines less steeply than detection thresholds predict (Jiang, Shooner & Mullen 2022, power-law exponent ~0.5).
+Historical claims of peripheral "color blindness" overstated the effect by conflating detection thresholds with suprathreshold appearance. Cone-opponent mechanisms persist to at least 50° eccentricity when stimuli are sufficiently large (Hansen, Pracejus & Gegenfurtner 2009, threshold data only; Bowers, Gegenfurtner & Goettker 2025). At typical display contrasts, suprathreshold color appearance shows partial constancy: perceived saturation declines less steeply than detection thresholds predict (Jiang, Shooner & Mullen 2022, power-law exponent ~0.5).
 
 ### Why Oklab?
 
-RGB color space is not perceptually uniform — equal numeric changes in RGB values do not correspond to equal perceived color differences. Reducing chrominance in RGB space produces "muddy" artifacts, especially for saturated reds and blues.
+RGB color space is not perceptually uniform: equal numeric changes in RGB values do not correspond to equal perceived color differences. Reducing chrominance in RGB space produces "muddy" artifacts, especially for saturated reds and blues.
 
 **Oklab** (Ottosson, 2020) is a perceptual color space where:
 - **L** (Lightness): Separates luminance from chrominance (0-1 range)
 - **a** (Green-Red): Opponent color dimension
 - **b** (Blue-Yellow): Opponent color dimension
 
-This separation directly maps to the biological visual system:
-- **Magnocellular pathway** (M-cells): Processes luminance (L channel)
-- **Parvocellular pathway** (P-cells): Processes chrominance (a, b channels)
+This separation is loosely analogous to post-receptoral channels: one achromatic channel and two cone-opponent channels. The mapping onto pathways is not one-to-one. The parvocellular pathway carries red-green opponent signals and also fine luminance detail, and blue-yellow (S-cone) signals run largely through the koniocellular pathway (Hendry & Reid 2000, *Annual Review of Neuroscience*, doi:10.1146/annurev.neuro.23.1.127). Oklab is fit to perceptual color-difference data.
 
 ### Implementation
 
@@ -695,7 +684,7 @@ const rgb = oklabToRgb(lab.L, lab.a, lab.b);
 ```
 
 **Rod-sensitive chrominance path (v1.4.3 "Usability Mode")**:
-To prevent "mustard" artifacts (where removing red leaves yellow) and simulate rod blindness to long wavelengths:
+To prevent "mustard" artifacts (where removing red leaves yellow). This path runs only when chromatic pooling or DoG is disabled:
 
 ```javascript
 // Progressive Red Crush
@@ -729,7 +718,8 @@ vec3 oklabToRgb(vec3 lab);
 // Chromatic decay uses visual_ecc (true gaze eccentricity), NOT coupledEccentricity
 // (V1 distortion-strength-scaled). Spatial band weights still use coupledEccentricity.
 float chromNormEcc = max(0.0, visual_ecc) / max(fovea_radius, 0.001);
-float ecc_deg = chromNormEcc * 2.0;  // fovea ≈ 2° radius
+float fovea_deg = 1.0;  // 1° foveal radius (2° diameter)
+float ecc_deg = chromNormEcc * fovea_deg;  // CMF-enabled modes then remap to cortical (log) eccentricity
 
 // RG: frequency-independent steep decay (castleCSF k_e = 0.085)
 float rg_atten = pow(pow(10.0, -u_rg_decay * ecc_deg), supra);
@@ -771,28 +761,27 @@ lab.z *= (1.0 - desaturationFactor); // b component
 vec3 desaturatedColor = oklabToRgb(lab);
 ```
 
-When chromatic pooling is active, the Red Kill Switch is bypassed (per-band RG decay at correct eccentricity handles red-specific suppression). Base desaturation always runs — it provides the overall cone-density-driven chroma floor that the castleCSF threshold model alone undershoots at suprathreshold contrasts.
+When chromatic pooling is active, the Red Kill Switch is bypassed (per-band RG decay at correct eccentricity handles red-specific suppression). Base desaturation always runs. It provides the overall cone-density-driven chroma floor that the castleCSF threshold model alone undershoots at suprathreshold contrasts.
 
-**Eigengrau tinting** in Oklab space:
+**Rod tint** in Oklab space (High-Key style):
 ```glsl
-// Eigengrau (dark blue-gray) in Oklab
-vec3 eigengrauLab = vec3(0.1, 0.0, -0.05); // Low L, blue shift
-vec3 whiteLab = vec3(1.0, 0.0, 0.0);
-
-// Map lightness: dark → eigengrau, bright → white
-vec3 rodColorLab = mix(eigengrauLab, whiteLab, L_contrasted);
+// Lightness kept (slightly dimmed), chroma removed, slight blue shift
+vec3 rodColorLab = vec3(0.96 * lab.x, 0.0, -0.05);
+vec3 rodColor = oklabToRgb(rodColorLab);
+// ...plus contrast-gated grain, then mixed in at 30% of the desaturation factor
+return mix(finalCol, rodColor, desaturationFactor * 0.3);
 ```
 
 ### Benefits
 
 1. **Perceptually uniform desaturation** - No muddy artifacts
-2. **Biologically accurate** - Matches Magno/Parvo pathway separation
+2. **Opponent-style axes** - a and b approximate red-green and blue-yellow dimensions, so RG and YV can be attenuated separately
 3. **Natural grayscale** - Preserves perceived brightness
-4. **Better rod vision** - Accurate cyan sensitivity (505nm peak)
+4. **Simple rod tint** - A fixed slight blue shift in Oklab b (−0.05), used as a visual cue. It does not model rod spectral sensitivity
 
 ### Gamma Correction
 
-Oklab requires linear RGB input. The implementation properly handles sRGB gamma correction:
+Oklab requires linear RGB input. The implementation handles sRGB gamma correction:
 - **sRGB → Linear:** Inverse gamma (2.4 with linear segment)
 - **Linear → sRGB:** Forward gamma for display
 
@@ -834,10 +823,9 @@ When enabled from the menu, the shader draws a subtle grey ring at the true fove
 
 The current implementation hard‑codes the key ratios:
 
-- `parafovea_radius / fovea_radius = 2.5` (biological macula: 0-5°)
-- `periphery_start / fovea_radius = 2.5` (same as parafovea boundary)
+- `parafovea_radius / fovea_radius = 2.5` (2.5° at the default calibration)
 
-> **Note**: "Calibrated Visual Angles" (Pixels Per Degree) is now implemented via the Foveal Calibration tool, allowing the simulation to adapt to physical monitor size rather than just arbitrary pixel radii.
+> **Note**: "Calibrated Visual Angles" (separating a measured pixels-per-degree value from the foveal radius) is not yet implemented; see ROADMAP. The Foveal Calibration tool measures a perceptual foveal radius in pixels, and the shader treats that radius as 1°.
 
 In future versions, these can be exposed as user‑tunable parameters by mapping UI sliders to:
 
@@ -852,7 +840,7 @@ In future versions, these can be exposed as user‑tunable parameters by mapping
   - Fractal Octaves (Detail density).
   - Shear vs. Chop Blend (Discontinuity hardness).
 
-Those sliders would effectively reshape the smoothstep curves described above, allowing different “profiles” of peripheral disruption while preserving the same underlying model.
+Those sliders would reshape the smoothstep curves described above, allowing different “profiles” of peripheral disruption while preserving the same underlying model.
 
 ---
 
@@ -863,7 +851,7 @@ The renderer organizes these effects into a modular pipeline inspired by the hum
 > **Note:** The terms "LGN", "V1", and "V4" are used here as software architectural labels to group related operations (Gating, Geometry, Aesthetics). They are not intended to represent a rigorous biological simulation of these brain areas.
 
 ### Stage 1: LGN (Gating & Masking)
-The "Gatekeeper" stage determines *where* effects are applied.
+This stage computes where effects apply.
 -   **Inputs**: Structure Map, Saliency Map, Foveal Distance.
 -   **Operation**: Calculates a `suppressionFactor`.
 -   **Logic**:
@@ -879,75 +867,58 @@ float bandwidth = max(lgn.saliency, lgn.density);
 ```
 
 This takes the maximum of:
-- **`lgn.saliency`** — High-contrast, colorful regions (computed from pixels via Itti-Koch color opponency)
-- **`lgn.density`** — Structural regions from DOM/node tree (TEXT blocks, images, UI controls)
+- **`lgn.saliency`**: High-contrast, colorful regions (computed from pixels via Itti-Koch color opponency)
+- **`lgn.density`**: Structural regions from DOM/node tree (TEXT blocks, images, UI controls)
 
-**Rationale**: Using `max()` ensures bandwidth is allocated if *either* signal detects important content:
+**Rationale**: With `max()`, bandwidth is allocated if *either* signal detects important content:
 - **Text in live DOM** → High structure density, even if low contrast (light gray text)
 - **Text in bitmaps/screenshots** → High saliency from contrast, even without structure data
 - **Colorful logos/icons** → High saliency from color opponency
 
-This dual-source approach provides reliable bandwidth allocation across both live DOM content (browser) and flattened bitmap exports (Figma plugin).
+Bandwidth is therefore allocated for both live DOM content (browser) and flattened bitmap exports (Figma plugin).
 
 ### Stage 2: V1 (Geometry & Distortion)
-The "Feature Extractor" stage determines *how* the image is warped.
+This stage computes how the image is warped.
 -   **Inputs**: `suppressionFactor` (from LGN), `ModeConfig`.
 -   **Operation**: Calculates `distortedUV` and `displacement`.
 -   **Modes**:
     -   **Noise**: Fluid, continuous distortion (e.g., Drunken Reading).
     -   **Mongrel Approximation** (formerly "Shatter"): Blocky, discontinuous displacement (e.g., Default).
-        > **Note:** This is a statistical approximation of the "Mongrel" texture theory. We aspire to full texture synthesis, but it is currently too expensive for real-time performance.
-    -   **None**: No distortion (e.g., Blueprint, Cyberpunk).
+        > **Note:** This displacement mode is a coarse approximation of the "Mongrel" texture account. Summary-statistic texture synthesis runs separately on WebGPU in the compute modes (Tier 2.5 and up, e.g. modes 10 and 14).
+    -   **None**: No distortion (e.g., Blueprint).
 
 ### Stage 3: V4 (Aesthetics & Style)
-The "Interpreter" stage determines *what* the final pixel looks like. This stage demonstrates how the core foveated pipeline can be customized to achieve different research or artistic goals.
+This stage computes the final color of each pixel. It also demonstrates how the core foveated pipeline can be customized to achieve different research or artistic goals.
 
 -   **Inputs**: `distortedUV`, `ModeConfig`.
 *   **Operation**: Applies color grading and pixel effects.
 *   **Customization Examples (Architectural Stress Tests)**:
-    *These modes not only demonstrate visual possibilities but also serve as stress-tests for the pipeline's flexibility.*
     -   **High-Key (Default)**: Standard peripheral bandwidth filtering with chromatic pooling and ghosting.
-    -   **Biological (Purkinje Darkening)**: A rigorously accurate simulation of rod vision, where red objects fade to black shadows (Protanopia) and luminance drops significantly.
+    -   **Biological (Purkinje Darkening)**: An approximation of scotopic (rod) vision, where red objects darken toward black as in the Purkinje shift and luminance drops significantly.
     -   **Frosted**: A low-contrast, milky aesthetic useful for simulating cataracts or foggy conditions.
-    -   **Blueprint**: A "wireframe" mode that visualizes the underlying Gestalt structure (rhythm/mass) detected by the engine.
-    -   **Cyberpunk**: An exaggerated "glitch" aesthetic using neon colors and blocky artifacts.
+    -   **Blueprint**: A "wireframe" mode that draws the layout structure detected by the engine as bounding boxes color-coded by ARIA role.
     -   **Drunken Reading**: A fluid, wave-based distortion that simulates temporary visual impairments or disorienting states.
 
-### Saccadic Suppression (The "Pupil Dilation" Model)
-To naturally simulate biological response to eye movement, the renderer maps **Mouse Velocity** to a simulated **"Pupil Aperture"** (Blur Radius).
+### Saccadic Blindness (Velocity-Dependent Fovea)
+When **Saccadic Blindness** is enabled (Simulation > Behavior), the shader shrinks `fovea_radius` and `parafovea_radius` as pointer velocity rises: `saccadeFactor = smoothstep(4.0, 10.0, u_velocity)` (px/ms), and both radii are multiplied by `1 − saccadeFactor`. At 10 px/ms and above, the whole viewport renders as periphery.
 
-This model mimics the **"Hunt vs. Gather"** cycle of the eye:
+This is a design heuristic loosely motivated by saccadic suppression, the reduced visual sensitivity during saccades (Ross, Morrone, Goldberg & Burr 2001, *Trends in Neurosciences*, doi:10.1016/S0166-2236(00)01685-4). Pointer velocity is a noisy proxy for saccadic state, and the thresholds are tuned for visual effect. See [`developers_guide.md`](developers_guide.md) (Saccadic Blindness).
 
-1.  **The Hunt (High Velocity)**:
-    *   **Action**: Mouse moves fast (>5px/frame).
-    *   **Response**: Pupil Dilates (Max Aperture).
-    *   **Effect**: Depth of field drops. The periphery blurs out (Tunnel Vision).
-    *   **Biological Analog**: Saccadic Suppression (brain cuts off processing during motion).
+The `u_blurRadius` uniform in `peripheral.frag` (a velocity-driven "pupil aperture" blur) is set only by the legacy `renderer/scrutinizer-visualizer.js`, which the app does not load. The live renderer leaves it at 0.
 
-2.  **The Gather (Zero Velocity)**:
-    *   **Action**: Mouse stops (Fixation).
-    *   **Response**: Pupil Constricts (Min Aperture).
-    *   **Effect**: Depth of field increases. The periphery sharpens.
-    *   **Biological Analog**: Accommodation (eye locks onto target, analyzing detail).
-
-**Implementation Details**:
-*   The visualizer calculates velocity and smooths the "Current Blur" state (Reactivity: 0.1).
-*   The shader scales the **peripheral pooling strength** (DoG band reconstruction or legacy MIP pooling) based on this blur radius.
-*   **Result**: The screen "breathes"—blurring during movement and sharpening during rest—rewarding the user for paying attention.
-
-### Architectural Guarantee: Foveal Integrity
-The pipeline enforces a strict "Do No Harm" policy for the fovea.
+### Foveal Integrity
+Two mechanisms keep the fovea unprocessed.
 -   **Hard Bypass**: Pixels within `dist < fovea_radius * 0.5` are strictly excluded from V1 distortion and V4 aesthetic processing.
--   **True Color Sampling**: A centralized `sampleSource(uv)` helper ensures that the fovea (and any "clear" view) always receives the raw, correctly color-swizzled (BGRA->RGBA) image from the capture buffer. This prevents accidental color shifts or darkening in the critical vision area.
+-   **True Color Sampling**: A centralized `sampleSource(uv)` helper ensures that the fovea (and any "clear" view) always receives the raw, correctly color-swizzled (BGRA->RGBA) image from the capture buffer. This prevents accidental color shifts or darkening in the fovea.
 
 ---
 
 ## 14. Visual Memory (Persistence)
 
-To simulate the brain's ability to "hold" visual information, Scrutinizer implements a **Visual Memory** system.
+Scrutinizer's **Visual Memory** setting keeps previously fixated regions clear after the pointer moves on, as an operational display aid.
 
 ### Mechanics
--   **Dwell Activation**: When the user fixates (velocity < 20.0 px/ms) on a spot for >50ms, that region is "committed" to memory.
+-   **Dwell Activation**: When the pointer stays nearly still (velocity < 0.1 px/ms) on a spot for >50ms, that region is "committed" to memory.
 -   **Buffer System**: Remembered spots are stored in a FIFO buffer (`visualMemoryBuffer`).
 -   **Capacity**: The buffer size is configurable (`visualMemoryLimit`). When full, the oldest memory fades out.
 -   **Rendering**:
@@ -959,7 +930,7 @@ To simulate the brain's ability to "hold" visual information, Scrutinizer implem
 
 #### 1. Standard Persistence (Foveal Protection)
 *   **Default Behavior**: Remembered areas are rendered *clearly*, creating a "clean" overlay on top of the distorted periphery.
-*   **Biological Mechanism**: Mimics short-term memory (iconic memory) where the brain retains high-fidelity details of recently visited locations to stitch together a coherent scene.
+*   **Biological Mechanism**: Loosely motivated by memory for previously fixated locations. It does not model human visual memory: iconic memory lasts a few hundred milliseconds (Sperling 1960), and detail carried across saccades is sparse and low-fidelity, as change blindness shows (Irwin 1991; Rensink, O'Regan & Clark 1997). The clear trail is an operational setting.
 *   **Implementation**: `u_useMask = 1.0`. The mask reduces distortion strength: `strength *= (1.0 - memoryStrength)`.
 
 #### 2. Inhibition of Return (Saliency Suppression)

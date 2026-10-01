@@ -17,7 +17,7 @@ node scripts/export-saliency.js \
 
 ### Input
 
-**`--input`**: Path to a SERP screenshot (PNG) or HTML file. If HTML, render at 1280px width via Playwright first (same pipeline as `build-gh-pages.js`).
+**`--input`**: Path to a SERP screenshot (PNG) or HTML file. If HTML, render at 1280px width via Playwright first (same pipeline as attentional-foraging's `scripts/build-gh-pages.js`).
 
 **`--coordinates`**: JSON file with an array of query points:
 
@@ -74,21 +74,21 @@ Where `fixation-coords/` contains one JSON per trial (generated from fixation CS
 
 ### What already exists in Scrutinizer
 
-- Saliency map computation: runs in the WebGL/WebGPU pipeline as part of the LGN/V1 pathway
-- Rosenholtz congestion: computed as a post-processing step
-- Both are computed per-frame and available in the GPU texture pipeline
+- Saliency map computation: runs on the CPU in a Web Worker (`renderer/saliency-worker.js`, Oklab DoG at 256px, every 15th frame); the shader's LGN-inspired stage reads the result
+- Rosenholtz congestion: computed in Web Workers via `renderer/congestion-core.js` (256px in the saliency worker; 1024px on demand in `renderer/congestion-worker.js`)
+- Both results are uploaded to the GPU as textures for the shader
 - The gazeplot capture scripts (`capture-fullpage-gazeplot.js`) already load images and run the pipeline
 
 ### What needs to be added
 
-1. **Headless saliency-only mode**: Run the pipeline without the foveation overlay — just compute saliency and congestion maps and read them back from the GPU
+1. **Headless saliency-only mode**: Run the pipeline without the foveation overlay. Compute only the saliency and congestion maps and read them back from the GPU *(As implemented, `scripts/export-saliency.js` runs `congestion-core.js` in Node.js with no Electron or GPU readback.)*
 2. **Coordinate sampling**: For each query point, sample the saliency/congestion textures at (x, y) with the given radius
 3. **JSON output**: Write the sampled values
 
 ### Constraints
 
-- No interactive window needed — headless Electron is fine
-- The saliency map should be computed at full document height (same issue as gazeplot tiling, but for this use case a single full-height render is acceptable since we're just reading textures, not producing a screenshot)
+- No interactive window needed; headless Electron is fine
+- The saliency map should be computed at full document height (same issue as gazeplot tiling, but for this use case a single full-height render is acceptable since the export reads textures and produces no screenshot)
 - If full-height exceeds WebGL max texture size, tile and stitch (existing approach)
 
 ## Use case in attentional-foraging
@@ -103,4 +103,4 @@ Where `fixation-coords/` contains one JSON per trial (generated from fixation CS
 
 ## Priority
 
-Low — the survey characterization analysis (saccade direction, click prediction, spatial spread) works without saliency data. This would add the visual feature angle.
+Low. The survey characterization analysis (saccade direction, click prediction, spatial spread) works without saliency data. This would add the visual feature angle.

@@ -2,11 +2,11 @@
 
 ## Motivation
 
-Scrutinizer's validation relies on 6 hand-crafted reference pages. Mind2Web provides 1,009 tasks across 73 real websites with full DOM snapshots and action sequences — orders of magnitude more content diversity. The dataset has everything needed to test whether peripheral rendering preserves enough visual information for task completion.
+Scrutinizer's validation relies on 6 hand-crafted reference pages. Mind2Web provides 1,009 tasks across 73 real websites with full DOM snapshots and action sequences, orders of magnitude more content diversity than the reference pages. The dataset has everything needed to test whether peripheral rendering preserves enough visual information for task completion.
 
 ## The question
 
-Given a task goal and a page, does Scrutinizer's peripheral rendering preserve the target element's visual salience at its eccentricity? If the simulation destroys the target's visibility, it's too aggressive. If it preserves it, it's calibrated correctly.
+Given a task goal and a page, does Scrutinizer's peripheral rendering preserve the target element's visual salience at its eccentricity? If the simulation destroys the target's visibility, it's too aggressive. If it preserves it, the simulation passes this check, which bounds how aggressive it can be but does not by itself establish calibration.
 
 ## Dataset
 
@@ -36,23 +36,23 @@ action_reprs: ["[searchbox] Search Site -> CLICK", "[searchbox] -> TYPE: Western
 
 ## Experiment candidates (5 tasks)
 
-Selected for layout diversity — different attention demands:
+Selected for layout diversity and different attention demands:
 
 | Site | Domain | Actions | DOM | Candidates | Attention pattern |
 |------|--------|---------|-----|------------|-------------------|
-| ESPN | Entertainment | 6 | 415KB | 540 | Dense text/stats table — scanning numbers |
-| Newegg | Shopping | 12 | 2.6MB | 1,120 | Product card grid — visual search across thumbnails |
-| United | Travel | 12 | 149KB | 285 | Sequential form — fields, dropdowns, buttons |
-| IMDb | Entertainment | 5 | 373KB | 789 | Media + text — posters competing with descriptions |
-| MTA | Travel | 4 | 211KB | 252 | Sparse functional — hierarchy navigation |
+| ESPN | Entertainment | 6 | 415KB | 540 | Dense text/stats table: scanning numbers |
+| Newegg | Shopping | 12 | 2.6MB | 1,120 | Product card grid: visual search across thumbnails |
+| United | Travel | 12 | 149KB | 285 | Sequential form: fields, dropdowns, buttons |
+| IMDb | Entertainment | 5 | 373KB | 789 | Media + text: posters competing with descriptions |
+| MTA | Travel | 4 | 211KB | 252 | Sparse functional: hierarchy navigation |
 
 ## Pipeline
 
 ### Phase 1: DOM → Scrutinizer rendering
 
 1. Load `raw_html` into Scrutinizer's BrowserView
-2. Locate target element (`pos_candidates`) in rendered layout — get bounding box via DOM query
-3. Set gaze to previous action's target (or center for first action) — simulates "where were you looking when you needed to find this"
+2. Locate target element (`pos_candidates`) in rendered layout (bounding box via DOM query)
+3. Set gaze to previous action's target (or center for first action). This simulates "where were you looking when you needed to find this"
 4. Compute target eccentricity from gaze position
 5. Capture through peripheral rendering pipeline
 
@@ -73,31 +73,31 @@ The dataset provides both what the user clicked (pos_candidates) and what they d
 2. Rank candidates by predicted salience (visibility × information scent from task description)
 3. Compare predicted rank of actual target vs baseline (random, center-biased)
 
-If Scrutinizer's rendering preserves the target's salience relative to distractors, the attention prediction should outperform random. If it destroys the target equally with distractors, the simulation isn't capturing what peripheral vision actually preserves.
+If Scrutinizer's rendering preserves the target's salience relative to distractors, the attention prediction should outperform random. If it destroys the target equally with distractors, the simulation isn't capturing what peripheral vision preserves.
 
 ### Phase 4: Cross-mode comparison
 
 Run Phase 2-3 for multiple Scrutinizer modes:
-- Pyramid Mongrel (sectors + displacement) — current default
-- TTM Synthesis (sectors only) — pure pooling
-- Standard displacement (no sectors) — pre-TTM baseline
-- Raw (no simulation) — upper bound
+- Pyramid Mongrel (sectors + displacement): current default
+- TTM Synthesis (sectors only): pure pooling
+- Standard displacement (no sectors): pre-TTM baseline
+- Raw (no simulation): upper bound
 
-The mode that best predicts actual user attention is the most biologically accurate simulation.
+The mode whose visibility ranking best predicts the annotated action targets ranks highest on this test. Mind2Web records annotator actions and has no gaze data, so the test measures task-target visibility; it does not measure attention or biological accuracy directly.
 
 ## Implementation notes
 
 - **DOM loading:** Scrutinizer's BrowserView can load raw HTML via `loadURL('data:text/html,...')` or write to temp file and `loadURL('file://...')`
 - **Element location:** `document.querySelector` + `getBoundingClientRect()` via `executeJavaScript()` on the BrowserView
 - **Scanpath construction:** Each task's action sequence → fixation points at target element centers. Import format matches existing `renderer/scanpath/scanpath-types.js`
-- **Batch capture:** Existing `capture-runner.js` handles Electron batch capture — extend with per-action DOM loading
+- **Batch capture:** Existing `capture-runner.js` handles Electron batch capture; extend it with per-action DOM loading
 
 ## Success criteria
 
 1. Target elements have higher visibility scores than random distractors in the peripheral rendering (basic sanity)
 2. Visibility ranking predicts actual click targets better than center-bias baseline
-3. Sector-based modes (Pyramid Mongrel, TTM) predict better than non-sector modes — validates the sector geometry
-4. Dense content pages (ESPN, Newegg) show larger differences between modes than sparse pages (MTA) — confirms sector pooling matters more when there's more to pool
+3. Sector-based modes (Pyramid Mongrel, TTM) predict better than non-sector modes, which would support the sector geometry
+4. Dense content pages (ESPN, Newegg) show larger differences between modes than sparse pages (MTA), which would indicate that sector pooling matters more when there's more to pool
 
 ## Dependencies
 

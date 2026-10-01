@@ -8,36 +8,36 @@
 
 Pipeline controls are scattered across three levels of Electron menu hierarchy (Simulation > Behavior, Simulation > Peripheral, Simulation > Utility). To toggle chromatic pooling, change intensity, and switch modes requires navigating three separate submenus that close after each selection. There is no way to see which effects are active at a glance, no way to compare two parameter states, and no way to make rapid adjustments during a usability evaluation session.
 
-The ComplexityHUD proves the architectural pattern works: a fixed-position overlay panel with interactivity toggling via `setIgnoreMouseEvents`, tabbed views, drag support. The control panel follows the same pattern, extended with two-way IPC sync.
+The architectural pattern already works in the ComplexityHUD: a fixed-position overlay panel with interactivity toggling via `setIgnoreMouseEvents`, tabbed views, drag support. The control panel follows the same pattern, extended with two-way IPC sync.
 
 ## Audiences & Use Cases
 
 ### Designers (3-5 controls visible)
 
-1. **Quick assessment** — Load a page, enable the simulation, adjust intensity between Reduced/Reference/Amplified, take a screenshot. Panel should not require learning what "DoG e2" or "cmf_a" means.
-2. **Structure check** — Switch between Legacy and Wireframe (ARIA) to see if information hierarchy survives peripheral degradation.
-3. **Mobile preview** — Select a device profile and immediately see how the simulation changes at phone-distance foveal radius.
+1. **Quick assessment:** Load a page, enable the simulation, adjust intensity between Reduced/Reference/Amplified, take a screenshot. Panel should not require learning what "DoG e2" or "cmf_a" means.
+2. **Structure check:** Switch between Legacy and Wireframe (ARIA) to see if information hierarchy survives peripheral degradation.
+3. **Mobile preview:** Select a device profile and immediately see how the simulation changes at phone-distance foveal radius.
 
 ### UX Researchers (10-15 controls visible)
 
-1. **Selective effect isolation** — Disable chromatic pooling to test whether a color-dependent notification is still detectable. Toggle saccadic blindness to evaluate animation-based alerts.
-2. **Preset comparison** — Switch between Legacy and FOVI Blur Only to compare how a UI performs under two different degradation models. The panel shows which preset is active and which parameters have been overridden.
-3. **Capture workflow** — Collapse panel to zero visual footprint, take golden capture, restore panel. Keyboard shortcut for collapse/expand.
+1. **Selective effect isolation:** Disable chromatic pooling to test whether a color-dependent notification is still detectable. Toggle saccadic blindness to evaluate animation-based alerts.
+2. **Preset comparison:** Switch between Legacy and FOVI Blur Only to compare how a UI performs under two different degradation models. The panel shows which preset is active and which parameters have been overridden.
+3. **Capture workflow:** Collapse panel to zero visual footprint, take golden capture, restore panel. Keyboard shortcut for collapse/expand.
 
 ### Vision/HCI Researchers (30+ controls visible)
 
-1. **Parameter tuning** — Type exact values for `rg_decay` (0.085), `cmf_a` (2.78), `dog_e2` (0.15) to match psychophysics data from a specific paper.
-2. **Model comparison** — Switch between aesthetic modes (Legacy, FOVI Isotropic, Log-Polar MIP, Texture Synthesis) while keeping other parameters fixed. Diff view showing which parameters changed.
-3. **Export/import** — Save current parameter set as JSON, share with collaborator, load their parameter set to reproduce their viewing conditions.
+1. **Parameter tuning:** Type exact values for `rg_decay` (0.085), `cmf_a` (2.78), `dog_e2` (0.15) to match psychophysics data from a specific paper.
+2. **Model comparison:** Switch between aesthetic modes (Legacy, FOVI Isotropic, Log-Polar MIP, Texture Synthesis) while keeping other parameters fixed. Diff view showing which parameters changed.
+3. **Export/import:** Save current parameter set as JSON, share with collaborator, load their parameter set to reproduce their viewing conditions.
 
 ## Architecture
 
 ### Panel-Menu Sync
 
-Bidirectional sync uses the existing IPC channels. No new channels are created — the panel emits the same messages the menus do.
+Menu-to-panel sync reuses the existing `menu:*` overlay channels. Panel-to-menu sync adds `panel:*` request channels in `main.js` (listed below), and each one forwards to the same `menu:*` message the matching menu item sends.
 
 **Menu -> Panel (main -> renderer):**
-The panel listens to the same `sendToOverlays` IPC events that `overlay.js` already handles. When a menu item fires `sendToOverlays('menu:set-intensity', 0.6)`, the panel's intensity slider updates to 0.6. The panel registers listeners alongside the existing ones in overlay.js — not instead of them.
+The panel listens to the same `sendToOverlays` IPC events that `overlay.js` already handles. When a menu item fires `sendToOverlays('menu:set-intensity', 0.6)`, the panel's intensity slider updates to 0.6. The panel registers listeners alongside the existing ones in overlay.js, which keep working.
 
 ```
 main process                    overlay.js                  control-panel.js
@@ -48,7 +48,7 @@ main process                    overlay.js                  control-panel.js
 ```
 
 **Panel -> Menu (renderer -> main):**
-When the user drags a slider or clicks a toggle in the panel, it calls `ipcRenderer.send('panel:set-intensity', 0.6)`. Main process handles this identically to a menu click: updates the menu checkmark state and calls `sendToOverlays('menu:set-intensity', 0.6)`, which flows back to both overlay.js (to update the shader) and the panel (to confirm the value). This round-trip ensures menu and panel never disagree.
+When the user drags a slider or clicks a toggle in the panel, it calls `ipcRenderer.send('panel:set-intensity', 0.6)`. Main process handles this identically to a menu click: updates the menu checkmark state and calls `sendToOverlays('menu:set-intensity', 0.6)`, which flows back to both overlay.js (to update the shader) and the panel (to confirm the value). Because of this round-trip, menu and panel never disagree.
 
 ```
 control-panel.js                main process                overlay.js
@@ -61,11 +61,11 @@ control-panel.js                main process                overlay.js
 ```
 
 New IPC channels needed in `main.js`:
-- `panel:set-intensity` — forwards to `sendToOverlays('menu:set-intensity', value)`
-- `panel:set-radius` — forwards to `sendToOverlays('menu:set-radius', value)`
-- `panel:set-aesthetic-mode` — forwards to `sendToOverlays('menu:set-aesthetic-mode', value)` + `app.emit('aesthetic-mode-changed', value)`
-- `panel:toggle-*` — one per toggle, each forwards to corresponding `sendToOverlays('menu:toggle-*', value)`
-- `panel:set-*` — one per numeric param, same pattern
+- `panel:set-intensity`: forwards to `sendToOverlays('menu:set-intensity', value)`
+- `panel:set-radius`: forwards to `sendToOverlays('menu:set-radius', value)`
+- `panel:set-aesthetic-mode`: forwards to `sendToOverlays('menu:set-aesthetic-mode', value)` + `app.emit('aesthetic-mode-changed', value)`
+- `panel:toggle-*`: one per toggle, each forwards to corresponding `sendToOverlays('menu:toggle-*', value)`
+- `panel:set-*`: one per numeric param, same pattern
 
 All `panel:*` handlers follow the same template: validate value, update menu state, forward via `sendToOverlays`.
 
@@ -106,7 +106,7 @@ A single pill-shaped element, 36x36px, positioned bottom-right (offset from Comp
 
 When collapsed, the panel consumes zero visual area beyond the pill. Golden captures and screenshots are unobstructed.
 
-### Expanded State — Designer View
+### Expanded State: Designer View
 
 Default view when panel first opens. Three controls, compact layout.
 
@@ -129,7 +129,7 @@ Default view when panel first opens. Three controls, compact layout.
 
 Width: 260px. Position: fixed, bottom-right, 12px inset. Same visual style as ComplexityHUD (dark translucent background, monospace, 1px border).
 
-### Expanded State — Researcher View
+### Expanded State: Researcher View
 
 Scrollable panel, organized by pipeline stage. Parameters that don't exist in the active mode's `pipeline` definition are dimmed (present but non-functional).
 
@@ -249,14 +249,14 @@ Each control maps to exactly one IPC channel. Type indicates the DOM control ren
 | Saliency Resolution | `menu:set-saliency-resolution` | dropdown | 256/512/1024 | 256 | No |
 | Congestion Resolution | `menu:set-congestion-resolution` | dropdown | 256/512/1024/2048 | 512 | No |
 
-Channels marked `(new)` do not exist yet — they need corresponding `ipcRenderer.on` handlers in overlay.js and `scrutinizer.set*()` methods.
+Channels marked `(new)` do not exist yet. They need corresponding `ipcRenderer.on` handlers in overlay.js and `scrutinizer.set*()` methods.
 
 ## Interaction Patterns
 
 **Keyboard:**
-- `Cmd+K` — Toggle panel expand/collapse
-- `Escape` — Collapse panel (when focused)
-- `Tab` / `Shift+Tab` — Navigate between controls within the panel
+- `Cmd+K`: Toggle panel expand/collapse
+- `Escape`: Collapse panel (when focused)
+- `Tab` / `Shift+Tab`: Navigate between controls within the panel
 - Number inputs accept typed values and commit on Enter or blur
 
 **Mouse passthrough:**
@@ -267,11 +267,11 @@ Title bar is the drag handle, using the same 3px click-vs-drag disambiguation as
 
 **Slider behavior:**
 - Sliders with discrete stops (intensity, radius) snap to defined values on release but allow smooth dragging for preview.
-- Slider changes emit IPC on release (mouseup), not on every mousemove, to avoid flooding the shader pipeline.
-- Number inputs next to sliders are editable — typing a value and pressing Enter updates the slider position and emits IPC.
+- Slider changes emit IPC once, on release (mouseup), to avoid flooding the shader pipeline.
+- Number inputs next to sliders are editable: typing a value and pressing Enter updates the slider position and emits IPC.
 
 **Toggle behavior:**
-- Toggles emit IPC immediately on click (no debounce needed — these are uniform updates, not shader recompilations).
+- Toggles emit IPC immediately on click (no debounce needed, because these are uniform updates and trigger no shader recompilation).
 - When a toggle is part of a group that a preset controls, overriding it shows the override indicator.
 
 **Dropdown behavior:**
@@ -287,13 +287,13 @@ A 4px colored dot (amber) appears to the left of any parameter that differs from
 
 **Goal:** Designer View functional, synced with menu, collapsible.
 
-1. **`renderer/control-panel.js`** — New module, same IIFE pattern as `complexity-hud.js`. Builds DOM programmatically (no external HTML template). Registers `ipcRenderer.on` listeners for all existing `menu:*` channels to read state. Emits `ipcRenderer.send('panel:*')` for writes.
+1. **`renderer/control-panel.js`:** New module, same IIFE pattern as `complexity-hud.js`. Builds DOM programmatically (no external HTML template). Registers `ipcRenderer.on` listeners for all existing `menu:*` channels to read state. Emits `ipcRenderer.send('panel:*')` for writes.
 
-2. **`main.js` additions** — Add `ipcMain.on('panel:*')` handlers that forward to `sendToOverlays('menu:*')`. Approximately 5 handlers for Phase 1 (intensity, radius, aspect, aesthetic-mode, toggle-foveal).
+2. **`main.js` additions:** Add `ipcMain.on('panel:*')` handlers that forward to `sendToOverlays('menu:*')`. Approximately 5 handlers for Phase 1 (intensity, radius, aspect, aesthetic-mode, toggle-foveal).
 
-3. **`renderer/overlay.html`** — Add `<script src="control-panel.js"></script>` and a container div `<div id="control-panel"></div>`.
+3. **`renderer/overlay.html`:** Add `<script src="control-panel.js"></script>` and a container div `<div id="control-panel"></div>`.
 
-4. **`renderer/overlay.js`** — After `Scrutinizer` init, instantiate `ControlPanel('control-panel', { ipcRenderer })`. Pass current state so panel renders with correct initial values.
+4. **`renderer/overlay.js`:** After `Scrutinizer` init, instantiate `ControlPanel('control-panel', { ipcRenderer })`. Pass current state so panel renders with correct initial values.
 
 5. **Controls in Phase 1:** Preset dropdown, Intensity slider, Foveal Radius slider, collapse/expand, drag.
 
@@ -305,31 +305,31 @@ A 4px colored dot (amber) appears to the left of any parameter that differs from
 
 **Goal:** Full Researcher View, preset export/import, new IPC channels for all parameters.
 
-1. **New IPC channels** — Add the ~15 `(new)` channels from the Controls Inventory. Each requires:
+1. **New IPC channels:** Add the ~15 `(new)` channels from the Controls Inventory. Each requires:
    - `ipcMain.on('panel:set-*')` in main.js
    - `ipcRenderer.on('menu:set-*')` in overlay.js (calling the corresponding `scrutinizer.set*()`)
    - The `scrutinizer.set*()` method itself if it doesn't exist
 
-2. **Section collapsibility** — Each pipeline section (LGN, V1, V4, Crowding, Behavior, Debug) collapses independently. State stored in a simple object, not persisted to disk.
+2. **Section collapsibility:** Each pipeline section (LGN, V1, V4, Crowding, Behavior, Debug) collapses independently. State is kept in a simple object and is not persisted to disk.
 
-3. **Override tracking** — Compare current values against `modes.json[activePreset].pipeline`. Render amber dots. "Reset to Preset" button.
+3. **Override tracking:** Compare current values against `modes.json[activePreset].pipeline`. Render amber dots. "Reset to Preset" button.
 
-4. **Export/Import** — "Export" serializes `{ preset: string, overrides: object, allValues: object }` as JSON. "Import" reads JSON file via Electron dialog, validates against known parameter names, applies.
+4. **Export/Import:** "Export" serializes `{ preset: string, overrides: object, allValues: object }` as JSON. "Import" reads JSON file via Electron dialog, validates against known parameter names, applies.
 
-5. **Parameter availability** — Dim controls for parameters not in the active mode's pipeline definition. E.g., `num_cortical_rings` only appears in FOVI Isotropic — it's dimmed (but still adjustable) in other modes.
+5. **Parameter availability:** Dim controls for parameters not in the active mode's pipeline definition. E.g., `num_cortical_rings` only appears in FOVI Isotropic, so it is dimmed (but still adjustable) in other modes.
 
 **Estimated scope:** ~600 additional lines JS, ~60 lines main.js IPC handlers.
 
 ## Open Questions
 
-1. **Panel position vs. ComplexityHUD** — Both are fixed-position overlays. ComplexityHUD is bottom-left. Control Panel is bottom-right. Should they be aware of each other's bounds to avoid overlap, or is independent positioning sufficient?
+1. **Panel position vs. ComplexityHUD:** Both are fixed-position overlays. ComplexityHUD is bottom-left. Control Panel is bottom-right. Should they be aware of each other's bounds to avoid overlap, or is independent positioning sufficient?
 
-2. **State persistence across sessions** — Phase 1 does not persist panel state (position, collapsed sections, overrides) to disk. Should Phase 2 add a `~/.scrutinizer/panel-state.json`, or is session-only state acceptable for a research tool?
+2. **State persistence across sessions:** Phase 1 does not persist panel state (position, collapsed sections, overrides) to disk. Should Phase 2 add a `~/.scrutinizer/panel-state.json`, or is session-only state acceptable for a research tool?
 
-3. **URL-specific presets** — UX researchers may want different settings for different test pages. Should the preset system support URL pattern matching (e.g., "use Wireframe mode on *.gov sites"), or is manual switching sufficient?
+3. **URL-specific presets:** UX researchers may want different settings for different test pages. Should the preset system support URL pattern matching (e.g., "use Wireframe mode on *.gov sites"), or is manual switching sufficient?
 
-4. **Multiple windows** — Scrutinizer supports multiple windows. Should each window have its own control panel with independent state, or should one panel control all windows? Currently the menu applies globally via `sendToOverlays` (which broadcasts to all overlay webContents).
+4. **Multiple windows:** Scrutinizer supports multiple windows. Should each window have its own control panel with independent state, or should one panel control all windows? Currently the menu applies globally via `sendToOverlays` (which broadcasts to all overlay webContents).
 
-5. **Performance budget** — The panel itself is pure DOM, no canvas. But rapid slider dragging could generate many IPC messages. Is throttling slider IPC to 60fps sufficient, or should we batch uniform updates within a single `requestAnimationFrame`?
+5. **Performance budget:** The panel itself is pure DOM, no canvas. But rapid slider dragging could generate many IPC messages. Is throttling slider IPC to 60fps sufficient, or should we batch uniform updates within a single `requestAnimationFrame`?
 
-6. **`Cmd+K` conflict** — This shortcut is used by VS Code and other tools. Acceptable for an Electron app that is not a text editor, but worth noting. Alternatives: `Cmd+Shift+K`, `Cmd+\`.
+6. **`Cmd+K` conflict:** This shortcut is used by VS Code and other tools. Acceptable for an Electron app that is not a text editor. Alternatives: `Cmd+Shift+K`, `Cmd+\`.

@@ -1,17 +1,17 @@
-# Informed Consent — Usability Session with Scrutinizer
+# Informed Consent: Usability Session with Scrutinizer
 
 > **Template.** Replace every `[bracketed]` field before use. This is a starting
-> point for a minimal-risk moderated usability session, not legal or ethics
-> advice — if your study runs under an IRB, ethics board, or company research
-> policy, their requirements take precedence. Pair with
+> point for a minimal-risk moderated usability session. It is not legal or
+> ethics advice. If your study runs under an IRB, ethics board, or company
+> research policy, their requirements take precedence. Pair with
 > [debrief.md](debrief.md) and the
 > [Usability-Testing Practitioner Guide](../tutorials/usability-testing-practitioner-guide.md).
 >
 > **In-app consent.** Every multi-task session link opens on a consent screen
 > inside Scrutinizer (wording version `scrutinizer-consent/1`). It covers what
 > the app records and collects the participant code. Nothing is captured or
-> written until the participant agrees. This form covers what the app cannot
-> know: who is running the study, how long data is kept, any recording you make
+> written until the participant agrees. This form covers what the app has no
+> record of: who is running the study, how long data is kept, any recording you make
 > with your own equipment, and signatures.
 
 ---
@@ -20,13 +20,13 @@
 **Researcher:** [name, role, organization]
 **Contact:** [email / phone]
 **Date:** [date]
-**Participant ID:** [anonymous ID — assigned, not the participant's name]
+**Participant ID:** [assigned anonymous ID; not the participant's name]
 
 ## What this session is
 
 You are being asked to try [number] short tasks on [a website / an app /
-a prototype]. We are evaluating **the design, not you** — there are no right
-or wrong answers, and you can't fail.
+a prototype]. We are evaluating **the design**. We are not evaluating you. There
+are no right or wrong answers, and you can't fail.
 
 ## What the software does
 
@@ -36,8 +36,8 @@ farther away is degraded in a way that models human peripheral vision. This
 lets us observe how a design holds up when only part of it is clearly visible
 at a time.
 
-Scrutinizer is **not an eye tracker**. It does not use a camera, and it does
-not know where you are looking — only where the pointer is.
+Scrutinizer is **not an eye tracker**. It does not use a camera, and it cannot
+detect where you are looking. It detects only where the pointer is.
 
 ## What we will record
 
@@ -60,9 +60,9 @@ delete the rest)*:
 - [ ] Screen recording of the task window
 - [ ] Video of the session (camera)
 - [ ] Audio recording of the conversation
-- [ ] [other — specify]
+- [ ] [other: specify]
 
-Everything recorded is labeled with your participant ID, not your name.
+Everything recorded is labeled with your participant ID instead of your name.
 Recordings listed above are made with the moderator's own equipment, kept
 [where], retained for [duration], and accessible to [who]. The Scrutinizer
 session data is kept [where], retained for [duration], and accessible to [who].
@@ -76,7 +76,7 @@ softened (Comfort Mode), or stop entirely.
 ## Voluntary participation
 
 Taking part is voluntary. You may skip any task, decline to answer any
-question, or withdraw at any time — without giving a reason and without
+question, or withdraw at any time, without giving a reason and without
 losing [compensation, if any]. If you withdraw, you can ask us to discard
 what was recorded up to that point.
 

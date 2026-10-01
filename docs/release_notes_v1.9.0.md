@@ -4,14 +4,14 @@
 
 ## In This Release
 
-1. [Per-Channel Chromatic Pooling](#per-channel-chromatic-pooling-castlecsf) — Large colored regions preserve mean chromaticity; small features lose chromatic identity. Per-channel RG/YV decay with suprathreshold correction (adjusting detection thresholds to account for the perceived appearance of stimuli well above threshold).
-2. [Congestion-Gated Pooling (Mode 9)](#congestion-gated-pooling-mode-9) — Local clutter modulates peripheral spatial pooling strength. Tests the TTM (Texture Tiling Model — Rosenholtz's framework where peripheral vision represents the visual field via summary statistics computed over pooling regions that grow with eccentricity) prediction that clutter and crowding share summary-statistic computation.
-3. [Saccadic Blindness](#saccadic-blindness) — Foveal region shrinks during rapid mouse movement, simulating saccadic suppression.
-4. [Crowding Diagnostics](#crowding-diagnostics) — Reference pages and a simulation limitations doc exposing the density-independent crowding gap.
-5. [Saliency vs Congestion Split View](#saliency-vs-congestion-split-view) — Side-by-side heatmap comparison: "What pops out?" vs "How cluttered?"
-6. [Mode 8 Removed](#mode-8-removed) — Gaussian Desaturation removed; superseded by castleCSF per-channel pooling.
-7. [Identified Simulation Gaps](#identified-simulation-gaps) — Two major gaps documented with specs and fix paths.
-8. [scrutinizer-audit — CLI + MCP Server](#scrutinizer-audit--cli--mcp-server) — Headless congestion scoring pipeline for CI and AI-assisted design review.
+1. [Per-Channel Chromatic Pooling](#per-channel-chromatic-pooling-castlecsf): Large colored regions preserve mean chromaticity; small features lose chromatic identity. Per-channel RG/YV decay with suprathreshold correction (adjusting detection thresholds to account for the perceived appearance of stimuli well above threshold).
+2. [Congestion-Gated Pooling (Mode 9)](#congestion-gated-pooling-mode-9): Local clutter modulates peripheral spatial pooling strength. Tests the TTM (Texture Tiling Model: Rosenholtz's framework where peripheral vision represents the visual field via summary statistics computed over pooling regions that grow with eccentricity) prediction that clutter and crowding share summary-statistic computation.
+3. [Saccadic Blindness](#saccadic-blindness): Foveal region shrinks during rapid mouse movement, simulating saccadic suppression.
+4. [Crowding Diagnostics](#crowding-diagnostics): Reference pages and a simulation limitations doc exposing the density-independent crowding gap.
+5. [Saliency vs Congestion Split View](#saliency-vs-congestion-split-view): Side-by-side heatmap comparison: "What pops out?" vs "How cluttered?"
+6. [Mode 8 Removed](#mode-8-removed): Gaussian Desaturation removed; superseded by castleCSF per-channel pooling.
+7. [Identified Simulation Gaps](#identified-simulation-gaps): Two major gaps documented with specs and fix paths.
+8. [scrutinizer-audit: CLI + MCP Server](#scrutinizer-audit-cli--mcp-server): Headless congestion scoring pipeline for CI and AI-assisted design review.
 
 ---
 
@@ -21,31 +21,31 @@ Full spec: [`docs/specs/implemented/chromatic_pooling.md`](specs/implemented/chr
 
 ### What It Does
 
-Peripheral color is **pooled, not lost** (Rosenholtz's Texture Tiling Model). The visual system averages chromaticity over progressively larger regions with eccentricity — a large colored panel retains its mean hue far into the periphery, while small colored text loses chromatic identity because it falls within a single pooling region. The previous uniform chrominance reduction missed both of these effects: it treated a full-width banner and 14px text identically, and it attenuated red-green and blue-yellow at the same rate.
+Peripheral color is **pooled** (Rosenholtz's Texture Tiling Model). The visual system averages chromaticity over progressively larger regions with eccentricity: a large colored panel retains its mean hue far into the periphery, while small colored text loses chromatic identity because it falls within a single pooling region. The previous uniform chrominance reduction missed both of these effects: it treated a full-width banner and 14px text identically, and it attenuated red-green and blue-yellow at the same rate.
 
 The new pipeline models two biological asymmetries:
 
-- **Size-dependent preservation:** The DoG (Difference of Gaussians) bands already decompose content by spatial scale. Large color fields live in low-frequency bands where chromatic pooling preserves mean chromaticity. Small colored features live in high-frequency bands where chromatic spatial resolution is genuinely reduced. Per-band attenuation gives size-dependent color preservation for free — no explicit stimulus-size measurement needed.
-- **Channel-dependent rates:** L-M (red-green) is a foveal specialization — midget ganglion cell wiring thins rapidly outside the fovea. The castleCSF model (Ashraf et al. 2024 — contrast sensitivity as a function of spatial frequency, eccentricity, and chromatic channel) parameterizes this with k_e (eccentricity decay rate: how fast sensitivity drops per degree from fixation) = 0.059 for RG. S-(L+M) (blue-yellow) tracks close to achromatic (k_e = 0.004), persisting far into the periphery. Both channels have frequency-dependent per-band attenuation controlled by k_ef (the interaction between eccentricity and spatial frequency decay) — YV strongly (k_ef = 0.008), RG weakly (k_ef = 0.003). castleCSF reports k_ef ≈ 0 for RG at detection threshold, but suprathreshold spatial summation means larger red-green stimuli integrate over more receptive fields, yielding better color constancy than small ones.
+- **Size-dependent preservation:** The DoG (Difference of Gaussians) bands already decompose content by spatial scale. Large color fields are in low-frequency bands, where chromatic pooling preserves mean chromaticity. Small colored features are in high-frequency bands, where chromatic spatial resolution is reduced. Per-band attenuation therefore produces size-dependent color preservation without an explicit stimulus-size measurement.
+- **Channel-dependent rates:** L-M (red-green) is a foveal specialization: midget ganglion cell wiring thins rapidly outside the fovea. The castleCSF model (Ashraf et al. 2024, a model of contrast sensitivity as a function of spatial frequency, eccentricity, and chromatic channel) parameterizes this with k_e (eccentricity decay rate: how fast sensitivity drops per degree from fixation) = 0.059 for RG. S-(L+M) (blue-yellow) tracks close to achromatic (k_e = 0.004), persisting far into the periphery. Both channels have frequency-dependent per-band attenuation controlled by k_ef (the interaction between eccentricity and spatial frequency decay): YV strongly (k_ef = 0.008), RG weakly (k_ef = 0.003). castleCSF reports k_ef ≈ 0 for RG at detection threshold, but suprathreshold spatial summation means larger red-green stimuli integrate over more receptive fields, yielding better color constancy than small ones.
 
 ### Suprathreshold Correction
 
-The castleCSF parameters are detection thresholds — the minimum visible chromatic contrast. Web colors are well above threshold. A follow-up commit added `u_supra_exponent` (default 0.5) applying power-law compression (Jiang, Shooner & Mullen 2022) to convert threshold sensitivity to perceived appearance. At 10° eccentricity, RG retains ~51% appearance instead of ~26% raw threshold.
+The castleCSF parameters are detection thresholds (the minimum visible chromatic contrast). Web colors are well above threshold. A follow-up commit added `u_supra_exponent` (default 0.5) applying power-law compression (Jiang, Shooner & Mullen 2022) to convert threshold sensitivity to perceived appearance. At 10° eccentricity, RG retains ~51% appearance instead of ~26% raw threshold.
 
-**Needs calibration data:** The current exponent (0.5) is conservative. Jiang et al. report individual exponents ranging 0.39–0.84 with a mean of ~0.63. Raising `u_supra_exponent` to 0.6–0.65 would preserve more peripheral saturation, which the literature supports. This is a tuning decision — the parameter is exposed as a uniform for exactly this reason — but ground-truth calibration against gaze-contingent photographs or perceptual matching data would pin it down properly.
+**Needs calibration data:** The current exponent (0.5) is conservative. Jiang et al. report individual exponents ranging 0.39–0.84 with a mean of ~0.63. Raising `u_supra_exponent` to 0.6–0.65 would preserve more peripheral saturation, which the literature supports. This is a tuning decision (the parameter is exposed as a uniform for exactly this reason), but ground-truth calibration against gaze-contingent photographs or perceptual matching data would pin it down properly.
 
 ### What This Produces
 
 | Scenario | Before (Uniform) | After (Per-Channel Pooling) |
 |----------|-------------------|---------------------|
-| Large blue background at 8° | ~50% color reduction | **~90% color preserved** — large field, low-freq band, slow YV decay |
-| Full-width green nav bar at 10° | ~60% color reduction | **~80% preserved** — mean chromaticity pooled over large region |
-| Small red button at 8° | ~50% color reduction | **~50% RG remaining** — small stimulus in high-freq band, fast RG decay |
-| Teal sidebar at 15° | ~80% color reduction | Blue-yellow persists, red-green faded — perceived hue shifts toward blue |
+| Large blue background at 8° | ~50% color reduction | **~90% color preserved** (large field, low-freq band, slow YV decay) |
+| Full-width green nav bar at 10° | ~60% color reduction | **~80% preserved** (mean chromaticity pooled over large region) |
+| Small red button at 8° | ~50% color reduction | **~50% RG remaining** (small stimulus in high-freq band, fast RG decay) |
+| Teal sidebar at 15° | ~80% color reduction | Blue-yellow persists, red-green faded, so perceived hue shifts toward blue |
 
 ### Implementation
 
-6 uniforms: `u_chromatic_pooling`, `u_rg_decay`, `u_rg_freq_decay`, `u_yv_decay`, `u_yv_freq_decay`, `u_supra_exponent`. The `chromaticAttenuate()` helper splits each DoG band into Oklab (a perceptually uniform color space where L = lightness, a = red-green, b = blue-yellow) luminance + chrominance, attenuates `a` (RG) and `b` (YV) independently per band, recombines. Both channels now have per-band frequency-dependent attenuation — YV strongly (k_ef=0.008), RG weakly (k_ef=0.003). When chromatic pooling is active, the legacy V4 uniform chrominance path and Red Kill Switch are bypassed.
+6 uniforms: `u_chromatic_pooling`, `u_rg_decay`, `u_rg_freq_decay`, `u_yv_decay`, `u_yv_freq_decay`, `u_supra_exponent`. The `chromaticAttenuate()` helper splits each DoG band into Oklab (a perceptually uniform color space where L = lightness, a = red-green, b = blue-yellow) luminance + chrominance, attenuates `a` (RG) and `b` (YV) independently per band, recombines. Both channels now have per-band frequency-dependent attenuation: YV strongly (k_ef=0.008), RG weakly (k_ef=0.003). When chromatic pooling is active, the legacy V4 uniform chrominance path and Red Kill Switch are bypassed.
 
 Enabled on modes 0 (High-Key), 1 (Biological), 9 (Congestion). Menu toggle: Behavior → Chromatic Pooling (RG/YV).
 
@@ -69,7 +69,7 @@ coupledEccentricity *= congestionBoost;
 
 ### Biological Rationale
 
-Rosenholtz et al. (2012) argue that peripheral vision computes summary statistics over local pooling regions, and that clutter is what happens when those statistics are ambiguous — too many features packed into a pooling region makes the summary unreliable. This mode tests that prediction: if congestion already tells us which regions will be hardest to parse peripherally, we should see *more* degradation there (matching the biological outcome) rather than treating a clean sidebar and a dense data table identically.
+Rosenholtz et al. (2012) argue that peripheral vision computes summary statistics over local pooling regions, and that clutter is what happens when those statistics are ambiguous: too many features packed into a pooling region makes the summary unreliable. This mode tests that prediction: if congestion scores identify which regions will be hardest to parse peripherally, we should see *more* degradation there than in clean regions such as a sidebar (matching the biological outcome).
 
 ### How It Works
 
@@ -79,17 +79,17 @@ Mode 9 inherits the full Mode 0 pipeline (LGN gating, V1 distortion, DoG reconst
 |------------|-----------|--------|
 | 0.0 (clean) | 1.0× | Standard eccentricity-only pooling |
 | 0.5 (moderate) | 1.5× | Fine detail filters out slightly earlier |
-| 1.0 (dense) | 2.0× | Double pooling — text clusters become indistinct blocks |
+| 1.0 (dense) | 2.0× | Double pooling: text clusters become indistinct blocks |
 
 ### Tagged: Experimental
 
-This is a hypothesis mode. The 1.0× congestion multiplier and linear boost curve are initial guesses. The prediction is testable: show observers gated vs. ungated peripheral renderings alongside ground-truth peripheral photographs and ask which simulation looks more realistic. Standard perceptual evaluation methods (forced-choice preference, similarity rating, image quality metrics like SSIM against gaze-contingent captures) would all work. If congestion gating consistently wins, it's doing real work. If observers can't tell the difference, congestion may not contribute additional pooling beyond what eccentricity already provides.
+This is a hypothesis mode. The 1.0× congestion multiplier and linear boost curve are initial guesses. The prediction is testable: show observers gated vs. ungated peripheral renderings alongside ground-truth peripheral photographs and ask which simulation looks more realistic. Standard perceptual evaluation methods (forced-choice preference, similarity rating, image quality metrics like SSIM against gaze-contingent captures) would all work. If observers consistently prefer congestion gating, congestion contributes pooling beyond eccentricity. If observers can't tell the difference, congestion may not contribute additional pooling beyond what eccentricity already provides.
 
 ---
 
 ## Saccadic Blindness
 
-During a saccade (rapid eye movement), the visual system suppresses foveal processing — you don't perceive the blur of the world sweeping across your retina. Scrutinizer simulates this by shrinking the foveal and parafoveal regions proportionally to mouse velocity.
+During a saccade (rapid eye movement), the visual system suppresses visual sensitivity, most strongly for low-spatial-frequency luminance signals (Burr, Morrone & Ross 1994), so you don't perceive the blur of the world sweeping across your retina. Scrutinizer simulates this by shrinking the foveal and parafoveal regions proportionally to mouse velocity.
 
 ```glsl
 float saccadeFactor = smoothstep(4.0, 10.0, u_velocity);  // px/ms
@@ -97,11 +97,11 @@ fovea_radius *= (1.0 - saccadeFactor);
 parafovea_radius *= (1.0 - saccadeFactor);
 ```
 
-At velocities below 4 px/ms (normal tracking), the fovea is full-size. Between 4-10 px/ms, the fovea shrinks linearly. Above 10 px/ms (fast flick), the fovea collapses to near-zero — the entire viewport renders as periphery.
+At velocities below 4 px/ms (normal tracking), the fovea is full-size. Between 4-10 px/ms, the fovea shrinks linearly. Above 10 px/ms (fast flick), the fovea collapses to near-zero, and the entire viewport renders as periphery.
 
 **Menu path:** Simulation → Saccadic Blindness (checkbox, off by default)
 
-The feature is disabled by default because mouse velocity is a noisy proxy for saccadic state. Real saccades are ballistic (200-500°/s, 30-80ms) with distinct kinematics. Mouse movement is continuous and user-controlled. The simulation is directionally correct but the velocity thresholds are tuned for visual effect, not biological fidelity. Future: integrate with eye tracker input via the GazeModel module, where saccade detection uses acceleration profiles rather than velocity thresholds.
+The feature is disabled by default because mouse velocity is a noisy proxy for saccadic state. Real saccades are ballistic (200-500°/s, 30-80ms) with distinct kinematics. Mouse movement is continuous and user-controlled. The simulation is directionally correct but the velocity thresholds are tuned for visual effect and have no biological calibration. Future: integrate with eye tracker input via the GazeModel module, where saccade detection uses acceleration profiles rather than velocity thresholds.
 
 ---
 
@@ -111,23 +111,23 @@ The feature is disabled by default because mouse velocity is a noisy proxy for s
 
 Two new reference pages published to GitHub Pages for testing crowding behavior:
 
-**`crowding.html`** — Crowded-vs-isolated letter identification at three font sizes (16/28/48px) and three eccentricities (3°/6°/10°). Each row places a flanked target V next to an identical isolated V. Four golden fixation points for capture. Click to randomize flanker letters. Inter-letter gap scales quadratically with font size; inter-group gap scales linearly.
+**`crowding.html`:** Crowded-vs-isolated letter identification at three font sizes (16/28/48px) and three eccentricities (3°/6°/10°). Each row places a flanked target V next to an identical isolated V. Four golden fixation points for capture. Click to randomize flanker letters. Inter-letter gap scales quadratically with font size; inter-group gap scales linearly.
 
-**`crowding-stimulus.html`** — Stimulus-specific crowding conditions from Pelli & Tillman (2008) and Rosenholtz et al. (2012): orientation (same vs orthogonal Gabor flankers), color grouping (monochrome vs color-differentiated target), complexity (house SVG vs circle SVG).
+**`crowding-stimulus.html`:** Stimulus-specific crowding conditions from Pelli & Tillman (2008) and Rosenholtz et al. (2012): orientation (same vs orthogonal Gabor flankers), color grouping (monochrome vs color-differentiated target), complexity (house SVG vs circle SVG).
 
 ### Simulation Limitations Document
 
 `docs/simulation-limitations.md` documents five known gaps between Scrutinizer's peripheral rendering and biological peripheral vision:
 
-1. **Crowding is not density-dependent** (High) — V1 Lateral Smash is purely eccentricity-dependent; isolated and flanked letters receive identical displacement
-2. **Crowding is not stimulus-specific** (Medium) — no concept of target-flanker similarity
-3. **No transsaccadic integration** (Medium) — continuously degraded periphery overestimates disruption
-4. **Chromatic pooling incomplete** (Partially addressed — this release)
+1. **Crowding is not density-dependent** (High): V1 Lateral Smash is purely eccentricity-dependent; isolated and flanked letters receive identical displacement
+2. **Crowding is not stimulus-specific** (Medium): no concept of target-flanker similarity
+3. **No transsaccadic integration** (Medium): continuously degraded periphery overestimates disruption
+4. **Chromatic pooling incomplete** (Partially addressed in this release)
 5. **MIP pooling approximations** (Accepted tradeoff)
 
 ### Density-Gated Crowding Spec
 
-`docs/specs/implemented/density_gated_crowding.md` proposes feeding the structure map's density channel into V1 strength via a sigmoid transfer function. Dense content (text clusters) gets full Lateral Smash distortion; isolated elements get reduced distortion (floor at 0.3 for residual acuity loss). Includes three options for density signal strength for team review. Status: shipped (v1.9.1). Threshold=0.6, steepness=20.0, calibrated against structure map density values from crowding.html reference page.
+`docs/specs/implemented/density_gated_crowding.md` proposes feeding the structure map's density channel into V1 strength via a sigmoid transfer function. Dense content (text clusters) gets full Lateral Smash distortion; isolated elements get reduced distortion (floor at 0.3 for residual acuity loss). Includes three options for density signal strength for team review. Status: planned, deferred pending feedback. Shipped later in v2.0.0 (threshold=0.6, steepness=20.0, calibrated against structure map density values from the crowding.html reference page).
 
 ---
 
@@ -135,18 +135,18 @@ Two new reference pages published to GitHub Pages for testing crowding behavior:
 
 ### What It Does
 
-Side-by-side rendering of both heatmaps in the overlay window. Left half: saliency (cool indigo-to-white palette). Right half: congestion (blue-yellow-red). Labels identify each side with the question it answers.
+Side-by-side rendering of both heatmaps in the overlay window. Left half: saliency (cool indigo-to-white palette). Right half: congestion (blue-yellow-red). Each side is labeled with its question.
 
 **Menu path:** Simulation → Utility → Congestion Report → Saliency vs Congestion
 
 ### Why Both Maps
 
-These are complementary signals, not redundant ones:
+These are complementary signals:
 
-- **Saliency** (center-surround DoG): "What pops out?" — items that differ from their surroundings
-- **Congestion** (local feature variance): "How cluttered?" — areas with high simultaneous variation in color, lightness, and edges
+- **Saliency** (center-surround DoG): "What pops out?" (items that differ from their surroundings)
+- **Congestion** (local feature variance): "How cluttered?" (areas with high simultaneous variation in color, lightness, and edges)
 
-A page with a clean hero and a dense product grid illustrates the difference. The saliency map lights up the hero headline (high contrast against a clean background). The congestion map lights up the product grid (high local variance regardless of contrast). Seeing them side by side makes this immediately clear.
+A page with a clean hero and a dense product grid illustrates the difference. The saliency map lights up the hero headline (high contrast against a clean background). The congestion map lights up the product grid (high local variance regardless of contrast).
 
 ### Implementation
 
@@ -165,9 +165,9 @@ The ComplexityHUD stays visible alongside the split view, so you can read the nu
 
 **Mode 8 (Gaussian Desaturation)** has been removed from the mode registry, shader pipeline, and menu.
 
-**Why it existed:** The base desaturation uses a smoothstep ramp — a sigmoid S-curve that transitions abruptly near its endpoints. Mode 8 tested whether a Gaussian `exp(-r²/σ²)` would produce a more natural-looking transition, especially at the boundary between desaturated periphery and full-color fovea. A reasonable question: does the mathematical shape of the falloff curve matter?
+**Why it existed:** The base desaturation uses a smoothstep ramp, a sigmoid S-curve that transitions abruptly near its endpoints. Mode 8 tested whether a Gaussian `exp(-r²/σ²)` would produce a more natural-looking transition, especially at the boundary between desaturated periphery and full-color fovea. The question was whether the mathematical shape of the falloff curve matters.
 
-**Why it's gone:** castleCSF per-channel chromatic pooling made the question obsolete. The relevant variable isn't *curve shape* (smoothstep vs Gaussian) — it's *which opponent channels decay at which rates*. A perfectly shaped uniform curve still treats red-green and blue-yellow identically, which is the bigger error. Additionally, the implementation was broken (missing `chromatic_pooling: true` caused triple desaturation stacking), and Bowers et al. (2025) showed RG attenuation is biphasic, which a single-parameter exponential can't capture anyway.
+**Why it's gone:** castleCSF per-channel chromatic pooling made the question obsolete. The relevant variable is *which opponent channels decay at which rates*. A perfectly shaped uniform curve still treats red-green and blue-yellow identically, which is the bigger error. Additionally, the implementation was broken (missing `chromatic_pooling: true` caused triple desaturation stacking), and Bowers et al. (2025) showed RG attenuation is biphasic, which a single-parameter exponential can't capture anyway.
 
 Gaussian color decay (`u_cmf_color_sigma`) remains in Mode 6 (CMF standalone) where it models peripheral color decay, orthogonal to the DoG pipeline.
 
@@ -177,28 +177,28 @@ Gaussian color decay (`u_cmf_color_sigma`) remains in Mode 6 (CMF standalone) wh
 
 Two major gaps exposed and documented this cycle, both with specs and reference pages for validation:
 
-1. **Size-dependent color preservation.** Chromatic pooling (this release) models per-channel, per-band decay rates — both RG and YV channels now have frequency-dependent attenuation, so large colored regions preserve hue further than small ones for both channels (Abramov et al. 1991). The DoG bands provide discrete spatial frequency buckets, not continuous perceptive-field scaling. Full perceptive-field integration (Bouma-scaled pooling regions) remains future work.
+1. **Size-dependent color preservation.** Chromatic pooling (this release) models per-channel, per-band decay rates. Both RG and YV channels now have frequency-dependent attenuation, so large colored regions preserve hue further than small ones for both channels (Abramov et al. 1991). The DoG bands provide discrete spatial frequency buckets. Full perceptive-field integration (continuous, Bouma-scaled pooling regions) remains future work.
 
-2. **Density-independent crowding.** The V1 Lateral Smash displaces pixels based on eccentricity alone — an isolated letter and a densely flanked letter at the same eccentricity receive identical distortion. In biological vision, the isolated letter remains identifiable (Bouma 1970). The structure map carries a density channel that could gate V1 strength, but it's unused. Spec: [`docs/specs/implemented/density_gated_crowding.md`](specs/implemented/density_gated_crowding.md). Reference pages: `crowding.html`, `crowding-stimulus.html`. See also: `docs/simulation-limitations.md`.
+2. **Density-independent crowding.** The V1 Lateral Smash displaces pixels based on eccentricity alone: an isolated letter and a densely flanked letter at the same eccentricity receive identical distortion. In biological vision, the isolated letter remains identifiable (Bouma 1970). The structure map includes a density channel that could gate V1 strength, but it's unused. Spec: [`docs/specs/implemented/density_gated_crowding.md`](specs/implemented/density_gated_crowding.md). Reference pages: `crowding.html`, `crowding-stimulus.html`. See also: `docs/simulation-limitations.md`.
 
 ---
 
 ## What's Next
 
 ### Rendering Pipeline
-- **Density-gated crowding** — Sigmoid density gate on V1 strength so dense content gets full Lateral Smash while isolated elements are spared. Spec written, pending team review on density signal approach. Spec: [`docs/specs/implemented/density_gated_crowding.md`](specs/implemented/density_gated_crowding.md)
-- **Oriented DoG bands (Oblique Effect)** — Cardinal edges persist ~50% further than oblique ones. Spec: [`docs/specs/implemented/oriented_dog_bands.md`](specs/implemented/oriented_dog_bands.md)
+- **Density-gated crowding:** Sigmoid density gate on V1 strength so dense content gets full Lateral Smash while isolated elements are spared. Spec written, pending team review on density signal approach. Spec: [`docs/specs/implemented/density_gated_crowding.md`](specs/implemented/density_gated_crowding.md)
+- **Oriented DoG bands (Oblique Effect):** Cardinal edges persist ~50% further than oblique ones. Spec: [`docs/specs/implemented/oriented_dog_bands.md`](specs/implemented/oriented_dog_bands.md)
 
 ### scrutinizer-audit
-- **HTML report template** — Lighthouse-style visual report with per-page score cards
-- **Watch mode** — `--watch http://localhost:3000` re-runs on dev server reload
-- **Historical tracking** — `--output scores.jsonl --append` for longitudinal score tracking
-- **GitHub Action** — Run in PR checks, post score table as PR comment
-- **Full-fidelity mode** — `--full-fidelity` flag driving the full Electron pipeline (peripheral rendering + saliency) for research-grade captures
+- **HTML report template:** Lighthouse-style visual report with per-page score cards
+- **Watch mode:** `--watch http://localhost:3000` re-runs on dev server reload
+- **Historical tracking:** `--output scores.jsonl --append` for longitudinal score tracking
+- **GitHub Action:** Run in PR checks, post score table as PR comment
+- **Full-fidelity mode:** `--full-fidelity` flag driving the full Electron pipeline (peripheral rendering + saliency) for research-grade captures
 
 ---
 
-## scrutinizer-audit — CLI + MCP Server
+## scrutinizer-audit: CLI + MCP Server
 
 ### What It Does
 
@@ -313,7 +313,7 @@ No new dependencies in the main Electron app.
 | **MCP Server** | `cli/mcp/server.js` |
 | **Split View** | `renderer/shaders/peripheral.frag`, `renderer/scrutinizer.js`, `renderer/webgl-renderer.js`, `menu-template.js` |
 | **Chromatic Pooling** | `renderer/shaders/peripheral.frag` (+`chromaticAttenuate`, per-band RG/YV decay, decoupled `visual_ecc` for chromatic eccentricity), `renderer/webgl-renderer.js` (6 uniforms), `shared/modes.json`, `menu-template.js`, `main.js`, `renderer/scrutinizer.js`, `renderer/overlay.js` |
-| **Saccadic Blindness** | `renderer/shaders/peripheral.frag` (+`u_saccadic_blindness`, fovea shrink), `renderer/shaders/peripheral.frag` (same), `renderer/webgl-renderer.js` (uniform), `renderer/scrutinizer.js` (+`toggleSaccadicBlindness`), `renderer/overlay.js` (IPC handler), `menu-template.js` (checkbox) |
+| **Saccadic Blindness** | `renderer/shaders/peripheral.frag` (+`u_saccadic_blindness`, fovea shrink), legacy shader (same; removed in v2.2.0), `renderer/webgl-renderer.js` (uniform), `renderer/scrutinizer.js` (+`toggleSaccadicBlindness`), `renderer/overlay.js` (IPC handler), `menu-template.js` (checkbox) |
 | **Crowding Diagnostics** | `scripts/capture-golden.js` (crowding capture tasks), `menu-template.js` (reference page menu items), `docs/simulation-limitations.md`, `docs/specs/implemented/density_gated_crowding.md` |
 | **Reference Pages** | `scrutinizer-www/src/reference-pages/crowding.html`, `scrutinizer-www/src/reference-pages/crowding-stimulus.html` |
 | **Validation** | `scripts/extract-congestion.js` (updated to use shared edge density + composite score), `scripts/capture-golden.js` (chromatic pooling on/off variants) |

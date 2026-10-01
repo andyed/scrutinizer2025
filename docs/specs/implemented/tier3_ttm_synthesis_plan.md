@@ -2,29 +2,29 @@
 
 ## Context
 
-Scrutinizer's WebGPU compute pipeline (Tier 2.5, shipped v2.3) produces "colored noise" in the periphery — per-tile Oklab statistics + oriented sine gratings. The core problem: no cross-scale magnitude correlations. This is the statistic that makes text look like horizontal stripes instead of random noise, faces look like skin-toned blobs instead of speckle.
+Scrutinizer's WebGPU compute pipeline (Tier 2.5, shipped v2.3) produces "colored noise" in the periphery (per-tile Oklab statistics + oriented sine gratings). Its core problem is the lack of cross-scale magnitude correlations, the statistic that makes text look like horizontal stripes and faces look like skin-toned blobs.
 
-The v2.6 blog post identifies the gap. This plan closes it: real-time TTM-style mongrel texture synthesis validated against published psychophysics, with each phase producing a blog-ready visual artifact.
+The gap is described in the v2.6 blog post. This plan addresses it with real-time TTM-style mongrel texture synthesis validated against published psychophysics, with each phase producing a blog-ready visual artifact.
 
-**Key insight from science review**: The quality bottleneck is the synthesis algorithm + multi-scale statistics, not the sector geometry. Isotropic sectors (v2.6) provide correct pooling region shapes but don't improve output quality alone. We prototype on the existing 8x8 tile grid first, upgrade to sector-aware binning after quality is proven.
+**From the science review**: The quality bottleneck is the synthesis algorithm + multi-scale statistics. Isotropic sectors (v2.6) provide correct pooling region shapes but don't improve output quality alone. We prototype on the existing 8x8 tile grid first, upgrade to sector-aware binning after quality is proven.
 
-**Pragmatic path**: Start with **Tier 2.75** (Laplacian pyramid + cross-scale correlations) before full steerable pyramid. The Laplacian pyramid already exists in `validate-subband-entropy.js`. Cross-scale correlations are the quality leap. If Tier 2.75 works, upgrade to steerable for orientation selectivity.
+**Pragmatic path**: Start with **Tier 2.75** (Laplacian pyramid + cross-scale correlations) before full steerable pyramid. The Laplacian pyramid already exists in `validate-subband-entropy.js`. Cross-scale correlations are expected to give the largest quality gain. If Tier 2.75 works, upgrade to steerable for orientation selectivity.
 
 ## Phase 0: Ground Truth Gap Analysis
 
 **Goal**: Quantify exactly how far Tier 2.5 is from Brown/Rosenholtz metamers. Establishes the baseline we're improving against.
 
 **Create**:
-- `scripts/analyze-tier25-gap.js` — Capture mode 10 output + Brown metamer for same source images. Compare per-eccentricity-band SSIM. Output JSON + markdown.
+- `scripts/analyze-tier25-gap.js`: Capture mode 10 output + Brown metamer for same source images. Compare per-eccentricity-band SSIM. Output JSON + markdown.
 
 **Uses existing**:
 - `scripts/generate-brown-metamers.py` (ground truth)
 - `scripts/compare-brown-metamers.js` (comparison infra)
 - `tests/golden-captures/raw/` (source screenshots)
 
-**Pass/fail**: No pass/fail — this is a baseline measurement. Expected: foveal SSIM ~0.95+, far peripheral ~0.3-0.5.
+**Pass/fail**: No pass/fail. This is a baseline measurement. Expected: foveal SSIM ~0.95+, far peripheral ~0.3-0.5.
 
-**Blog artifact**: Side-by-side strip — original | Tier 2.5 | Brown metamer — at 3 eccentricities. The "here's the gap" image.
+**Blog artifact**: Side-by-side strip (original | Tier 2.5 | Brown metamer) at 3 eccentricities. The "here's the gap" image.
 
 ## Phase 1: Multi-Scale Decomposition (validation-first)
 
@@ -48,10 +48,10 @@ The v2.6 blog post identifies the gap. This plan closes it: real-time TTM-style 
 ### 1c. Pyramid validation (Wave 7a)
 
 **Create**:
-- `tests/unit/pyramid-decompose.test.js` — JS reference Laplacian pyramid (adapted from `validate-subband-entropy.js:buildLaplacianPyramid`), compare against pyrtools output
-- `scripts/capture-pyramid-subbands.js` — Run decompose pass only, readback per-band textures
-- `scripts/validate-pyramid.js` — Compare WGSL output vs JS/pyrtools reference
-- `docs/specs/wave7_pyramid_validation.md`
+- `tests/unit/pyramid-decompose.test.js`: JS reference Laplacian pyramid (adapted from `validate-subband-entropy.js:buildLaplacianPyramid`), compare against pyrtools output
+- `scripts/capture-pyramid-subbands.js`: Run decompose pass only, readback per-band textures
+- `scripts/validate-pyramid.js`: Compare WGSL output vs JS/pyrtools reference
+- `docs/specs/implemented/wave7_pyramid_validation.md`
 
 **Validation criteria**:
 - **Tier 1 (must)**: Solid gray → near-zero bands (all energy in residual), MSE < 0.001
@@ -59,7 +59,7 @@ The v2.6 blog post identifies the gap. This plan closes it: real-time TTM-style 
 - **Tier 2 (should)**: Per-band MSE vs pyrtools Laplacian < 0.005
 - **Tier 3 (nice)**: Energy conservation: sum of band energies = total image energy ± 2%
 
-**Blog artifact**: Tiled subband visualization — the 4-band + residual decomposition of a web page screenshot. Classic pyramid image, immediately publishable. Caption: "What the peripheral visual system decomposes before pooling."
+**Blog artifact**: Tiled subband visualization showing the 4-band + residual decomposition of a web page screenshot. Caption: "Laplacian pyramid subbands: the multi-scale decomposition the model computes before pooling."
 
 ## Phase 2: Cross-Scale Statistics Extraction
 
@@ -70,7 +70,7 @@ The v2.6 blog post identifies the gap. This plan closes it: real-time TTM-style 
 Per tile (reusing 8x8 grid initially), extract from the pyramid bands:
 - **Per-band magnitude**: mean |band_k| for k=0..3 (4 values)
 - **Per-band variance**: var(band_k) (4 values)
-- **Cross-scale magnitude correlations**: corr(|band_k|, |band_{k+1}|) for k=0..2 (3 values) — **the key statistic**
+- **Cross-scale magnitude correlations**: corr(|band_k|, |band_{k+1}|) for k=0..2 (3 values). This is the statistic missing from Tier 2.5.
 - **Mean color**: mean L, a, b in Oklab (3 values, carried from Tier 2.5)
 - **Marginal skewness**: skew(band_k) for k=0..3 (4 values)
 
@@ -83,16 +83,16 @@ Reduction: Same binary-tree pattern as current `crowding-stats.wgsl` but operati
 ### 2b. Statistics validation (Wave 7b)
 
 **Create**:
-- `scripts/analyze-pyramid-stats.js` — Readback tile stats, compare against Python reference
+- `scripts/analyze-pyramid-stats.js`: Readback tile stats, compare against Python reference
 - Reference: pyrtools decompose → numpy per-tile stats (add to `generate-pyramid-reference.py`)
 
 **Validation criteria**:
 - **Tier 1**: Mean magnitude per band per tile within 5% of reference
-- **Tier 2**: Cross-scale correlation sign matches reference (if ref says positive, ours says positive)
+- **Tier 2**: Cross-scale correlation sign matches reference (positive in the reference means positive in ours)
 - **Tier 2**: Correlation magnitude within 0.15 of reference
 - **Tier 3**: Skewness within 0.2 of reference
 
-**Blog artifact**: Cross-scale correlation heatmap overlaid on the original page. Hot = high correlation (edges, text strokes, UI borders). Cold = low correlation (flat backgrounds, noise). Caption: "Where the visual system detects structure across spatial scales."
+**Blog artifact**: Cross-scale correlation heatmap overlaid on the original page. Hot = high correlation (edges, text strokes, UI borders). Cold = low correlation (flat backgrounds, noise). Caption: "Cross-scale correlation computed by the model: high where structure persists across spatial scales."
 
 ## Phase 3: Synthesis from Statistics
 
@@ -118,21 +118,21 @@ Iterations: 2-3 passes (Walton reports convergence in 3). Each iteration is a se
 - Alpha blend: foveal passthrough (mip < 0.5), smooth ramp to full synthesis
 - Same alpha encoding as Tier 2.5 for fragment shader compatibility
 
-### 3c. Crowding asymmetry validation (Wave 7c — the scientific milestone)
+### 3c. Crowding asymmetry validation (Wave 7c)
 
 **Create**:
-- `scripts/capture-crowding-tier3.js` — Capture crowding stimulus through Tier 2.75/3 pipeline
-- `scripts/validate-crowding-tier3.js` — OCR comparison: isolated vs flanked letters
+- `scripts/capture-crowding-tier3.js`: Capture crowding stimulus through Tier 2.75/3 pipeline
+- `scripts/validate-crowding-tier3.js`: OCR comparison: isolated vs flanked letters
 
 **Validation criteria**:
-- **Tier 1 (must)**: Isolated letter at 8° — OCR recognizes it (structure preserved without flankers)
-- **Tier 1 (must)**: Flanked letter at 8° — OCR fails (crowding destroys identity via statistical pooling)
+- **Tier 1 (must)**: Isolated letter at 8°: OCR recognizes it (structure preserved without flankers)
+- **Tier 1 (must)**: Flanked letter at 8°: OCR fails (crowding destroys identity via statistical pooling)
 - **Tier 2 (should)**: Asymmetry ratio > 2x (isolated recognition / flanked recognition)
 - **Tier 3 (nice)**: Critical spacing tracks Bouma's 0.5 × eccentricity within 20%
 
-This is **simulation limitation #1** from `simulation-limitations.md` — the gap displacement can't close. If synthesis produces it, that's a publishable result and the scientific justification for the entire Tier 3 effort.
+This is **simulation limitation #1** from `simulation-limitations.md`, a gap that displacement can't close. If synthesis produces the asymmetry, the result would be publishable and would justify the Tier 3 effort.
 
-**Blog artifact**: The money shot — same letter, same eccentricity, isolated vs flanked, through Tier 3. Side-by-side with Tier 2.5 (no asymmetry) and Brown metamer (ground truth asymmetry).
+**Blog artifact**: The same letter at the same eccentricity, isolated vs flanked, through Tier 3. Side-by-side with Tier 2.5 (no asymmetry) and Brown metamer (ground truth asymmetry).
 
 ## Phase 4: Integration
 
@@ -161,11 +161,11 @@ This is **simulation limitation #1** from `simulation-limitations.md` — the ga
 **Add to**: `renderer/webgpu-crowding-compute.js`
 - Debug readback for intermediate buffers (pyramid bands, stats heatmaps, synthesis stages)
 - Keyboard shortcut to dump intermediates as PNGs
-- Feeds blog content directly
+- Output usable directly for blog content
 
 ### 4e. Spec + docs update
 
-**Modify**: `docs/specs/mongrel_textures.md` — Update tier table, mark Tier 2.75/3 as shipped
+**Modify**: `docs/specs/implemented/mongrel_textures.md` (update tier table, mark Tier 2.75/3 as shipped)
 
 ## Performance Budget
 
@@ -200,7 +200,7 @@ Phase 4 (integration)          ~2 sessions
 
 Phase 1b and 1c can overlap. Phase 0 is independent. Debug viz (4d) is parallel with anything.
 
-## Critical Files
+## Files
 
 | File | Action | Purpose |
 |------|--------|---------|
@@ -212,8 +212,8 @@ Phase 1b and 1c can overlap. Phase 0 is independent. Debug viz (4d) is parallel 
 | `scripts/validate-pyramid.js` | Create | Wave 7a decomposition fidelity |
 | `scripts/validate-crowding-tier3.js` | Create | Wave 7c crowding asymmetry |
 | `tests/unit/pyramid-decompose.test.js` | Create | Decomposition unit tests |
-| `docs/specs/wave7_pyramid_validation.md` | Create | Validation spec |
-| `docs/specs/mongrel_textures.md` | Modify | Update tier status |
+| `docs/specs/implemented/wave7_pyramid_validation.md` | Create | Validation spec |
+| `docs/specs/implemented/mongrel_textures.md` | Modify | Update tier status |
 | `renderer/webgpu-safety.js` | Minor modify | Tiered fallback thresholds |
 | `shared/modes.json` | Modify | Mode 13 or upgraded mode 10 |
 

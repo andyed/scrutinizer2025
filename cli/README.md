@@ -1,12 +1,12 @@
-# Scrutinizer — CLI & Automation
+# Scrutinizer: CLI & Automation
 
-Scrutinizer is a foveated vision simulator — it renders web pages the way the human visual system actually processes them, with high detail at the fixation point and increasing degradation toward the periphery. This CLI and scripting layer lets you use that pipeline without touching the desktop app.
+Scrutinizer is a foveated vision simulator. It renders web pages with high detail at the fixation point and increasing degradation toward the periphery, following published models of peripheral vision. This CLI and scripting layer lets you use that pipeline without touching the desktop app.
 
-Three automation surfaces:
+Three automation entry points:
 
-- **`cli/scrutinizer-audit`** — Standalone visual complexity scorer. No GPU, no Electron. Crawls pages with Playwright, computes a 0–100 clutter score.
-- **`cli/mcp/`** — MCP server wrapping the auditor for AI coding agents (Claude Code, etc.).
-- **`scripts/`** — 75+ Node.js scripts that drive the full Electron pipeline headlessly: capture screenshots through the foveated shader, replay eye-tracking data, export saliency maps, run validation experiments.
+- **`cli/scrutinizer-audit`:** Standalone visual complexity scorer that runs without a GPU or Electron. Crawls pages with Playwright, computes a 0–100 clutter score.
+- **`cli/mcp/`:** MCP server for AI coding agents (Claude Code, etc.). Three tools wrap the auditor; `capture_vision` launches the Electron app to return a foveated screenshot.
+- **`scripts/`:** 75+ Node.js scripts that drive the full Electron pipeline headlessly: capture screenshots through the foveated shader, replay eye-tracking data, export saliency maps, run validation experiments.
 
 ---
 
@@ -20,7 +20,7 @@ Three automation surfaces:
 | Compare modes side-by-side | `node scripts/capture-mode-comparison.js` | PNGs in `docs/golden/mode-comparison/` |
 | Replay eye-tracking fixations | `node scripts/replay-scanpath.js --data-dir ./data --trial T01` | Foveated accumulation image |
 | Export saliency values at fixation coordinates | `node scripts/export-saliency.js --input img.png --coordinates coords.json` | JSON with per-coordinate metrics |
-| Run a quick sanity check before shader changes | `npm run capture-smoke` | 5 screenshots in `tests/smoke-captures/` |
+| Run a quick sanity check before shader changes | `npm run capture-smoke` | 12 screenshots in `tests/smoke-captures/` |
 | Run the full golden capture suite | `npm run capture-golden` | Versioned PNGs in `tests/golden-captures/` |
 | Validate the congestion pipeline end-to-end | `npm run validate-congestion` | Comparison report |
 | Build a signed macOS release | `npm run build` | `.dmg` in `dist/` |
@@ -29,7 +29,7 @@ Three automation surfaces:
 
 ## scrutinizer-audit (standalone)
 
-Visual complexity scorer. Uses Rosenholtz Feature Congestion — local variance across luminance, red-green, and blue-yellow channels in Oklab color space — plus Sobel edge density.
+Visual complexity scorer. Uses Rosenholtz Feature Congestion (local variance across luminance, red-green, and blue-yellow channels in Oklab color space) plus Sobel edge density.
 
 ### Install & Run
 
@@ -104,7 +104,7 @@ node scrutinizer-audit.js https://example.com
 
 ## MCP Server
 
-Wraps the visual complexity auditor for MCP clients (Claude Code, Cursor, etc.).
+Wraps the visual complexity auditor for MCP clients (Claude Code, Cursor, etc.) and adds a foveated-capture tool. The three scoring tools use Playwright only; `capture_vision` needs Electron installed at the project root.
 
 ```bash
 claude mcp add scrutinizer-audit -- node cli/mcp/server.js
@@ -112,7 +112,7 @@ claude mcp add scrutinizer-audit -- node cli/mcp/server.js
 
 ### Tools
 
-**`analyze_url`** — Score one page.
+**`analyze_url`:** Score one page.
 
 Input: `{ url, viewport?, scroll? }`
 
@@ -130,25 +130,31 @@ Input: `{ url, viewport?, scroll? }`
 }
 ```
 
-**`analyze_urls`** — Score multiple pages with summary.
+**`analyze_urls`:** Score multiple pages with summary.
 
-Input: `{ urls[], viewport?, scroll? }`
+Input: `{ urls[], viewport? }` (always scores above the fold)
 
 Returns `{ summary: { pagesAnalyzed, avgScore, maxScore, minScore }, pages: [...] }`
 
-**`compare_pages`** — Side-by-side delta between two URLs.
+**`compare_pages`:** Side-by-side delta between two URLs.
 
-Input: `{ urlA, urlB, viewport?, scroll? }`
+Input: `{ urlA, urlB, viewport? }` (always scores above the fold)
 
 Returns `{ a: {...}, b: {...}, delta: { score, congestion_p90, edgeDensity_p90 }, summary: "..." }`
+
+**`capture_vision`:** Screenshot of a page with the Scrutinizer effect applied at a fixation point.
+
+Input: `{ url, x?, y?, mode?, radius? }` (`x`/`y` normalized 0–1, default 0.5; `mode` default 0; `radius` in pixels, default 180)
+
+Returns a base64 PNG image block. Launches Electron via `scripts/run-electron.js` and times out after 25 s.
 
 ---
 
 ## Capture Scripts (`scripts/`)
 
-These scripts drive the Electron app headlessly. They launch Electron with `TEST_MODE=true` and configure behavior through environment variables — no GUI interaction required.
+These scripts drive the Electron app headlessly. They launch Electron with `TEST_MODE=true` and configure behavior through environment variables, so no GUI interaction is required.
 
-**All scripts run from the project root**, not from `scripts/`.
+**All scripts run from the project root.**
 
 ### How Headless Capture Works
 
@@ -162,7 +168,7 @@ The Electron app reads `TEST_*` environment variables at startup. The capture sc
 | `TEST_MODES` | Comma-separated mode IDs (e.g., `"0,5,10"`) |
 | `TEST_FIXATION_X` / `TEST_FIXATION_Y` | Where to fixate (normalized 0–1 or pixels) |
 | `TEST_SELECTOR` | CSS selector to fixate on (alternative to coordinates) |
-| `TEST_RADIUS` | Foveal blur radius in pixels |
+| `TEST_RADIUS` | Foveal radius in pixels |
 | `TEST_SCANPATH` | Path to JSON fixation sequence for replay |
 | `TEST_VISUAL_MEMORY` | Buffer lifetime in frames (-1 = infinite accumulation) |
 | `TEST_BATCH_FILE` | JSON file with batch capture specifications |
@@ -197,7 +203,7 @@ For `TEST_BATCH_FILE`, provide a JSON array:
 ### Quick Reference
 
 ```bash
-# Smoke test (5 shots, fast)
+# Smoke test (12 shots, fast)
 npm run capture-smoke
 
 # Golden captures (manifest-cached, --force to recapture all)
@@ -222,7 +228,7 @@ node scripts/capture-fullpage-gazeplot.js \
 
 ## Saliency & Congestion Export
 
-Extracts per-coordinate metrics from images. Runs in pure Node.js — no Electron, no GPU. Uses the same `congestion-core.js` (Oklab DoG + local variance) as the desktop app.
+Extracts per-coordinate metrics from images. Runs in pure Node.js without Electron or a GPU. Uses the same `congestion-core.js` (Oklab DoG + local variance) as the desktop app.
 
 ```bash
 node scripts/export-saliency.js \
@@ -310,14 +316,14 @@ node scripts/capture-reading-span.js
 
 ## Validation Waves
 
-Each wave captures controlled stimuli through the pipeline, then runs analysis scripts to produce quantitative reports against known ground truth.
+For each wave, a capture script renders controlled stimuli through the pipeline, and analysis scripts compare the output against known ground truth in quantitative reports.
 
 | Wave | What it validates | Run with |
 | --- | --- | --- |
 | Spatial acuity | Grating contrast falloff vs eccentricity | `capture-spatial-acuity.js` → `analyze-spatial-acuity.js` → `report-spatial-acuity.js` |
 | Crowding | Letter identification in clutter | `capture-crowding.js` → `analyze-crowding.js` → `report-crowding.js` |
 | Color search | Chromatic pooling accuracy | `capture-color-search.js` → `analyze-color-search.js` → `report-color-search.js` |
-| Saliency | Attention modulation of foveal detail | `capture-saliency.js` → `analyze-saliency.js` |
+| Saliency | Attention modulation of peripheral detail | `capture-saliency.js` → `analyze-saliency.js` |
 | Halverson | Mixed-density page rendering | `capture-halverson.js` → `analyze-halverson.js` |
 | COCO-Periph | Natural image peripheral degradation | `npm run wave6` (end-to-end) |
 | Tier 3 | Pyramid statistics + crowding | `npm run wave7` (end-to-end) |
@@ -344,7 +350,7 @@ cli/
 ├── scrutinizer-audit.js      Standalone complexity CLI (no Electron)
 ├── package.json              Own dependencies: Playwright, pngjs, MCP SDK
 ├── mcp/
-│   └── server.js             MCP server (stdio transport, 3 tools)
+│   └── server.js             MCP server (stdio transport, 4 tools)
 ├── lib/
 │   ├── analyzer.js           Oklab DoG + Feature Congestion + edge density
 │   ├── crawler.js            Playwright page capture

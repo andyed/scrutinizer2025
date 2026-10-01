@@ -1,24 +1,24 @@
-# Scrutinizer v2.7.0 — Pyramid Mongrel
+# Scrutinizer v2.7.0: Pyramid Mongrel
 
 **Date:** 2026-03-25
 **Previous:** [v2.6.0](release_notes_v2.6.0.md)
 
-Tier 2.75 replaces Tier 2.5's single-scale oriented noise with a Laplacian pyramid decomposition pipeline. Four frequency bands plus a DC residual are extracted per tile, their variances and cross-scale correlations measured, and noise is synthesized to match those statistics at each scale. The result is spatially coherent peripheral texture instead of colored noise. Mode 14 (Pyramid Mongrel) is the new default.
+Tier 2.75 replaces Tier 2.5's single-scale oriented noise with a Laplacian pyramid decomposition pipeline. Four frequency bands plus a DC residual are extracted per tile, their variances and cross-scale correlations measured, and noise is synthesized to match those statistics at each scale. This produces spatially coherent peripheral texture in place of Tier 2.5's colored noise. Mode 14 (Pyramid Mongrel) is the new default.
 
 ## Highlights
 
 ### Laplacian Pyramid Compute Pipeline (Tier 2.75)
 
-A 15-dispatch-per-frame WebGPU compute pipeline decomposes the half-res source into 4 bandpass levels plus a residual, extracts per-tile statistics (variance, magnitude, parent-child correlation), and synthesizes noise that matches those statistics at each scale. The pipeline drops into the existing TEXTURE5 path — `peripheral.frag` sees the same RGBA8 + alpha blend weight format as Tier 2.5.
+A 15-dispatch-per-frame WebGPU compute pipeline decomposes the half-res source into 4 bandpass levels plus a residual, extracts per-tile statistics (variance, magnitude, parent-child correlation), and synthesizes noise that matches those statistics at each scale. The pipeline drops into the existing TEXTURE5 path, and `peripheral.frag` sees the same RGBA8 + alpha blend weight format as Tier 2.5.
 
 Three new WGSL shaders:
-- `pyramid-decompose.wgsl` — luminance extraction, blur/downsample, band subtraction (3 entry points)
-- `pyramid-stats.wgsl` — atomic tile accumulation + finalize producing 18 floats per tile (TileStatsTier3)
-- `pyramid-synth.wgsl` — sine-grating noise generation, variance matching, bilinear tile interpolation, multi-band reconstruction
+- `pyramid-decompose.wgsl`: luminance extraction, blur/downsample, band subtraction (3 entry points)
+- `pyramid-stats.wgsl`: atomic tile accumulation + finalize producing 18 floats per tile (TileStatsTier3)
+- `pyramid-synth.wgsl`: sine-grating noise generation, variance matching, bilinear tile interpolation, multi-band reconstruction
 
 Pipeline manager: `webgpu-pyramid-compute.js` (803 lines) orchestrates device setup, buffer allocation, bind groups, and the 15-dispatch sequence (decompose, stats, seed, match x2, reconstruct).
 
-### Mode 14 — Pyramid Mongrel (Default)
+### Mode 14: Pyramid Mongrel (Default)
 
 Mode 14 replaces mode 12 (FOVI Cortical Grid) as the default. It uses the full Scrutinizer pipeline (LGN structure mask, saliency gate, V1 distortion, V4 chromatic pooling) with Tier 2.75 synthesis replacing Tier 2.5's oriented noise. Previous default accessible via menu.
 
@@ -32,15 +32,31 @@ The original `sin(x)*cos(y)` noise pattern was axis-aligned and produced diagona
 
 ### Eccentricity-Graded Content Replacement
 
-Synthesis alpha now controls detail strength as a function of eccentricity: near-fovea (0.15) preserves structure, far periphery (0.8) replaces content. High-variance tiles (flanked letters) receive more noise disruption than low-variance tiles (isolated letters) — this is the mechanism through which crowding emerges from the synthesis.
+Synthesis alpha now controls detail strength as a function of eccentricity: near-fovea (0.15) preserves structure, far periphery (0.8) replaces content. High-variance tiles (flanked letters) receive more noise disruption than low-variance tiles (isolated letters). This is the intended route to crowding in the synthesis; the Wave 7c crowding test has not validated it (see Test Results).
 
 ### Gaze-Based Stable Seed
 
-Noise seed is derived from gaze position rather than pixel coordinates, so the synthesized texture is stable across frames at a given fixation. Eliminates the shimmer artifact present in Tier 2.5 where noise pattern changed every frame during fixation.
+Noise seed is derived from gaze position (previously pixel coordinates), so the synthesized texture is stable across frames at a given fixation. Eliminates the shimmer artifact present in Tier 2.5 where noise pattern changed every frame during fixation.
 
 ### Mode-Switch Pipeline Recreation
 
-Switching between Tier 2.5 and Tier 2.75 modes now correctly destroys and recreates the WebGPU compute pipeline. Previously, switching from mode 14 to mode 10 (or vice versa) would crash because the pipeline manager expected a different buffer layout. The `compute_tier` config field drives pipeline selection.
+Switching between Tier 2.5 and Tier 2.75 modes now correctly destroys and recreates the WebGPU compute pipeline. Previously, switching from mode 14 to mode 10 (or vice versa) would crash because the pipeline manager expected a different buffer layout. Pipeline selection is set by the `compute_tier` config field.
+
+### Acuity-Gated Saliency
+
+Saliency protection decays with eccentricity per Strasburger et al. (2011). E2 tuned to 8.0° for web content.
+
+### Eccentricity-Weighted Congestion
+
+Feature Congestion runs at two scales: foveal (σ=2.5) and peripheral (σ=5.0), weighted by eccentricity.
+
+### Comfort Mode
+
+Checkbox (Simulation → Behavior → Comfort Mode; no keyboard shortcut) adds +1° to the clear zone. Extends foveal protection from 1° to ~2°, approximating the fovea + microsaccade envelope hypothesized in `docs/comfort-zone-research.md`.
+
+### Compute Texture Comparison Tooling
+
+New validation scripts: `capture-compute-texture.js` and `compare-compute-textures.js` for isolated compute pipeline comparison. Wave 7.5 validation showed Tier 2.75 output is non-degenerate (MAD = 0.86 against Tier 2.5's near-black output, a known bug; see Known Limitations). The MAD does not measure fidelity to peripheral appearance.
 
 ## New Files
 
@@ -49,7 +65,7 @@ Switching between Tier 2.5 and Tier 2.75 modes now correctly destroys and recrea
 | `renderer/shaders/pyramid-decompose.wgsl` | Laplacian pyramid decomposition (luminance, blur, band subtraction) |
 | `renderer/shaders/pyramid-stats.wgsl` | Per-tile statistics extraction (variance, magnitude, correlation) |
 | `renderer/shaders/pyramid-synth.wgsl` | Multi-scale noise synthesis with bilinear interpolation |
-| `renderer/webgpu-pyramid-compute.js` | Pipeline manager — 15 dispatches per frame |
+| `renderer/webgpu-pyramid-compute.js` | Pipeline manager (15 dispatches per frame) |
 | `scripts/generate-pyramid-reference.py` | Python reference generator for pyramid validation (pyrtools) |
 | `scripts/validate-pyramid.js` | Pyramid decomposition validation against Python reference |
 | `scripts/validate-crowding-tier3.js` | Crowding asymmetry validation (Wave 7c) |
@@ -61,7 +77,7 @@ Switching between Tier 2.5 and Tier 2.75 modes now correctly destroys and recrea
 | `docs/specs/implemented/wave7_pyramid_validation.md` | Wave 7 validation spec (7a fidelity, 7b stats, 7c crowding) |
 | `docs/specs/implemented/tier3_ttm_synthesis_plan.md` | Tier 3 TTM synthesis architecture plan |
 | `tests/unit/pyramid-decompose.test.js` | 30 unit tests: decomposition validated against pyrtools |
-| `tests/unit/pyramid-reference/pyramid-reference.json` | Golden reference data from Python generator |
+| `tests/validation/pyramid-reference/pyramid-reference.json` | Golden reference data from Python generator |
 | `tests/validation/wave7c-crowding.json` | Wave 7c crowding asymmetry validation data |
 
 ## Test Results
@@ -77,32 +93,16 @@ Switching between Tier 2.5 and Tier 2.75 modes now correctly destroys and recrea
 | Golden (73) | PASS |
 | Wave 7a (pyramid fidelity) | Scaffolded |
 | Wave 7b (stats accuracy) | Scaffolded |
-| Wave 7c (crowding asymmetry) | FAIL — OCR calibration needed, not a synthesis issue |
-
-### Acuity-Gated Saliency
-
-Saliency protection decays with eccentricity per Strasburger et al. (2011). E2 tuned to 8.0° for web content.
-
-### Eccentricity-Weighted Congestion
-
-Feature Congestion runs at two scales: foveal (σ=2.5) and peripheral (σ=5.0), weighted by eccentricity.
-
-### Comfort Mode
-
-Toggle (View → Comfort Mode, ⌘⇧C) adds +1° to the clear zone. Extends foveal protection from 1° to ~2°, matching the microsaccade-maintained visibility envelope.
-
-### Compute Texture Comparison Tooling
-
-New validation scripts: `capture-compute-texture.js` and `compare-compute-textures.js` for isolated compute pipeline comparison. Wave 7.5 validation proved Tier 2.75 produces structured content (MAD = 0.86 vs Tier 2.5's near-black output).
+| Wave 7c (crowding asymmetry) | FAIL: OCR calibration needed, not a synthesis issue |
 
 ## Known Limitations
 
-- **Tier 2.5 (mode 10) near-black bug** — oriented noise synthesis produces near-zero RGB. Not user-facing (mode 14 is default).
-- **Tier 3 (mode 15) not ready** — Pure sector pooling without V1 displacement doesn't degrade sparse content. Fragment shader fixes identified, deferred. See `docs/specs/implemented/tier3_lessons_learned.md`.
-- **Brown metamer comparison pending** — Overnight PooledStatisticsMetamers jobs needed for quantitative gap analysis.
+- **Tier 2.5 (mode 10) near-black bug:** oriented noise synthesis produces near-zero RGB. Not user-facing (mode 14 is default).
+- **Tier 3 (mode 15) not ready:** Pure sector pooling without V1 displacement doesn't degrade sparse content. Fragment shader fixes identified, deferred. See `docs/specs/implemented/tier3_lessons_learned.md`.
+- **Brown metamer comparison pending:** Overnight PooledStatisticsMetamers jobs needed for quantitative gap analysis.
 - Cross-scale correlation strength tuned to 0.8 empirically. No psychophysical calibration yet.
 
 ## Breaking Changes
 
 - Default mode changed from 12 (FOVI Cortical Grid) to 14 (Pyramid Mongrel)
-- Compute phase added to FrameTimer — timing breakdowns from earlier versions are not directly comparable
+- Compute phase added to FrameTimer, so timing breakdowns from earlier versions are not directly comparable

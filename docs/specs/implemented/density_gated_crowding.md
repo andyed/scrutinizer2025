@@ -4,30 +4,30 @@
 
 **Status**: Shipped (v1.9.1, 2026-03-07)
 **Created**: 2026-03-04
-**Diagnostic**: `reference-pages/crowding.html`, `reference-pages/crowding-stimulus.html`
-**Validation**: Wave 3 — Crowding Geometry (`docs/specs/wave3_crowding_validation.md`, Prediction C). Density gate validated at 3.3:1 crowded-to-isolated ratio. Wave 5 — Halverson Mixed-Density (`docs/release_notes_v2.1.0.md#wave-5-halverson-mixed-density`): density gate predicts same sparse/dense degradation pattern as Halverson & Hornof 2011 EPIC model.
-**Successor**: Mongrel texture synthesis (`docs/specs/mongrel_textures.md`) replaces this strength-based proxy with statistical texture replacement.
+**Diagnostic**: `scrutinizer-www/src/reference-pages/crowding.html`, `scrutinizer-www/src/reference-pages/crowding-stimulus.html`
+**Validation**: Wave 3, Crowding Geometry (`docs/specs/implemented/wave3_crowding_validation.md`, Prediction C). Density gate validated at 3.3:1 crowded-to-isolated ratio. Wave 5, Halverson Mixed-Density (`docs/release_notes_v2.1.0.md#wave-5-halverson-mixed-density`): tests whether the density gate predicts the same sparse/dense degradation pattern as the Halverson & Hornof 2011 EPIC model. *(Correction 2026-10-01: it does not. Density discrimination was "Not met": sparse and dense word groups differed by 0.1–0.3% SSIM at 60–90 px foveal radius, and at 38 px the difference ran the wrong way. See `docs/specs/implemented/halverson_hornof_validation.md`, v2.1 Findings.)*
+**Successor**: Mongrel texture synthesis (`docs/specs/implemented/mongrel_textures.md`) replaces this strength-based proxy with statistical texture replacement.
 
 ## Context
 
-The crowding reference page (`crowding.html`) exposed that Scrutinizer's V1 Lateral Smash distortion is purely eccentricity-dependent — an isolated letter and a densely flanked letter at the same eccentricity receive identical displacement. In real peripheral vision, the isolated letter remains identifiable (Bouma 1970). The structure map already carries a `density` channel (green) through the LGN signal but it's unused in V1 or V4. This change feeds density into the V1 strength calculation so dense content (text clusters, UI grids) gets full crowding distortion while sparse content (isolated elements on background) is spared.
+Testing against the crowding reference page (`crowding.html`) showed that Scrutinizer's V1 Lateral Smash distortion is purely eccentricity-dependent: an isolated letter and a densely flanked letter at the same eccentricity receive identical displacement. In real peripheral vision, the isolated letter remains identifiable (Bouma 1970). The structure map already includes a `density` channel (green), passed through the LGN signal, but it's unused in the V1 and V4 stages. This change adds density to the V1 strength calculation so dense content (text clusters, UI grids) gets full crowding distortion while sparse content (isolated elements on background) is spared.
 
-This is a defensible first-order approximation of TTM-style summary statistic pooling (Rosenholtz 2012) — it models the *consequence* of feature pooling (identity loss scales with feature density in the pooling region) without computing actual statistics. One step shy of true mongrel/metamer texture synthesis (Level 2), which would replace content with statistically-matched texture.
+This is a defensible first-order approximation of TTM-style summary statistic pooling (Rosenholtz 2012). It models the *consequence* of feature pooling (identity loss scales with feature density in the pooling region) without computing actual statistics. One step shy of true mongrel/metamer texture synthesis (Level 2), which would replace content with statistically-matched texture.
 
 ## Approach: Sigmoid density gate on V1 strength
 
-**Why sigmoid, not linear or step:**
-- Bouma's law describes a relatively sharp transition — inside critical spacing, recognition drops precipitously. A sigmoid captures this.
+**Why sigmoid over linear or step:**
+- Bouma's law describes a relatively sharp transition: inside critical spacing, recognition drops precipitously. A sigmoid has this shape.
 - Linear would over-distort sparse regions and under-distort moderate ones.
 - A hard step would create visible discontinuity boundaries in the rendered output.
 
 **Why NOT local contrast variance (alternative 4a):**
-- Requires 8+ extra texture fetches per fragment — measurable perf hit at 60fps.
+- Requires 8+ extra texture fetches per fragment, a measurable perf hit at 60fps.
 - Density is already computed and flowing through the pipeline for free.
-- Density captures the dominant first-order effect. Variance is a second-order refinement for later.
+- The dominant first-order effect is already reflected in density. Variance is a second-order refinement for later.
 
 **Known limitations (acceptable for now):**
-- Isolated complex glyphs (e.g., Chinese characters) have high internal density → may be over-distorted. Mitigated if density is sampled at Bouma-scaled radius, but current structure map is block-level, not pixel-level.
+- Isolated complex glyphs (e.g., Chinese characters) have high internal density → may be over-distorted. Mitigated if density is sampled at Bouma-scaled radius, but the current structure map is block-level.
 - Same-density but different-similarity flankers (e.g., all-same vs all-different letters) produce identical distortion. This is a second-order effect.
 - Density is derived from font-weight + Gestalt group boost (1.2×), giving crowded groups ~0.53 vs isolated ~0.44. Small absolute difference, but the sigmoid amplifies it.
 
@@ -38,15 +38,15 @@ This is a defensible first-order approximation of TTM-style summary statistic po
 **File:** `renderer/config.js` (or wherever uniforms are declared)
 
 Add two new uniforms:
-- `u_crowding_density_threshold` (float, default 0.2) — density below this = minimal crowding
-- `u_crowding_density_steepness` (float, default 10.0) — sharpness of sigmoid transition
+- `u_crowding_density_threshold` (float, default 0.2): density below this = minimal crowding
+- `u_crowding_density_steepness` (float, default 10.0): sharpness of sigmoid transition
 
 These are tunable via dev tools / modes.json so we can A/B test against the crowding reference page.
 
 ### 2. Modify V1 strength calculation in both fragment shaders
 
-**File:** `renderer/shaders/peripheral.frag` — line 426
-**File:** `renderer/shaders/peripheral.frag` — line 514
+**File:** `renderer/shaders/peripheral.frag`, line 426
+**File:** `renderer/shaders/peripheral.frag`, line 514
 
 Current:
 ```glsl
@@ -65,15 +65,15 @@ float crowdingFactor = mix(0.3, 1.0, densityCrowding);
 float strength = lgn.suppressionFactor * config.v1_strength_mult * eccentricityScale * crowdingFactor;
 ```
 
-The `mix(0.3, 1.0, ...)` floor is important: isolated peripheral elements still lose acuity (MIP pooling, desaturation) — they just don't get the full Lateral Smash displacement that makes crowded text illegible. Without the floor, isolated text would look unnaturally sharp in the far periphery.
+With the `mix(0.3, 1.0, ...)` floor, isolated peripheral elements still lose acuity (MIP pooling, desaturation). They do not get the full Lateral Smash displacement that makes crowded text illegible. Without the floor, isolated text would look unnaturally sharp in the far periphery.
 
 ### 3. V4 MIP pooling inherits automatically
 
-No change needed. V4's coupled pooling (line 606) already uses `v1.distortionStrength`:
+No change needed. The V4 stage's coupled pooling (line 606) already uses `v1.distortionStrength`:
 ```glsl
 float coupledEccentricity = v1.distortionStrength * u_intensity * fovea_radius * blurMult;
 ```
-When V1 strength is reduced for sparse regions, MIP pooling automatically reduces too — isolated elements get sharper MIP sampling. This is the correct behavior: less feature mixing in sparse pooling regions.
+When V1 strength is reduced for sparse regions, MIP pooling automatically reduces too, so isolated elements get sharper MIP sampling. This is the correct behavior: less feature mixing in sparse pooling regions.
 
 ### 4. Wire up uniforms in renderer
 
@@ -108,7 +108,7 @@ Add `crowding_density_threshold` and `crowding_density_steepness` to mode config
 
 3. **Regression check on existing pages:**
    - `dashboard.html`: Dense UI should still degrade normally in periphery
-   - `article.html`: Body text (high density) distorted, headings with spacing (lower density) slightly clearer — this is correct behavior
+   - `article.html`: Body text (high density) distorted, headings with spacing (lower density) slightly clearer, which is correct behavior
    - `grid.html`: Regular grid pattern at uniform density → no change from current behavior
 
 4. **Golden capture:** Re-capture crowding goldens at all 4 fixation points. The crowded-vs-isolated asymmetry should now be visible in the screenshots.
@@ -117,19 +117,19 @@ Add `crowding_density_threshold` and `crowding_density_steepness` to mode config
 
 The structure map density difference between a 5-letter crowded group (~0.53) and an isolated letter (~0.44) is small. Three options for increasing the signal, each with different tradeoffs:
 
-**Option A: Sigmoid only (current plan).** Keep `density = fontWeight/900 * 1.2` as-is. The sigmoid amplifies the 0.44→0.53 gap into a meaningful crowdingFactor difference. Pro: zero risk to existing pipeline stages that read density. Con: the shader is doing all the work to separate a narrow signal — fragile if font-weight happens to be similar across content types.
+**Option A: Sigmoid only (current plan).** Keep `density = fontWeight/900 * 1.2` as-is. The sigmoid amplifies the 0.44→0.53 gap into a meaningful crowdingFactor difference. Pro: zero risk to existing pipeline stages that read density. Con: the shader is doing all the work to separate a narrow signal, which is fragile if font-weight happens to be similar across content types.
 
 **Option B: Scale group boost by cluster size.** Change gestalt-processor.js line 166 from `* 1.2` to `* (1.0 + 0.1 * Math.min(cluster.length, 8))`. A 5-letter cluster gets 1.5×, a single letter stays 1.0×. Pro: gives the shader more dynamic range with a biologically motivated signal (more items in the pooling region = more features to pool). Con: changes the density channel semantics for ALL downstream consumers, including the LGN whitespace gate and any future saliency-density interaction.
 
-**Option C: Spatial coverage density.** Replace font-weight-based density with `totalInkArea / boumaRegionArea` — a direct measure of how much of the local pooling region is occupied by content. Pro: physically meaningful for crowding (this IS what the TTM measures — feature density within pooling regions). Con: requires computing a Bouma-scaled sampling area per block, which means the Gestalt processor needs eccentricity information it currently doesn't have (it operates in screen-space without knowing fixation position). Would need a two-pass approach or deferred computation.
+**Option C: Spatial coverage density.** Replace font-weight-based density with `totalInkArea / boumaRegionArea`, a direct measure of how much of the local pooling region is occupied by content. Pro: physically meaningful for crowding, since the TTM measures feature density within pooling regions. Con: requires computing a Bouma-scaled sampling area per block, which means the Gestalt processor needs eccentricity information it currently doesn't have (it operates in screen-space without knowing fixation position). Would need a two-pass approach or deferred computation.
 
-**Recommendation for first implementation:** Option A. Ship the sigmoid gate with current density values and test against the crowding reference page. If the effect is too subtle, try Option B as a quick follow-up. Option C is architecturally cleaner but requires fixation-aware structure analysis — better suited for a future pass when/if the team validates the approach.
+**Recommendation for first implementation:** Option A. Ship the sigmoid gate with current density values and test against the crowding reference page. If the effect is too subtle, try Option B as a quick follow-up. Option C is architecturally cleaner but requires fixation-aware structure analysis, so it is better suited for a future pass when/if the team validates the approach.
 
 ## Future path
 
 - **Local contrast variance** as secondary crowding signal (8 texture fetches in Bouma-scaled ring)
-- **Radial/tangential asymmetry** — crowding is stronger along the radial axis (Toet & Levi 1992)
-- **Tier 2 mongrel textures** — replace content with statistically-matched texture within pooling regions (Level 2 metamers, requires multi-pass architecture)
+- **Radial/tangential asymmetry:** crowding is stronger along the radial axis (Toet & Levi 1992)
+- **Tier 2 mongrel textures:** replace content with statistically-matched texture within pooling regions (Level 2 metamers, requires multi-pass architecture)
 
 ## References
 
@@ -138,5 +138,5 @@ The structure map density difference between a 5-letter crowded group (~0.53) an
 - Rosenholtz, R., Huang, J., Raj, A., Balas, B. J., & Ilie, L. (2012). A summary statistic representation in peripheral vision explains visual search. *Journal of Vision*, 12(4):14.
 - Freeman, J., & Simoncelli, E. P. (2011). Metamers of the ventral stream. *Nature Neuroscience*, 14(9), 1195-1201.
 - Pelli, D. G., Palomares, M., & Majaj, N. J. (2004). Crowding is unlike ordinary masking: Distinguishing feature integration from detection. *Journal of Vision*, 4(12):12.
-  <!-- NOTE: Previously attributed to "Zhang et al. 2015" which was fabricated. The title "Crowding is unlike ordinary masking" belongs to Pelli, Palomares & Majaj (2004). Not in references.bib — verify and add if needed. -->
+  <!-- NOTE: Previously attributed to "Zhang et al. 2015" which was fabricated. The title "Crowding is unlike ordinary masking" belongs to Pelli, Palomares & Majaj (2004). Not in references.bib. Verify and add if needed. -->
 - Toet, A., & Levi, D. M. (1992). The two-dimensional shape of spatial interaction zones in the parafovea. *Vision Research*, 32(7), 1349-1357.

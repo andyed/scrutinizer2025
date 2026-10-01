@@ -1,11 +1,12 @@
-# Deploy — Scrutinizer (scrutinizer2025)
+# Deploy: Scrutinizer (scrutinizer2025)
 
-Scrutinizer has a well-established release skill. **Use it.**
+Releases go through the `/release` Claude Code skill.
 
 ## Canonical procedure
 
-Use the **`/release`** Claude Code skill. Source at
-`~/.claude/skills/release/SKILL.md`.
+The **`/release`** skill's source is at
+`~/.claude/skills/release/SKILL.md` on the maintainer's machine (not in this
+repo; the tracked `.claude/skills/release/SKILL.md` is an older variant).
 
 ```
 /release              # Release current version from package.json
@@ -13,7 +14,7 @@ Use the **`/release`** Claude Code skill. Source at
 ```
 
 The skill detects major (`x.Y.0`) vs dot (`x.y.Z`) releases and adjusts
-artifacts. Full workflow documented in the skill itself — don't duplicate here.
+artifacts. The full workflow is documented in the skill itself. Don't duplicate it here.
 
 ## Deploy surfaces (one release cycle touches all of these)
 
@@ -28,19 +29,19 @@ artifacts. Full workflow documented in the skill itself — don't duplicate here
 
 ## Minimal-change protocol
 
-Text-only patches to the blog / homepage go through `scrutinizer-www` — see its
-own `DEPLOY.md`. Changes to the native app (rendering, UI, features) always go
+Text-only patches to the blog / homepage go through `scrutinizer-www` (see its
+own `DEPLOY.md`). Changes to the native app (rendering, UI, features) always go
 through a full `/release` cycle; don't ship un-notarized DMGs.
 
 ## PostHog
 
 The scrutinizer-www site writes to **Scrutinizer project (259660)**. This
-native-app repo doesn't embed PostHog directly — app events are captured
+native-app repo doesn't embed PostHog directly. App events are captured
 through a different pipeline (scrutinizer session telemetry).
 
 ## See also
 
-- `~/.claude/skills/release/SKILL.md` — full release workflow
-- `../scrutinizer-www/DEPLOY.md` — for web-only patches
+- `~/.claude/skills/release/SKILL.md`: full release workflow (maintainer-only)
+- `../scrutinizer-www/DEPLOY.md`: for web-only patches
 - `CHANGELOG.md`, `ROADMAP.md`
-- `tests/golden-captures/` — visual regression captures per release
+- `tests/golden-captures/`: visual regression captures per release

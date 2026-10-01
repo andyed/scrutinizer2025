@@ -2,16 +2,16 @@
 
 > **Last updated:** 2026-05-25
 
-**Status**: Proposed (not yet shipped)
+**Status**: P1, P2 and P5 shipped (mode 17, research-only, off in all other modes); P3 validation, P4 and P6 not started
 **Created**: 2026-05-25
-**Diagnostic**: TBD — proposed `tests/reference-pages/border-suppression.html` (page-tall sidebar + horizontal divider stack at varied lengths). Existing `dashboard.html` and `techmeme.html` work as informal probes.
-**Validation**: Wave-adjacent — extends Wave 3 (Crowding) by characterizing how V1 length-tuning shapes peripheral saliency on structural chrome. Quantitative target: Cavanaugh, Bair & Movshon (2002) length-tuning curve — ~60-80% surround suppression at lengths well past the CRF preferred length, with a sharp onset around 2× preferred length.
+**Diagnostic**: `tests/reference-pages/border-suppression.html` (page-tall sidebar + horizontal divider stack at varied lengths). Existing `dashboard.html` and `techmeme.html` work as informal probes.
+**Validation**: Wave-adjacent. Extends Wave 3 (Crowding) by characterizing how V1 length-tuning shapes peripheral saliency on structural chrome. Quantitative target: Cavanaugh, Bair & Movshon (2002) length-tuning curve, with ~60-80% surround suppression at lengths well past the CRF preferred length and a sharp onset around 2× preferred length.
 
 ## Context
 
-Web layouts are riddled with **structural chrome**: page-tall sidebar rails, horizontal section dividers, table column rules, card outlines, sticky-header underlines, scrollbar tracks. These are long, parallel, high-contrast edges. They contribute zero content but light up bright on every saliency / DoG output the renderer produces — because the current pipeline treats edge energy uniformly regardless of edge length.
+Web layouts are riddled with **structural chrome**: page-tall sidebar rails, horizontal section dividers, table column rules, card outlines, sticky-header underlines, scrollbar tracks. These are long, parallel, high-contrast edges. They contribute zero content but light up bright on every saliency / DoG output the renderer produces, because the current pipeline treats edge energy uniformly regardless of edge length.
 
-The result is **visual noise in the foveated browser**: page borders compete with content for the user's peripheral attention budget. The cortical-magnification + Bouma crowding model the renderer already implements correctly degrades the *resolution* of these borders in the periphery, but it doesn't change their *salience* relative to content. A page-tall vertical border at 5° eccentricity is still encoded as "high-contrast feature here" — even though humans treat it as background structure they read past.
+Page borders therefore add **visual noise in the foveated browser**, competing with content for the user's peripheral attention budget. The cortical-magnification + Bouma crowding model the renderer already implements correctly degrades the *resolution* of these borders in the periphery, but it doesn't change their *salience* relative to content. A page-tall vertical border at 5° eccentricity is still encoded as "high-contrast feature here," even though humans treat it as background structure they read past.
 
 Biologically this is solved by **end-stopping** in V1: neurons whose response to a preferred-orientation edge **peaks at a preferred length and then drops** as the edge extends further. A short word-baseline activates the cell fully; a page-tall border drives the cell's endzones into its surround and suppresses output. Long contours are still *seen* (V2/V4 contour integration handles them) but they no longer dominate the saliency signal at V1.
 
@@ -21,18 +21,18 @@ Adding length-tuning to the oriented-DoG pass is the bio-grounded knob for reduc
 
 | Mechanism | Key reference | Operational statement |
 |---|---|---|
-| End-stopping (length-tuning) | Hubel & Wiesel (1965) *J Physiol* — original hypercomplex cell description in cat V1 | V1 neurons respond preferentially to edges of a limited length; response drops as edge extends past preferred length. |
+| End-stopping (length-tuning) | Hubel & Wiesel (1965) *J Neurophysiol*, the original hypercomplex cell description (cat areas 18 and 19); end-stopped cells in cat area 17 (V1): Gilbert (1977) | V1 neurons respond preferentially to edges of a limited length; response drops as edge extends past preferred length. |
 | Iso-orientation surround suppression | Knierim & Van Essen (1992) *J Neurophysiol* | Same-orientation surround stimulation reduces center response in macaque V1; suppression strongest along the cell's preferred orientation axis. |
-| Length-tuning curve quantification | Cavanaugh, Bair & Movshon (2002) *J Neurophysiol* — "Selectivity and spatial distribution of signals from the receptive field surround in macaque V1 neurons" | Surround suppression typically 60-80% of CRF response at lengths 4-8× preferred. Sigmoidal transition with steep slope. |
-| Co-existence with contour integration | Field, Hayes & Hess (1993) *Vis Res* — "association field" | Long contours suppressed at single-cell V1 but *integrated* at V2/V4 — so long borders remain perceptible (Gestalt good-continuation) without dominating saliency. |
+| Length-tuning curve quantification | Cavanaugh, Bair & Movshon (2002) *J Neurophysiol*, "Selectivity and spatial distribution of signals from the receptive field surround in macaque V1 neurons" | Surround suppression typically 60-80% of CRF response at lengths 4-8× preferred. Sigmoidal transition with steep slope. |
+| Co-existence with contour integration | Field, Hayes & Hess (1993) *Vis Res*, "association field" | Long contours suppressed at single-cell V1 but *integrated* at V2/V4, so long borders remain perceptible (Gestalt good-continuation) without dominating saliency. |
 
-The dual character matters for Scrutinizer: we want to suppress long-edge *saliency* (V1 contribution to attention) without making long borders *invisible* (they're still structural cues a real observer uses for layout parsing).
+Scrutinizer should therefore suppress long-edge *saliency* (V1 contribution to attention) without making long borders *invisible* (they're still structural cues a real observer uses for layout parsing).
 
 ## Approach: along-edge persistence probe → sigmoid suppression
 
-The Phase-2 oriented DoG at `renderer/shaders/peripheral.frag:203-242` already computes per-pixel gradient `(gx, gy)`, cardinal/oblique energy split, and an `orientBonus` that scales the per-band DoG response. Length-tuning slots in as an additional multiplicative gate on `orientBonus`.
+The Phase-2 oriented DoG at `renderer/shaders/peripheral.frag:289-397` already computes per-pixel gradient `(gx, gy)`, cardinal/oblique energy split, and an `orientBonus` that scales the per-band DoG response. Length-tuning slots in as an additional multiplicative gate on `orientBonus`.
 
-**Core idea:** sample along the **tangent** of the local edge (perpendicular to the gradient) at K steps. Count how many of those samples have edge energy aligned with the same orientation. High count = long edge = suppress. Low count = short edge = preserve.
+Sample along the **tangent** of the local edge (perpendicular to the gradient) at K steps. Count how many of those samples have edge energy aligned with the same orientation. High count = long edge = suppress. Low count = short edge = preserve.
 
 ```glsl
 // Already computed in Phase 2 (lines 213-215):
@@ -79,17 +79,17 @@ if (g2 > EDGE_GATE && u_length_tuning_enabled > 0.5) {
 }
 ```
 
-**Why sigmoid, not linear:**
-Length-tuning curves in macaque V1 (CBM 2002, Fig 4) show a sharp shoulder around 2× preferred length, then plateau. Linear under-suppresses short-but-long-enough edges (e.g., paragraph baselines) and over-suppresses very long edges. Sigmoid captures the shoulder + plateau shape and gives one knob (steepness) to tune sharpness vs gradualness.
+**Why sigmoid instead of linear:**
+Length-tuning curves in macaque V1 (CBM 2002, Fig 4) show a sharp shoulder around 2× preferred length, then plateau. Linear under-suppresses short-but-long-enough edges (e.g., paragraph baselines) and over-suppresses very long edges. A sigmoid has the same shoulder + plateau shape and gives one knob (steepness) to tune sharpness vs gradualness.
 
-**Why probe along the tangent, not the gradient:**
-End-stopping operates along the edge's *own axis*. Sampling perpendicular to the gradient (= along the tangent) is the right direction to ask "does this edge continue?" Sampling along the gradient asks "is there a parallel edge nearby" — that's collinear facilitation, the *opposite* effect (Field-Hayes-Hess association field), and would *boost* long edges instead of suppressing them.
+**Why probe along the tangent instead of the gradient:**
+End-stopping operates along the edge's *own axis*. Sampling perpendicular to the gradient (= along the tangent) is the right direction to ask "does this edge continue?" Sampling along the gradient asks "is there a parallel edge nearby?", which is the side-by-side iso-orientation flank configuration (Knierim & Van Essen 1992). It measures edge density and has no information about edge length. Collinear facilitation (Polat & Sagi 1993; the Field, Hayes & Hess 1993 association field) lies along the edge's own axis, the same axis this probe samples. The probe models end-zone suppression on that axis and does not model collinear facilitation.
 
-**Why MIP 1 reads, not MIP 0:**
-MIP 1 (2×2 averaging) is what Phase 2 already uses for cardinal/oblique energy. Same level keeps the per-pixel cost reasonable (we add 8 extra texture reads — 4 at +k and 4 at -k — per fragment when the edge gate fires) and matches the spatial scale of the orientation tuning the Phase-2 cell models. Reading at MIP 0 would add noise without information.
+**Why MIP 1 reads instead of MIP 0:**
+MIP 1 (2×2 averaging) is what Phase 2 already uses for cardinal/oblique energy. Same level keeps the per-pixel cost reasonable (each probe step adds 8 texture reads, 4 at +k and 4 at -k, so K_STEPS = 8 adds 64 reads per fragment when the edge gate fires) and matches the spatial scale of the orientation tuning the Phase-2 cell models. Reading at MIP 0 would add noise without information.
 
 **Why a gate on `g2 > EDGE_GATE`:**
-Length-tuning only matters at locations that already have detectable edge energy. Flat regions don't trigger the probe — saves the 8 extra reads on most of the screen. Same gate already exists in Phase 2 (`gradMag > 0.005`) and we should share it.
+Length-tuning only matters at locations that already have detectable edge energy. Flat regions don't trigger the probe, which saves those reads on most of the screen. Same gate already exists in Phase 2 (`gradMag > 0.005`) and we should share it.
 
 ## Why this and not the alternatives
 
@@ -97,9 +97,9 @@ Length-tuning only matters at locations that already have detectable edge energy
 |---|---|
 | Drop saliency weight uniformly | Removes useful short-edge saliency along with the noise. Page-tall sidebars and word baselines would degrade together. |
 | Detect borders via DOM (`border` CSS property) | Doesn't generalize beyond Scrutinizer's instrumented capture path; misses purely-rendered borders (e.g., divs with shadow gradients, table column rules without `border`). Pixel-domain bio mechanism is dataset-agnostic. |
-| End-stopping at higher MIP levels | Tried mentally — at MIP 3+ the tangent step covers too much of the visual field to be biologically meaningful. The mechanism we're modeling operates at the CRF scale (~1° = ~45 px), which is MIP 1 in our coordinate system. |
-| Hand-tuned per-page border masks | Doesn't generalize. Bio mechanism is the point — the whole project is "Scrutinizer mirrors what humans actually do, not what the page declares." |
-| Combine with Phase-3 radial-tangential anisotropy | Phase 3 (Toet & Levi crowding) already biases radial vs tangential edges. That's a different mechanism (crowding asymmetry, not length-tuning) and operates on *orientation relative to fovea*. Length-tuning is *orientation-agnostic* — vertical borders, horizontal dividers, diagonal sidebar separators all need suppression. The two mechanisms compose cleanly. |
+| End-stopping at higher MIP levels | Rejected without testing: at MIP 3+ the tangent step covers too much of the visual field to be biologically meaningful. The mechanism we're modeling operates at the CRF scale (~1° = ~45 px), which is MIP 1 in our coordinate system. |
+| Hand-tuned per-page border masks | Doesn't generalize. A pixel-domain mechanism responds to what is rendered, whatever the page declares. |
+| Combine with Phase-3 radial-tangential anisotropy | Phase 3 (Toet & Levi crowding) already biases radial vs tangential edges. That is a different mechanism (crowding asymmetry) and operates on *orientation relative to fovea*. Length-tuning is *orientation-agnostic*: vertical borders, horizontal dividers, diagonal sidebar separators all need suppression. The two mechanisms compose cleanly. |
 
 ## Changes
 
@@ -119,7 +119,7 @@ lengthTuningMidpoint: 0.5,         // persistence value at which suppression
 lengthTuningSteepness: 8.0,        // sigmoid slope. CBM 2002 shoulder shape
                                    // is matched well by ~6-10.
 lengthTuningProbeSteps: 8,         // K_STEPS — bigger probes longer edges
-                                   // but costs 2 texture reads per step.
+                                   // but costs 8 texture reads per step.
                                    // 8 = ±16 px at MIP 1 = ~32 px native,
                                    // a "very long" edge near the 45 px fovea.
 ```
@@ -134,15 +134,15 @@ Add the length-tuning block after the existing `orientBonus` computation (~line 
 
 ### 4. Wire mode metadata in `shared/modes.json`
 
-Add `length_tuning_enabled`, `length_tuning_strength`, etc. to the mode-config block. Default `false` everywhere. Phase 5 of this rollout will turn it on for mode 17 ("Structural Chrome Suppression" — research-only) before promoting to default modes.
+Add `length_tuning_enabled`, `length_tuning_strength`, etc. to the mode-config block. Default `false` everywhere. Phase 5 of this rollout will turn it on for mode 17 ("Structural Chrome Suppression", research-only) before promoting to default modes.
 
 ### 5. Diagnostic reference page
 
-`tests/reference-pages/border-suppression.html` — a stripped-down page rendering:
+`tests/reference-pages/border-suppression.html` is a stripped-down page rendering:
 - A page-tall vertical sidebar rail (1 px stroke, full viewport height)
 - A horizontal divider stack at 5 different lengths (50/100/200/400/800 px)
-- A text paragraph (the control — short baselines should NOT be suppressed)
-- A table grid (column rules — varying lengths)
+- A text paragraph (the control: short baselines should NOT be suppressed)
+- A table grid (column rules of varying lengths)
 
 Capture this page at center fixation with `length_tuning_enabled=true` and `=false`, diff. Long edges should darken (saliency reduced); short text baselines should be unchanged.
 
@@ -156,17 +156,17 @@ Capture this page at center fixation with `length_tuning_enabled=true` and `=fal
 |---|---|---|
 | Long-edge saliency ratio (off/on) | 3-5× reduction at the 800-px divider | CBM 2002 reports 4× response ratio at 5° eccentricity for surround stim 4× preferred length |
 | Short-edge saliency ratio (off/on) | < 1.2× change for text baselines under 100 px | Length-tuning should be near-flat in the "preferred" regime |
-| Cardinal vs oblique difference | < 10% — mechanism should be orientation-agnostic | CBM 2002 surround tuning is broad across orientation |
-| Compute cost (median frame time) | < +0.6 ms vs baseline at 1920×1080 | Budget: 8 extra texture reads per edge pixel, gated by EDGE_GATE so most fragments skip |
+| Cardinal vs oblique difference | < 10% (mechanism should be orientation-agnostic) | CBM 2002 surround tuning is broad across orientation |
+| Compute cost (median frame time) | < +0.6 ms vs baseline at 1920×1080 | Budget: 64 extra texture reads per edge pixel (8 per probe step), gated by EDGE_GATE so most fragments skip |
 
 ### Qualitative (visual regression)
 
 Add to the existing smoke set:
-- `smoke_dashboard_lengthtuning.png` — dashboard with length-tuning on, default mode
-- `smoke_techmeme_lengthtuning.png` — techmeme.html (text-heavy, lots of horizontal dividers)
-- `smoke_borders_lengthtuning.png` — the new border-suppression.html
+- `smoke_dashboard_lengthtuning.png`: dashboard with length-tuning on, default mode
+- `smoke_techmeme_lengthtuning.png`: techmeme.html (text-heavy, lots of horizontal dividers)
+- `smoke_borders_lengthtuning.png`: the new border-suppression.html
 
-Manual A/B: switch the menu toggle on a real page (e.g. github.com or stackoverflow.com) and confirm the sidebar rails fade into the periphery instead of carrying bright structural energy.
+Manual A/B: switch the menu toggle on a real page (e.g. github.com or stackoverflow.com) and confirm the sidebar rails fade into the periphery instead of staying bright.
 
 ### Bio plausibility check
 
@@ -174,24 +174,24 @@ Reproduce CBM 2002 Fig 4 (response vs stimulus length) using a synthetic Gabor p
 
 ## Known limitations (acceptable for v1)
 
-- **Curved long edges** (e.g., a column rule that runs through a CSS-rounded corner) will only have suppression at the straight portions. The corner pixels see edge orientation change mid-probe and persistence drops to ~0.5. Acceptable: the corner is a perceptually-relevant feature anyway (terminator).
-- **Crossing long edges** (table cell intersections) — each direction's edge is suppressed by its own length-tuning, but the intersection itself might be over-suppressed if both directions are long. Bio reality: V1 cells at junctions DO see lower response than at the middle of either edge, but T-junctions are recognized as a higher-level feature in V2. We accept the V1-level over-suppression.
+- **Curved long edges** (e.g., a column rule that runs through a CSS-rounded corner) will only have suppression at the straight portions. At the corner pixels, edge orientation changes mid-probe and persistence drops to ~0.5. This is acceptable because the corner is a perceptually-relevant feature anyway (terminator).
+- **Crossing long edges** (table cell intersections): each direction's edge is suppressed by its own length-tuning, but the intersection itself might be over-suppressed if both directions are long. In V1, cells at junctions do respond less than at the middle of either edge, but T-junctions are recognized as a higher-level feature in V2. We accept the V1-level over-suppression.
 - **Anti-aliased borders** with width >1 px may have spatially-varying gradient direction across the border thickness, slightly diluting the probe. Sample-direction normalization mitigates but doesn't eliminate.
 - **Doesn't help long curves** that look "short" at any local segment (e.g., a circle perimeter). These would be picked up by V2 contour integration in a real visual system but Scrutinizer doesn't model V2.
-- **Low-contrast 1-px chrome bypasses the probe entirely** (discovered empirically 2026-05-25 during P1+P2 A/B). The Phase-2 `edgeGate = smoothstep(0.005, 0.03, gradMag)` filter that guards the probe also filters out edges below that gradient threshold. A 1-px `#dddddd` divider on white produces g² ≈ 0.003 at MIP 1, under the gate, so length-tuning never sees it. This is intentional for compute-cost reasons (don't pay 32 texture reads on flat regions) but means real-world web layouts using light shades like `border: 1px solid #e5e5e5` (very common on github.com, stackoverflow.com, most modern designs) get no benefit. The current heavier 2-px/`#333` borders that this mechanism targets are present but no longer dominant in modern web design. Empirical signal at center fixation on `border-suppression.html`: with the original test page (1-px #999 sidebar, 2-px #333 dividers) only the dividers were suppressed; equalizing the sidebar to 2-px #333 brought sidebar-zone suppression up to 879 px (vs 576 in content), confirming the shader is orientation-symmetric and the asymmetry was contrast-driven.
+- **Low-contrast 1-px chrome bypasses the probe entirely** (discovered empirically 2026-05-25 during P1+P2 A/B). The Phase-2 `edgeGate = smoothstep(0.005, 0.03, gradMag)` filter that guards the probe also filters out edges below that gradient threshold. A 1-px `#dddddd` divider on white produces g² ≈ 0.003 at MIP 1, under the gate, so the length-tuning probe never runs on it. This is intentional for compute-cost reasons (don't pay 64 texture reads on flat regions) but means real-world web layouts using light shades like `border: 1px solid #e5e5e5` (very common on github.com, stackoverflow.com, most modern designs) get no benefit. The current heavier 2-px/`#333` borders that this mechanism targets are present but no longer dominant in modern web design. Empirical signal at center fixation on `border-suppression.html`: with the original test page (1-px #999 sidebar, 2-px #333 dividers) only the dividers were suppressed; equalizing the sidebar to 2-px #333 brought sidebar-zone suppression up to 879 px (vs 576 in content), confirming the shader is orientation-symmetric and the asymmetry was contrast-driven.
 
 ## Phasing
 
 | Phase | Effort | Risk | Target version |
 |---|---|---|---|
-| P1: Shader implementation + uniforms + mode 17 | 4-6 hrs | Low — additive on top of existing Phase 2 code | v2.8 (research-only) ✓ shipped |
+| P1: Shader implementation + uniforms + mode 17 | 4-6 hrs | Low (additive on top of existing Phase 2 code) | v2.8 (research-only) ✓ shipped |
 | P2: Reference page + smoke captures | 1-2 hrs | None | v2.8 ✓ shipped |
-| P3: Quantitative validation against CBM 2002 | 2-3 hrs | Medium — may reveal tuning gaps | v2.8 |
+| P3: Quantitative validation against CBM 2002 | 2-3 hrs | Medium (may reveal tuning gaps) | v2.8 |
 | P4: Menu UX (toggle, intensity knob) | 1-2 hrs | None | v2.9 |
-| **P5: Relocate production hook to `saliency-worker.js`** (see D4 below) | 3-5 hrs | Medium — moves the suppression earlier in the pipeline; bigger downstream propagation | v2.9 ✓ shipped 09d7e62 |
-| P6: Enable by default in production modes if validation passes | 1 hr + screenshot review | Medium — visual change to all default renders | v3.0 |
+| **P5: Relocate production hook to `saliency-worker.js`** (see D4 below) | 3-5 hrs | Medium (moves the suppression earlier in the pipeline; bigger downstream propagation) | v2.9 ✓ shipped 09d7e62 |
+| P6: Enable by default in production modes if validation passes | 1 hr + screenshot review | Medium (visual change to all default renders) | v3.0 |
 
-Estimated end-to-end: 1-2 working sessions of focused effort to land P1-P3; P5 adds ~half a session and is the architectural payoff for the visual reach the empirics (open question #3) showed P1 didn't get on its own.
+Estimated end-to-end: 1-2 working sessions of focused effort to land P1-P3; P5 adds ~half a session; it shipped, but the A/B in open question #3 measured its visible effect at perceptual floor, as with P1.
 
 ## Decisions
 
@@ -199,7 +199,7 @@ These were open questions in the first draft of this spec; resolved 2026-05-25.
 
 ### D1. Composition order with Phase-3 radial-tangential anisotropy
 
-Both Phase-3 (Toet & Levi 1992 crowding anisotropy) and length-tuning modify `orientBonus`. **Length-tuning runs first, then radial-tangential.** Rationale: length-tuning is a single-cell mechanism (V1 CRF length response), radial-tangential is a population-level effect (foveation-relative crowding). The single-cell modulation should apply before the population-level reweighting — same order the cortical layers compose them in. Concretely the shader code becomes:
+Both Phase-3 (Toet & Levi 1992 crowding anisotropy) and length-tuning modify `orientBonus`. **Length-tuning runs first, then radial-tangential.** Rationale: length-tuning is a single-cell mechanism (V1 CRF length response), radial-tangential is a population-level effect (foveation-relative crowding). The single-cell modulation applies before the population-level reweighting. Both factors multiply `orientBonus`, so the order does not change the result; the cited studies do not establish a cortical ordering for the two effects. Concretely the shader code becomes:
 
 ```glsl
 // (Phase 2 produces) float orientBonus = cardinalFrac * edgeGate * u_dog_orient_bias;
@@ -216,9 +216,9 @@ if (u_dog_radial_bias > 0.001) {
 
 ### D2. Probe span scales with local cortical magnification
 
-Length-tuning probe step is in physical pixels; without scaling, the same probe span covers a vanishing slice of the cortical visual field as eccentricity grows. **The probe scales with local CMF MIP level so it stays biologically meaningful at all eccentricities** — a "long" edge means "long relative to the local pooling region" at every retinal location, which is how a real cortical neuron sees it.
+Length-tuning probe step is in physical pixels; without scaling, the same probe span covers a vanishing slice of the cortical visual field as eccentricity grows. **The probe scales with local CMF MIP level so it stays biologically meaningful at all eccentricities.** A "long" edge means "long relative to the local pooling region" at every retinal location, matching how receptive-field size scales with eccentricity.
 
-Concrete formulation: keep `K_STEPS` constant; scale the per-step tangent magnitude by a factor derived from the existing `computeMipLevel(eccentricity, fovea_radius)` helper at `peripheral.frag:578`. Half-octave per MIP level matches the existing cortical-distance scaling already used by the DoG band cutoffs:
+Concrete formulation: keep `K_STEPS` constant; scale the per-step tangent magnitude by a factor derived from the existing `computeMipLevel(eccentricity, fovea_radius)` helper at `peripheral.frag:706`. Half-octave per MIP level matches the existing cortical-distance scaling already used by the DoG band cutoffs:
 
 ```glsl
 float mipForProbe = computeMipLevel(eccentricity, fovea_radius);
@@ -228,28 +228,28 @@ float probeScale = pow(2.0, mipForProbe * 0.5);
 vec2 tan = normalize(vec2(-gy, gx)) * px * probeScale;
 ```
 
-The exact exponent (0.5 here = half-octave per MIP) becomes a validation knob: tune against the CBM 2002 curve replicated at multiple eccentricities. If the published length-tuning shoulder shifts cleanly with eccentricity in their data (it does — receptive field size scales with eccentricity), the half-octave default should match. Otherwise validation will return a corrected exponent.
+The exact exponent (0.5 here = half-octave per MIP) becomes a validation knob: tune against the CBM 2002 curve replicated at multiple eccentricities. If the published length-tuning shoulder shifts cleanly with eccentricity in their data (it does, because receptive field size scales with eccentricity), the half-octave default should match. Otherwise validation will return a corrected exponent.
 
-This means parameter count is unchanged (no new uniform) — the scaling is derived. The cost is still bounded since `K_STEPS` stays fixed; only the texture-sample positions move.
+Parameter count is unchanged (no new uniform) because the scaling is derived. The cost is still bounded since `K_STEPS` stays fixed; only the texture-sample positions move.
 
 ### D3. Diagonal / curved borders accepted as graceful-degradation case
 
-`border-image`, `clip-path`, CSS-rounded corners, and SVG-derived borders can produce curved or diagonal long edges. The tangent probe captures persistence on straight portions but loses persistence at the curvature. **This is accepted as a known limitation** — it's not a regression vs current behavior (which over-weights these too), the suppression just doesn't fire maximally at the curve. The straight runs between curves still benefit. In a real visual system V2 contour integration handles curves; Scrutinizer doesn't model V2.
+`border-image`, `clip-path`, CSS-rounded corners, and SVG-derived borders can produce curved or diagonal long edges. The tangent probe measures persistence on straight portions but loses it at the curvature. **This is accepted as a known limitation.** Current behavior over-weights these edges too, so nothing regresses; the suppression fires less than maximally at the curve. The straight runs between curves still benefit. In a real visual system V2 contour integration handles curves; Scrutinizer doesn't model V2.
 
 ### D4. Production hook relocates from `peripheral.frag` to `saliency-worker.js` (post-P3)
 
-Resolved 2026-05-25 as an amendment after P1+P2 empirics. The shader implementation we just landed is biologically correct (V1 hypercomplex cells modulate at the per-cell level) but is plumbed into the **wrong layer of the pipeline** for the visual outcome we want.
+Resolved 2026-05-25 as an amendment after P1+P2 empirics. The shader implementation we just landed models the mechanism at the per-cell level, as V1 hypercomplex cells operate (its fit to CBM 2002 awaits P3), but is plumbed into the **wrong layer of the pipeline** for the visual outcome we want.
 
-**The architectural finding.** P1+P2's A/B (mode 14 vs mode 17 at center fixation on `border-suppression.html`) produced 0.072% pixel diff with max channel-sum delta of 17/765 — the mechanism IS firing, the discrimination IS correct (sidebar suppression > content text after the test-page contrast fix at commit 86c4ce5), but the visual effect on the final composite is bounded by the only place `orientBonus` is consumed:
+**Why the shader hook is too weak.** P1+P2's A/B (mode 14 vs mode 17 at center fixation on `border-suppression.html`) produced 0.072% pixel diff with max channel-sum delta of 17/765. The mechanism fires and the discrimination is correct (sidebar suppression > content text after the test-page contrast fix at commit 86c4ce5), but the visual effect on the final composite is bounded by the only place `orientBonus` is consumed:
 
 ```glsl
-// peripheral.frag:477
+// peripheral.frag:536
 float boost = 1.0 + orientBonus * effectiveEccFade * mix(0.5, 0.1, float(k) / 11.0);
 ```
 
-`orientBonus` is a small *additive boost* on per-band DoG cutoffs. Suppressing it removes a small boost — that's a precision change, not a saliency change. The downstream pipeline (LGN gating, V1 strength, V4 pooling, structure-mask weighting) never learns that the long edge "should be quiet."
+`orientBonus` is a small *additive boost* on per-band DoG cutoffs. Suppressing it removes a small boost, which changes band precision and leaves saliency unchanged. The suppression never reaches the downstream pipeline (LGN gating, V1 strength, V4 pooling, structure-mask weighting).
 
-**The bio argument for relocation.** V1 hypercomplex cells don't operate in isolation. Their length-tuned output feeds the saliency network (Itti & Koch 1998; Borji & Itti 2013). The bio-correct architectural placement is *as early as possible in the analysis chain, then propagated everywhere downstream*. That maps to Scrutinizer's pipeline cleanly:
+**The bio argument for relocation.** V1 hypercomplex cells don't operate in isolation. In saliency models, oriented-edge output feeds the saliency map (Itti, Koch & Niebur 1998; Borji & Itti 2013). The placement chosen here follows those models: *as early as possible in the analysis chain, then propagated everywhere downstream*. That maps to Scrutinizer's pipeline cleanly:
 
 ```
 V1 cell-level length-tuning   ⇄   saliency-worker per-pixel orientation energy
@@ -257,7 +257,7 @@ V1 cell-level length-tuning   ⇄   saliency-worker per-pixel orientation energy
 attention / saccade guidance     LGN mask + structure-mask + V4 pooling
 ```
 
-The shader location matches the bio analog of the cell; the right *Scrutinizer hook* is the saliency map, because that's where the cortex propagates V1 modulation to everything downstream.
+The shader location matches the bio analog of the cell; the right *Scrutinizer hook* is the saliency map, because the downstream stages listed below all read `u_saliencyMap`.
 
 **Concretely.** In `renderer/saliency-worker.js`, after the saliency map is computed (~line 400, before `postMessage`), run a JS port of the tangent-probe walk at the saliency-map resolution (256-512 px instead of native 1920×1080), and multiply the saliency map by `(1 - length_suppress)` in long-edge regions:
 
@@ -279,50 +279,54 @@ The downstream effects then propagate via `u_saliencyMap`:
 - V4 color preservation weakens (high-saliency regions retain more chroma; long edges lose it)
 - Tier 2.75 pyramid synth weight allocation deprioritizes long-edge tiles
 
-That's the "borders fade into the periphery" outcome the spec set out to achieve, with no additional shader fragment cost.
+This was the intended route to the "borders fade into the periphery" outcome, with no additional shader fragment cost. P5 shipped (09d7e62), but the A/B in open question #3 measured the visible change at perceptual floor (max 21/255 per channel), so that outcome has not been reached.
 
 **The shader implementation does not get deleted.** It becomes the **ground-truth comparator for P3 validation**:
-- The shader version runs at native res with exact bio replication for CBM 2002 Fig 4 curve fitting
+- The shader version runs at native res and is the per-pixel reference for the CBM 2002 Fig 4 curve fit (P3, not yet run)
 - The worker version runs at 256-512 px with the same algorithm at lower precision, for production
 - Mode 17 stays on as the per-pixel reference; a new debug uniform `u_length_tuning_debug` makes the shader visualization togglable for direct inspection
-- The two implementations agree within tolerance on the synthetic Gabor stimuli used for CBM 2002 validation
+- The two implementations must agree within tolerance on the synthetic Gabor stimuli used for CBM 2002 validation
 
 **Tradeoffs of the relocation:**
 
 | | Shader (current P1) | Worker (P5 target) |
 |---|---|---|
 | Resolution | Native (1920×1080) | 256-512 px |
-| Cost | ~32 texture reads per edge fragment | ~1ms once per saliency cycle (~3 Hz) |
+| Cost | 64 texture reads per edge fragment | ~1ms once per saliency cycle (~3 Hz) |
 | Thread | GPU fragment | CPU worker (off main thread) |
-| Visual reach | `orientBonus` only — small bounded change | `u_saliencyMap` everywhere — propagates through 4+ downstream stages |
+| Visual reach | `orientBonus` only (small bounded change) | `u_saliencyMap` everywhere (propagates through 4+ downstream stages) |
 | Precision | Exact at every pixel | Coarse at low res, sharp downstream after eccentricity scaling |
 | When it fires | Every fragment, every frame, on edges | Once per saliency cycle (already 100-300 ms latency) |
 | Bio analog | Single-cell V1 modulation | Per-cell modulation propagating to saliency map (the *whole* mechanism) |
 
-**P5 is not P1's correction** — it's P1's bio-completeness. P1 models the cell, P5 models the network the cell feeds.
+**P5 extends P1.** P1 models the cell; P5 models the network the cell feeds.
 
 ## Risks and open questions
 
-1. **Compute cost in mid-periphery.** 8 extra texture reads per edge fragment, gated by `g2 > EDGE_GATE`. Most fragments don't hit the gate but page-tall sidebars are EXACTLY the worst case. Mitigation if profiling reveals an issue: cap probe activation by eccentricity (no benefit to a long-edge probe in the fovea anyway, since saliency is supposed to be sharp there) and/or reduce `K_STEPS` adaptively at high MIP levels where each sample already covers more area.
+1. **Compute cost in mid-periphery.** 64 extra texture reads per edge fragment, gated by `g2 > EDGE_GATE`. Most fragments don't hit the gate but page-tall sidebars are the worst case. Mitigation if profiling reveals an issue: cap probe activation by eccentricity (no benefit to a long-edge probe in the fovea anyway, since saliency is supposed to be sharp there) and/or reduce `K_STEPS` adaptively at high MIP levels where each sample already covers more area.
 
-2. **`edgeGate` threshold tradeoff.** The Phase-2 `smoothstep(0.005, 0.03, gradMag)` cutoff serves two purposes: keeping noise/JPEG artifacts/anti-aliased fringe out of the cardinal-vs-oblique calculation, AND keeping the new length-tuning probe from firing on flat regions. P1+P2 empirics confirmed it does its job in the "filter noise" direction — but it also filters out genuinely-long but low-contrast structural chrome (1-px `#dddddd`, `#e5e5e5` borders typical of modern web design). Lowering the gate (e.g., `smoothstep(0.001, 0.01, gradMag)`) would catch these but expose the probe to JPEG-block-edge false positives. P3 should profile both: cost of probe-firing on text-dense pages with a lower gate, and whether the lower gate produces visible improvement on real web pages (github.com, news sites, IDE chrome). One viable middle path: **two gates — a tighter one for orientBonus computation, a looser one for length-tuning probe firing.** Worth evaluating once we have the CBM 2002 baseline.
+2. **`edgeGate` threshold tradeoff.** The Phase-2 `smoothstep(0.005, 0.03, gradMag)` cutoff serves two purposes: keeping noise/JPEG artifacts/anti-aliased fringe out of the cardinal-vs-oblique calculation, AND keeping the new length-tuning probe from firing on flat regions. P1+P2 empirics confirmed it does its job in the "filter noise" direction, but it also filters out long, low-contrast structural chrome (1-px `#dddddd`, `#e5e5e5` borders typical of modern web design). Lowering the gate (e.g., `smoothstep(0.001, 0.01, gradMag)`) would catch these but expose the probe to JPEG-block-edge false positives. P3 should profile both: cost of probe-firing on text-dense pages with a lower gate, and whether the lower gate produces visible improvement on real web pages (github.com, news sites, IDE chrome). One viable middle path: **two gates: a tighter one for orientBonus computation and a looser one for length-tuning probe firing.** Worth evaluating once we have the CBM 2002 baseline.
 
-3. ~~**`orientBonus` as the suppression hook may be too weak.** P1+P2 showed only 0.072% of pixels change in the A/B between mode 14 and mode 17 — the mechanism IS firing, the discrimination IS correct (sidebar suppression > content suppression after the test-page contrast fix), but `orientBonus` only contributes a small additive boost on top of per-band cutoffs (`boost = 1.0 + orientBonus * effectiveEccFade * mix(0.5, 0.1, k/11)`). Suppressing it removes a small bonus. If P3 confirms the visual effect on real pages is still subtle, the next escalation is wiring `length_suppress` into the saliency-map output or structure-mask path where it has a more direct handle on saliency rather than band-weighting. That's a bigger architectural decision and would graduate from this spec into a follow-up.~~ **Empirically validated and superseded 2026-05-25.** Three hooks were tried (orientBonus shader, saliency-worker post-PASS-4, V1 strength in processV1). All fire correctly. Max per-channel delta on photo-edge A/B at center fixation, even with mode 17 parameters cranked to maximum aggression (strength=1.0, midpoint=0.3, steepness=4.0): **21/255 = 8% per channel — at perceptual floor.** The cap is structural: V1 `strength` controls Bender displacement, but the visible peripheral fringe is composited from **multiple parallel effects** that the strength multiplier doesn't gate (DoG band reconstruction, Pyramid Mongrel synth, chromatic decay, MIP pooling). Suppressing one contributor doesn't move the visible composite. **Parameter tuning won't unblock this.** Three forward paths, in increasing surgery: (a) post-process the FINAL composited output — multiply `finalRGB` toward a local pool in long-edge regions, ~5 lines at the end of main(); (b) dilate length_suppress so a neighborhood of fringe-pixels inherits suppression (not just edge pixels themselves); (c) apply suppression to every contributor in parallel (DoG band weights, synth output, MIP level) — broad shader surgery. Recommend (a) as the cheapest first attempt; if (a) doesn't deliver, (b) and (c) are escalations. This is a P7 amendment territory.
+3. ~~**`orientBonus` as the suppression hook may be too weak.** P1+P2 showed only 0.072% of pixels change in the A/B between mode 14 and mode 17. The mechanism fires and the discrimination is correct (sidebar suppression > content suppression after the test-page contrast fix), but `orientBonus` only contributes a small additive boost on top of per-band cutoffs (`boost = 1.0 + orientBonus * effectiveEccFade * mix(0.5, 0.1, k/11)`). Suppressing it removes a small bonus. If P3 confirms the visual effect on real pages is still subtle, the next escalation is wiring `length_suppress` into the saliency-map output or structure-mask path where it has a more direct handle on saliency rather than band-weighting. That's a bigger architectural decision and would graduate from this spec into a follow-up.~~ **Empirically validated and superseded 2026-05-25.** Three hooks were tried (orientBonus shader, saliency-worker post-PASS-4, V1 strength in processV1). All fire correctly. Max per-channel delta on photo-edge A/B at center fixation, even with mode 17 parameters cranked to maximum aggression (strength=1.0, midpoint=0.3, steepness=4.0): **21/255 = 8% per channel, at perceptual floor.** The cap is structural: V1 `strength` controls Bender displacement, but the visible peripheral fringe is composited from **multiple parallel effects** that the strength multiplier doesn't gate (DoG band reconstruction, Pyramid Mongrel synth, chromatic decay, MIP pooling). Suppressing one contributor doesn't move the visible composite. **Parameter tuning won't unblock this.** Three forward paths, in increasing surgery: (a) post-process the FINAL composited output: multiply `finalRGB` toward a local pool in long-edge regions, ~5 lines at the end of main(); (b) dilate length_suppress so a neighborhood of fringe-pixels inherits suppression along with the edge pixels themselves; (c) apply suppression to every contributor in parallel (DoG band weights, synth output, MIP level), which is broad shader surgery. Recommend (a) as the cheapest first attempt; if (a) doesn't deliver, (b) and (c) are escalations. This is P7 amendment territory.
 
 4. **User expectation calibration.** Some users may have built mental models of "Scrutinizer makes borders visible." Removing border saliency changes the qualitative feel of the periphery. Worth a brief screenshot-comparison in the v3.0 release notes if this graduates to default.
 
 ## References
 
-- Hubel, D. H., & Wiesel, T. N. (1965). Receptive fields and functional architecture in two nonstriate visual areas (18 and 19) of the cat. *J. Neurophysiol.* 28, 229–289. — Original hypercomplex cell description.
-- Knierim, J. J., & Van Essen, D. C. (1992). Neuronal responses to static texture patterns in area V1 of the alert macaque monkey. *J. Neurophysiol.* 67, 961–980. — Surround orientation tuning.
-- Cavanaugh, J. R., Bair, W., & Movshon, J. A. (2002). Selectivity and spatial distribution of signals from the receptive field surround in macaque V1 neurons. *J. Neurophysiol.* 88, 2547–2556. — Quantitative length-tuning curve.
-- Field, D. J., Hayes, A., & Hess, R. F. (1993). Contour integration by the human visual system: Evidence for a local "association field." *Vis. Res.* 33, 173–193. — V2/V4 contour integration coexisting with V1 length-tuning.
-- Rosenholtz, R. (2012). Capabilities and limitations of peripheral vision. *Annu. Rev. Vis. Sci.* — Context for why structural-chrome suppression matters for peripheral scene parsing.
+- Hubel, D. H., & Wiesel, T. N. (1965). Receptive fields and functional architecture in two nonstriate visual areas (18 and 19) of the cat. *J. Neurophysiol.* 28, 229–289. Original hypercomplex cell description.
+- Gilbert, C. D. (1977). Laminar differences in receptive field properties of cells in cat primary visual cortex. *J. Physiol.* 268, 391–421. End-stopped cells in area 17.
+- Knierim, J. J., & Van Essen, D. C. (1992). Neuronal responses to static texture patterns in area V1 of the alert macaque monkey. *J. Neurophysiol.* 67, 961–980. Surround orientation tuning.
+- Cavanaugh, J. R., Bair, W., & Movshon, J. A. (2002). Selectivity and spatial distribution of signals from the receptive field surround in macaque V1 neurons. *J. Neurophysiol.* 88, 2547–2556. Quantitative length-tuning curve.
+- Field, D. J., Hayes, A., & Hess, R. F. (1993). Contour integration by the human visual system: Evidence for a local "association field." *Vis. Res.* 33, 173–193. V2/V4 contour integration coexisting with V1 length-tuning.
+- Polat, U., & Sagi, D. (1993). Lateral interactions between spatial channels: Suppression and facilitation revealed by lateral masking experiments. *Vis. Res.* 33, 993–999. Collinear facilitation.
+- Itti, L., Koch, C., & Niebur, E. (1998). A model of saliency-based visual attention for rapid scene analysis. *IEEE TPAMI* 20, 1254–1259.
+- Borji, A., & Itti, L. (2013). State-of-the-art in visual attention modeling. *IEEE TPAMI* 35, 185–207.
+- Rosenholtz, R. (2016). Capabilities and limitations of peripheral vision. *Annu. Rev. Vis. Sci.* 2, 437–457. Context for why structural-chrome suppression matters for peripheral scene parsing.
 
 ## Cross-references in this repo
 
-- Existing Phase-2 oriented DoG: `renderer/shaders/peripheral.frag:203-242`
-- Existing Phase-3 radial-tangential anisotropy: `renderer/shaders/peripheral.frag:244-273`
+- Existing Phase-2 oriented DoG: `renderer/shaders/peripheral.frag:289-397`
+- Existing Phase-3 radial-tangential anisotropy: `renderer/shaders/peripheral.frag:399-428`
 - BGRA channel-order contract (length-tuning probe reads must respect it): top of `peripheral.frag`
 - Sister Brown-dataflow end-stopped feature detection (different mechanism: D2 *enhances* distortion at end-stops; this spec *suppresses* response on long edges): `docs/specs/implemented/brown_dataflow_integration.md` §D2
-- Density-gated crowding (compositional with this — orthogonal mechanism): `docs/specs/implemented/density_gated_crowding.md`
+- Density-gated crowding (compositional with this; orthogonal mechanism): `docs/specs/implemented/density_gated_crowding.md`

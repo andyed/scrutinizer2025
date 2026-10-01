@@ -46,7 +46,7 @@ In the Figma plugin `ScrutinizerEngine.ts`:
 ### 2.1 Fovea Radius Normalization (Browser vs Figma)
 
 - **Browser canonical behavior** (`peripheral.frag`):
-  - Foveal geometry is computed in **canvas space**, not in image-fit UV space.
+  - Foveal geometry is computed in **canvas space**. It does not use image-fit UV space.
   - Distance is measured on a canvas-space coordinate system that is stretched by the canvas aspect, then corrected by a fovea aspect ratio:
     ```glsl
     float aspect = u_resolution.x / u_resolution.y;
@@ -67,7 +67,7 @@ In the Figma plugin `ScrutinizerEngine.ts`:
     float fovea_radius    = radius_norm;
     float parafovea_radius = radius_norm * 2.5;
     ```
-  - **Key point**: the *distance* is in the same (aspect-stretched) units for both `dist` and `fovea_radius`, so the fovea shape is consistent on screen.
+  - The *distance* is in the same (aspect-stretched) units for both `dist` and `fovea_radius`, so the fovea shape is consistent on screen.
 
 - **Figma plugin behavior (ScrutinizerEngine.ts)**:
   - Uses the **same canvas-space geometry** for fovea distance and radius as the browser shader (the snippet above is effectively mirrored in the inlined shader).
@@ -83,9 +83,9 @@ In the Figma plugin `ScrutinizerEngine.ts`:
     // uv used for sampling source/structure maps (object-fit: contain)
     vec2 uv = (v_texCoord - 0.5) * scale + 0.5;
     ```
-  - **Important**: fovea geometry (distances, radii, LGN/V1 gating) is driven by **canvas UVs** (`v_texCoord`), while image content is sampled with **fit UVs** (`uv`). The two pipelines are intentionally decoupled.
+  - Fovea geometry (distances, radii, LGN/V1 gating) is driven by **canvas UVs** (`v_texCoord`), while image content is sampled with **fit UVs** (`uv`). The two pipelines are intentionally decoupled.
 
-- **Why this still matters in Figma**:
+- **Failure modes in Figma**:
   - If you accidentally:
     - Compute `dist` in the **fit UV** space (after scale/letterbox), or
     - Normalize `u_foveaRadius` differently from how `dist` is measured,
@@ -120,7 +120,7 @@ The `ScrutinizerEngine.ts` contains an **inlined** version of `peripheral.frag`.
 3. **Texture Sampling**:
    - Browser uses `texture(u_texture, uv)`.
    - Figma plugin uses `sampleSource(uv)`.
-   - **Important**: Figma plugin might need to swap channels (RBGA vs BGRA) depending on how the image data was read. Currently `sampleSource` is a pass-through, but keep an eye on colors.
+   - The Figma plugin might need to swap channels (RGBA vs BGRA) depending on how the image data was read. Currently `sampleSource` is a pass-through, but keep an eye on colors.
 
 ## 4. State Management (React vs Vanilla)
 
@@ -146,7 +146,7 @@ The `ScrutinizerEngine.ts` contains an **inlined** version of `peripheral.frag`.
 
 ### Initial Load Race Condition
 - **Symptom**: When opening the plugin with an image already selected, it says "Select an image" (loading fails). Selecting *another* image works fine.
-- **Cause**: The plugin backend (`code.ts`) sends the `update-image` message *before* the UI (`App.tsx`) has mounted and set up its listeners. The message is lost in the void.
+- **Cause**: The plugin backend (`code.ts`) sends the `update-image` message *before* the UI (`App.tsx`) has mounted and set up its listeners. The message is dropped.
 - **Fix**: Implement a **Handshake Protocol**.
   1. `App.tsx`: On mount -> `parent.postMessage({ pluginMessage: { type: 'UI_READY' } }, '*')`
   2. `code.ts`: Listen for `UI_READY` -> Call `handleSelection()` to send the initial image.
@@ -210,7 +210,7 @@ This section provides a detailed breakdown of browser features introduced in v1.
 
 ## Figma "DOM" (Node Tree Access)
 
-**IMPORTANT**: Contrary to earlier assumptions, Figma DOES provide DOM-like access to its node tree! This means **Structure Map Debug Annotations** are feasible in Figma.
+Contrary to earlier assumptions, Figma provides DOM-like access to its node tree, so **Structure Map Debug Annotations** are feasible in Figma.
 
 ### Available Node Properties
 
@@ -281,7 +281,7 @@ function extractStructureBlocks(node: SceneNode): StructureBlock[] {
 - [ ] **Add React state/controls** in `App.tsx` + `VisualizerCanvas.tsx` bridge
 - [ ] **Check Coordinate System** (no mouse-Y flip in Figma!)
 - [ ] **Verify Aspect Ratio logic** (canvas-UV for fovea, fit-UV for sampling)
-- [ ] **Build & Test** (check console for WebGL errors—shader bugs only show at runtime!)
+- [ ] **Build & Test** (check the console for WebGL errors; shader bugs only show at runtime)
 
 ### v1.4.x Specific Checklist
 - [x] Port Tier 1.8.1 "Lateral Smash" distortion (anisotropic 6x horizontal crowding, micro-warp 900Hz)
@@ -308,16 +308,16 @@ Unlike the browser version which balances blur and distortion, the Figma plugin 
 - **Tuning Values**:
   - `micro-warp`: **0.008** (Strength) @ **900Hz** (Frequency) - Creates fine-grain text melting.
   - `macro-wobble`: **0.005** (Very Low) - Keeps text lines straight to maintain readability.
-  - `horizontal-bias`: **10.0** (Extreme) - Smashes letters horizontally ("Anisotropic Crowding").
-  - `blurMult`: **0.0** - **Crucial**. MIP blur is disabled to prevent "underwater/glow" look. The effect relies purely on geometric distortion.
+  - `horizontal-bias`: **10.0** (Extreme) - Smashes letters horizontally ("Anisotropic Crowding"). Crowding zones are elongated radially (Toet & Levi, 1992), so a horizontal bias matches them only near the horizontal meridian.
+  - `blurMult`: **0.0**. MIP blur is disabled to prevent "underwater/glow" look. The effect relies purely on geometric distortion.
   - `grain`: **0.0** - No static noise.
 
 ### Lessons Learned: The "No Change" Trap
 During the "Lateral Smash" migration, we encountered a persistent issue where distortion appeared inactive ("No Change").
 1.  **Structure Mask Suppression**: The `u_has_structure` uniform was true (blank texture uploaded), but the texture was empty. The shader interpreted this as "all whitespace" and masked the distortion to 0.0.
-    - **Fix**: Permanently disable `lgn_use_structure_mask` (0.0) in Figma shader config, or implement robust "Clear Texture" logic in App.tsx.
+    - **Fix**: Permanently disable `lgn_use_structure_mask` (0.0) in Figma shader config, or implement "Clear Texture" logic in App.tsx that handles an empty structure texture.
 2.  **Vertical Flattening**: Missing `u_fovea_aspect_ratio` caused `uv_lateral.x` to multiply by 0, resulting in 1D vertical noise (straight text).
-    - **Fix**: Hardcode `1.33` or ensure robust prop passing.
+    - **Fix**: Hardcode `1.33` or ensure the prop is always passed.
 3.  **UV Artifacts**: High distortion strength pushed UVs < 0 or > 1. Without clamping, this caused edge streaking or "leopard print" artifacts.
     - **Fix**: Add `clamp(uv, 0.005, 0.995)` to all texture samplers (tighter margin than 0.001).
 4.  **MIP Edge Sampling (v1.4.x)**: Even with clamped UVs, high MIP levels sample a wider footprint via hardware texture filtering. Near image edges (especially with aspect ratio letterboxing), this caused "leopard spots" as the MIP blur picked up the black canvas border.
@@ -325,7 +325,7 @@ During the "Lateral Smash" migration, we encountered a persistent issue where di
     - **Fix (Preferred)**: Enable `ENABLE_AUTO_TRIM` in `App.tsx`. Auto-resizes the plugin window on image load to match the image aspect ratio, eliminating black letterbox bars entirely. This is the root-cause fix.
 
 ## Future Work / Retro
-This migration highlighted the difficulty of manually porting complex shader logic and state management from Vanilla/Electron to React/Figma.
+Porting complex shader logic and state management by hand from Vanilla/Electron to React/Figma proved difficult in this migration.
 - **Goal**: Abstract the core visual model (shader + physics) into a framework-agnostic library (`@scrutinizer/core`) shared by both apps.
 - **Documentation**: We need to perform a deeper audit of the browser "latest flows" and verify they are accurately reflected here before the next major feature push. This was the "2nd migration attempt gone south" due to drift between codebases.
 

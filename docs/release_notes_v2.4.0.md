@@ -5,17 +5,17 @@
 
 ## In This Release
 
-1. [Reading Span — Asymmetric Foveal Envelope](#reading-span--asymmetric-foveal-envelope) — Velocity-gated fovea center shift extends protection in the reading direction during horizontal pursuit over text. Based on Rayner (1998) perceptual span asymmetry.
-2. [Fovea Degree Correction](#fovea-degree-correction) — fovea_deg 2.0→1.0 (1° radius = 2° diameter), default fovealRadius 90→45px. Corrects the angular-to-pixel mapping across all shader stages.
-3. [Saccadic Blindness Default](#saccadic-blindness-default) — Now ON by default for all modes that support it.
-4. [Wave 6: COCO-Periph Validation Scaffolding](#wave-6-coco-periph-validation-scaffolding) — System-level peripheral encoding validation against Harrington et al. 2024.
-5. [Citation Export Improvements](#citation-export-improvements) — foveaDeg and pxPerDeg metadata fields in PNG captures.
+1. [Reading Span: Asymmetric Foveal Envelope](#reading-span-asymmetric-foveal-envelope): Velocity-gated fovea center shift extends protection in the reading direction during horizontal pursuit over text. Based on Rayner (1998) perceptual span asymmetry.
+2. [Fovea Degree Correction](#fovea-degree-correction): fovea_deg 2.0→1.0 (1° radius = 2° diameter), default fovealRadius 90→45px. Corrects the angular-to-pixel mapping across all shader stages.
+3. [Saccadic Blindness Default](#saccadic-blindness-default): Now ON by default for all modes that support it.
+4. [Wave 6: COCO-Periph Validation Scaffolding](#wave-6-coco-periph-validation-scaffolding): System-level peripheral encoding validation against Harrington et al. 2024.
+5. [Citation Export Improvements](#citation-export-improvements): foveaDeg and pxPerDeg metadata fields in PNG captures.
 
 ---
 
-## Reading Span — Asymmetric Foveal Envelope
+## Reading Span: Asymmetric Foveal Envelope
 
-Rayner (1998, 2009) showed the perceptual span during reading is asymmetric: ~1.3° left of fixation, ~5° right (for LTR). This is attentional, not acuity-driven — it reverses for RTL readers. Scrutinizer now reshapes the foveal protection zone during horizontal reading motion.
+Rayner (1998, 2009) showed the perceptual span during reading is asymmetric: ~1.3° left of fixation, ~5° right (for LTR). The asymmetry is attentional. It reverses for RTL readers. Scrutinizer now reshapes the foveal protection zone during horizontal reading motion.
 
 ### Mechanism
 
@@ -25,13 +25,13 @@ The fovea center shifts in the reading direction by up to `fovea_radius × 0.7` 
 - **Horizontality gate**: Movement must be predominantly horizontal (hSpeed / totalSpeed).
 - **Text gate**: Structure map B channel under cursor must indicate text content (smoothstep 0.3–0.6).
 
-The shift feeds into the existing `dist` calculation, so all downstream stages (LGN gating, V1 crowding, V4 chromatic decay) automatically get the asymmetric boundary without any changes to their logic.
+The shifted center is used in the existing `dist` calculation, so all downstream stages (LGN gating, V1 crowding, V4 chromatic decay) automatically get the asymmetric boundary without any changes to their logic.
 
 ### Configuration
 
 | Mode | reading_span | Rationale |
 |------|-------------|-----------|
-| Compute Mongrel (default) | ON | Primary user-facing mode — reading comfort |
+| Compute Mongrel (default) | ON | Primary user-facing mode (reading comfort) |
 | Blueprint (presentation) | ON | Demos benefit from reading ease |
 | Highkey, Biological (research) | OFF | Strict circular fovea for scientific accuracy |
 | Congestion-gated (experimental) | OFF | Testing specific predictions |
@@ -55,7 +55,7 @@ Menu toggle: **Vision Model → Reading Span (Rayner)**
 
 ## Fovea Degree Correction
 
-The `fovea_deg` constant was 2.0 (treating the radius as a diameter). Corrected to 1.0 — the foveal radius subtends ~1° of visual angle (2° diameter total). This propagates through:
+The `fovea_deg` constant was 2.0 (treating the radius as a diameter). Corrected to 1.0. The foveal radius subtends ~1° of visual angle (2° diameter total). This propagates through:
 
 - **Default fovealRadius**: 90→45px (preserving ppd at 45)
 - **Shader**: All `fovea_deg` references (CMF MIP derivation, oblique effect scaling, chromatic attenuation, FOVI color decay, Bouma edge density)
@@ -70,7 +70,7 @@ Foveal radius options now show px/° units (e.g. "Medium (45px radius, 45 px/°)
 
 ## Saccadic Blindness Default
 
-Saccadic blindness (foveal suppression during high-velocity eye movements) now defaults to ON. The previous default (OFF) meant most users never experienced the feature unless they found it in the menu.
+Saccadic blindness (the simulation of reduced visual sensitivity during high-velocity eye movements) now defaults to ON. The previous default (OFF) meant most users never experienced the feature unless they found it in the menu.
 
 ---
 
@@ -83,7 +83,7 @@ Scripts and published data for system-level validation against Harrington et al.
 - SSIM, PSNR, and DFT band energy comparison against TTM reference
 - `npm run wave6` runs the full pipeline
 
-Results pending — scaffolding ships in this release, validation results in v2.5.
+Results pending. The scaffolding ships in this release, and validation results are planned for v2.5. *(Correction 2026-10-01: v2.5.0 shipped without Wave 6 results. The validation journal still lists them as pending.)*
 
 ---
 
@@ -97,4 +97,4 @@ PNG capture metadata now includes `foveaDeg` (angular fovea radius) and `pxPerDe
 
 - Rayner, K. (1998). Eye movements in reading and information processing: 20 years of research. *Psychological Bulletin*, 124(3), 372–422.
 - Rayner, K. (2009). The 35th Sir Frederick Bartlett Lecture: Eye movements and attention in reading, scene perception, and visual search. *QJEP*, 62(8), 1457–1506.
-- Harrington, C., Pepe, A., Ling, S. & Rosenholtz, R. (2024). COCO-Periph: Bridging the gap between human and machine perception with a peripheral vision benchmark. *ICLR 2024*.
+- Harrington, A., DuTell, V., Hamilton, M., Tewari, A., Stent, S., Freeman, W. T. & Rosenholtz, R. (2024). COCO-Periph: Bridging the gap between human and machine perception in the periphery. *ICLR 2024*.

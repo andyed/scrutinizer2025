@@ -1,8 +1,8 @@
-# Session Capture — Procedural Replay (P3-2 substrate)
+# Session Capture: Procedural Replay (P3-2 substrate)
 
 *Status: PROCEDURAL CAPTURE WRITE PATH IMPLEMENTED IN SOURCE (2026-07-26).
 Decisions from the usability-pivot review: capture is
-**procedural replay, not video**. This spec defines the on-disk session record and
+**procedural replay**, with no video. This spec defines the on-disk session record and
 the input-trail wire format. It refines P3-2 in
 [`../sprucing/phase-3-usability-foundation.md`](../sprucing/phase-3-usability-foundation.md);
 it does not replace the P3-2 stream-fusion work (pipeline snapshots, behavioral
@@ -16,9 +16,10 @@ moment. No screen/video recording.
 
 - Event logs are queryable and aggregatable; video is analysis debt (the original
   instrumented-browser argument: Edmonds, *BRMIC* 35(2), 2003).
-- In RFV mode the cursor trail + foveation config **is** the percept. Procedural
+- In RFV mode the cursor trail + foveation config is sufficient to re-render the
+  foveated view the participant saw. Procedural
   capture supports counterfactual replay (same session, different foveation
-  parameters) — video cannot.
+  parameters), which video cannot.
 - The replay read-side already exists: `renderer/scanpath-player.js` consumes
   `ScanpathData` (`renderer/scanpath/scanpath-types.js`). Capture is the write
   side of that format. **Do not invent a new schema.**
@@ -30,7 +31,7 @@ camera on the participant, a think-aloud audio track. Scrutinizer does not
 record video or audio itself and does not try to. Its job is to make the
 session record **joinable** to that footage after the fact.
 
-What already supports a join: every envelope timestamp is wall-clock ISO 8601
+Several things already support a join. Every envelope timestamp is wall-clock ISO 8601
 (`consent.consentedAt`, each task's `startedAt`/`endedAt`, `done` events), and
 each one coincides with a visible screen change that a screen recording or a
 camera aimed at the screen picks up (consent → task interstitial → task page →
@@ -65,8 +66,8 @@ One directory per session:
 
 ### envelope.json (`scrutinizer-session-capture/1`)
 
-Extends the shipped `scrutinizer-session-summary/1` (`shared/study-session.js`) —
-same `sessionId`/`participantId`/`taskRecords` keys, so the summary is a strict
+Extends the shipped `scrutinizer-session-summary/1` (`shared/study-session.js`)
+with the same `sessionId`/`participantId`/`taskRecords` keys, so the summary is a strict
 subset. Adds:
 
 - `capture`: `{ schema: "scrutinizer-session-capture/1", evtrackVersion,
@@ -74,19 +75,19 @@ subset. Adds:
   plus an optional final `health` snapshot from the capture adapter.
 - `coordinates`: explicit contract declaration (see below).
 - `settings` per task: the deep-link vocabulary snapshot (already produced by
-  `summarySettings()`) — this is the **foveation config snapshot** and maps to
+  `summarySettings()`). This is the **foveation config snapshot** and maps to
   ISO 25062:2025 §7.4.6 *evaluation environment*; deep-link params map to
   §7.8.4 *independent variables*.
 - `pageVisits`: `[{ pageVisitId, taskId, url, tStart, tEnd, screenshot,
-  stimulusWidth, stimulusHeight }]` — the stimulus anchor index.
-- `taskRecords[*]` gain `events`: Done / Quit / Comment (with comment text) —
-  the CIF task-event trail.
+  stimulusWidth, stimulusHeight }]`: the stimulus anchor index.
+- `taskRecords[*]` gain `events`: Done / Quit / Comment (with comment text),
+  forming the CIF task-event trail.
 
-### Input trail — evtrack wire schema → ScanpathData
+### Input trail: evtrack wire schema → ScanpathData
 
 The in-page tracker is a **vendored** copy of evtrack (Leiva,
 github.com/luileito/evtrack; the same telemetry format AdSERP shipped, so
-existing analysis tooling — approach-retreat, clicksense — ingests Scrutinizer
+existing analysis tooling (approach-retreat, clicksense) ingests Scrutinizer
 study output unchanged). Vendor rules: `renderer/instrumentation/vendor/evtrack/`,
 MIT license option of the dual license, header noting upstream commit, **no
 server leg** (the PHP POST sink is deleted; events buffer in-page and flush to
@@ -102,7 +103,7 @@ Column mapping (evtrack → `ScanpathData`):
 | `xpath` | `MouseTimelineEvent.xpath` | DOM anchor (the Uzilla DOM-path idea) |
 | `attrs` | `events[].data` for click/submit | element attributes at event time |
 | `extras` (callback) | reserved | per-event foveation state if config changes mid-task |
-| scroll events | `ScrollTimelineEvent.scrollY` | **sampled with every polled row**, not only on scroll events — required for percept reconstruction |
+| scroll events | `ScrollTimelineEvent.scrollY` | **sampled with every polled row** as well as on scroll events; required for view reconstruction |
 | key events | `events[]` with **masked** payload | see privacy |
 
 Cursor fidelity: evtrack polling mode for `mousemove`/`scroll`, default
@@ -118,11 +119,11 @@ listeners. It returns `false` with `health().code` set to
 `tracker_unavailable`, `tracker_inert`, or `tracker_start_failed` when that
 handshake fails; callers must not begin an analyzable task in that state.
 
-While capture is running, zero rows is reported as `awaiting_first_row`, not as
-success or failure. After `stop()`, zero rows becomes the explicit QC result
+While capture is running, zero rows is reported as `awaiting_first_row`, which
+counts as neither success nor failure. After `stop()`, zero rows becomes the explicit QC result
 `status: "empty", code: "empty_trail"`. The serializable health snapshot is
 included in `captureMeta().health` and `ScanpathData.meta.captureHealth`, so the
-DataCollector and Workbench can distinguish setup failure from genuine
+DataCollector and Workbench can distinguish setup failure from
 participant behavior without inferring from zeros.
 
 The study lifecycle starts the tracker only after the task page finishes
@@ -153,14 +154,14 @@ Follow `docs/adserp-coordinate-system.md`. The trail records **client-viewport
 CSS px + scrollY**; page-space is derived (`yPage = y + scrollY`);
 screenshot-space is derived via `devicePixelRatio`. The envelope's
 `coordinates` block states all three and the DPR so no consumer guesses.
-(`Fixation` coords in `ScanpathData` are physical canvas px — conversion happens
+(`Fixation` coords in `ScanpathData` are physical canvas px; conversion happens
 at replay import, as the AdSERP importer already does.)
 
 ### Stimulus anchors
 
 One full-page screenshot per page-visit (navigation or SPA URL change), captured
 via Chromium's full-page capture path (including content beyond the current
-viewport) — a static archive, **not** a frame
+viewport). Each anchor is a static archive; capture records no frame
 stream. Rationale: live pages are non-stationary; re-rendering archived HTML
 against drifted CSS is unfixable (AdSERP lesson). Replay prefers the live URL
 and falls back to the screenshot through the static-stimulus path
@@ -189,12 +190,12 @@ where `webContents` is valid.
 
 ## Derived views (post hoc, never at capture time)
 
-Compression at capture time is the one unrecoverable mistake — store raw rows;
-derive: time-on-task, mouse miles, click count, and the procedural Done-recorded
+Compression at capture time cannot be undone, so store raw rows and derive
+later: time-on-task, mouse miles, click count, and the procedural Done-recorded
 rate; approach-retreat episode geometry (P3-4); gazeplot/attention maps.
 Effectiveness/task success requires a separately defined analyst adjudication
 and must not be inferred from `outcome: 'done'`. Report layer follows **ISO
-25062:2025** (Annex B outline; cite it, not NIST CIF 1999).
+25062:2025** (Annex B outline; cite it in place of NIST CIF 1999).
 
 ## Out of scope
 

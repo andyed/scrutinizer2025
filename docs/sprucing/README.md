@@ -1,26 +1,26 @@
-# Sprucing Roadmap — verification-first hardening + usability-testing foundation
+# Sprucing Roadmap: verification-first hardening + usability-testing foundation
 
 *Created 2026-07-11 · Source: 5-agent broad audit (simulation status, AI posture, tool automation, robustness, usability-readiness) · Supersedes the ad-hoc remediation tail in [`../../TODO.md`](../../TODO.md) "Post-Isotropic Audit Remediation".*
 
 ## Why this exists
 
-The default-mode science (mode 12 FOVI isotropic) is **stable and defensible**, but the **verification layer that would catch the next regression is broken** — the crowding gate passes by reading nothing, the radial baseline is a clone of itself, and two named validation scripts don't exist. Adding usability testing on top of an unverified base would make study data meaningless. So the sequence is: **fix the gates first, floor the robustness, make the instrument drivable, then build usability testing.**
+The default-mode science (mode 12 FOVI isotropic) is **stable and defensible**, but the **verification layer that would catch the next regression is broken**: the crowding gate passes by reading nothing, the radial baseline is a clone of itself, and two named validation scripts don't exist. Adding usability testing on top of an unverified base would make study data meaningless. The sequence is therefore to **fix the gates first, floor the robustness, make the instrument drivable, then build usability testing.**
 
 ## How to use these docs
 
 Each phase file is a list of **self-contained tickets**. Every ticket has the same shape so it can be executed cold, without reading the rest of the repo:
 
-- **Goal** — one sentence, what "done" means.
-- **Files** — exact paths (and line anchors where stable) to touch.
-- **Steps** — ordered, concrete edits/commands.
-- **Verify** — the command to run and the output that proves success.
-- **Done when** — the checkbox condition.
+- **Goal:** one sentence, what "done" means.
+- **Files:** exact paths (and line anchors where stable) to touch.
+- **Steps:** ordered, concrete edits/commands.
+- **Verify:** the command to run and the output that proves success.
+- **Done when:** the checkbox condition.
 
 **Rules for any executor (including low-complexity models):**
 
 1. Do the tickets **in phase order**. Phase 3 depends on Phase 2's control-plane API; Phase 2 is only worth it once Phase 0/1 make the data trustworthy.
 2. Within a phase, tickets are independent unless a ticket says "depends on X".
-3. **Never** report a fix as working without running its **Verify** command and seeing the stated output. This whole roadmap exists because prose drifted from artifacts — do not add to that.
+3. **Never** report a fix as working without running its **Verify** command and seeing the stated output. This whole roadmap exists because prose drifted from artifacts. Do not add to that.
 4. If a **Verify** command needs the app and `node_modules` is missing, run `npm install` at `scrutinizer2025/` root first (that's ticket **P1-1**).
 5. Conventional commits: `type(scope): message`. One ticket ≈ one commit. Reference the ticket id in the body (e.g. `Closes P0-2`).
 6. No GitHub pushes weekdays 10am–3pm PT (day-job hours) unless asked.
@@ -42,7 +42,7 @@ Phase 3's controlled studies need Phase 2's per-trial condition-toggle API → c
 
 Check boxes in each phase file as tickets land. When a whole phase is green, add a dated line here:
 
-- [~] Phase 0 — 2026-07-11: P0-1..P0-4 done, P0-5 done except the held v2.8.0/v2.6.1 release-tag decision. Unit suite green (562 pass). Two honest gate failures now visible by design (crowding diagnostic; mode-12 radial non-monotonicity, chip spawned).
-- [x] Phase 1 — 2026-07-11: all 7 tickets. CI workflow, clean-clone-safe suite, tessdata provenance, validator exit codes, hygiene, and compute-tier stamping + `--require-tier` (P1-5, verified with a real capture). Two small deferrals noted in-ticket (OCR RC-2.x warnings→failures; HUD pooling badge). Unit suite green (562 pass). P1-5 surfaced a real finding — the default mode 12 renders Tier 2.5 while requesting 2.75 on this GPU (chip spawned).
-- [ ] Phase 2 complete —
-- [ ] Phase 3 complete —
+- [~] Phase 0 (2026-07-11): P0-1..P0-4 done, P0-5 done except the `v2.8.0` tag (v2.6.1 is tagged; `package.json` is 2.8.0 since `6e3f827` with no matching tag). Unit suite green (562 pass). The crowding gate fails by design as a diagnostic; the mode-12 radial non-monotonicity was resolved as content-driven (phase-0 P0-2).
+- [x] Phase 1 (2026-07-11): all 7 tickets. CI workflow, clean-clone-safe suite, tessdata provenance, validator exit codes, hygiene, and compute-tier stamping + `--require-tier` (P1-5, verified with a real capture). Two small deferrals noted in-ticket (OCR RC-2.x warnings→failures; HUD pooling badge). Unit suite green (562 pass). P1-5 found that the default mode 12 renders Tier 2.5 while requesting 2.75 on this GPU (chip spawned).
+- [ ] Phase 2 complete (date pending)
+- [ ] Phase 3 complete (date pending)

@@ -11,9 +11,9 @@
 
 ## Context
 
-Brown et al. is Rosenholtz's own team (with NVIDIA rendering researchers) reformulating TTM for graphics applications. The key architectural insight: warp the image into log-polar space so all pooling regions become uniform size, run cheap uniform convolution, unwarp. This avoids per-region convolutions at each eccentricity.
+Brown et al. is Rosenholtz's own team (with NVIDIA rendering researchers) reformulating TTM for graphics applications. Their pipeline warps the image into log-polar space so all pooling regions are uniform in size, runs a cheap uniform convolution, and unwarps. This avoids per-region convolutions at each eccentricity.
 
-Scrutinizer currently uses two MIP level selection paths: legacy linear scaling (`normalizedEcc * 2.5`) and CMF logarithmic scaling (`log(1 + r/a)`). The Brown et al. pipeline does something architecturally different: it warps the image into log-polar space, runs a uniform convolution, and unwarps. The warp math is relevant to our MIP computation, but the full warp-convolve-unwarp pipeline is a separate capability needed only for statistics-based synthesis (D5/Tier 3). This distinction matters and was previously conflated in D1.
+Scrutinizer currently uses two MIP level selection paths: legacy linear scaling (`normalizedEcc * 2.5`) and CMF logarithmic scaling (`log(1 + r/a)`). The Brown et al. pipeline does something architecturally different: it warps the image into log-polar space, runs a uniform convolution, and unwarps. The warp math is relevant to our MIP computation, but the full warp-convolve-unwarp pipeline is a separate capability needed only for statistics-based synthesis (D5/Tier 3).
 
 ---
 
@@ -21,9 +21,9 @@ Scrutinizer currently uses two MIP level selection paths: legacy linear scaling 
 
 ### D1. Log-Polar Pooling Integration
 
-#### D1a. MIP Level Selection vs UV Warp — What We Have vs What Brown et al. Does
+#### D1a. MIP Level Selection vs UV Warp: What We Have vs What Brown et al. Does
 
-Two fundamentally different operations that the original D1 spec conflated:
+Two different operations that the original D1 spec conflated:
 
 **What Scrutinizer does today (CMF path):**
 ```glsl
@@ -32,7 +32,7 @@ float cortical_dist = log(1.0 + r_deg / u_cmf_a);
 mipLevel = clamp(maxMipLevel * cortical_dist / u_cortical_max, 0.0, maxMipLevel);
 // Then: textureLod(u_texture, uv, mipLevel)  — SAME UV, different blur
 ```
-This controls **how much blur** at each eccentricity. Higher MIP = larger Gaussian kernel = more spatial averaging. But the UV coordinates are unchanged — every source pixel maps 1:1 to an output pixel. No spatial compression occurs.
+This controls **how much blur** at each eccentricity. Higher MIP = larger Gaussian kernel = more spatial averaging. But the UV coordinates are unchanged: every source pixel maps 1:1 to an output pixel. No spatial compression occurs.
 
 The JS side precomputes `cortical_max` from screen geometry (`webgl-renderer.js:617-621`):
 ```js
@@ -57,20 +57,20 @@ warped_uv = log_polar_transform(uv, gaze)  # compress periphery spatially
 output = uniform_convolution(warped_image)   # same kernel everywhere
 result = inverse_warp(output)                # back to Cartesian
 ```
-This **spatially remaps** the image: peripheral pixels get compressed into fewer output pixels. Then a uniform (constant-size) convolution in warped space produces eccentricity-scaled pooling in the original space. The warp IS the mechanism — the convolution kernel doesn't need to vary.
+This **spatially remaps** the image: peripheral pixels get compressed into fewer output pixels. Then a uniform (constant-size) convolution in warped space produces eccentricity-scaled pooling in the original space. The warp is the mechanism, so the convolution kernel doesn't need to vary.
 
 **Why MIP-level blur is a valid real-time approximation:**
 
-MIP sampling averages texels within the MIP kernel, destroying high-frequency detail at a rate that scales with eccentricity (when the MIP level is derived from a log CMF). The perceptual effect is similar to spatial pooling: fine detail is lost, coarse structure survives. The CMF path already implements this with the correct logarithmic falloff from Blauch, Alvarez & Konkle (2026).
+MIP sampling averages texels within the MIP kernel, destroying high-frequency detail at a rate that scales with eccentricity (when the MIP level is derived from a log CMF). The perceptual effect is similar to spatial pooling: fine detail is lost, coarse structure survives. The CMF path already implements this with a logarithmic falloff: the complex-log mapping of Schwartz (1980), with the foveal constant a = 2.78° from Blauch, Alvarez & Konkle (2026).
 
 **Where MIP-level blur breaks down:**
 
-It preserves the spatial layout — every pixel still has a unique UV. True log-polar warping compresses many source locations into the same output location, which is closer to what cortical magnification actually does (many retinal ganglion cell receptive fields → same cortical area). This matters for statistics-based synthesis (D5), where uniform patch sizes in warped space enable efficient PS computation. It does not matter for MIP-based blur.
+It preserves the spatial layout: every pixel still has a unique UV. True log-polar warping compresses many source locations into the same output location, which is closer to what cortical magnification does (many retinal ganglion cell receptive fields → same cortical area). This matters for statistics-based synthesis (D5), where uniform patch sizes in warped space enable efficient PS computation. It does not matter for MIP-based blur.
 
 | Approach | Spatial downsampling? | Blur control? | Stat replacement? | Perf cost |
 |----------|----------------------|---------------|-------------------|-----------|
-| Current CMF MIP | No — same UV | Yes — via MIP level | No | Zero (same `textureLod` call) |
-| Brown et al. warp | Yes — log-polar UV remap | Yes — uniform post-warp | Enables it | Extra pass (warp + unwarp) |
+| Current CMF MIP | No (same UV) | Yes, via MIP level | No | Zero (same `textureLod` call) |
+| Brown et al. warp | Yes (log-polar UV remap) | Yes (uniform post-warp) | Enables it | Extra pass (warp + unwarp) |
 
 ---
 
@@ -95,7 +95,7 @@ It preserves the spatial layout — every pixel still has a unique UV. True log-
 
 **Rollback:** Flip the flag back to `false`. Mode 7 (`legacy_v16`) retains `cmf_enabled: false` as a frozen comparison baseline.
 
-**Risk:** Low. The CMF path has been shipping in Mode 6 since v1.8. The only behavioral difference is the MIP curve shape — no new code executes.
+**Risk:** Low. The CMF path has been shipping in Mode 6 since v1.8. The only behavioral difference is the MIP curve shape. No new code executes.
 
 ---
 
@@ -110,7 +110,7 @@ It preserves the spatial layout — every pixel still has a unique UV. True log-
 uniform float u_ecc_scaling;      // Pooling growth rate (Bouma scaling, default 0.75)
 ```
 
-**Shader integration** — modify MIP computation in both `sampleMIPPooled` (line 267) and `sampleMIPPooledGrad` (line 294):
+**Shader integration:** modify MIP computation in both `sampleMIPPooled` (line 267) and `sampleMIPPooledGrad` (line 294):
 ```glsl
 // Current:
 mipLevel = clamp(maxMipLevel * cortical_dist / u_cortical_max, 0.0, maxMipLevel);
@@ -121,7 +121,7 @@ mipLevel = clamp(maxMipLevel * cortical_dist / u_cortical_max * (u_ecc_scaling /
 
 The `/ 0.75` normalizes so that the default value (0.75) produces no change from current behavior. Values > 0.75 increase peripheral blur (larger pooling zones); values < 0.75 decrease it.
 
-**DoG band cutoff propagation** — the CMF-derived cutoffs at `peripheral.frag:167-171` must also scale:
+**DoG band cutoff propagation:** the CMF-derived cutoffs at `peripheral.frag:167-171` must also scale:
 ```glsl
 // Current:
 float scale = u_cortical_max / maxMipLevel;
@@ -130,7 +130,7 @@ float scale = u_cortical_max / maxMipLevel;
 float scale = u_cortical_max / maxMipLevel / (u_ecc_scaling / 0.75);
 ```
 
-This ensures DoG bands drop out at eccentricities consistent with the scaled MIP levels. When `u_ecc_scaling` is high (aggressive blur), bands drop out sooner (closer to fovea); when low, they persist further.
+With this change, DoG bands drop out at eccentricities consistent with the scaled MIP levels. When `u_ecc_scaling` is high (aggressive blur), bands drop out sooner (closer to fovea); when low, they persist further.
 
 **JS-side setup** (add to `webgl-renderer.js` near line 639):
 ```js
@@ -162,11 +162,11 @@ this.eccScalingLocation = null;
 
 All modes start at the same value. Per-mode tuning comes after D3 ground truth comparison.
 
-**Performance:** Zero — one additional multiply in the MIP computation.
+**Performance:** Zero (one additional multiply in the MIP computation).
 
 ---
 
-#### D1d. Log-Polar UV Warp (Future — NOT Initial Implementation)
+#### D1d. Log-Polar UV Warp (Future: NOT Initial Implementation)
 
 **Architecture for warp pass, if justified by D5 or Tier 3:**
 
@@ -181,7 +181,7 @@ Source FBO ──[warp shader]──→ Log-Polar FBO ──[uniform conv]──
 
 **When this becomes necessary:**
 - D5 async PS synthesis needs uniform patch sizes to run efficient FFT-based statistics. The warp provides this for free.
-- Tier 3 atlas matching benefits from uniform pooling regions — each atlas entry covers the same angular/radial extent in warped space.
+- Tier 3 atlas matching benefits from uniform pooling regions: each atlas entry covers the same angular/radial extent in warped space.
 
 **When it is NOT necessary:**
 - MIP-based blur (D1b, D1c). The CMF log curve already gives the correct blur growth rate without spatial remapping.
@@ -191,18 +191,18 @@ Source FBO ──[warp shader]──→ Log-Polar FBO ──[uniform conv]──
 
 ---
 
-#### D1e. Meeting Question — CMF vs Bouma Scaling
+#### D1e. Meeting Question: CMF vs Bouma Scaling
 
 Two related but distinct biological quantities control different aspects of peripheral rendering:
 
-**CMF (Cortical Magnification Factor):** How many cortical neurons are allocated per degree of visual field. Determines **resolution** — how much spatial detail is available. Parameterized by `u_cmf_a` (default 2.78, from Blauch et al. 2026). Currently drives MIP level selection.
+**CMF (Cortical Magnification Factor):** How many cortical neurons are allocated per degree of visual field. Determines **resolution**, meaning how much spatial detail is available. Parameterized by `u_cmf_a` (default 2.78, from Blauch et al. 2026). Currently used for MIP level selection.
 
-**Bouma scaling:** How large the "crowding zone" is at each eccentricity — approximately `0.5 × eccentricity` (Bouma 1970), with Brown et al. using 0.75. Determines **pooling region size** — how large an area gets averaged into a single perceptual summary. This is what `u_ecc_scaling` (D1c) parameterizes.
+**Bouma scaling:** How large the "crowding zone" is at each eccentricity: approximately `0.5 × eccentricity` (Bouma 1970), with Brown et al. using 0.75. Determines **pooling region size**, meaning how large an area gets averaged into a single perceptual summary. This is what `u_ecc_scaling` (D1c) parameterizes.
 
-These are correlated (both fall off with eccentricity) but not identical. CMF tells you the sampling density; Bouma tells you the integration area for crowding. A pixel at 10 degrees eccentricity has low CMF (few cortical neurons) AND a large Bouma zone (features within 7.5 degrees interact). But they scale differently: CMF follows `1/(r+a)`, Bouma follows `0.5r` to `0.75r` linearly.
+These are correlated (both fall off with eccentricity) but not identical. CMF gives the sampling density; Bouma gives the integration area for crowding. A pixel at 10 degrees eccentricity has low CMF (few cortical neurons) AND a large Bouma zone (features within 7.5 degrees interact). But they scale differently: CMF follows `1/(r+a)`, Bouma follows `0.5r` to `0.75r` linearly.
 
 **Questions for March 13:**
-1. For web content perception, which matters more — resolution falloff (CMF) or crowding zone size (Bouma)? MIP blur approximates both, but they produce different curves.
+1. For web content perception, which matters more: resolution falloff (CMF) or crowding zone size (Bouma)? MIP blur approximates both, but they produce different curves.
 2. Is MIP-level blur an acceptable approximation of spatial pooling, or does the preservation of spatial layout (every pixel retains a unique UV) invalidate the perceptual simulation at mid-periphery?
 3. Should `u_ecc_scaling` modulate the CMF curve (as proposed in D1c) or should it independently control a separate pooling mechanism?
 
@@ -212,9 +212,9 @@ These are correlated (both fall off with eccentricity) but not identical. CMF te
 
 **What:** Single compute pass detecting where edges terminate. Modulates Melter distortion strength.
 
-**Source:** `autodifference.py` in Brown et al. -- computes `image - shift(image, offset)` at oriented offsets. Where the difference is large along the edge but small perpendicular, you have an end-stopped feature.
+**Source:** `autodifference.py` in Brown et al. computes `image - shift(image, offset)` at oriented offsets. Where the difference is large along the edge but small perpendicular, you have an end-stopped feature.
 
-**Why it matters:** End-stopped cells respond to line terminators and corners. Crowding is strongest at these locations (features pool together). The Melter should increase lateral smash at end-stops and reduce it along continuous contours.
+**Relevance to crowding:** End-stopped cells respond to line terminators and corners. Crowding is strongest at these locations (features pool together). The Melter should increase lateral smash at end-stops and reduce it along continuous contours.
 
 **Implementation approach:**
 ```glsl
@@ -255,7 +255,7 @@ float lateralSmash = mix(BASE_SMASH, MAX_SMASH, end_stop_signal);
 
 **Effort:** Low (scripting). Runtime: minutes per image (offline, not a concern).
 
-**Value:** Paper figures showing "ground truth TTM metamer vs. our real-time approximation at 60fps." This is the validation story.
+**Value:** Paper figures showing "ground truth TTM metamer vs. our real-time approximation at 60fps."
 
 ---
 
@@ -269,7 +269,7 @@ float lateralSmash = mix(BASE_SMASH, MAX_SMASH, end_stop_signal);
 3. Pack into a texture atlas (16x16 tiles, 256 entries)
 4. At runtime, Tier 3 compute shader matches each pooling region to nearest atlas entry (existing spec)
 
-**Advantage over hand-designed atlas:** The procedural tiles in the current Tier 3 spec (stripes, noise, solids) are intuitive but arbitrary. Atlas entries generated from actual PS synthesis are statistically grounded -- each tile IS a mongrel texture for its statistics bin.
+**Advantage over hand-designed atlas:** The procedural tiles in the current Tier 3 spec (stripes, noise, solids) are intuitive but arbitrary. Atlas entries generated from actual PS synthesis are statistically grounded: each tile is a mongrel texture for its statistics bin.
 
 **Effort:** Medium. Clustering pipeline + synthesis runs. One-time offline cost.
 
@@ -305,7 +305,7 @@ Main thread (60fps)     Web Workers (async, ~2-3 Hz)
 
 **20 patches x 4 workers = ~300-400ms full update.** Cross-fade over 500ms. Web content barely changes frame-to-frame in the periphery, so ~2-3 Hz update rate is likely imperceptible.
 
-**UI:** Toggle in mode selector: "Research: Live Mongrel Synthesis (slow)". Show update indicator. Useful for demos and paper screenshots, not everyday use.
+**UI:** Toggle in mode selector: "Research: Live Mongrel Synthesis (slow)". Show update indicator. Useful for demos and paper screenshots.
 
 ---
 
@@ -328,8 +328,8 @@ Main thread (60fps)     Web Workers (async, ~2-3 Hz)
 
 1. **CMF vs Bouma for web content** (see D1e): For web page viewing at ~60cm (~15-20 degree useful field), does resolution falloff (CMF) or crowding zone size (Bouma 0.75) matter more for peripheral perception? MIP blur approximates both but they produce different curves.
 2. **MIP blur as pooling proxy:** Does the preservation of spatial layout (every pixel retains a unique UV in MIP-based blur) invalidate the perceptual simulation? Or is the texture averaging within MIP kernels sufficient to approximate pooled statistics at each eccentricity?
-3. **Which PS statistics matter for web content?** Web pages are not natural images -- they have flat color, text, hard edges, photos in boxes. Can we drop cross-scale phase correlations (group vi) entirely? What about cross-orientation at same scale (group iv)?
-4. **End-stopped features in web layouts:** Are line terminators (where a border ends, where a heading stops) actually the primary crowding sites in web UIs, or does web content crowd differently than natural scenes?
+3. **Which PS statistics matter for web content?** Web pages differ from natural images: they have flat color, text, hard edges and photos in boxes. Can we drop cross-scale phase correlations (group vi) entirely? What about cross-orientation at same scale (group iv)?
+4. **End-stopped features in web layouts:** Are line terminators (where a border ends, where a heading stops) the primary crowding sites in web UIs, or does web content crowd differently than natural scenes?
 5. **Validation methodology:** Is SSIM-per-eccentricity-band the right metric for comparing our approximation against Brown et al. metamers? Or is there a perceptual metric they'd recommend?
 6. **`ecc_scaling` 0.75 default:** Brown et al. use 0.75 for their pooling growth rate. Should this modulate the CMF MIP curve directly (as D1c proposes), or should it control a separate pooling mechanism independent of CMF?
 

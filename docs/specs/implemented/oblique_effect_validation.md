@@ -18,19 +18,21 @@ With these fixes, the effect produces a 27% pixel difference on a dense data tab
 
 ### Missing: Eccentricity-dependent attenuation
 
-The published literature reports a critical constraint we don't model:
+The published literature reports a constraint we don't model:
 
 | Source | Finding |
 |--------|---------|
 | Berkley, Kitterle & Watkins (1975) | Oblique effect disappears at 8–18° eccentricity for high spatial frequencies (acuity) |
-| Essock (1990) | "Global oblique effect" persists to 40°+ for low-medium spatial frequencies |
+| Pointer (1996) | "Global oblique effect" persists to 40°+ for low-medium spatial frequencies |
 | Jigo, Tavdy, Himmelberg & Carrasco (2023, eLife) | Cortical magnification eliminates differences in contrast sensitivity across but not around the visual field. HVA persists after M-scaling. doi:10.7554/eLife.84205 |
 | Barbot, Xue & Carrasco (2021, JOV) | Asymmetries in visual acuity around the visual field. doi:10.1167/jov.21.1.2 |
-| **UNCITED — verify or remove** | 10.1% more cortical space for cardinal orientations in central MT, only 3.6% in peripheral MT |
+| Xu, Collins, Khaytin, Kaas & Casagrande (2006, PNAS) | Owl monkey MT: 10.1% more cortical space for cardinal orientations in central MT, only 3.6% in peripheral MT. doi:10.1073/pnas.0608502103 |
+
+*(Correction 2026-10-01: Jigo et al. (2023) and Barbot et al. (2021) measure performance asymmetries around the visual field by stimulus location (horizontal vs vertical meridian). They do not measure the orientation oblique effect, so they do not constrain how the cardinal-orientation advantage changes with eccentricity.)*
 
 The oblique effect has a **spatial frequency × eccentricity interaction**: it diminishes with eccentricity, and the rate of diminishment depends on spatial frequency. Fine spatial frequencies lose the cardinal advantage faster.
 
-Our current implementation applies `orientBonus` uniformly across all eccentricities. A horizontal edge at 3° gets the same cardinal bonus as one at 15°. Berkley et al. (1975) says the bonus should be gone by 10–18° for fine detail.
+Our current implementation applies `orientBonus` uniformly across all eccentricities. A horizontal edge at 3° gets the same cardinal bonus as one at 15°. Per Berkley et al. (1975), the cardinal advantage for fine detail is gone by 10–18°, so the bonus should be too.
 
 ---
 
@@ -50,8 +52,8 @@ At lower spatial frequencies, the relevant receptive fields are already large in
 | 3° | ~25% | ~20% | ~10% |
 | 6° | ~10% | ~15% (Jigo et al. 2023: HVA persists after M-scaling) | ~10% |
 | 10° | ~0% (Berkley 1975: disappears) | ~10% | ~8% |
-| 15° | 0% | ~5% | ~5% (Essock 1990: persists) |
-| 40° | 0% | 0% | ~3% (Essock 1990) |
+| 15° | 0% | ~5% | ~5% (Pointer 1996: persists) |
+| 40° | 0% | 0% | ~3% (Pointer 1996) |
 
 Note: exact values are approximate. Berkley 1975 reports inter-subject variability of 8–18° for the disappearance point.
 
@@ -98,18 +100,18 @@ for (int k = 0; k < 8; k++) {
 }
 ```
 
-**Key parameters:**
+**Parameters:**
 
 | Parameter | Value | Source |
 |-----------|-------|--------|
-| Fine band fade start | 3° | Fovea edge — no attenuation needed inside fovea |
+| Fine band fade start | 3° | Fovea edge (no attenuation needed inside fovea) |
 | Fine band fade end | 10° | Berkley 1975 lower bound (8–18° range) |
 | Coarse band fade start | 8° | Oblique effect persists longer for low SF |
-| Coarse band fade end | 25° | Essock 1990: persists to 40° for low SF, conservative estimate |
+| Coarse band fade end | 25° | Pointer 1996: persists to 40° for low SF, conservative estimate |
 
-### 3.2 Why smoothstep, not linear
+### 3.2 Why smoothstep
 
-The cortical orientation tuning bandwidth broadens gradually with eccentricity — it's not a step function. `smoothstep` provides a sigmoidal transition that approximates the gradual loss of orientation selectivity. The transition width (fadeEnd - fadeStart) is ~7° for fine bands and ~17° for coarse, matching the broader tuning of larger receptive fields.
+The cortical orientation tuning bandwidth broadens gradually with eccentricity. `smoothstep` provides a sigmoidal transition that approximates the gradual loss of orientation selectivity. The transition width (fadeEnd - fadeStart) is ~7° for fine bands and ~17° for coarse, matching the broader tuning of larger receptive fields.
 
 ### 3.3 Uniform for eccentricity in degrees
 
@@ -141,7 +143,7 @@ Reference page with Gabor patches at 4 orientations × 5 eccentricity rings (1.7
 3. Plot ratio vs eccentricity
 
 **Expected result (pre-eccentricity-fade):**
-- Flat cardinal advantage (~1.3–1.5×) at all eccentricities — doesn't match biology
+- Flat cardinal advantage (~1.3–1.5×) at all eccentricities, which doesn't match biology
 
 **Expected result (post-eccentricity-fade):**
 - Cardinal advantage ~1.3–1.5× at 2–4°
@@ -173,9 +175,9 @@ Berkley et al. measured acuity (highest resolvable spatial frequency) for H, V, 
 
 We can measure the analogous quantity: at each eccentricity, what is the finest DoG band that retains >50% weight for a cardinal vs oblique edge? The ratio of those band indices is our "acuity advantage."
 
-### 4.4 Comparison against Essock (1990)
+### 4.4 Comparison against Pointer (1996)
 
-Essock measured contrast sensitivity for H vs 45° gratings at 1 cpd along the horizontal meridian out to 40°. The cardinal advantage was ~10–15% at all tested eccentricities, including far peripheral.
+Pointer (1996) reanalyzed one subject's contrast sensitivity along the cardinal and oblique meridians and found higher sensitivity to horizontal than to oblique gratings at low to medium spatial frequencies, out to at least 40° eccentricity. *(Correction 2026-10-01: this section previously credited the measurement to Essock (1990), which varied stimulus length and did not test eccentricity. Its figure of a ~10–15% cardinal advantage at 1 cpd has not been checked against Pointer's paper.)*
 
 We can validate by checking that coarse DoG bands (3-5, corresponding to ~0.5–1 cpd) still show a small cardinal bonus at 20–30° eccentricity with the eccentricity fade active.
 
@@ -188,30 +190,30 @@ Following the v2.2 Claim/Basis/Result structure:
 ### Claim 1: Cardinal edges survive further in the parafovea
 
 **Claim:** At 3–6° eccentricity, cardinal (H/V) edges retain 30–50% more spatial detail than oblique edges.
-**Basis:** Appelle (1972), Campbell et al. (1966) — oblique effect magnitude.
+**Basis:** Appelle (1972) and Campbell et al. (1966) on oblique effect magnitude.
 **Result:** _pending_
 
-### Claim 2: The oblique effect diminishes by 10–18° for fine detail
+### Claim 2: The oblique effect diminishes by 8–18° for fine detail
 
 **Claim:** At eccentricities >10°, fine DoG bands (0–2) show no cardinal advantage.
-**Basis:** Berkley, Kitterle & Watkins (1975) — disappearance at 8–18°.
+**Basis:** Berkley, Kitterle & Watkins (1975) report the effect disappearing at 8–18°.
 **Result:** _pending_
 
 ### Claim 3: Coarse structure retains cardinal advantage further
 
 **Claim:** Coarse DoG bands (4–6) retain a small (~10%) cardinal advantage out to 20–30°.
-**Basis:** Essock (1990) — global oblique effect persists at low SF.
+**Basis:** Pointer (1996) reports a global oblique effect that persists at low SF.
 **Result:** _pending_
 
 ### Claim 4: No orientation bonus in flat regions
 
 **Claim:** Uniform-luminance regions show zero difference between isotropic and oriented modes.
-**Basis:** Architecture — gradient magnitude gate rejects flat regions.
+**Basis:** Architecture (the gradient magnitude gate rejects flat regions).
 **Result:** _pending_
 
 ### Claim 5: Dense table shows "hump" profile
 
-**Claim:** The isotropic-vs-oriented delta peaks at 4–7° eccentricity, not at the maximum eccentricity.
+**Claim:** The isotropic-vs-oriented delta peaks at 4–7° eccentricity.
 **Basis:** Eccentricity fade (Berkley 1975) combined with band rolloff (M-scaling).
 **Result:** _pending_
 
@@ -220,15 +222,15 @@ Following the v2.2 Claim/Basis/Result structure:
 ## 6. Files
 
 ### Implementation
-- `renderer/shaders/peripheral.frag` — eccentricity fade in band boost loop
-- `renderer/webgl-renderer.js` — no changes needed (visual_ecc already passed)
+- `renderer/shaders/peripheral.frag`: eccentricity fade in band boost loop
+- `renderer/webgl-renderer.js`: no changes needed (visual_ecc already passed)
 
 ### Validation stimuli
-- `scrutinizer-www/src/reference-pages/oblique-effect.html` — Gabor patch rings
-- `scrutinizer-www/src/reference-pages/dense-table.html` — 120-row issue tracker
+- `scrutinizer-www/src/reference-pages/oblique-effect.html`: Gabor patch rings
+- `scrutinizer-www/src/reference-pages/dense-table.html`: 120-row issue tracker
 
 ### Validation reports (to be generated)
-- `tests/validation/reports/oblique-effect-report.html` — Claim/Basis/Result with charts
+- `tests/validation/reports/oblique-effect-report.html`: Claim/Basis/Result with charts
 
 ---
 
@@ -238,7 +240,7 @@ Following the v2.2 Claim/Basis/Result structure:
 
 2. **Berkley, M. A., Kitterle, F. L. & Watkins, D. W.** (1975). Grating visibility as a function of orientation and retinal eccentricity. *Vision Research*, 15(2), 239-244. doi:10.1016/0042-6989(75)90213-8
 
-3. **Essock, E. A.** (1990). The influence of stimulus length on the oblique effect of contrast sensitivity. *Vision Research*, 30(8), 1243-1246. See also: Essock, E. A. (1996). Evidence of a global oblique effect in human extrafoveal vision. *Perception*, 25(5), 523-530. doi:10.1068/p250523
+3. **Pointer, J. S.** (1996). Evidence of a global oblique effect in human extrafoveal vision. *Perception*, 25(5), 523-530. doi:10.1068/p250523. (Earlier drafts credited this paper and its eccentricity findings to Essock (1990, *Vision Research*, 30(8), 1243-1246, doi:10.1016/0042-6989(90)90179-O), which is a study of stimulus length.)
 
 4. **Campbell, F. W., Kulikowski, J. J. & Levinson, J.** (1966). The effect of orientation on the visual resolution of gratings. *Journal of Physiology*, 187(2), 427-436.
 
@@ -253,3 +255,5 @@ Following the v2.2 Claim/Basis/Result structure:
 8. **Hubel, D. H. & Wiesel, T. N.** (1962). Receptive fields, binocular interaction and functional architecture in the cat's visual cortex. *Journal of Physiology*, 160(1), 106-154.
 
 9. **Li, B., Peterson, M. R. & Freeman, R. D.** (2003). Oblique effect: a neural basis in the visual cortex. *Journal of Neurophysiology*, 90(1), 204-217. doi:10.1152/jn.00954.2002
+
+10. **Xu, X., Collins, C. E., Khaytin, I., Kaas, J. H. & Casagrande, V. A.** (2006). Unequal representation of cardinal vs. oblique orientations in the middle temporal visual area. *Proceedings of the National Academy of Sciences*, 103(46), 17490-17495. doi:10.1073/pnas.0608502103

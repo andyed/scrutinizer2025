@@ -33,7 +33,7 @@ Before uploading to WebGL:
 3. Fill entire canvas with that color
 4. Draw original image on top
 
-This ensures transparent pixels become the edge color, not black.
+Transparent pixels then take the edge color. Without this step they render black.
 
 ```typescript
 ctx.fillStyle = detectedEdgeColor; // e.g., "rgb(245, 245, 245)"

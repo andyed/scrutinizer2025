@@ -6,11 +6,11 @@
 
 ## The Goal
 
-Implement Feature Congestion (Rosenholtz, Li & Nakano, 2007) as a quantitative page-complexity signal in Scrutinizer. Feature Congestion measures visual clutter as the local variance of low-level visual features — where the brain's pre-attentive channels are all screaming at once, that's clutter. The original paper showed Spearman ρ=0.83 between the FC scalar and human clutter ratings across 25 natural scenes.
+Implement Feature Congestion (Rosenholtz, Li & Nakano, 2007) as a quantitative page-complexity signal in Scrutinizer. Feature Congestion measures visual clutter as the local variance of low-level visual features. The earlier CHI paper (Rosenholtz, Li, Mansfield & Jin, 2005) reported Spearman ρ=0.83 between FC and 20 observers' average clutter rankings of 25 maps.
 
 Scrutinizer uses this signal two ways:
-1. **Pooling modifier** — the existing saliency pipeline uses a congestion channel to modulate MIP sampling (peripheral blur). Higher congestion = more aggressive simplification.
-2. **Complexity report** — a toggleable HUD overlay showing per-page complexity scores, heatmap, and spatial breakdown.
+1. **Pooling modifier:** the existing saliency pipeline uses a congestion channel to modulate MIP sampling (peripheral blur). Higher congestion = more aggressive simplification.
+2. **Complexity report:** a toggleable HUD overlay showing per-page complexity scores, heatmap, and spatial breakdown.
 
 ---
 
@@ -25,7 +25,7 @@ Rosenholtz's original uses steerable pyramids across CIE L\*a\*b\*, computing co
 | Covariance ellipsoid volume | Sum of per-channel variance |
 | 3 contrast levels × orientation bands | Single separable Gaussian blur |
 
-The core math lives in `renderer/congestion-core.js`, extracted as a shared module so both the real-time Web Worker and headless Node.js validation scripts run the exact same code path.
+The core math is in `renderer/congestion-core.js`, extracted as a shared module so both the real-time Web Worker and headless Node.js validation scripts run the exact same code path.
 
 **Pipeline:**
 ```
@@ -36,7 +36,7 @@ Input image → sRGB→linear→Oklab (L, |a|, |b|)
   → normalize to [0, 1]
 ```
 
-The sigma scales proportionally with resolution: σ = baseSigma × (imageDim / baseDim), where baseSigma=2.5 at baseDim=256px. This keeps the spatial neighborhood physically consistent across resolutions.
+The validation script `extract-congestion.js` scales sigma with resolution by default: σ = baseSigma × (imageDim / baseDim), where baseSigma=2.5 at baseDim=256px. The real-time worker uses a fixed σ=2.5 at every resolution; the Resolution Sweep below compares the two.
 
 ---
 
@@ -71,9 +71,9 @@ Three scripts form a self-contained validation pipeline:
 
 ## Resolution Sweep
 
-The first major discovery: **sigma scaling matters more than resolution.**
+The sweep's first finding was that **sigma scaling matters more than resolution.**
 
-Initial validation used auto-scaled sigma (σ = 2.5 × maxDim/256), which seemed reasonable — keep the spatial neighborhood proportional. The results were discouraging:
+Initial validation used auto-scaled sigma (σ = 2.5 × maxDim/256), which seemed reasonable, since it keeps the spatial neighborhood proportional. The results were discouraging:
 
 | Resolution | σ (auto-scaled) | Spearman ρ | Pass? |
 |---|---|---|---|
@@ -83,9 +83,9 @@ Initial validation used auto-scaled sigma (σ = 2.5 × maxDim/256), which seemed
 | 1024px | 10.0 | 0.6485 | fail |
 | Full (native) | varies | 0.7212 | PASS |
 
-Only full-resolution barely passed. 512px was the *worst* — the auto-scaled σ=5.0 smeared page structure into mush.
+Only full-resolution barely passed. 512px was the *worst*. The auto-scaled σ=5.0 blurred away page structure.
 
-### The Fix: Fixed σ=2.5
+### Fixed σ=2.5
 
 Re-running with fixed σ=2.5 regardless of resolution:
 
@@ -95,17 +95,19 @@ Re-running with fixed σ=2.5 regardless of resolution:
 | 768px | **ρ=0.9273** | was 0.6000 |
 | 1024px | **ρ=0.9152** | was 0.6485 |
 
-All three pass comfortably. 768px with fixed σ=2.5 achieves ρ=0.93 — near-perfect rank agreement with the Python reference implementation.
+All three pass comfortably. 768px with fixed σ=2.5 achieves ρ=0.93, near-perfect rank agreement with the Python reference implementation.
 
 ### Why Auto-Scaling Fails for Web Content
 
-The formula `σ = baseSigma × (maxDim / baseDim)` was designed for natural images at varying capture resolutions: a 1024px photo and a 512px photo of the same scene should produce the same congestion. But web screenshots aren't scaled versions of each other — a 512px capture and a 1024px capture are the same page at different pixel densities. Scaling sigma up with resolution just smears text, borders, and UI elements into indistinguishable blobs.
+The formula `σ = baseSigma × (maxDim / baseDim)` was designed for natural images at varying capture resolutions: a 1024px photo and a 512px photo of the same scene should produce the same congestion. But web screenshots aren't scaled versions of each other. A 512px capture and a 1024px capture are the same page at different pixel densities. Scaling sigma up with resolution just smears text, borders, and UI elements into indistinguishable blobs.
 
 The `congestion-worker.js` already uses fixed σ=2.5 at all resolutions. The validation confusion arose from `extract-congestion.js` defaulting to auto-scaled sigma.
 
+*(Correction 2026-10-01: the sweep downscaled the same native screenshots to each `maxDim`, so the inputs were scaled versions of each other, and auto-scaled σ covered the same page area at every resolution (σ ≈ 10–42 native px for this corpus). What changed between the auto and fixed runs was neighborhood size: fixed σ=2.5 pools over a 2–4× smaller page area at 512–1024 px, closer to the reference's σ=3 px pooling on native-resolution images. The defect was the `extract-congestion.js` default; the worker already used fixed σ=2.5.)*
+
 ### Resolution Choice
 
-768px is the sweet spot for rank correlation (ρ=0.93), but the worker defaults to 1024px for the heatmap overlay — more spatial detail visible when inspecting the map, at minimal ρ cost (0.92 vs 0.93). The resolution is runtime-configurable.
+768px is the sweet spot for rank correlation (ρ=0.93), but the worker defaults to 1024px for the heatmap overlay. 1024px shows more spatial detail when inspecting the map, at minimal ρ cost (0.92 vs 0.93). The resolution is runtime-configurable.
 
 ---
 
@@ -123,11 +125,11 @@ capturePage → saliencyWorker (256px) → RGB texture
                                      → congestionStats → HUD
 ```
 
-This was computationally efficient but produced low-quality congestion data. The 256px resolution was chosen for the saliency pipeline's latency budget (every 15th frame, <5ms target), not for congestion accuracy.
+This was computationally efficient but produced low-quality congestion data, because the 256px resolution was chosen for the saliency pipeline's latency budget (every 15th frame, <5ms target).
 
 ### Phase 2: Dedicated Worker (1024px)
 
-The congestion report is a diagnostic tool — users toggle it on to assess page complexity, then toggle it off. Latency is tolerable (100-500ms). This enabled a clean architectural separation:
+The congestion report is a diagnostic tool: users toggle it on to assess page complexity, then toggle it off. Latency is tolerable (100-500ms), so congestion moved to a dedicated worker:
 
 ```
 capturePage → saliencyWorker (256px)    → saliency texture (R channel)
@@ -140,7 +142,7 @@ capturePage → saliencyWorker (256px)    → saliency texture (R channel)
 
 | File | Change |
 |---|---|
-| `renderer/congestion-worker.js` | **New** — Dedicated Web Worker, imports congestion-core.js |
+| `renderer/congestion-worker.js` | **New:** Dedicated Web Worker, imports congestion-core.js |
 | `renderer/content-analysis.js` | Added congestion worker lifecycle, dual-tier stats tracking |
 | `renderer/webgl-renderer.js` | Added `u_congestionMap` texture on TEXTURE4 |
 | `renderer/shaders/peripheral.frag` | Reads from high-res texture when available |
@@ -151,7 +153,7 @@ capturePage → saliencyWorker (256px)    → saliency texture (R channel)
 
 **Key design decisions:**
 
-1. The 256px congestion stays in the saliency worker for the pooling modifier — it doesn't need to be accurate, just directionally correct.
+1. The 256px congestion stays in the saliency worker for the pooling modifier, which needs only directional correctness.
 2. The new worker only runs when the congestion report is toggled on. Zero cost when off.
 3. Resolution is runtime-configurable: `scrutinizer.setCongestionResolution(512 | 768 | 1024)`.
 4. A generation counter pattern detects fresh async worker results in the synchronous render loop.
@@ -175,9 +177,9 @@ const compositeScore = Math.round(Math.sqrt(c.p90 * 0.7 + e.p90 * 0.3) * 100);
 ```
 
 **Rationale:**
-- **P90** answers "how cluttered are the busy parts of this page?" — ignores the whitespace floor.
+- **P90** measures how cluttered the busy parts of the page are and ignores the whitespace floor.
 - **Sqrt** spreads the [0, 1] raw range into a more discriminating [0, 100] scale. Without it, most pages cluster between 0.01 and 0.15.
-- **70/30 weighting** favors congestion (color variance) over edge density, matching Rosenholtz's finding that color variance is the dominant clutter predictor.
+- **70/30 weighting** favors congestion (L, a, b variance) over edge density. The weights came from empirical tuning against the 10-image test corpus; Rosenholtz et al. (2007) sum their normalized color, contrast, and orientation clutter with equal weight.
 
 The same formula applies to spatial quadrant scores in the HUD's Spatial tab.
 
@@ -185,7 +187,7 @@ The same formula applies to spatial quadrant scores in the HUD's Spatial tab.
 
 ## Update Trigger Logic
 
-The congestion worker recomputes on user-relevant events, not continuously:
+The congestion worker recomputes only on user-relevant events:
 
 | Trigger | Behavior | Debounce | HUD opacity |
 |---|---|---|---|
@@ -196,7 +198,7 @@ The congestion worker recomputes on user-relevant events, not continuously:
 
 The trigger type is threaded through a 3-layer IPC chain: `preload.js` tags each `structure-update` as `'scroll'` or `'mutation'`, `main.js` forwards it, and `scrutinizer.js` differentiates the response.
 
-**Why differentiate:** A scroll changes the viewport entirely — the current congestion map is wrong. A DOM mutation (tooltip appearing, accordion expanding) usually doesn't invalidate the overall page score. The 5-second cooldown for mutations prevents the worker from thrashing on pages with continuous DOM activity (chat feeds, live tickers).
+**Why differentiate:** A scroll changes the viewport entirely, so the current congestion map is wrong. A DOM mutation (tooltip appearing, accordion expanding) usually doesn't invalidate the overall page score. The 5-second cooldown for mutations prevents the worker from thrashing on pages with continuous DOM activity (chat feeds, live tickers).
 
 ---
 
@@ -216,23 +218,24 @@ This was a pre-existing bug exposed by adding the congestion toggle.
 
 ## Open Questions
 
-1. **Original Rosenholtz benchmark.** The 2007 paper validated against 25 printed maps (US and San Francisco Bay Area) rank-ordered by 20 human subjects (ρ=0.83 between FC scalar and human ratings). These maps were never publicly released. Reaching out to Ruth Rosenholtz at MIT CSAIL to obtain them — validating against human ground truth is the gold standard. The MATLAB toolbox is available from [MIT DSpace](http://dspace.mit.edu/handle/1721.1/37593) and the Simoncelli steerable pyramid from [matlabPyrTools](https://github.com/LabForComputationalVision/matlabPyrTools).
+1. **Original Rosenholtz benchmark.** The CHI 2005 paper (Rosenholtz, Li, Mansfield & Jin) validated against 25 printed maps (US and San Francisco Bay Area) rank-ordered by 20 human subjects (ρ=0.83 between FC scalar and human ratings). These maps were never publicly released. Reaching out to Ruth Rosenholtz at MIT CSAIL to obtain them, since human rankings are the benchmark FC was originally validated against. The MATLAB toolbox is available from [MIT DSpace](http://dspace.mit.edu/handle/1721.1/37593) and the Simoncelli steerable pyramid from [matlabPyrTools](https://github.com/LabForComputationalVision/matlabPyrTools).
 
-2. **Ranking metric: mean vs p90 for validation.** The comparison script ranks images by `mean` congestion (matching Rosenholtz's Minkowski p=1 mean over the clutter map). The HUD uses p90 for display. These are different questions: mean asks "how cluttered is this page overall?", p90 asks "how cluttered are the busy parts?" Both are useful; validation should probably continue using mean for Rosenholtz comparison.
+2. **Ranking metric: mean vs p90 for validation.** The comparison script ranks images by `mean` congestion (matching Rosenholtz's Minkowski p=1 mean over the clutter map). The HUD uses p90 for display. These measure different things. Mean measures how cluttered the page is overall, and p90 measures how cluttered the busy parts are. Both are useful; validation should probably continue using mean for Rosenholtz comparison.
 
 3. **Multi-scale approach.** The simplification from steerable pyramids to a single Gaussian is the largest departure from Rosenholtz. A 2-scale pyramid (σ=2.5 + σ=5.0, combined) might capture both fine detail and broader structure without the computational cost of the full steerable pyramid.
 
-4. **Corpus expansion.** 10 images is statistically thin for Spearman correlation. Expanding to 20-30 web screenshots spanning the full complexity range would make ρ more robust and reduce sensitivity to individual outliers (e.g., `test.png` is consistently the worst-ranked image, and it's the only natural scene in an otherwise all-web corpus).
+4. **Corpus expansion.** 10 images is statistically thin for Spearman correlation. Expanding to 20-30 web screenshots spanning the full complexity range would make ρ more stable and reduce sensitivity to individual outliers (e.g., `test.png` is consistently the worst-ranked image, and it's the only natural scene in an otherwise all-web corpus).
 
 ---
 
 ## References
 
+- Rosenholtz, R., Li, Y., Mansfield, J., & Jin, Z. (2005). Feature congestion: A measure of display clutter. *Proc. CHI 2005*, 761–770. https://doi.org/10.1145/1054972.1055078
 - Rosenholtz, R., Li, Y., & Nakano, L. (2007). Measuring visual clutter. *Journal of Vision*, 7(2), 17. https://doi.org/10.1167/7.2.17
 - `visual-clutter` Python package: https://github.com/kargaranamir/visual-clutter
-- `congestion-core.js` — shared pure-math module used by both workers and validation scripts
-- `saliency_roadmap.md` — broader saliency pipeline history (Phases 1-5)
-- `CHANGELOG.md` — release-level feature history
+- `congestion-core.js`: shared pure-math module used by both workers and validation scripts
+- `saliency_roadmap.md`: broader saliency pipeline history (Phases 1-5)
+- `CHANGELOG.md`: release-level feature history
 
 ---
 
@@ -240,10 +243,10 @@ This was a pre-existing bug exposed by adding the congestion toggle.
 
 | Directory | σ | ρ | Notes |
 |---|---|---|---|
-| `results/` | auto (full res) | 0.7212 | Baseline — passes |
+| `results/` | auto (full res) | 0.7212 | Baseline (passes) |
 | `results-256/` | 2.5 | 0.6848 | Real-time worker resolution |
-| `results-512/` | 5.0 auto | 0.5273 | Auto-scaled — worst |
-| `results-512-fixed/` | 5.0 auto | 0.5273 | Misnamed — was NOT fixed sigma |
+| `results-512/` | 5.0 auto | 0.5273 | Auto-scaled (worst) |
+| `results-512-fixed/` | 5.0 auto | 0.5273 | Misnamed: was NOT fixed sigma |
 | `results-512-fixed-sigma/` | 2.5 fixed | 0.8909 | First true fixed-sigma test |
 | `results-768/` | 7.5 auto | 0.6000 | Auto-scaled |
 | `results-768-fixed-sigma/` | 2.5 fixed | 0.9273 | Best rank correlation |

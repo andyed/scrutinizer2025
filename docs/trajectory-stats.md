@@ -1,16 +1,16 @@
 # Scrutinizer Development Trajectory
 
-Generated 2026-03-08 from git history. 479 commits, Nov 22 2025 — present.
+Generated 2026-03-08 from git history. 479 commits, Nov 22 2025 to present.
 
 ## Three Phases
 
 | Phase | Dates | Duration | Commits | Lines Changed | Daily Rate | Character |
 |-------|-------|----------|---------|---------------|------------|-----------|
-| **1. Build** | Nov 22 — Dec 31 | 40 days | 347 | 53,682 | 1,342 lines/day, 8.7 commits/day | Core renderer, modes, saliency pipeline |
-| **2. Lull** | Jan 1 — Feb 26 | 55 days | 21 | 2,593 | 47 lines/day, 0.4 commits/day | Maintenance, a few specs |
-| **3. Validation Sprint** | Feb 27 — Mar 8 | 10 days | 111 | 40,669 | 4,067 lines/day, 11.1 commits/day | Five-wave validation + paper + release |
+| **1. Build** | Nov 22–Dec 31 | 40 days | 347 | 53,682 | 1,342 lines/day, 8.7 commits/day | Core renderer, modes, saliency pipeline |
+| **2. Lull** | Jan 1–Feb 26 | 57 days | 21 | 2,593 | 45 lines/day, 0.4 commits/day | Maintenance, a few specs |
+| **3. Validation Sprint** | Feb 27–Mar 8 | 10 days | 111 | 40,669 | 4,067 lines/day, 11.1 commits/day | Five-wave validation + paper + release |
 
-Phase 3 produced **76% of Phase 1's total output in 25% of the time** (3× the daily rate). This is the scope expansion you're feeling.
+Phase 3 produced **76% of Phase 1's total output in 25% of the time** (3× the daily rate).
 
 ## Phase 3 Breakdown: What Happened in 10 Days
 
@@ -31,7 +31,7 @@ Phase 3 produced **76% of Phase 1's total output in 25% of the time** (3× the d
 
 | Theme | Phase 1 | Phase 3 | Interpretation |
 |-------|---------|---------|----------------|
-| fix | 110 | 36 | Still fixing, but less — code is stabilizing |
+| fix | 110 | 36 | Still fixing, but less, as code stabilizes |
 | fovea/shader/mode | 67 | 24 | Renderer work shifted from creation to tuning |
 | wave/validation | 0 | 28 | Entirely new workstream |
 | spec/doc/paper | 12 | 46 | 4× increase in writing vs coding |
@@ -58,7 +58,7 @@ Phase 3: Validate + write + extend
 
 ## Why Phase 3 is Wider Than Phase 1
 
-Phase 1 built ONE thing: the rendering pipeline. Deep but narrow — shaders, modes, saliency, structure map, UI chrome.
+Phase 1 built ONE thing: the rendering pipeline. Deep but narrow: shaders, modes, saliency, structure map, UI chrome.
 
 Phase 3 is validating that pipeline against FIVE independent psychophysical domains, writing a paper, shipping release notes for 6 versions, and opening new research threads. Each validation wave spawns:
 - A reference page (stimulus)
@@ -94,13 +94,11 @@ Phase 3 commits: 40% weekend (44 of 111). This weekend (Mar 7-8) alone: 31 commi
 
 ## What This Means for v2.1
 
-The validation pipeline IS the v2.1 release. The scope feels large because each wave is a mini-project (stimulus → capture → analyze → document → fix shader → repeat). But the output is coherent: every file serves the same goal of grounding the paper's claims in measurement.
+The validation pipeline IS the v2.1 release. The scope feels large because each wave is a mini-project (stimulus → capture → analyze → document → fix shader → repeat). But the output is coherent: every file is part of grounding the paper's claims in measurement.
 
-The risk isn't scope creep in the traditional sense (adding features nobody asked for). It's that each validation wave keeps revealing new research threads:
+The risk is that each validation wave keeps revealing new research threads:
 - Wave 3 → density-gated crowding spec
 - Wave 5 → Halverson behavioral validation → congestion text density spec
 - Gaussian comparison → separate validation track
 
-Each thread is legitimate — they're findings from running the experiments. The discipline is deciding which go in v2.1 (validation + honest reporting of limits) vs v2.2+ (congestion graduation, pixel-level edge density, human subjects).
-
-**v2.1 ships the measurement. v2.2 acts on what the measurements reveal.**
+Each thread is legitimate. They are findings from running the experiments. The discipline is deciding which go in v2.1 (validation + reporting of limits) vs v2.2+ (congestion graduation, pixel-level edge density, human subjects).

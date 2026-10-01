@@ -10,23 +10,23 @@ Specification for importing published eye-tracking scanpath datasets, replaying 
 
 ## Motivation
 
-`GazeModel` exposes `update(now)`, `getPosition()`, `getVelocity()` and is consumed by the render loop at `scrutinizer.js:352-354`. This clean interface is a branch point — any object implementing these four methods can drive the pipeline. Importing published scanpath data through a drop-in replacement enables:
+`GazeModel` exposes `update(now)`, `getPosition()`, `getVelocity()`, `getVelocityComponents()` and `getScale()`, and is consumed by the render loop at `scrutinizer.js:562-564`. This clean interface is a branch point: any object implementing these five methods can drive the pipeline. Three uses become possible once published scanpath data can be imported through a drop-in replacement:
+
+1. **Automated video demos:** deterministic, repeatable renderings for blog posts and presentations
+2. **Perceptual validation:** compare Scrutinizer's output against known human fixation data
+3. **Regression testing:** detect unintended pipeline changes by replaying identical scanpaths across versions
 
 ### Dependent grad student projects
 
 Phases 1–2 (common format + ScanpathPlayer) are prerequisites for:
-- **Project 2.1** (Fixation Recording) — recording format and coordinate conversion
-- **Project 2.3** (Cognitive Load) — behavioral baseline for mouse-vs-eye comparison
-- **Project 4.1** (Saliency/Congestion Comparison) — Validation Experiment D
+- **Project 2.1** (Fixation Recording): recording format and coordinate conversion
+- **Project 2.3** (Cognitive Load): behavioral baseline for mouse-vs-eye comparison
+- **Project 4.1** (Saliency/Congestion Comparison): Validation Experiment D
 - See `docs/research-opportunities.md` for full project descriptions.
 
 ### Pipeline validation integration
 
-The v2.1 validation waves (`docs/release_notes_v2.1.0.md`) use static fixation captures. Scanpath replay enables dynamic validation — replaying published scanpaths (UEyes, MIT1003) through the pipeline and measuring temporal output against Wave 3 crowding predictions.
-
-1. **Automated video demos** — deterministic, repeatable renderings for blog posts and presentations
-2. **Perceptual validation** — compare Scrutinizer's output against known human fixation data
-3. **Regression testing** — detect unintended pipeline changes by replaying identical scanpaths across versions
+The v2.1 validation waves (`docs/release_notes_v2.1.0.md`) use static fixation captures. Scanpath replay supports dynamic validation, in which published scanpaths (UEyes, MIT1003) are replayed through the pipeline and the temporal output is measured against Wave 3 crowding predictions.
 
 ---
 
@@ -71,7 +71,7 @@ Internal representation shared by all importers.
 
 ### Coordinate Convention
 
-- Physical pixels, positive-down — matches `GazeModel.getPosition()` output
+- Physical pixels, positive-down, matching `GazeModel.getPosition()` output
 - `tStart`/`tEnd` pairs encode fixation duration; gaps between `tEnd[i]` and `tStart[i+1]` are saccade intervals
 - If a dataset provides only fixation centers with durations (no explicit saccade gaps), the importer sets `tEnd = tStart + duration` and the player inserts synthetic saccades (see §3)
 
@@ -79,14 +79,14 @@ Internal representation shared by all importers.
 
 ## 2. Per-Dataset Importers
 
-Each importer lives in `renderer/scanpath/importers/`, exports `parse(fileContent, options) → ScanpathData[]`.
+Each importer is in `renderer/scanpath/importers/` and exports `parse(fileContent, options) → ScanpathData[]`.
 
 ### Summary Table
 
 | Dataset | Format | Coord System | Time | Parser Approach |
 |---------|--------|-------------|------|----------------|
 | **UEyes** | Gazepoint CSV | Normalized 0-1 | ms | JS CSV parse, multiply by stimulus dims |
-| **AdSERP** | Gazepoint CSV + mouse CSV + XML + JSON | Page-space px (gaze), Screen-space px (mouse) | ms | JS CSV parse, scroll-offset reconciliation |
+| **AdSERP** | Gazepoint CSV + mouse CSV + XML + JSON | Page-space px (gaze and mouse; mouse in window px) | ms | JS CSV parse, scroll-offset reconciliation |
 | **RecGaze** | Tobii CSV | Pixels | mixed (ms fixations, s clicks) | JS CSV, extract scroll/click as events |
 | **MIT1003** | MATLAB .mat | Pixels (1024×768) | ms | Python converter → JSON, JS reads JSON |
 | **FixaTons** | NumPy .npy | Pixels, Y-inverted | s→ms | Python converter using `fixatons` API → JSON |
@@ -103,7 +103,7 @@ Each importer lives in `renderer/scanpath/importers/`, exports `parse(fileConten
 
 ### 2.2 AdSERP (Implemented)
 
-**Why:** First dataset with real scrollable HTML stimuli, simultaneous mouse tracking, and dense scroll data. Enables replaying actual SERP browsing sessions through the foveated pipeline — gaze drives the fovea, mouse drives a fake cursor, page scrolls in sync.
+**Why:** First dataset with real scrollable HTML stimuli, simultaneous mouse tracking, and dense scroll data. With it, actual SERP browsing sessions can be replayed through the foveated pipeline: gaze positions the fovea, the mouse trail moves a fake cursor, and the page scrolls in sync.
 
 **Dataset:** 2,776 trials, 47 participants, Gazepoint GP3 HD (150 Hz). Each trial is a unique Google Shopping SERP. See `~/Documents/dev/attentional-foraging/AdSERP/data/`.
 
@@ -112,16 +112,16 @@ Each importer lives in `renderer/scanpath/importers/`, exports `parse(fileConten
 | File | Format | Coordinate System | Contents |
 |------|--------|-------------------|----------|
 | `fixation-data/{id}.csv` | CSV: `timestamp,FPOGX,FPOGY,FPOGD` | **Page-space** pixels | Gaze fixations with absolute timestamps, duration in ms |
-| `mouse-movement-data/{id}.csv` | CSV: `timestamp,xpos,ypos,event,xpath` | **Screen-space** pixels | Mouse events (~60Hz), scroll events (cumulative offset), clicks |
+| `mouse-movement-data/{id}.csv` | CSV: `timestamp,xpos,ypos,event,xpath` | **Page-space** pixels, window coordinates | Mouse events (~60Hz), scroll events (cumulative offset), clicks |
 | `trial-metadata/{id}.xml` | XML | — | Viewport dimensions, document size, query, task |
 | `ad-boundary-data/{id}.json` | JSON | Page-space pixels | Ad bounding boxes by type (native_ad, dd_top, dd_right) |
 | `serps/{id}.html` | HTML | — | Complete Google SERP snapshot (self-contained) |
 
 **Coordinate systems:**
 
-The Gazepoint GP3 HD reports gaze in **screen-space** (where the eye looks on the physical monitor), not page-space. This means fixation coordinates and mouse coordinates are in the same coordinate system — no scroll correction needed for gaze-mouse comparison. The importer passes fixation coordinates through directly.
+Fixation coordinates in the AdSERP CSVs are **page-space** (absolute document pixels; `FPOGY` often exceeds the 1024 px screen height). Mouse coordinates are evtrack `pageX`/`pageY`, also page-space but in window pixels. The importer converts both to screen-space: it subtracts the scroll offset interpolated at each sample's timestamp from Y, and rescales mouse coordinates from window to screen dimensions.
 
-Scroll events in the mouse CSV (`event=scroll`, `ypos` = cumulative offset) are used to sync the page position during replay, not to transform gaze coordinates. The scroll timeline is interpolated with binary search + linear lerp for O(log n) lookup.
+Scroll events in the mouse CSV (`event=scroll`, `ypos` = cumulative offset) are used to sync the page position during replay and to convert gaze and mouse coordinates from page-space to screen-space. The scroll timeline is interpolated with binary search + linear lerp for O(log n) lookup.
 
 **Importer:** `importers/adserp-importer.js`
 
@@ -139,12 +139,12 @@ const scanpathData = loadTrial('/path/to/AdSERP/data', 'p004-b1-t1');
 
 **Extended ScanpathData fields** (AdSERP-specific, defined in `scanpath-types.js`):
 
-- `mouseTimeline: MouseTimelineEvent[]` — dense mouse position + event stream (screen-space)
-- `scrollTimeline: ScrollTimelineEvent[]` — scroll offset keyframes
+- `mouseTimeline: MouseTimelineEvent[]`: dense mouse position + event stream (screen-space)
+- `scrollTimeline: ScrollTimelineEvent[]`: scroll offset keyframes
 
 **Mouse cursor replay:** `MouseCursorPlayer` (`renderer/mouse-cursor-player.js`) interpolates mouse positions independently of gaze. Loaded automatically by `ScanpathPlayer` when `scanpathData.mouseTimeline` is present. Renders as an arrow cursor in the SVG overlay, visually distinct from the foveal circle. Click events trigger a brief radial pulse animation.
 
-**Scroll sync:** `ScanpathPlayer` maintains a `scrollTimeline` and fires an `onScroll(scrollY)` callback during playback. In the Electron main process, this drives `window.scrollTo()` on the content view, keeping the page position in sync with the recording.
+**Scroll sync:** `ScanpathPlayer` maintains a `scrollTimeline` and fires an `onScroll(scrollY)` callback during playback. In the Electron main process, this calls `window.scrollTo()` on the content view, keeping the page position in sync with the recording.
 
 **CLI replay:**
 
@@ -168,7 +168,7 @@ node scripts/replay-adserp.js --trial=p004-b1-t1 \
 --list              List available trial IDs
 ```
 
-**Interesting trials catalog:** `attentional-foraging/AdSERP/data/interesting-trials.json` — 2,341 tagged trials with behavioral annotations. Generated by `attentional-foraging/scripts/find_interesting_trials.py`. Tags include:
+**Interesting trials catalog:** `attentional-foraging/AdSERP/data/interesting-trials.json`: 2,341 tagged trials with behavioral annotations. Generated by `attentional-foraging/scripts/find_interesting_trials.py`. Tags include:
 
 | Tag | Count | Defining metric |
 |-----|-------|-----------------|
@@ -200,7 +200,7 @@ node scripts/replay-adserp.js --trial=p004-b1-t1 \
 
 **Script:** `scripts/capture-fullpage-gazeplot.js`
 
-Generates a full-page PNG showing accumulated visual memory — where the viewer looked across the entire SERP, rendered through the foveated pipeline. Foveated regions appear clear; unviewed regions are degraded.
+Generates a full-page PNG showing accumulated visual memory (where the viewer looked across the entire SERP, rendered through the foveated pipeline). Foveated regions appear clear; unviewed regions are degraded.
 
 ```bash
 # Batch mode (recommended — seconds, not minutes)
@@ -230,13 +230,13 @@ node scripts/capture-fullpage-gazeplot.js --data=/path/to/AdSERP/data --trial=p0
    - Capture tile PNG at 2× DPR
 6. On exit: Playwright stitches tiles at 1× resolution, crops canvas to exact `documentHeight`
 
-**Known limitation — reflow drift:** AdSERP fixation data was recorded at the original window width (1422px). SERPs are rendered at 1280px for the gazeplot, causing text to reflow — vertical positions drift progressively down the page. Early fixations (search bar, top results) align well; later fixations may be offset by 10–40px. The correct fix is to render at the original 1422px width and scale the output image, preserving element positions. (Backlogged.)
+**Known limitation (reflow drift):** AdSERP fixation data was recorded at the original window width (1422px). SERPs are rendered at 1280px for the gazeplot, causing text to reflow, so vertical positions drift progressively down the page. Early fixations (search bar, top results) align well; later fixations may be offset by 10–40px. The correct fix is to render at the original 1422px width and scale the output image, preserving element positions. (Backlogged.)
 
 **Output:** `output/adserp-fullpage-gazeplots/{trialId}_fullpage_gazeplot.png`
 
 ### 2.3 RecGaze (Priority 2)
 
-**Why third:** Interactive stimuli with scroll/click events — enables testing interaction-aware rendering.
+**Why third:** Its stimuli are interactive, with scroll/click events, so interaction-aware rendering can be tested.
 
 - Source: Tobii CSV with fixation coordinates in pixels, timestamps in ms
 - Click events in separate column with timestamps in seconds (convert × 1000)
@@ -362,7 +362,7 @@ Between fixations, the player generates smooth saccadic trajectories using the *
 s(t) = 10t³ - 15t⁴ + 6t⁵     where t ∈ [0, 1]
 ```
 
-This produces a bell-shaped velocity profile matching biological saccades — acceleration from zero, peak mid-flight, deceleration to zero at the new fixation.
+This produces a symmetric bell-shaped velocity profile: acceleration from zero, peak mid-flight, deceleration to zero at the new fixation. It only approximates saccades, because minimum jerk was derived for arm movements and saccadic velocity profiles become positively skewed as amplitude grows (Van Opstal & Van Gisbergen 1987).
 
 **Saccade duration estimation:** If the dataset provides explicit inter-fixation gaps (`tEnd[i]` to `tStart[i+1]`), use those durations. Otherwise, insert synthetic saccades using the main sequence relationship (Bahill et al. 1975):
 
@@ -376,9 +376,9 @@ Where `amplitude_deg` is the Euclidean distance between fixation centers convert
 
 During fixation: velocity = 0 (or near-zero drift if microsaccade simulation is added later).
 
-During saccade: velocity derived from the minimum-jerk trajectory's first derivative. The peak velocity for a given amplitude follows the main sequence: `peak_vel ≈ amplitude_deg × 500 deg/s` (Bahill et al. 1975).
+During saccade: velocity derived from the minimum-jerk trajectory's first derivative, so peak velocity = 1.875 × amplitude / duration. Measured peak velocity rises roughly linearly with amplitude for small saccades and saturates for large ones (Bahill, Clark & Stark 1975), commonly fit as `V_peak = V_max · (1 − e^(−A/C))` (Baloh et al. 1975) with V_max around 500–700 deg/s. With synthetic durations from the formula above, the player's implied peak is about 440 deg/s at 10° and 580 deg/s at 20°, approaching 850 deg/s at large amplitudes; with dataset-provided gaps, peak velocity depends on the gap length.
 
-This velocity feeds `scrutinizer.js:354` and drives saccadic suppression in the LGN shader stage when `velocity > saccadicSuppressionThreshold`.
+This velocity is read at `scrutinizer.js:564`; when `velocity > saccadicSuppressionThreshold`, the LGN shader stage applies saccadic suppression.
 
 ### Integration Point
 
@@ -395,7 +395,7 @@ if (config.scanpathReplay) {
 }
 ```
 
-No other changes to the render loop — `update(now)`, `getPosition()`, `getVelocity()` work identically.
+No other changes to the render loop; `update(now)`, `getPosition()`, `getVelocity()` work identically.
 
 ### Auxiliary Streams (AdSERP)
 
@@ -413,13 +413,13 @@ _updateAuxiliary(timeMs) {
 }
 ```
 
-The render loop in `scrutinizer.js` queries `gazeModel.mousePlayer.getPosition()` to update the SVG overlay's fake mouse cursor (arrow path + click pulse ring). The scroll callback is wired in the Electron main process to drive `window.scrollTo()` on the content view.
+The render loop in `scrutinizer.js` queries `gazeModel.mousePlayer.getPosition()` to update the SVG overlay's fake mouse cursor (arrow path + click pulse ring). The scroll callback is wired in the Electron main process to call `window.scrollTo()` on the content view.
 
 ### MouseCursorPlayer
 
 **File:** `renderer/mouse-cursor-player.js`
 
-Lightweight interpolator for dense mouse event data. Separate class from ScanpathPlayer — different concern (input device replay vs. oculomotor simulation), different update rate (60Hz mouse vs. sparse fixations).
+Lightweight interpolator for dense mouse event data. Separate class from ScanpathPlayer: different concern (input device replay vs. oculomotor simulation), different update rate (60Hz mouse vs. sparse fixations).
 
 ```js
 class MouseCursorPlayer {
@@ -461,7 +461,7 @@ scrutinizer-audit replay <scanpath-file> [options]
 
 ### Architecture
 
-Must use **Electron** (not Playwright/Puppeteer) for full WebGL pipeline access. Launch in offscreen mode matching `tests/run-test.js` pattern:
+Must use **Electron** for full WebGL pipeline access; Playwright/Puppeteer do not provide it. Launch in offscreen mode matching `tests/run-test.js` pattern:
 
 ```js
 const win = new BrowserWindow({
@@ -614,9 +614,9 @@ Band boundaries in pixels are computed from the display's `px_per_deg` (see FOV 
 - Compare against uniform random baseline and center-bias model
 
 **Metrics:**
-- **AUC-Judd** — Area under ROC curve (fixation locations as positives, uniform sampling as negatives)
-- **NSS** (Normalized Scanpath Saliency) — Mean saliency at fixation locations, normalized by saliency map mean/std
-- **Information Gain** — Bits above center-bias model
+- **AUC-Judd:** Area under ROC curve (fixation locations as positives, uniform sampling as negatives)
+- **NSS** (Normalized Scanpath Saliency): Mean saliency at fixation locations, normalized by saliency map mean/std
+- **Information Gain:** Bits above center-bias model
 
 **Channel decomposition:**
 - Oklab color DoG (bottom-up)
@@ -628,24 +628,24 @@ Band boundaries in pixels are computed from the display's `px_per_deg` (see FOV 
 
 **File:** `tests/validation/experiments/saliency-prediction.js`
 
-**Priority:** This is the lowest-cost, highest-signal experiment. Only requires saliency map extraction + fixation coordinate lookup — no per-frame rendering comparison. Start here.
+**Priority:** This is the lowest-cost, highest-signal experiment. Only requires saliency map extraction + fixation coordinate lookup, with no per-frame rendering comparison. Start here.
 
 ---
 
-## 6. CI Pipeline Integration — Automated Attention Auditing
+## 6. CI Pipeline Integration: Automated Attention Auditing
 
 *Concept contributed by Matt Queen, drawing on his work with icon discrimination
 and industrial interface evaluation.*
 
 ### Motivation
 
-Scrutinizer's pipeline already answers "where does the eye go?" for any web page.
-The next step is embedding that answer into a build or release pipeline so teams can
+Scrutinizer's pipeline computes a saliency estimate for any web page; Experiment D above tests
+whether it predicts where the eye goes. The next step is embedding that estimate into a build or release pipeline so teams can
 track visual attention regressions the same way they track performance regressions.
 
-This matters most for **industrial UI** — dashboards, control panels, analyst
-workbenches — where the number of competing attention targets is high and the
-cost of missing a critical element is real. Consumer UI benefits too, but
+Automated auditing would help most with **industrial UI** (dashboards, control panels, analyst
+workbenches), where the number of competing attention targets is high and
+missing a critical element is costly. Consumer UI benefits too, but
 industrial UI is where frequency-based scoring has the clearest payoff because
 the stimulus is dense and the task structure is well-defined.
 
@@ -658,7 +658,7 @@ commit/PR → headless Scrutinizer → saliency + congestion maps → ROI scorin
 1. **Trigger**: A CI step (GitHub Action, Jenkins stage, etc.) launches Scrutinizer
    in headless mode against one or more target URLs or local screenshots.
 2. **ROI identification**: Scrutinizer scores each region using a combination of:
-   - Frequency-domain energy (DoG band weights — already computed)
+   - Frequency-domain energy (DoG band weights, already computed)
    - Congestion / clutter score (Feature Congestion metric)
    - DOM-aware element scoring (interactive elements, data displays, alerts)
    - Optional: face detection, motion onset for animated UI
@@ -677,14 +677,14 @@ commit/PR → headless Scrutinizer → saliency + congestion maps → ROI scorin
      "tolerance": 0.15
    }
    ```
-5. **Offset measurement**: The report compares predicted attention rank against
-   expected rank, flagging elements whose offset exceeds the tolerance threshold.
+5. **Offset measurement**: Predicted attention rank is compared against
+   expected rank, and elements whose offset exceeds the tolerance threshold are flagged.
    A sidebar that jumps from priority 5 to predicted rank 1 after a redesign is a
-   regression — it's stealing attention from the alert banner.
+   regression, because it now outranks the alert banner.
 
 ### ROI identification strategy
 
-This is the core puzzle. Three complementary approaches:
+Three complementary approaches:
 
 | Strategy | Signal | Best for |
 |----------|--------|----------|
@@ -692,7 +692,7 @@ This is the core puzzle. Three complementary approaches:
 | **Congestion mapping** | Feature Congestion / Subband Entropy | Cluttered layouts, competing elements |
 | **DOM structure** | Element type, size, color contrast, interactivity | Web apps with semantic markup |
 
-The frequency approach reuses existing pipeline output — the per-band weights that
+The frequency approach reuses existing pipeline output: the per-band weights that
 `sampleDoGReconstructed` computes are already a spatial frequency decomposition.
 Regions with high energy in the mid-frequency bands (edges, text) that *also* have
 high local contrast relative to surround are strong ROI candidates.
@@ -740,8 +740,8 @@ after the validation suite.
 
 | Phase | Work | Rationale |
 |-------|------|-----------|
-| 1 | Common format + UEyes importer | Simplest CSV, web stimuli, enables all downstream work |
-| 2 | ScanpathPlayer class | Core playback engine, drives everything else |
+| 1 | Common format + UEyes importer | Simplest CSV, web stimuli, prerequisite for all downstream work |
+| 2 | ScanpathPlayer class | Core playback engine; everything else depends on it |
 | 3 | Experiment D (saliency prediction) | Lowest implementation cost, highest scientific signal |
 | 4 | RecGaze importer | Interactive events for interaction-aware testing |
 | 5 | CLI replay + video recording | Automation, demo generation |

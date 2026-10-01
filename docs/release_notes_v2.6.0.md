@@ -1,16 +1,16 @@
-# Scrutinizer v2.6.0 — Isotropic Cortical Sampling
+# Scrutinizer v2.6.0: Isotropic Cortical Sampling
 
 **Date:** 2026-03-19
 **Previous:** [v2.5.0 release notes](release_notes_v2.5.0.md)
 **Blog post:** [Isotropic Cortical Sampling](https://andyed.github.io/scrutinizer-www/blog/2026-03-21-v2.6.html)
 
-Scrutinizer's default mode now derives its peripheral distortion profile from the FOVI cortical magnification model (Blauch, Alvarez & Konkle 2026). Seven rendering approaches failed before the eighth succeeded: sector geometry drives *where and how fast* degradation changes — not how pixels change.
+Scrutinizer's default mode now derives its peripheral distortion profile from the FOVI cortical magnification model (Blauch, Alvarez & Konkle 2026). Seven rendering approaches failed before the eighth succeeded. In the eighth, sector geometry sets *where and how fast* degradation changes, and the existing displacement pipeline sets how pixels change.
 
 ## Highlights
 
 ### FOVI Cortical Grid (Default)
 
-The displacement pipeline is now parameterized by cortical sector extent derived from `w = log(r + a)`. Noise frequency scales inversely with sector size; scramble cell size tracks sector extent (capped at 12px). The visual difference from the previous default is subtle — fewer implausible long-range pixel scatters, smoother degradation profile — but the derivation is now principled and traceable to Blauch's formulation.
+The displacement pipeline is now parameterized by cortical sector extent derived from `w = log(r + a)`. Noise frequency scales inversely with sector size; scramble cell size tracks sector extent (clamped to 8–16px). The visual difference from the previous default is subtle (fewer implausible long-range pixel scatters, smoother degradation profile), but the derivation is now principled and traceable to Blauch's formulation.
 
 - 19-test geometry suite validates math against Blauch's Python to 3 decimal places
 - [Interactive grid comparison (CodePen)](https://codepen.io/andy-edmonds/pen/019ced00-b472-7c33-8ebb-20982aa039ad)
@@ -19,15 +19,15 @@ The displacement pipeline is now parameterized by cortical sector extent derived
 
 ### Bender/Cutter Extraction
 
-V1 displacement components extracted as parameterized GLSL structs (`BenderConfig`, `CutterConfig`). Researchers can swap implementations by constructing different configs. Type 1 (Shredder) refactored to delegate — behavior-identical.
+V1 displacement components extracted as parameterized GLSL structs (`BenderConfig`, `CutterConfig`). Researchers can swap implementations by constructing different configs. Type 1 (Shredder) refactored to delegate, with identical behavior.
 
 ### Gradient Halo Fix
 
-DoG band reconstruction artifacts on smooth gradients ("the halo") eliminated via smooth-content detection. When `pooledCol ≈ foveaCol`, the pipeline snaps to the source color — no Mach bands to amplify. V4 transitions restored to pixel-space.
+DoG band reconstruction artifacts on smooth gradients ("the halo") eliminated via smooth-content detection. When `pooledCol ≈ foveaCol`, the pipeline snaps to the source color, leaving no Mach bands to amplify. V4 transitions restored to pixel-space.
 
 ### Citation Audit (Science Agent)
 
-AI-confabulated paper titles, authors, and article numbers corrected across 8 files using the [science agent](./../.claude/agents/science-agent.md) — a specialized Claude Code subagent that validates citations against CrossRef and BibTeX, detects confabulated titles/authors/DOIs, and flags cross-file inconsistencies. Findings: 12% of BibTeX entries had issues, 1 complete fabrication, 5 partial confabulations. [citation-guardian](https://github.com/andyed/citation-guardian) tool built to detect this class of error.
+AI-confabulated paper titles, authors, and article numbers corrected across 8 files using the [science agent](./../.claude/agents/science-agent.md), a specialized Claude Code subagent that validates citations against CrossRef and BibTeX, detects confabulated titles/authors/DOIs, and flags cross-file inconsistencies. Findings: 12% of BibTeX entries had issues, 1 complete fabrication, 5 partial confabulations. [citation-guardian](https://github.com/andyed/science-agent) tool (since renamed science-agent) built to detect this class of error.
 
 ## New Files
 
@@ -35,7 +35,6 @@ AI-confabulated paper titles, authors, and article numbers corrected across 8 fi
 |------|---------|
 | `scripts/validate-isotropic-rendering.js` | 12-check rendering validation suite |
 | `docs/specs/implemented/mode_graduation.md` | Process spec for promoting modes to default |
-| `docs/drafts/blauch-update-2026-03-19.md` | Draft correspondence re: FOVI adoption |
 
 ## Test Results
 
@@ -55,12 +54,12 @@ AI-confabulated paper titles, authors, and article numbers corrected across 8 fi
 ## Post-Release Fixes (2026-03-19 → 2026-03-22)
 
 ### Code
-- **Scrollbar protection bypass**: Scrollbar detection now bypasses the full pipeline (not just the memory mask), preventing peripheral distortion from bleeding into native scrollbar rendering.
+- **Scrollbar protection bypass**: Scrollbar detection now bypasses the full pipeline (previously only the memory mask), preventing peripheral distortion from bleeding into native scrollbar rendering.
 - **Foveal radius menu**: Removed separator elements from the foveal radius radio group for cleaner menu layout.
 
 ### Documentation
 - ArXiv paper: Reframed as "Restricted Focus Viewer," 25% trim, 4 empirical claim corrections, citation audit fixes.
-- Science agent (`scripts/science-agent/`) added for automated citation validation.
+- Science agent (`.claude/agents/science-agent.md`) added for automated citation validation.
 - Reading span (Rayner 1998) added to simulation limitations; limitations section reframed.
 - Mongrel textures spec rewritten as architectural plan with Tier 3 synthesis path.
 - ROADMAP condensed from narrative to table format.

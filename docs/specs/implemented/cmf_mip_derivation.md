@@ -10,11 +10,11 @@ Source: Feedback from Nicholas Blauch (FOVI co-author)
 
 Three errors in how Scrutinizer maps the FOVI cortical magnification function to GPU MIP levels:
 
-1. **Wrong log base** — we use `log₂` where the CMF integral requires natural log
-2. **Collapsed notation** — we wrote `log₂(1 + r/a)` instead of the traceable `ln(r+a) - ln(a)`, hiding the derivation and making it unauditable against the source math
-3. **Missing normalization** — FOVI normalizes cortical distance by dividing by the range `ln(r_max+a) - ln(a)`; we skipped this and let the log base do implicit (wrong) scaling
+1. **Wrong log base:** we use `log₂` where the CMF integral requires natural log
+2. **Collapsed notation:** we wrote `log₂(1 + r/a)` instead of the traceable `ln(r+a) - ln(a)`, hiding the derivation and making it unauditable against the source math
+3. **Missing normalization:** FOVI normalizes cortical distance by dividing by the range `ln(r_max+a) - ln(a)`; we skipped this and let the log base do implicit (wrong) scaling
 
-The net effect: MIP levels climb 44% faster than the biology predicts. The periphery is over-pooled — text that should be partially legible in the parafovea gets blurred into mush.
+With these errors, MIP levels climb 44% faster than the normalized CMF mapping. The periphery is over-pooled: text that should be partially legible in the parafovea gets blurred into mush. *(Correction 2026-10-01: 44% is 1/ln 2 − 1 and disagrees with the 47–48% in the table below, and for the example given the log₂ form under-pooled. See the correction under that table.)*
 
 ## What Blauch Said
 
@@ -39,7 +39,7 @@ This collapses to `log₂(1 + r/a)`. Three problems packed into one line:
 - `(r+a)/a` instead of `(r+a)` with separate `- ln(a)` subtraction
 - No normalization by the cortical distance range
 
-## What FOVI Actually Does
+## What FOVI Does
 
 From `fovi/sensing/coords.py`:
 
@@ -50,9 +50,9 @@ log_radius = (torch.log(radius + cmf_a) - torch.log(cmf_a)) / \
 ```
 
 Breaking this down:
-- `torch.log(radius + cmf_a)` — cortical distance, natural log, `w = ln(r + a)` (Schwartz 1980)
-- `- torch.log(cmf_a)` — zero-reference by subtracting `ln(a)`, NOT by adding 1 inside the log
-- `/ (torch.log(fov/2 + cmf_a) - torch.log(cmf_a))` — normalize to [0, 1] by dividing by the total cortical range
+- `torch.log(radius + cmf_a)`: cortical distance, natural log, `w = ln(r + a)` (Schwartz 1980)
+- `- torch.log(cmf_a)`: zero-reference by subtracting `ln(a)`. FOVI does not add 1 inside the log
+- `/ (torch.log(fov/2 + cmf_a) - torch.log(cmf_a))`: normalize to [0, 1] by dividing by the total cortical range
 
 The complex log mapping is `w = log(z + a)` where `z = x + iy`. FOVI uses natural log throughout with no base conversion.
 
@@ -66,7 +66,7 @@ CMF(r) = 1 / (r + a)
 d(r) = ∫₀ʳ 1/(t + a) dt = ln(r + a) - ln(a)
 ```
 
-Note: `ln(r + a) - ln(a)` equals `ln(1 + r/a)` algebraically. But the `ln(r+a) - ln(a)` form is what matters — it traces directly to the Schwartz (1980) complex log mapping `w = log(z + a)` with an explicit zero-reference subtraction. The collapsed `ln(1+r/a)` form hides this derivation and makes it impossible to audit against the source math.
+Note: `ln(r + a) - ln(a)` equals `ln(1 + r/a)` algebraically. The `ln(r+a) - ln(a)` form is preferred because it traces directly to the Schwartz (1980) complex log mapping `w = log(z + a)` with an explicit zero-reference subtraction. The collapsed `ln(1+r/a)` form hides this derivation and makes it impossible to audit against the source math.
 
 ### Step 2: Normalized cortical distance → MIP level
 
@@ -91,20 +91,20 @@ mipLevel = maxMipLevel × [ln(r + a) - ln(a)] / cortical_max
 
 ### Step 3: r_max from foveal radius and screen size
 
-The foveal radius encodes the user's pixels-per-degree calibration (fovea ≈ 2° visual angle):
+The user's pixels-per-degree calibration is expressed through the foveal radius (fovea ≈ 2° visual angle):
 
 ```
 r_max_deg = (screen_half_diagonal_px / fovea_radius_px) × 1.0°
 cortical_max = ln(r_max_deg + a) - ln(a)
 ```
 
-No new user-facing controls — `r_max` is derived from the foveal radius and screen dimensions, both already known.
+No new user-facing controls: `r_max` is derived from the foveal radius and screen dimensions, both already known.
 
 ### Why the collapsed form was wrong
 
 Our code had `log₂((r+a)/a)` = `log₂(1 + r/a)` = `ln(1 + r/a) / ln(2)`.
 
-This silently sets the normalization constant to `1/ln(2) ≈ 1.443`, which has no relationship to the actual cortical distance range. It happens to work "sort of" — the function shape is correct — but the scaling is wrong by an amount that depends on the screen geometry.
+This silently sets the normalization constant to `1/ln(2) ≈ 1.443`, which has no relationship to the actual cortical distance range. It happens to work "sort of" (the function shape is correct), but the scaling is wrong by an amount that depends on the screen geometry.
 
 For a = 2.78° and a 1440×900 screen with 75px foveal radius (r_max ≈ 16°):
 
@@ -114,7 +114,9 @@ For a = 2.78° and a 1440×900 screen with 75px foveal radius (r_max ≈ 16°):
 | **Corrected** (normalized `ln`) | 0.93 | 1.51 | 2.09 |
 | **Over-pooling** | 48% | 47% | 47% |
 
-At every eccentricity, we're nearly 50% too aggressive. MIP level 2.2 (≈5× coarser) where the biology says 1.5 (≈3× coarser).
+At every eccentricity, we're nearly 50% too aggressive. MIP level 2.2 (≈5× coarser) where the normalized CMF mapping gives 1.5 (≈3× coarser).
+
+*(Correction 2026-10-01: this table does not reproduce from the formulas above. With a = 2.78°, log₂(1 + r/a) is 1.48, 2.20 and 2.76 at 5°, 10° and 16°. A 1440×900 screen with a 75 px foveal radius gives r_max = 22.6° at the 2°-per-foveal-radius scale used in commit 5be3b2b (11.3° at the current 1°). The table's 16° matches neither. The ratio of the log₂ form to the normalized form is cortical_max / (ln 2 × maxMipLevel), the same at every eccentricity, so the log₂ form over-pools only when 1 + r_max/a > 2^maxMipLevel. With maxMipLevel = 4 (`peripheral2.frag` at 5be3b2b) that requires r_max > 15a ≈ 42°. At r_max = 22.6° the log₂ form gave MIP levels about 20% lower than the normalized form (41% lower at 11.3°), so it under-pooled. The three formula errors in the Summary are real; the direction and size of their effect stated here are wrong.)*
 
 ## Corrected Code
 

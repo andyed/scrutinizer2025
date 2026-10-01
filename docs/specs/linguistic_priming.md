@@ -3,7 +3,7 @@
 > **Last updated:** 2026-03-09
 
 > [!NOTE]
-> **Version 3.0** — Rewritten to align with the current Scrutinizer architecture (v2.1+). Replaces v2 spec. Grounded in existing pipeline components: `dom-adapter.js`, `saliency-worker.js`, `peripheral.frag`, and the declarative mode registry.
+> **Version 3.0.** Rewritten to align with the current Scrutinizer architecture (v2.1+). Replaces v2 spec. Grounded in existing pipeline components: `dom-adapter.js`, `saliency-worker.js`, `peripheral.frag`, and the declarative mode registry.
 
 > [!IMPORTANT]
 > **Implementation Status: PLANNED**
@@ -18,7 +18,7 @@
 > - [ ] Icon/symbol dictionary
 > - [ ] `scent_gated` mode in `modes.json`
 >
-> **No external dependencies.** Runs entirely within Electron — no servers, no Qdrant, no external embedding APIs.
+> **No external dependencies.** Runs entirely within Electron, with no servers, Qdrant, or external embedding APIs.
 
 ---
 
@@ -28,7 +28,7 @@ This feature adds **top-down attentional control** to the Scrutinizer pipeline. 
 
 The integration touches two existing branch points:
 - **Branch point #2 (Saliency):** Scent scores are blended into the R channel of `u_saliencyMap` (TEXTURE3).
-- **Branch point #4 (Structure):** `dom-adapter.js` already harvests text nodes with bounding rects — we extend its output with semantic scores rather than building a parallel extraction pipeline.
+- **Branch point #4 (Structure):** `dom-adapter.js` already harvests text nodes with bounding rects. We extend its output with semantic scores rather than building a parallel extraction pipeline.
 
 No shader modifications are required. The scent signal enters through the same saliency gating path that already protects faces and luminance singletons.
 
@@ -72,13 +72,13 @@ The $\alpha / \beta$ balance is dynamic (Section 5.3).
 
 ### 3.3 Eccentricity-Semantics Interaction
 
-A semantic match is irrelevant if the text is unreadable at that eccentricity. The scent score must be gated by legibility — the same $E_2$-based resolution model the shader already uses for band cutoffs (Section 5.2).
+A semantic match is irrelevant if the text is unreadable at that eccentricity. The scent score must be gated by legibility, using the same $E_2$-based resolution model the shader already uses for band cutoffs (Section 5.2).
 
-> **The "Eagle Eye" Fallacy.** A word matching the goal does not generate saliency if the visual system cannot resolve its letters at that eccentricity. Semantic signal must be gated by legibility. This forces the simulation to make exploratory saccades toward candidate regions before confirming a match — which is what humans actually do.
+> **The "Eagle Eye" Fallacy.** A word matching the goal does not generate saliency if the visual system cannot resolve its letters at that eccentricity. A matching region therefore gains scent only after the gaze point (the cursor, or a replayed scanpath) moves close enough to resolve its letters, as a reader must fixate near a word to confirm it.
 
 ### 3.4 Parafoveal Preview (Rayner, 1998)
 
-Readers process word length and partial shape parafoveally before fixating. We model this by allowing partial scent signal (attenuated, not zeroed) at eccentricities where word shape but not letter identity is available — the zone between the crowding boundary and the acuity limit.
+Readers process word length and partial shape parafoveally before fixating. We model this by allowing partial scent signal (attenuated but nonzero) at eccentricities where word shape is available and letter identity is not, the zone between the crowding boundary and the acuity limit.
 
 ---
 
@@ -95,7 +95,7 @@ Self-contained, ships with Scrutinizer. No external servers.
 | **Format** | ONNX quantized (int8, ~23 MB) |
 | **Runtime** | ONNX Runtime Web (WebGPU → WASM fallback) |
 | **Execution** | Dedicated Web Worker (`scent-worker.js`) |
-| **Caching** | Cache API — downloaded once, persisted across sessions |
+| **Caching** | Cache API: downloaded once, persisted across sessions |
 | **Cold start** | ~2s (cached), ~8s (first download on fast connection) |
 
 Why this model: 384 dimensions is sufficient for short UI text strings. Larger models (gte-large, mxbai-embed-large) improve accuracy on paragraphs but are oversized for button labels and menu items. The 23 MB footprint is comparable to face-api.js models already shipped.
@@ -133,13 +133,13 @@ A new `scent-worker.js` runs alongside the existing `saliency-worker.js`. They c
 ```
 
 Currently `saliency` is hardcoded to 1.0 for all blocks. The integration:
-1. Extend `dom-adapter.js` to include `text` content in its StructureBlock output (it already walks text nodes via TreeWalker — the text is available, just not exported).
+1. Extend `dom-adapter.js` to include `text` content in its StructureBlock output (it already walks text nodes via TreeWalker; the text is available but not exported).
 2. Pass blocks with text to `scent-worker.js` for embedding.
 3. Scent worker returns per-block scores.
 4. `dom-adapter.js` writes scent scores into the `saliency` field of each block.
-5. `saliency-worker.js` reads these scores when painting the R channel — scent-bearing blocks get boosted saliency.
+5. `saliency-worker.js` reads these scores when painting the R channel, and scent-bearing blocks get boosted saliency.
 
-**No new shader uniforms.** The scent signal enters through `u_saliencyMap` R channel, which the LGN saliency gate (`u_lgn_use_saliency_gate`) already reads. High-scent regions are protected; low-scent regions degrade normally.
+**No new shader uniforms.** The scent signal enters through `u_saliencyMap` R channel, which the LGN saliency gate (`u_lgn_use_saliency_gate`) already reads.
 
 **No new texture slots.** TEXTURE0–4 are all occupied. Scent is blended into the existing saliency texture before upload.
 
@@ -165,7 +165,7 @@ Runs in `scent-worker.js`:
 6. Apply exploration/exploitation weighting (Section 5.3).
 7. Return per-block scent scores to main thread.
 
-**Cadence:** Embeddings are recomputed when DOM changes (MutationObserver, 500 ms debounce) or viewport scrolls (IntersectionObserver). The goal vector is computed once. Cosine similarity is O(N × 384) — negligible compared to inference.
+**Cadence:** Embeddings are recomputed when DOM changes (MutationObserver, 500 ms debounce) or viewport scrolls (IntersectionObserver). The goal vector is computed once. Cosine similarity is O(N × 384), negligible compared to inference.
 
 **Vector cache:** A `Map<string, Float32Array>` keyed on text content. Survives across DOM updates. Cleared on page navigation. Typical page has 50–200 unique text strings; cache prevents re-embedding unchanged content.
 
@@ -180,13 +180,13 @@ const legibility = sigmoid((block.fontSize - minSize) / 4);
 const S_effective = S_sem * legibility;
 ```
 
-This uses the same $E_2$ (half-resolution eccentricity) parameter the shader uses for band cutoffs. At eccentricities where letters are irresolvable, scent drops to zero regardless of semantic match. Between the crowding boundary and the acuity limit, partial scent leaks through — modeling parafoveal word-shape processing.
+This uses the same $E_2$ (half-resolution eccentricity) parameter the shader uses for band cutoffs. At eccentricities where letters are irresolvable, scent drops to zero regardless of semantic match. Between the crowding boundary and the acuity limit, partial scent leaks through, modeling parafoveal word-shape processing.
 
 **Gaze dependency:** Legibility gating makes scent scores gaze-contingent. When gaze moves, the legibility multiplier changes for every block. Recomputation is cheap (no re-embedding, just distance + sigmoid per block) and piggybacks on the existing gaze update loop.
 
 ### 5.3 Exploration / Exploitation Controller
 
-Static $\alpha / \beta$ mixing feels robotic. Instead, the blend adapts to scent strength:
+Instead of a static $\alpha / \beta$ mix, the blend adapts to scent strength:
 
 | State | Condition | Behavior |
 |-------|-----------|----------|
@@ -200,7 +200,7 @@ Where $k$ is a threshold (default 0.4, tunable). The final saliency value per pi
 
 $$R_{pixel} = \alpha \cdot V_{bottomup} + \beta \cdot S_{effective}$$
 
-This is computed in `saliency-worker.js` when painting the R channel, not in the shader.
+This is computed in `saliency-worker.js` when painting the R channel. The shader does not compute it.
 
 ### 5.4 Icon / Symbol Dictionary
 
@@ -239,9 +239,9 @@ Add a `scent_gated` mode to `shared/modes.json`:
 }
 ```
 
-The `scent_enabled` flag tells the main thread to start `scent-worker.js` and route DOM text to it. All other pipeline parameters (DoG bands, chromatic pooling, crowding) remain independent — scent only modulates the saliency channel.
+When the `scent_enabled` flag is set, the main thread starts `scent-worker.js` and routes DOM text to it. All other pipeline parameters (DoG bands, chromatic pooling, crowding) remain independent; scent modulates only the saliency channel.
 
-Zero shader changes. The mode registry is the configuration interface (branch point #5).
+The mode registry is the configuration interface (branch point #5).
 
 ---
 
@@ -259,7 +259,7 @@ Elements with high bottom-up saliency ($V > 0.7$) but low semantic scent ($S < 0
 
 > "The 'Sign Up' banner is visually dominant ($V=0.9$) but irrelevant to the 'Checkout' goal ($S=0.1$). **Distractor.**"
 
-This is a design audit output — useful in `scrutinizer-audit` CLI headless mode.
+This is a design audit output, useful in `scrutinizer-audit` CLI headless mode.
 
 ### 7.3 Stats HUD Integration
 

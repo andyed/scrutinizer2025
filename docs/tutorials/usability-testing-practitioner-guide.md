@@ -4,18 +4,18 @@ This guide explains how to use Scrutinizer's **Restricted Focus Viewer** (RFV) t
 
 For basic installation, controls, calibration, Visual Memory, and Comfort Mode, begin with [Getting Started: Restricted Focus Viewer](getting-started-rfv.md). For the deep-link implementation contract, see [Usability Study Deep Links and Study Toolbar](../specs/usability-study-deep-links.md).
 
-## The strategic value of RFV
+## What RFV adds to a usability session
 
-Ordinary usability observation shows clicks, navigation, speech, and task outcomes, but much of the participant's moment-to-moment visual access remains hidden. RFV changes the task environment by rendering the foveal-plus-peripheral scene that the participant uses to plan the next move. Its peripheral pipeline is scientifically motivated to approximate the information available outside fixation for eye-movement planning; it is not a simple mask over an otherwise unchanged page. Detailed information remains available only around a participant-controlled location, so inspecting a region requires bringing it into focus.
+Ordinary usability observation shows clicks, navigation, speech, and task outcomes, but much of the participant's moment-to-moment visual access remains hidden. RFV changes the task environment by rendering the foveal-plus-peripheral scene that the participant uses to plan the next move. Its peripheral pipeline is scientifically motivated to approximate the information available outside fixation for eye-movement planning. Detailed information remains available only around a participant-controlled location, so inspecting a region requires bringing it into focus.
 
-That intervention creates two linked benefits:
+The intervention has two linked benefits:
 
 1. **Control:** every participant performs the task under the same documented restriction on visual information.
-2. **Revelation:** movement of the clear region exposes the participant's functional focus—the places they choose to inspect in order to understand and act.
+2. **Revelation:** movement of the clear region exposes the participant's functional focus: the places they choose to inspect in order to understand and act.
 
 “See what your user sees” is therefore meaningful in an RFV session. The participant works from the rendered stimulus, and the researcher sees that same stimulus. The researcher can observe what was available before each move, which region the participant revealed next, and whether the interface provided enough peripheral information to guide that transition.
 
-The core loop is: **modeled peripheral view → next target selection → pointer movement as an emulated gaze shift → new foveal information and Visual Memory → next decision**. This is why the quality of the peripheral simulation matters: it shapes the evidence from which the participant chooses the next target.
+The core loop is: **modeled peripheral view → next target selection → pointer movement as an emulated gaze shift → new foveal information and Visual Memory → next decision**. The participant chooses each next target from the peripheral view, so the quality of the peripheral simulation affects the evidence behind each choice.
 
 RFV does not claim that pointer coordinates equal exact physiological gaze. A participant may move their eyes within the display or direct covert attention outside the clear region. The pointer instead has a stronger operational meaning than an ordinary cursor: it is the emulated fixation location and controls where task-relevant detail can be acquired. Call this **functional focus** or **revealed focus**, reserving **gaze** for eye-tracker measurements.
 
@@ -35,11 +35,11 @@ Use RFV findings as evidence about visual access, functional focus, and interact
 
 ### Participant-controlled task
 
-The participant moves the pointer and completes a realistic task while the moderator observes. This is the primary usability-testing format. The current peripheral rendering supplies the evidence for choosing the next target; the pointer movement then emulates that shift in fixation and reveals which regions the participant chooses to bring into functional focus, in what sequence, and for what apparent purpose.
+The participant moves the pointer and completes a realistic task while the moderator observes. This is the primary usability-testing format. The participant chooses each next target from the current peripheral rendering; the pointer movement then emulates that shift in fixation and reveals which regions the participant chooses to bring into functional focus, in what sequence, and for what apparent purpose.
 
 ### Moderator-controlled walkthrough
 
-The moderator moves through selected viewing locations while a participant or stakeholder describes what is available. This is useful for design critique and tightly controlled comparisons, but it is not a natural participant scanpath.
+The moderator moves through selected viewing locations while a participant or stakeholder describes what is available. This is useful for design critique and tightly controlled comparisons. It does not produce a natural participant scanpath.
 
 ### Fixation-memory question
 
@@ -107,7 +107,7 @@ Supported settings:
 | `comfort_mode` | `false` | Whether Comfort Mode begins enabled |
 | `visual_memory_limit` | `0`, `5`, `10`, `-1`, or `20` | Off, Limited, Extended, Infinite, or IOR |
 
-Query values containing URLs, spaces, punctuation, or other reserved characters must be percent-encoded. The easiest path is the hosted [Study Link Builder](https://scrutinizer.app/study-link-builder.html), which assembles and percent-encodes the link and validates it with the same parser the installed app runs — a link that passes there will not be rejected on a participant's machine. To generate links programmatically instead, use `URLSearchParams` in browser JavaScript:
+Query values containing URLs, spaces, punctuation, or other reserved characters must be percent-encoded. The easiest path is the hosted [Study Link Builder](https://scrutinizer.app/study-link-builder.html), which assembles and percent-encodes the link and validates it with a vendored copy of the app's current parser. A link that passes there will pass in an installed build with the same parser. Older builds can reject newer link types (session links need a build newer than 2.8.1), so confirm the link in the pilot. To generate links programmatically instead, use `URLSearchParams` in browser JavaScript:
 
 ```html
 <a id="start-task" href="#">Start task in Scrutinizer</a>
@@ -126,7 +126,7 @@ Query values containing URLs, spaces, punctuation, or other reserved characters 
 </script>
 ```
 
-Scrutinizer rejects unknown, duplicate, or invalid parameters rather than silently running a different condition.
+Scrutinizer rejects unknown, duplicate, or invalid parameters, so a malformed link never silently runs a different condition.
 
 ## Run a multi-task session
 
@@ -136,7 +136,7 @@ Most moderated sessions run several tasks in order on the same participant. A **
 scrutinizer://v1/session/start?session_id=nav-study&participant_id=P04&mode=12&fovea_radius_px=45&t1.url=…&t1.instructions=…&t2.url=…&t2.instructions=…
 ```
 
-Build session links in the [Study Link Builder](https://scrutinizer.app/study-link-builder.html) — choose **Multi-task session**, add task rows, and set the shared condition once; any task row can override it. The builder enforces the same limits the app does (2–8 tasks, 8192-character link cap) and validates with the app's own parser. Session links require a Scrutinizer build newer than 2.8.1; single-task links are unchanged.
+Build session links in the [Study Link Builder](https://scrutinizer.app/study-link-builder.html): choose **Multi-task session**, add task rows, and set the shared condition once; any task row can override it. The builder enforces the same limits the app does (2–8 tasks, 8192-character link cap) and validates with the app's own parser. Session links require a Scrutinizer build newer than 2.8.1; single-task links are unchanged.
 
 What the participant experiences:
 
@@ -152,19 +152,19 @@ If a participant withdraws and asks for their data to be deleted, delete the fol
 
 Semantics to know when moderating:
 
-- **Done on an interstitial (before Begin) ends the whole session.** There is no per-task skip; skipping would make outcomes ambiguous. If a task must be abandoned mid-way, press Done (it records as done — note the abandonment on your worksheet) or end the session from the menu.
+- **Done on an interstitial (before Begin) ends the whole session.** There is no per-task skip; skipping would make outcomes ambiguous. If a task must be abandoned mid-way, press Done (it records as done, so note the abandonment on your worksheet) or end the session from the menu.
 - The menu escape is relabeled **End Study Session**; it ends early and records the in-flight task as `session_ended`.
 - Opening another Study Link mid-session replaces the session; the interrupted session's timing data is saved first.
 
 ### The session summary
 
-Every session the participant consented to — completed, ended early, replaced, or interrupted by quitting — writes a local JSON summary to the app's data directory (`~/Library/Application Support/scrutinizer-electron/study-sessions/` on macOS), named `<session_id>-<start time>-summary.json`. It records the session and participant IDs, the condition defaults, and per task: start/end timestamps, duration, outcome, final URL, and the resolved settings. This gives you time-on-task per task with no manual timing.
+Every session the participant consented to (completed, ended early, replaced, or interrupted by quitting) writes a local JSON summary to the app's data directory (`~/Library/Application Support/scrutinizer-electron/study-sessions/` on macOS), named `<session_id>-<start time>-summary.json`. It records the session and participant IDs, the condition defaults, and per task: start/end timestamps, duration, outcome, final URL, and the resolved settings. This gives you time-on-task per task with no manual timing.
 
-Treat the file as potentially sensitive: `finalUrl` reflects wherever the participant actually navigated and can contain query strings. Keep summaries with the study's other data under its data-handling plan, and use anonymous codes for `participant_id` — never names.
+Treat the file as potentially sensitive: `finalUrl` reflects wherever the participant navigated and can contain query strings. Keep summaries with the study's other data under its data-handling plan, and use anonymous codes (never names) for `participant_id`.
 
 ### Counterbalancing task order
 
-Session links present tasks in the order they appear in the link. To counterbalance across participants, use the builder's **Rotate order** button: copy the link for participant 1, rotate, update the participant ID, copy again — a hand-built Latin square. Automated counterbalancing is planned for the experiment-runner phase.
+Session links present tasks in the order they appear in the link. To counterbalance across participants, use the builder's **Rotate order** button: copy the link for participant 1, rotate, update the participant ID, copy again. Repeating this builds a Latin square by hand. Automated counterbalancing is planned for the experiment-runner phase.
 
 ## Prepare the participant instruction sheet
 
@@ -176,7 +176,7 @@ Tell participants what will happen before they click:
 4. Work as naturally as possible and think aloud only if that is part of the study protocol.
 5. Select **Done** after completing the task or when the moderator asks you to stop.
 
-Explain that the pointer controls where detail is available and that the moderator will observe how the participant reveals and uses information. Do not describe this as eye tracking unless an eye tracker is actually connected. Obtain any consent required by the research plan.
+Explain that the pointer controls where detail is available and that the moderator will observe how the participant reveals and uses information. Do not describe this as eye tracking unless an eye tracker is connected. Obtain any consent required by the research plan.
 
 ## Run the session
 
@@ -202,7 +202,7 @@ After the task:
 1. Record completion, abandonment, or moderator termination.
 2. Ask a neutral retrospective question such as, “What were you looking for when you moved there?”
 3. Select **Done** before starting another task.
-4. Use a fresh Study Link for the next condition — or use a session link (above) and Done advances to the next task automatically.
+4. Use a fresh Study Link for the next condition, or use a session link (above) so Done advances to the next task automatically.
 
 ## Observation worksheet
 
@@ -229,17 +229,17 @@ Use one row per task. Add timestamps or recordings only when they are covered by
 The **Study Workbench** (`scrutinizer-moderator` repo) is a companion browser
 app for the analysis side of a study: it imports captured session data, checks
 it arrived intact, and computes time on task, pointer path length, interaction
-counts, and the rate at which Done was recorded — per task and aggregated
-across participants (median and IQR, with honest small-sample reporting).
-Done is an end-of-task trigger, not evidence that the participant achieved the
+counts, and the rate at which Done was recorded, per task and aggregated
+across participants (median and IQR, with n and exclusions shown for each cell).
+Done is an end-of-task trigger. It is not evidence that the participant achieved the
 task goal. Record and adjudicate goal achievement separately using the study's
 outcome rubric. Everything runs locally in your browser; session data is never
 uploaded.
 
 Current status: the source build now records per-task input trails and full-page
 stimulus anchors, then publishes the complete Workbench session directory
-atomically. That unlocks the Workbench's motion measures and procedural replay
-for source-built studies. A packaged macOS verification and release is still
+atomically. With these, the Workbench's motion measures and procedural replay
+work for source-built studies. A packaged macOS verification and release is still
 required before treating this as generally available in the distributed 2.8.x
 app. The Workbench and its file formats are ready now, and its bundled demo
 session shows the complete workflow. See the
@@ -287,7 +287,7 @@ Windows packaging is configured, but the 2.8.1 Study Link installation and brows
 ## Reporting checklist
 
 For a full report, the current reporting standard is **ISO 25062:2025** (the
-Common Industry Format for reporting usability evaluations — successor to the
+Common Industry Format for reporting usability evaluations, successor to the
 NIST CIF lineage); the Workbench's findings-memo template
 (`scrutinizer-moderator/docs/findings-memo-template.md`, sibling repo) follows its structure
 so a pilot memo can grow into a standards-shaped report without restructuring.
@@ -304,4 +304,4 @@ Whatever the format, include these details:
 - Technical incidents and moderator interventions
 - A statement that the pointer controlled detailed visual access and revealed functional focus; note separately whether physiological gaze was measured
 
-These details make RFV observations interpretable and make later replications meaningfully comparable.
+With these details, RFV observations can be interpreted and later replications can be compared.

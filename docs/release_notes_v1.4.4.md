@@ -2,6 +2,8 @@
 
 **Release Date:** 2026-01-09
 
+*(Note 2026-10-01: v1.4.4 was never tagged or published as a GitHub release. These changes first shipped in v1.5.0.)*
+
 ## Overview
 This release introduces visible version numbering within the application interface to assist with debugging and verification.
 

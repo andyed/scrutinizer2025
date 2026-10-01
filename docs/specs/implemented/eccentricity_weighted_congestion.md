@@ -6,7 +6,7 @@
 
 ## Motivation
 
-Scrutinizer's congestion and saliency pipelines computed uniformly — same resolution, same parameters at every eccentricity. But clutter impact and feature detectability are eccentricity-dependent:
+Scrutinizer's congestion and saliency pipelines computed uniformly, with the same resolution and the same parameters at every eccentricity. But clutter impact and feature detectability are eccentricity-dependent:
 
 - **Congestion:** A cluttered sidebar at 15° is irrelevant because the visual system can't resolve the features that make it cluttered. Fine-grained Feature Congestion (σ=2.5) overestimates peripheral clutter.
 - **Saliency:** A salient icon at 15° can't drive a saccade if it's below the cortical resolution floor. Uniform saliency over-protects far-peripheral content from degradation.
@@ -17,14 +17,14 @@ The v2.6 isotropic cortical sectors provide the geometry. These features add ecc
 
 ### Mechanism
 
-Acuity decay applied in the shader (not the worker — acuity is a viewing-geometry property, not an image property):
+Acuity decay is applied in the shader, because acuity depends on viewing geometry and the worker computes image properties:
 
 ```glsl
 acuity(ecc) = 1 / (1 + ecc / E2)
 signal.saliency = salTex.r * acuity
 ```
 
-E2 = 8.0° (half-sensitivity eccentricity). Strasburger, Rentschler & Jüttner (2011) report E2 from 2° (Vernier) to 10° (letter acuity) — 8° is within the biological range for feature detection. Initial value of 6.0 caused blue scatter artifacts by removing too much saliency protection in the far periphery.
+E2 = 8.0° (half-sensitivity eccentricity). Strasburger, Rentschler & Jüttner (2011) report E2 from 2° (Vernier) to 10° (letter acuity), so 8° is within the biological range for feature detection. Initial value of 6.0 caused blue scatter artifacts by removing too much saliency protection in the far periphery.
 
 ### Saliency-aware scramble zone
 
@@ -96,10 +96,10 @@ congestionBoost = 1.0 + (boumaEdge * 0.5 + eccCong * 0.5)
 
 ## Validation
 
-1. `npm run validate-congestion` — Spearman ρ ≥ 0.93 (R channel regression)
+1. `npm run validate-congestion`: Spearman ρ ≥ 0.93 (R channel regression)
 2. Worker `computeTimeMs` < 120ms (baseline ~80ms)
 3. Toggle E2: 6.0 vs 999.0 to visualize saliency gating effect
-4. `npm run capture-smoke` — no visual regressions
+4. `npm run capture-smoke`: no visual regressions
 5. Debug overlay (`u_show_congestion=1`): B channel shows smoother, broader congestion than R
 
 ## References

@@ -106,7 +106,8 @@ Generated 2026-03-19. Every claim below attributes a specific finding or number 
 - [ ] `peripheral.frag:64` — "Jiang, Shooner & Mullen (2022) power-law exponent ~0.5." Paper (PMC9639675) reports 0.5-0.63 for RG — using 0.5 for all channels is a simplification.
 - [ ] `chromatic_pooling.md:88-91` — castleCSF parameters: RG k_e=0.059, YV k_e=0.004, Achromatic k_e=0.024. Need verification against Ashraf et al. (2024) doi:10.1167/jov.24.4.5.
 - [ ] `scanpath-replay-spec.md:236` — "duration_ms = 2.2 x amplitude_deg + 21" from Bahill et al. (1975). Coefficients need verification — Bahill focused on peak velocity, duration formula may be secondary derivation.
-- [ ] `scanpath-replay-spec.md:245` — "peak_vel approx amplitude_deg x 500 deg/s." Oversimplification of main sequence — saturates for saccades >20 deg.
+- [x] `scanpath-replay-spec.md:245` — "peak_vel approx amplitude_deg x 500 deg/s." Oversimplification of main sequence — saturates for saccades >20 deg.
+  - **FIXED 2026-10-01:** `docs/specs/scanpath-replay-spec.md` (now line 379) replaces the linear rule with the saturating main sequence (Bahill, Clark & Stark 1975; Baloh et al. 1975 fit) and states the player's implied peaks (about 440 deg/s at 10°, 580 deg/s at 20°).
 - [ ] `peripheral.frag:1495-1503` — "RG caps at 70%; YV caps at 35%." Attributed to Jiang/Hansen but these appear to be implementation choices, not directly reported values.
 - [ ] `oblique_effect_validation.md:48` — "0 deg (fovea): 30-50% cardinal advantage (Appelle 1972)." Appelle is a review — some studies report 15-20% for contrast sensitivity. Range may be overstated.
 - [x] `oblique_effect_validation.md:27` — **FIXED: compound confabulation.** "Barbot et al. (2021, eLife)" merged two Carrasco-lab papers: the eLife paper (e84205) is Jigo, Tavdy, Himmelberg & Carrasco (2023); Barbot, Xue & Carrasco (2021) is a JOV paper (doi:10.1167/jov.21.1.2) about acuity asymmetries. Both now cited separately with DOIs.
@@ -123,7 +124,8 @@ Generated 2026-03-19. Every claim below attributes a specific finding or number 
 
 ### Issues Found
 
-- [!] **Missing citation:** `oblique_effect_validation.md:28` — "PNAS MT cortex data: 10.1% more cortical space for cardinal orientations in central MT, only 3.6% in peripheral MT." No author or year. Needs proper citation or removal.
+- [x] **Missing citation:** `oblique_effect_validation.md:28` — "PNAS MT cortex data: 10.1% more cortical space for cardinal orientations in central MT, only 3.6% in peripheral MT." No author or year. Needs proper citation or removal.
+  - **FIXED 2026-10-01:** now cited in `docs/specs/implemented/oblique_effect_validation.md` as Xu, Collins, Khaytin, Kaas & Casagrande (2006), PNAS 103:17490, doi:10.1073/pnas.0608502103 (owl monkey MT; both percentages confirmed in the paper).
 - [!] **Internal inconsistency:** `u_rg_decay` is 0.072 in shader (line 70) but 0.085 in spec. The Bowers attribution covers both but they can't both be correct.
 - [!] **Internal inconsistency:** Oblique effect fade is "~10 deg" in shader (line 345) but "8-18 deg" in spec (oblique_effect_validation.md:25).
 - [!] **Already caught fabrication:** `density_gated_crowding.md:141` — "Zhang et al. 2015" was fabricated. Corrected to Pelli, Palomares & Majaj (2004).
