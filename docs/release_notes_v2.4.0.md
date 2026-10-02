@@ -27,6 +27,8 @@ The fovea center shifts in the reading direction by up to `fovea_radius × 0.7` 
 
 The shifted center is used in the existing `dist` calculation, so all downstream stages (LGN gating, V1 crowding, V4 chromatic decay) automatically get the asymmetric boundary without any changes to their logic.
 
+*(Correction 2026-10-02: from v2.4.0 through v2.8.0 the shader added the shift to the pixel-to-pointer vector, which moved the center behind the reading direction instead of ahead of it. The release captures did not show this: their capture point sat on the byline row, where the text gate kept the shift near zero. The sign is fixed, the capture script now sweeps over body text, and `scripts/check-reading-span-direction.js` asserts the direction on live captures. Measured after the fix: detail gained 100 px ahead of the pointer for a left-to-right sweep and 134 px ahead for right-to-left.)*
+
 ### Configuration
 
 | Mode | reading_span | Rationale |

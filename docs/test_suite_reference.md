@@ -104,6 +104,22 @@ Before shipping ANY change to `structure-map.js` or `peripheral.frag`, you MUST 
 1.  **Saliency Map Integrity**: Turn on **Show Saliency Map**. If it looks like a solid color, **STOP**. You have broken the mapping.
 2.  **Blueprint Mode Clarity**: Switch to Blueprint (mode 3). Images should be **solid blocks** without fuzz. Text should be "schematic lines".
 3.  **Red Saliency Regression**: We have hit this twice. Always check that the saliency map is NOT full-red.
+4.  **Reading Span Direction**: After touching the reading-span block or anything that feeds `u_velocity_dir`, run the reading-span check below.
+
+## Reading Span Direction Check
+
+The reading span shifts the foveal protection zone ahead of the reading direction (Rayner 1998). From v2.4.0 to v2.8.0 a sign error moved it backward, and the release captures did not catch it because their capture point was not on body text.
+
+```bash
+node scripts/capture-reading-span.js          # 5 captures + reading-span-manifest.json
+node scripts/check-reading-span-direction.js  # exits non-zero on failure
+```
+
+The check compares each sweep's reading-span-ON capture with its OFF control at the same pointer position and locates where ON keeps more high-frequency detail.
+
+- **Pass**: detail gained more than 20 px right of the pointer for a left-to-right sweep, and more than 20 px left of it for right-to-left.
+- **Fail (inactive)**: ON and OFF barely differ (activation below 0.005). The capture point is off body text or the sweep speed is outside the pursuit gate. Adjust `READING_SPAN_Y`, `READING_SPAN_X0` and `READING_SPAN_X1` if the reference page layout changes.
+- **Fail (direction)**: detail gained behind the pointer. Captures from the v2.4.0–v2.8.0 shader fail this way (left-to-right −146 px, right-to-left +62 px).
 
 ## Pixel-Level Saliency Verification
 

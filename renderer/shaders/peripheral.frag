@@ -2322,14 +2322,16 @@ void main() {
         // Combined activation
         float readingActivation = readingGate * textGate * u_reading_span_strength;
 
-        // Shift fovea center in reading direction
+        // Shift fovea center in reading direction. delta = uv - mouse, so moving the
+        // center to mouse + shift means SUBTRACTING the shift from delta. (v2.4.0 to
+        // v2.8.0 added it, which moved the zone behind the reading direction.)
         float readDir = sign(u_velocity_dir.x); // +1 LTR, -1 RTL
         float shiftAmount = radius_norm_pre * 0.7 * readingActivation * readDir;
-        delta.x += shiftAmount / u_fovea_aspect_ratio;
+        delta.x -= shiftAmount / u_fovea_aspect_ratio;
         dist = length(delta);
 
         // Apply same shift to stable delta for consistent V1 boundaries
-        delta_stable.x += shiftAmount / u_fovea_aspect_ratio;
+        delta_stable.x -= shiftAmount / u_fovea_aspect_ratio;
         dist_stable = length(delta_stable);
     }
 
