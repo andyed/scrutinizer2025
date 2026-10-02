@@ -3,7 +3,7 @@
 **Release Date:** March 2026
 
 **Blog post:** [Measuring the Pipeline](https://andyed.github.io/scrutinizer-www/blog/2026-03-08-v2.1.html)
-**Published data:** [tests/validation/published-data/](https://github.com/andyed/scrutinizer2025/tree/main/tests/validation/published-data): Rovamo 1979, Hansen 2009, Mullen & Kingdom 2002, Bowers 2025
+**Published data:** [tests/validation/published-data/](https://github.com/andyed/scrutinizer2025/tree/main/tests/validation/published-data): Rovamo 1979, Hansen 2009, Mullen & Kingdom 2002, Bowers 2025 *(Correction 2026-10-02: the Hansen 2009 file was removed; see the note under the Validation Summary.)*
 **Previous:** [v2.0 blog post](https://andyed.github.io/scrutinizer-www/blog/2026-03-07-v2.0.html)
 
 ## In This Release
@@ -44,6 +44,8 @@ The four waves map to the four shader stages, each named for the biological stag
 | 2 | Spatial frequency | Rovamo & Virsu 1979 | 11/11 | 5/5 | 0/1 | DoG step functions at MIP boundaries vs smooth CSF |
 | 3 | Crowding geometry | Bouma 1970, Toet & Levi 1992 | 7/7 | — | — | R:T bug found and fixed; density gate validated at 3.3:1 ratio |
 | 4 | Saliency protection | Itti & Koch 2001, Hershler 2005 | 6/7 + 5/5 | — | — | Face saliency 4.79× control; protection ratio 0.283 |
+
+*(Correction 2026-10-02: the Hansen 2009 "naming accuracy" values were not from the paper, which reports detection thresholds at 10–50°. The data file and its Tier 3 check were removed; the check was a rank correlation of two monotone curves and could not fail.)*
 
 **Tier definitions:**
 - **Tier 1** (must pass): Properties that hold by construction (monotonic decay, correct ordering).

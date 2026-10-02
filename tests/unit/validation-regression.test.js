@@ -5,7 +5,7 @@
  * modes.json change, these tests catch regressions against published data.
  *
  * Validated against:
- *   Wave 1: Mullen & Kingdom 2002, Hansen 2009, Bowers 2025 (chromatic decay)
+ *   Wave 1: Mullen & Kingdom 2002, Bowers 2025 (chromatic decay)
  *   Wave 2: Rovamo & Virsu 1979 (spatial frequency / M-scaling)
  *   Wave 3: Bouma 1970, Toet & Levi 1992 (crowding geometry)
  *
@@ -93,7 +93,7 @@ function assertClose(actual, expected, tol, label) {
 
 // ─── Wave 1: Chromatic Decay ────────────────────────────────────────────────
 
-describe('Wave 1: Chromatic decay (Mullen 2002, Hansen 2009, Bowers 2025)', function () {
+describe('Wave 1: Chromatic decay (Mullen 2002, Bowers 2025)', function () {
 
     const ECCS = [2, 5, 10, 15, 30, 50, 75];
     const FREQ = 1.0; // representative mid-band frequency

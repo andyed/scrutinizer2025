@@ -43,7 +43,7 @@ Stimuli are HTML pages captured through Scrutinizer's full rendering path (shade
 - RG channels (red, green) decay ~5x faster than BY channels (blue, yellow), per Mullen & Kingdom (2002)
 - Green tracks the RG decay curve, as predicted by Oklab's `a`-axis projection
 - Decay ratio matches Mullen & Kingdom and Bowers et al. within 20%
-- Chroma retention correlates with Hansen et al. (2009) color naming accuracy *(Correction 2026-10-01: Hansen et al. report detection and identification thresholds (identification at 10 and 50° only), not naming accuracy as a function of eccentricity. The naming-accuracy curve in `hansen2009_color_naming.json` is labeled as their Figure 2, which shows detection thresholds; none of the paper's six figures contains it.)*
+- Chroma retention correlates with Hansen et al. (2009) color naming accuracy *(Correction 2026-10-01: Hansen et al. report detection and identification thresholds (identification at 10 and 50° only), not naming accuracy as a function of eccentricity. The naming-accuracy curve in `hansen2009_color_naming.json` is labeled as their Figure 2, which shows detection thresholds; none of the paper's six figures contains it.)* *(Correction 2026-10-02: the data file and its Tier 3 check were removed; the check was a rank correlation of two monotone curves and could not fail.)*
 
 ### Results: Tier 1: 7/7 PASS | Tier 2: 3/3 PASS | Tier 3: 1/2
 
@@ -51,7 +51,7 @@ All fundamental predictions confirmed. Applying the RG decay constant to Oklab's
 
 Monotonicity checks required non-strict comparison (`>=`) due to 8-bit RGB quantization creating legitimate plateaus at low chroma values (red at inner rings: 0.024 across rings 0-3).
 
-*(Note 2026-10-01: these counts are from the 2026-03-07 run. The regenerated report linked above (generated 2026-04-07, `rg_decay=0.085`, `yv_decay=0.014`) has a different check set and records Tier 1: 9/9, Tier 2: 2/3 (rendered-vs-model within 15% fails, 10/20), Tier 3: 3/3.)*
+*(Note 2026-10-01: these counts are from the 2026-03-07 run. The regenerated report linked above (generated 2026-04-07, `rg_decay=0.085`, `yv_decay=0.014`) has a different check set and records Tier 1: 9/9, Tier 2: 2/3 (rendered-vs-model within 15% fails, 10/20), Tier 3: 3/3.)* *(Correction 2026-10-02: two of those Tier 3 checks were the Hansen naming correlation, now removed. Tier 3 has one check: BY ranks above RG at every ring.)*
 
 ---
 

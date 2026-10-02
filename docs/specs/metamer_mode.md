@@ -139,7 +139,7 @@ vec4 color = textureLod(u_texture, distortedUV, targetLOD);
 
 2. **Interaction with existing V4 styles.** The metamer V1 distortion should compose with High-Key desaturation, rod vision, and chromatic aberration. Need to verify the V4 stage doesn't fight the V1 displacement.
 
-3. **Validation target.** What does "correct" look like for a metamer? Main's validation uses psychophysical stimuli with measurable outcomes (spread ratio, color naming, acuity). Metamer correctness is harder to quantify. One option is to compare against TTM mongrel images as ground truth.
+3. **Validation target.** What does "correct" look like for a metamer? Main's validation uses psychophysical stimuli with measurable outcomes (spread ratio, chroma retention, acuity). Metamer correctness is harder to quantify. One option is to compare against TTM mongrel images as ground truth.
 
 4. **Performance.** The wobbly grid adds 2 snoise evaluations + 1 hash per fragment. Micro-turbulence adds 2 more snoise calls. Total: ~5 noise evaluations per fragment beyond current pipeline. Profile on target hardware.
 

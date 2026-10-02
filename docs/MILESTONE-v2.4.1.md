@@ -46,6 +46,8 @@ Integrating all three simultaneously created cascading issues that blocked relea
 | `scripts/capture-reading-span.js` | +10 lines | Review: may be general capture fix |
 | `docs/specs/control_panel.md` | 335 lines | General spec (not chromatic-dependent) |
 
+*(Correction 2026-10-02: the Hansen 2009 "naming accuracy" values were not from the paper, which reports detection thresholds at 10–50°. The data file and its Tier 3 check were removed; the check was a rank correlation of two monotone curves and could not fail.)*
+
 ### Preserved on feature branch (re-land later)
 
 **Renderer / shader changes:**
@@ -152,7 +154,7 @@ Release notes: "Foveal boundary blur fix + MIP fidelity validation + capture inf
 - Biphasic RG decay (Bowers 2025)
 - chromaticAttenuate (linear desaturation)
 - Per-band Oklab attenuation in sampleDoGReconstructed
-- stimulus-domain.test.js, Bowers/Hansen data
+- stimulus-domain.test.js, Bowers/Hansen data *(Correction 2026-10-02: the Hansen data file was removed; see the note under the cherry-pick table.)*
 - Must address: scroll shadow visibility (chromatic makes compute lag visible)
 
 **PR B: Isotropic cortical sampling** (after PR A or independent)

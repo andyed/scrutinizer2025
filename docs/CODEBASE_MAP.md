@@ -179,7 +179,7 @@ scrutinizer2025/
 ├── tests/                          # Jest (NOT Vitest)
 │   ├── unit/                       # 25 tests: math + algorithms
 │   ├── validation/                 # Multi-wave validation harness
-│   │   ├── published-data/         # 8 JSON refs: Bowers, Rovamo, Mullen, Bouma, Toet, Hansen, Pelli, Harrington
+│   │   ├── published-data/         # 7 JSON refs: Bowers, Rovamo, Mullen, Bouma, Toet, Pelli, Harrington
 │   │   ├── blur-isotropy/, mind2web/, reports/
 │   ├── verification/, golden/      # SSIM/PSNR golden baselines
 │   ├── reference-pages/            # 16 HTML stimuli (article, dashboard, color-spectrum, etc.)
@@ -377,7 +377,7 @@ The `scripts/` directory is a research pipeline orchestrating capture → analys
 
 | Wave | What | Capture | Analyzer | Validator | Report | Ground truth |
 |---|---|---|---|---|---|---|
-| 1: Color Search | RG/YV chromatic attenuation | `capture-color-search.js` | `analyze-color-search.js` | `validate-color-search.js` | `report-color-search.js` | Bowers, Mullen & Kingdom, Hansen |
+| 1: Color Search | RG/YV chromatic attenuation | `capture-color-search.js` | `analyze-color-search.js` | `validate-color-search.js` | `report-color-search.js` | Bowers, Mullen & Kingdom |
 | 2: Spatial Acuity | DoG + M-scaling vs CSF | `capture-spatial-acuity.js` | `analyze-spatial-acuity.js` | `validate-spatial-acuity.js` | `report-spatial-acuity.js` | Rovamo & Virsu (1979) |
 | 3: Crowding | Bouma + R:T anisotropy | `capture-crowding.js` | `analyze-crowding.js` + `analyze-crowding-geometry.js` | `validate-crowding.js` | `report-crowding.js` | Bouma (1970), Toet & Levi (1992), Pelli & Tillman (2008) |
 | 4: Saliency | Peak localization + modulation | `capture-saliency.js` | `analyze-saliency.js` | (inferred from `validate-color-search`-style structure) | — | Itti & Koch, Hershler |
@@ -416,7 +416,7 @@ Coordinate transforms in `mind2web-bbox-transform.js`. Reproducibility via `mind
 - **`tests/visual-test.html`** — WebGL renderer smoke (upload noise, render, count pixels). Run via `scripts/run-electron.js`.
 - **`tests/memory-test.html`** — Visual memory state machine.
 - **`tests/perf-test.html`** — trajectory + frame timing (30s timeout).
-- **`tests/validation/published-data/`** — 8 JSON refs (Bowers, Rovamo, Mullen, Bouma, Toet, Hansen, Pelli, Harrington) consumed by `validation-regression.test.js`.
+- **`tests/validation/published-data/`** — 7 JSON refs (Bowers, Rovamo, Mullen, Bouma, Toet, Pelli, Harrington) consumed by `validation-regression.test.js`.
 - **`tests/reference-pages/`** — 16 HTML stimuli (article, dashboard, ecommerce, grid, color-spectrum v1/v2, halverson-mixed-density, face-test, spatial-acuity, etc.). Used as live capture targets, not Jest fixtures directly.
 - **Golden corpus** — 362 PNGs in `tests/golden/` + 1622 files across `tests/golden-captures/v2.3..v2.7/`. SSIM ≥ 0.98 / PSNR ≥ 35 dB thresholds. Updated via `npm run capture-golden`.
 

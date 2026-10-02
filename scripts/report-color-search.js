@@ -36,7 +36,6 @@ try {
 
 const bowers = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'bowers2025_sensitivity.json'), 'utf8'));
 const mullen = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'mullen_kingdom2002_rg_by.json'), 'utf8'));
-const hansen = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'hansen2009_color_naming.json'), 'utf8'));
 
 // ── Run validation to get pass/fail results ──
 let validationReport = '';
@@ -103,8 +102,8 @@ const html = `<!DOCTYPE html>
     margin: 0 auto;
   }
   h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
-  .subtitle { font-size: 13px; color: #888; margin-bottom: 24px; }
-  .subtitle span { color: #aaa; }
+  .subtitle { font-size: 13px; color: #b8b8c8; margin-bottom: 24px; }
+  .subtitle span { color: #d0d0dc; }
 
   /* Scorecard */
   .scorecard {
@@ -123,7 +122,7 @@ const html = `<!DOCTYPE html>
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: #888;
+    color: #c0c0cc;
     margin-bottom: 8px;
   }
   .tier-card .score {
@@ -131,19 +130,19 @@ const html = `<!DOCTYPE html>
     font-weight: 700;
     margin-bottom: 4px;
   }
-  .tier-card .score .of { font-size: 16px; color: #666; font-weight: 400; }
+  .tier-card .score .of { font-size: 16px; color: #c0c0cc; font-weight: 400; }
   .tier-card.all-pass { border-color: #2d6a3080; }
   .tier-card.all-pass .score { color: #4ade80; }
   .tier-card.has-fail { border-color: #a0602080; }
   .tier-card.has-fail .score { color: #fbbf24; }
   .tier-card.all-fail { border-color: #dc262680; }
-  .tier-card.all-fail .score { color: #f87171; }
-  .tier-label { font-size: 11px; color: #666; }
-  .intro { font-size: 13px; line-height: 1.7; color: #999; margin-bottom: 24px; max-width: 800px; }
-  .intro strong { color: #bbb; font-weight: 600; }
-  .section-desc { font-size: 12px; line-height: 1.6; color: #888; margin-bottom: 12px; max-width: 720px; }
-  .section-desc em { color: #998; }
-  .chart-desc { font-size: 11px; line-height: 1.5; color: #777; margin-top: -8px; margin-bottom: 12px; }
+  .tier-card.all-fail .score { color: #fca5a5; }
+  .tier-label { font-size: 11px; color: #c0c0cc; }
+  .intro { font-size: 13px; line-height: 1.7; color: #b8b8c8; margin-bottom: 24px; max-width: 800px; }
+  .intro strong { color: #e0e0e8; font-weight: 600; }
+  .section-desc { font-size: 12px; line-height: 1.6; color: #c0c0cc; margin-bottom: 12px; max-width: 720px; }
+  .section-desc em { color: #d0d0c0; }
+  .chart-desc { font-size: 11px; line-height: 1.5; color: #c0c0cc; margin-top: -8px; margin-bottom: 12px; }
 
   /* Charts */
   .charts {
@@ -166,14 +165,14 @@ const html = `<!DOCTYPE html>
     color: #ccc;
   }
   svg { display: block; }
-  .axis-label { fill: #666; font-size: 10px; }
+  .axis-label { fill: #c0c0cc; font-size: 10px; }
   .axis-line { stroke: #444; stroke-width: 1; }
   .grid-line { stroke: #2a2a44; stroke-width: 1; }
   .data-line { fill: none; stroke-width: 2; }
   .published-line { fill: none; stroke-width: 1.5; stroke-dasharray: 6 3; opacity: 0.5; }
   .data-dot { stroke-width: 2; }
   .meas-dot { stroke-width: 1.5; }
-  .legend { font-size: 10px; fill: #aaa; }
+  .legend { font-size: 10px; fill: #c0c0cc; }
 
   /* Results table */
   .results {
@@ -209,19 +208,19 @@ const html = `<!DOCTYPE html>
     flex-shrink: 0;
     margin-top: 1px;
   }
-  .badge.pass { background: #166534; color: #4ade80; }
-  .badge.fail { background: #7c2d12; color: #fbbf24; }
-  .badge.skip { background: #374151; color: #9ca3af; }
-  .result-text { color: #bbb; }
+  .badge.pass { background: #052e16; color: #86efac; }
+  .badge.fail { background: #7c2d12; color: #fef3c7; }
+  .badge.skip { background: #374151; color: #e5e7eb; }
+  .result-text { color: #c8c8d4; }
 
   /* Footer */
   .footer {
     margin-top: 24px;
     font-size: 11px;
-    color: #555;
+    color: #b8b8c8;
     text-align: center;
   }
-  .footer a { color: #666; }
+  .footer a { color: #d0d0dc; }
 
   /* Go flyout */
   .go-wrap {
@@ -244,7 +243,7 @@ const html = `<!DOCTYPE html>
     transition: border-color 0.15s, background 0.15s;
   }
   .go-btn:hover { border-color: #666; background: #2a2a50; }
-  .go-btn .arrow { font-size: 11px; color: #666; transition: transform 0.2s; }
+  .go-btn .arrow { font-size: 11px; color: #c0c0cc; transition: transform 0.2s; }
   .go-wrap:hover .go-btn .arrow,
   .go-wrap:focus-within .go-btn .arrow { transform: rotate(90deg); }
 
@@ -274,14 +273,14 @@ const html = `<!DOCTYPE html>
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: #666;
+    color: #c0c0cc;
     margin-bottom: 12px;
   }
   .flyout-section { margin-bottom: 16px; }
   .flyout-section:last-child { margin-bottom: 0; }
   .flyout-section h4 {
     font-size: 12px;
-    color: #888;
+    color: #c0c0cc;
     margin-bottom: 8px;
     padding-bottom: 4px;
     border-bottom: 1px solid #2a2a44;
@@ -301,7 +300,7 @@ const html = `<!DOCTYPE html>
     border: 1px solid #333;
     text-decoration: none;
     font-size: 12px;
-    color: #bbb;
+    color: #c8c8d4;
     transition: border-color 0.15s, background 0.15s;
   }
   .stim-link:hover { border-color: #666; background: #2a2a50; color: #eee; }
@@ -311,7 +310,7 @@ const html = `<!DOCTYPE html>
     border-radius: 3px;
     flex-shrink: 0;
   }
-  .stim-mode { color: #666; font-size: 10px; }
+  .stim-mode { color: #c0c0cc; font-size: 10px; }
 </style>
 </head>
 <body>
@@ -330,8 +329,8 @@ const html = `<!DOCTYPE html>
   faster than blue-yellow (BY). These predictions use the castleCSF per-channel decay model (Ashraf et al. 2024),
   with decay rates calibrated to Bowers et al. (2025), applied to Oklab perceptual color space. We validate by rendering colored dot arrays through
   Scrutinizer's filter, measuring chroma retention at each eccentricity ring, and comparing
-  the RG/BY decay ratio against published psychophysical data from Mullen &amp; Kingdom (2002),
-  Bowers (2025), and Hansen et al. (2009).
+  the RG/BY decay ratio against published psychophysical data from Mullen &amp; Kingdom (2002)
+  and Bowers (2025).
 </div>
 
 <!-- Scorecard -->
@@ -398,7 +397,6 @@ ${['red', 'green', 'blue', 'yellow'].map(color => {
 <div class="charts">
 ${buildRetentionChart()}
 ${buildChannelComparisonChart()}
-${buildPublishedOverlayChart()}
 ${buildMeasuredVsModelChart()}
 </div>
 
@@ -414,9 +412,10 @@ ${[1, 2, 3].map(t => {
     2: `<p class="section-desc"><strong>Observation:</strong> The RG/BY decay ratio should match published psychophysical data within 20%.
     Green should track the RG curve (Oklab a-axis), not the BY curve — a prediction that distinguishes
     our Oklab-based model from naive hue-based approaches.</p>`,
-    3: `<p class="section-desc"><strong>Observation:</strong> Does our chroma retention curve predict real-world color perception tasks?
-    Hansen et al. (2009) measured color naming accuracy across eccentricity. If our model captures the
-    underlying signal, the correlation should be strong (r &gt; 0.8).</p>`,
+    3: `<p class="section-desc"><strong>Observation:</strong> Blue-yellow colors should retain more chroma than
+    red-green colors at every eccentricity ring, the ordering Mullen &amp; Kingdom (2002) report. The check
+    counts BY-above-RG pairs across all rings (threshold: 90%). A correlation with a curve attributed to
+    Hansen et al. (2009) was removed on 2026-10-02: the curve was not from that paper, and the check could not fail.</p>`,
   };
   return `<div class="results" style="margin-bottom:16px">
   <h3>Tier ${t}: ${label}</h3>
@@ -430,7 +429,7 @@ ${[1, 2, 3].map(t => {
 
 <div class="footer">
   Scrutinizer Wave 1 &middot; castleCSF chromatic pooling &middot;
-  Bowers 2025 &middot; Hansen 2009 &middot; Mullen &amp; Kingdom 2002
+  Bowers 2025 &middot; Mullen &amp; Kingdom 2002
 </div>
 
 </body>
@@ -573,78 +572,12 @@ function buildChannelComparisonChart() {
   return svg;
 }
 
-function buildPublishedOverlayChart() {
-  const c = svgChart(540, 300);
-  const xMin = 0, xMax = 20, yMin = 0, yMax = 100;
-
-  let svg = `<div class="chart-box">
-  <h3>Hansen 2009: Naming Accuracy vs Model Retention</h3>
-  <p class="chart-desc">Hansen et al. (2009) measured how accurately people name colors at different eccentricities.
-  Solid lines show our model's chroma retention; dashed lines show Hansen's naming accuracy.
-  If chroma retention predicts naming ability, these curves should correlate (Tier 3 target: r &gt; 0.8).</p>
-  <svg width="${c.w}" height="${c.h}" viewBox="0 0 ${c.w} ${c.h}">
-  <g transform="translate(${c.margin.left},${c.margin.top})">`;
-
-  for (let y = 0; y <= 100; y += 20) {
-    const py = scaleY(y, yMin, yMax, c.ih);
-    svg += `<line x1="0" y1="${py}" x2="${c.iw}" y2="${py}" class="grid-line"/>`;
-    svg += `<text x="-8" y="${py + 3}" text-anchor="end" class="axis-label">${y}%</text>`;
-  }
-  for (let x = 0; x <= 20; x += 5) {
-    svg += `<text x="${scaleX(x, xMin, xMax, c.iw)}" y="${c.ih + 16}" text-anchor="middle" class="axis-label">${x}°</text>`;
-  }
-  svg += `<text x="${c.iw / 2}" y="${c.ih + 32}" text-anchor="middle" class="axis-label">Eccentricity (degrees)</text>`;
-
-  // Hansen data (dashed lines with open dots)
-  for (const hue of ['red', 'blue']) {
-    const acc = hansen.hues[hue].naming_accuracy;
-    let d = '';
-    for (let i = 0; i < hansen.eccentricities_deg.length; i++) {
-      const ecc = hansen.eccentricities_deg[i];
-      if (ecc > xMax) continue;
-      d += (d ? ' L' : 'M') + `${scaleX(ecc, xMin, xMax, c.iw)},${scaleY(acc[i] * 100, yMin, yMax, c.ih)}`;
-    }
-    svg += `<path d="${d}" class="published-line" stroke="${COLORS[hue]}"/>`;
-    for (let i = 0; i < hansen.eccentricities_deg.length; i++) {
-      const ecc = hansen.eccentricities_deg[i];
-      if (ecc > xMax) continue;
-      svg += `<circle cx="${scaleX(ecc, xMin, xMax, c.iw)}" cy="${scaleY(acc[i] * 100, yMin, yMax, c.ih)}" r="3.5" fill="none" stroke="${COLORS[hue]}" stroke-width="1.5"/>`;
-    }
-  }
-
-  // Model retention curves (solid lines with filled dots)
-  const preds24 = pred.predictions.filter(p => p.size_px === 24);
-  for (const hue of ['red', 'blue']) {
-    const pts = preds24.filter(p => p.color === hue).sort((a, b) => a.ecc_deg - b.ecc_deg);
-    let d = `M${scaleX(0, xMin, xMax, c.iw)},${scaleY(100, yMin, yMax, c.ih)}`;
-    for (const p of pts) {
-      if (p.ecc_deg > xMax) continue;
-      d += ` L${scaleX(p.ecc_deg, xMin, xMax, c.iw)},${scaleY(p.composite_retention * 100, yMin, yMax, c.ih)}`;
-    }
-    svg += `<path d="${d}" class="data-line" stroke="${COLORS[hue]}"/>`;
-    for (const p of pts) {
-      if (p.ecc_deg > xMax) continue;
-      svg += `<circle cx="${scaleX(p.ecc_deg, xMin, xMax, c.iw)}" cy="${scaleY(p.composite_retention * 100, yMin, yMax, c.ih)}" r="3" fill="${COLORS[hue]}" stroke="#1a1a2e" stroke-width="2"/>`;
-    }
-  }
-
-  svg += `<rect x="4" y="2" width="12" height="3" fill="#e04040" rx="1"/>`;
-  svg += `<text x="20" y="8" class="legend">Red model</text>`;
-  svg += `<rect x="4" y="16" width="12" height="3" fill="#4060d0" rx="1"/>`;
-  svg += `<text x="20" y="22" class="legend">Blue model</text>`;
-  svg += `<line x1="4" y1="33" x2="16" y2="33" stroke="#999" stroke-width="1.5" stroke-dasharray="4 2"/>`;
-  svg += `<text x="20" y="36" class="legend">Hansen naming accuracy</text>`;
-
-  svg += `</g></svg></div>`;
-  return svg;
-}
-
 function buildMeasuredVsModelChart() {
   if (!meas) {
     return `<div class="chart-box">
     <h3>Measured vs Model (no screenshots yet)</h3>
     <svg width="540" height="300" viewBox="0 0 540 300">
-      <text x="270" y="150" text-anchor="middle" fill="#555" font-size="14">Capture screenshots to populate this chart</text>
+      <text x="270" y="150" text-anchor="middle" fill="#c0c0cc" font-size="14">Capture screenshots to populate this chart</text>
     </svg></div>`;
   }
 
@@ -705,8 +638,8 @@ function buildMeasuredVsModelChart() {
   svg += `<text x="${c.iw - 84}" y="8" class="legend">Model (faint)</text>`;
   svg += `<circle cx="${c.iw - 94}" cy="19" r="3.5" fill="#e04040" stroke="#fff" stroke-width="1"/>`;
   svg += `<text x="${c.iw - 84}" y="22" class="legend">Measured</text>`;
-  svg += `<text x="${c.iw - 100}" y="40" class="legend" fill="#666">Note: Mode 0 base desaturation</text>`;
-  svg += `<text x="${c.iw - 100}" y="52" class="legend" fill="#666">compresses measured range</text>`;
+  svg += `<text x="${c.iw - 100}" y="40" class="legend" fill="#c0c0cc">Note: Mode 0 base desaturation</text>`;
+  svg += `<text x="${c.iw - 100}" y="52" class="legend" fill="#c0c0cc">compresses measured range</text>`;
 
   svg += `</g></svg></div>`;
   return svg;

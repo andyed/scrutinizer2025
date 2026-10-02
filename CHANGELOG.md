@@ -14,6 +14,17 @@
 - Locked navigation and simulation-changing controls while Study mode is active so a task link defines a reproducible condition.
 - Clarified RFV documentation and corrected stale control instructions and over-broad claims about what the simulation predicts.
 
+### Fixed: reading span direction (2026-10-02)
+
+- **Reading span moved the foveal protection zone backward.** From v2.4.0 the shader added the shift to the pixel-to-pointer vector, which placed the zone behind the reading direction instead of ahead of it (Rayner 1998). The sign is fixed in `peripheral.frag`. Measured on live captures: detail is now gained 100 px ahead of the pointer for a left-to-right sweep and 134 px ahead for right-to-left; before the fix it was gained 146 px and 62 px behind.
+- **The release captures could not catch it.** Their capture point sat on the byline row or past the end of the text column, where the text gate keeps the shift near zero. `scripts/capture-reading-span.js` now sweeps over body text and records an OFF control for each direction, and the new `scripts/check-reading-span-direction.js` exits non-zero when the zone moves the wrong way or when reading span did not activate.
+- Arm-0 config-hash pins refreshed for the `peripheral.frag` change; mode 16 runs with reading span off, so its pipeline is unaffected.
+
+### Removed: invented Hansen 2009 validation data (2026-10-02)
+
+- **`tests/validation/published-data/hansen2009_color_naming.json` was not data from Hansen, Pracejus & Gegenfurtner (2009).** The paper reports detection and discrimination thresholds at 10–50°, with no color-naming experiment; the file's "naming accuracy" values and its 2°, 6° and 18° eccentricities appear nowhere in it. The file and the color-search Tier 3 check that used it are removed. That check was a rank correlation between two curves that both fall with eccentricity, so it returned r = 1.000 for any monotone model. Tier 3 now has one check (BY above RG at every ring). Dated corrections added where the result was cited.
+- **Color-search report text raised to the 8:1 contrast floor.** Every readable text color in `scripts/report-color-search.js` and the committed reports now measures at least 8:1 on its rendered background (lowest 8.42:1); the intro was 6.0:1 and the footer 2.3:1.
+
 ### Fixed: post-audit hardening (2026-07-16)
 
 - **Toolbar contrast to the 8:1 floor:** Study Done button 3.98:1 → 11.18:1 (now dark-on-light-blue, also the most salient toolbar element), destination origin 7.01:1 → 8.49:1, browse URL display 4.43:1 → 8.52:1; hover/active states computed and verified.

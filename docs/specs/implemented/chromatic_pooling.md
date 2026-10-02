@@ -6,7 +6,7 @@ Date: 2026-03-03
 Status: IMPLEMENTED (v1.9.0)
 Commits: a9051e3, aad22cf, 276e8de
 Dependencies: DoG band decomposition (v1.6, implemented), Oklab color pipeline (v1.4+, implemented)
-Validation: **Wave 1, Chromatic Decay** (`docs/specs/implemented/wave1_feature_search_validation.md`). Tier 1: 7/7 PASS, Tier 2: 3/3 PASS. Green tracks the RG decay curve. This confirms the Oklab opponent channel assignment. Published data: `tests/validation/published-data/hansen2009_color_naming.json`, `mullen_kingdom2002_rg_by.json`.
+Validation: **Wave 1, Chromatic Decay** (`docs/specs/implemented/wave1_feature_search_validation.md`). Tier 1: 7/7 PASS, Tier 2: 3/3 PASS. Green tracks the RG decay curve. This confirms the Oklab opponent channel assignment. Published data: `tests/validation/published-data/hansen2009_color_naming.json`, `mullen_kingdom2002_rg_by.json`. *(Correction 2026-10-02: the Hansen 2009 "naming accuracy" values were not from the paper, which reports detection thresholds at 10–50°. The data file and its Tier 3 check were removed; the check was a rank correlation of two monotone curves and could not fail.)*
 
 ## 1. Problem Statement
 

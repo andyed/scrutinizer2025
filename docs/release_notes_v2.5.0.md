@@ -71,6 +71,8 @@ Wave 1 validation places 24px colored dots (~0.94 cpd at 45 ppd) at five eccentr
 | Tier 2 (should) | 2/3 | Bowers BY/RG ratio 5% off (pass), green tracks red (pass), rendered-vs-model 5/20 (fail) |
 | Tier 3 (stretch) | 3/3 | Hansen naming correlation r=1.000, BY > RG every ring |
 
+*(Correction 2026-10-02: the Hansen 2009 "naming accuracy" values were not from the paper, which reports detection thresholds at 10–50°. The data file and its Tier 3 check were removed; the check was a rank correlation of two monotone curves and could not fail.)*
+
 The Tier 2 miss (rendered-vs-model pixel agreement) reflects MIP chain quantization and base ramp effects that the analytical model does not predict. Rank ordering is correct; absolute values diverge.
 
 ### Analyzer Fix

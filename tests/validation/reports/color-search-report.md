@@ -4,6 +4,8 @@ Generated: 2026-04-07
 Parameters: rg_decay=0.085, yv_decay=0.014, supra=0.5
 Geometry: fovea_radius=45px, ppd=45
 
+*(Correction 2026-10-02: the two Hansen rows under Tier 3 are invalid. The "naming accuracy" values were not from Hansen et al. (2009), which reports detection thresholds at 10–50°. The data file and its check were removed from `validate-color-search.js`; the check was a rank correlation of two monotone curves and could not fail. Without them, Tier 3 is 1/1.)*
+
 ## Tier 1: Must Pass
 
 - [PASS] red composite retention monotonically decreases: 73.9% > 57.0% > 48.1% > 41.6% > 37.0%

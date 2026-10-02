@@ -196,6 +196,8 @@ Total: ~10-15 KB. All values digitized from published figures with source figure
 
 *(Correction 2026-10-01: Hansen et al. (2009) measured chromatic detection, identification and discrimination thresholds at 10–50 deg. They report identification thresholds (at 10 and 50 deg only), not naming accuracy as a function of eccentricity. The file attributes its curve to their Figure 2, which shows detection thresholds, and none of the paper's six figures contains it.)*
 
+*(Correction 2026-10-02: the data file and its Tier 3 check were removed; the check was a rank correlation of two monotone curves and could not fail.)*
+
 ### Step 5: Orchestrate and report
 
 New script `scripts/validate-color-search.js` (~100 lines):
@@ -231,7 +233,7 @@ No saliency worker changes needed. Delta-C computation from screenshots is suffi
 - Rendered delta-C matches `chromatic-attenuation-table.js` predictions within 15% (verifies shader fidelity)
 
 ### Tier 3 (stretch)
-- Detection boundary (eccentricity where delta-C drops below JND) correlates with the color naming drop-off in `hansen2009_color_naming.json` (not Hansen et al. 2009 data; see the Step 4 correction), Spearman r > 0.8
+- Detection boundary (eccentricity where delta-C drops below JND) correlates with the color naming drop-off in `hansen2009_color_naming.json` (not Hansen et al. 2009 data; see the Step 4 correction), Spearman r > 0.8 *(Correction 2026-10-02: removed with the data file; see Step 4.)*
 - Size x eccentricity interaction matches Mullen & Kingdom (2002) spatial frequency scaling for both RG and BY channels
 - Model predicts correct rank ordering of all 4 colors at all 5 rings (20 measurements, Kendall tau > 0.9)
 

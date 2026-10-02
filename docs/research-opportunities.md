@@ -4,7 +4,7 @@ Open research directions building on Scrutinizer's infrastructure. Scrutinizer i
 
 The modular pipeline (GazeModel, VisualMemory, ContentAnalysis, pipeline orchestrator) means each module can be independently swapped, extended, or instrumented without touching the rest. As of v2.1, the system includes:
 - **12 half-octave DoG bands**: Difference-of-Gaussians peripheral reconstruction at √2 frequency spacing (5.66–0.088 cpd), validated against Rovamo & Virsu 1979 spatial frequency data
-- **Per-channel chromatic pooling**: castleCSF-based RG/YV decay in Oklab color space, validated against Hansen 2009 and Mullen & Kingdom 2002
+- **Per-channel chromatic pooling**: castleCSF-based RG/YV decay in Oklab color space, validated against Bowers 2025 and Mullen & Kingdom 2002
 - **Density-gated crowding**: Sigmoid gate on structure density modulates the V1-distortion stage, validated against Halverson & Hornof 2011 behavioral data
 - **Five-wave psychophysical validation**: Automated pipeline testing against published data (see [validation published data](https://github.com/andyed/scrutinizer2025/tree/main/tests/validation/published-data) and [v2.1 release notes](docs/release_notes_v2.1.0.md))
 - **Dual-worker content analysis**: Saliency worker (256 px, continuous ~4 Hz) + Congestion worker (1024 px, on-demand) running in Web Workers

@@ -41,7 +41,7 @@ This creates an active-vision loop: current foveal and peripheral view → next 
 
 Scrutinizer is built with AI coding tools (Claude Code and Gemini) as research partners: AI synthesizes literature and drafts implementations; the human evaluates scientific defensibility.
 
-The v2.1 [psychophysical validation](https://andyed.github.io/scrutinizer-www/blog/2026-03-08-v2.1.html) is a case study. In a single day, AI and human together digitized data from papers spanning 1970–2025 ([Rovamo 1979](tests/validation/published-data/rovamo_virsu1979_csf.json), [Hansen 2009](tests/validation/published-data/hansen2009_color_naming.json), [Mullen & Kingdom 2002](tests/validation/published-data/mullen_kingdom2002_rg_by.json), [Bowers 2025](tests/validation/published-data/bowers2025_sensitivity.json)) and built stimulus pages recreating the original experiments. The full validation battery found three shader bugs that months of visual testing had missed. All published data, stimuli, and analysis scripts ship with the repo.
+The v2.1 [psychophysical validation](https://andyed.github.io/scrutinizer-www/blog/2026-03-08-v2.1.html) is a case study. In a single day, AI and human together digitized data from papers spanning 1970–2025 ([Rovamo 1979](tests/validation/published-data/rovamo_virsu1979_csf.json), [Mullen & Kingdom 2002](tests/validation/published-data/mullen_kingdom2002_rg_by.json), [Bowers 2025](tests/validation/published-data/bowers2025_sensitivity.json)) and built stimulus pages recreating the original experiments. A fourth file, attributed to Hansen et al. (2009), held values that do not appear in that paper and was removed on 2026-10-02. The full validation battery found three shader bugs that months of visual testing had missed. All published data, stimuli, and analysis scripts ship with the repo.
 
 ---
 
@@ -107,7 +107,7 @@ Five waves test the shader against published human data. Each wave renders a kno
 
 | Wave | Domain | Published basis | Key result |
 |------|--------|-----------------|------------|
-| 1 | Chromatic decay | [Hansen 2009](tests/validation/published-data/hansen2009_color_naming.json), [Mullen & Kingdom 2002](tests/validation/published-data/mullen_kingdom2002_rg_by.json) | RG/YV channel separation matches opponent-channel predictions |
+| 1 | Chromatic decay | [Mullen & Kingdom 2002](tests/validation/published-data/mullen_kingdom2002_rg_by.json), [Bowers 2025](tests/validation/published-data/bowers2025_sensitivity.json) | RG/YV channel separation matches opponent-channel predictions |
 | 2 | Spatial frequency | [Rovamo & Virsu 1979](tests/validation/published-data/rovamo_virsu1979_csf.json) | Frequency-selective attenuation (not uniform blur), r=0.600 composite (below the r>0.9 Tier 3 target) |
 | 3 | Crowding geometry | Bouma 1970, Toet & Levi 1992 | R:T bug found and fixed; density gate validated at 3.3:1 |
 | 4 | Saliency protection | Itti & Koch 2001, Hershler 2005 | Face saliency 4.79× control; protection ratio 0.283 |

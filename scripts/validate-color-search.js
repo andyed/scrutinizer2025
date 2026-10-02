@@ -51,22 +51,6 @@ function loadPublished(name) {
   return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
 
-// ── Spearman rank correlation ──
-function spearmanR(x, y) {
-  if (x.length !== y.length || x.length < 3) return NaN;
-  const rank = (arr) => {
-    const sorted = arr.map((v, i) => ({ v, i })).sort((a, b) => a.v - b.v);
-    const ranks = new Array(arr.length);
-    for (let i = 0; i < sorted.length; i++) ranks[sorted[i].i] = i + 1;
-    return ranks;
-  };
-  const rx = rank(x), ry = rank(y);
-  const n = x.length;
-  let d2 = 0;
-  for (let i = 0; i < n; i++) d2 += (rx[i] - ry[i]) ** 2;
-  return 1 - (6 * d2) / (n * (n * n - 1));
-}
-
 // ── Check monotonic decrease (non-strict: allows ties from quantization) ──
 function isMonotonicallyDecreasing(values) {
   for (let i = 1; i < values.length; i++) {
@@ -85,7 +69,6 @@ function validate() {
 
   const bowers = loadPublished('bowers2025_sensitivity.json');
   const mullen = loadPublished('mullen_kingdom2002_rg_by.json');
-  const hansen = loadPublished('hansen2009_color_naming.json');
 
   const lines = [];
   const log = (s = '') => lines.push(s);
@@ -215,36 +198,10 @@ function validate() {
   log('## Tier 3: Stretch');
   log();
 
-  // Hansen correlation: model retention vs naming accuracy
-  // Map model eccentricities to closest Hansen eccentricities
-  const hansenEcc = hansen.eccentricities_deg;
-  for (const hue of ['red', 'blue']) {
-    const hansenAcc = hansen.hues[hue].naming_accuracy;
-    // Model predictions at ring eccentricities
-    const modelPreds = pred.predictions
-      .filter(p => p.color === hue && p.size_px === 24)
-      .sort((a, b) => a.ecc_deg - b.ecc_deg);
-
-    // Interpolate Hansen at model eccentricities
-    const interpHansen = modelPreds.map(mp => {
-      const ecc = mp.ecc_deg;
-      // Linear interpolation
-      for (let i = 0; i < hansenEcc.length - 1; i++) {
-        if (ecc >= hansenEcc[i] && ecc <= hansenEcc[i + 1]) {
-          const t = (ecc - hansenEcc[i]) / (hansenEcc[i + 1] - hansenEcc[i]);
-          return hansenAcc[i] + t * (hansenAcc[i + 1] - hansenAcc[i]);
-        }
-      }
-      return ecc <= hansenEcc[0] ? hansenAcc[0] : hansenAcc[hansenAcc.length - 1];
-    });
-
-    const modelRetentions = modelPreds.map(p => p.composite_retention);
-    const r = spearmanR(modelRetentions, interpHansen);
-    const pass = r > 0.8;
-    tier3Total++;
-    if (pass) tier3Pass++;
-    log(`- [${pass ? 'PASS' : 'FAIL'}] ${hue} model retention correlates with Hansen naming accuracy: r=${r.toFixed(3)} (threshold: r>0.8)`);
-  }
+  // A Spearman check against a "Hansen 2009 naming accuracy" curve was removed
+  // on 2026-10-02. The curve did not come from Hansen et al. (2009), which reports
+  // detection thresholds at 10-50 deg. A rank correlation of two curves that both
+  // fall with eccentricity returns r = 1 for any monotone model, so it could not fail.
 
   // Rank ordering across all colors at all rings
   const allPreds24 = pred.predictions.filter(p => p.size_px === 24).sort((a, b) => {
