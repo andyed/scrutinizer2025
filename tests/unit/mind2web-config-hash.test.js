@@ -37,7 +37,12 @@ const FRAG_PATH = path.join(REPO_ROOT, 'renderer/shaders/peripheral.frag');
 // SHAs -> both pins in arm-0-config.json refreshed -> the config's own hash moved. Mode 16's
 // pipeline knobs are unchanged (only its `citations` metadata changed); sampleDoGReconstructed
 // still lives at the pinned line 283; validate() and validateLive() pass.
-const EXPECTED_HASH_PREFIX = 'ee091be67707';
+// Refreshed 2026-10-02 (reading-span sign fix): peripheral.frag's reading-span block now
+// subtracts the shift from delta (the zone moves ahead of the reading direction). Its blob
+// SHA moved -> pooled_stat_path.file_blob_sha refreshed -> the config's own hash moved. Arm-0
+// runs mode 16 with reading_span false, so its pipeline is unaffected; sampleDoGReconstructed
+// still lives at the pinned line 283; validate() and validateLive() pass.
+const EXPECTED_HASH_PREFIX = '1f0a5e627538';
 
 describe('Mind2Web Arm-0 config hash', () => {
     let cfg;
