@@ -12,6 +12,7 @@
 
         const Logger = require('./logger');
         const { FOVEA_ASPECT_RATIO_DEFAULT } = require('./config');
+        const { MAX_SCROLL_LOCK_RECTS } = require('../shared/scroll-registration');
 
         // Load mode registry from shared/modes.json
         let modesRegistry = null;
@@ -346,6 +347,8 @@
                 this.saliencyOffsetLocation = gl.getUniformLocation(this.program, "u_saliency_offset");
                 this.congestionOffsetLocation = gl.getUniformLocation(this.program, "u_congestion_offset");
                 this.computeOffsetLocation = gl.getUniformLocation(this.program, "u_compute_offset");
+                this.scrollLockLocation = gl.getUniformLocation(this.program, "u_scroll_lock");
+                this.scrollLockCountLocation = gl.getUniformLocation(this.program, "u_scroll_lock_count");
 
                 // Create buffers
                 this.positionBuffer = gl.createBuffer();
@@ -630,6 +633,19 @@
             }
 
             /**
+             * Scroll-locked boxes (fixed, stuck sticky) as UV rects
+             * [x0, y0, x1, y1]; the shader zeroes every content offset inside
+             * them. At most MAX_SCROLL_LOCK_RECTS (the shader's array size).
+             * @param {Array<number[]>} rects
+             */
+            setScrollLock(rects) {
+                if (!this._scrollLock) this._scrollLock = new Float32Array(MAX_SCROLL_LOCK_RECTS * 4);
+                const n = Array.isArray(rects) ? Math.min(rects.length, MAX_SCROLL_LOCK_RECTS) : 0;
+                for (let i = 0; i < n; i++) this._scrollLock.set(rects[i], i * 4);
+                this._scrollLockCount = n;
+            }
+
+            /**
              * Set the compute tier level (0 = disabled, 2.5 = active).
              */
             setComputeTier(tier) {
@@ -907,6 +923,8 @@
                 gl.uniform2fv(this.saliencyOffsetLocation, offsets.saliency || zero);
                 gl.uniform2fv(this.congestionOffsetLocation, offsets.congestion || zero);
                 gl.uniform2fv(this.computeOffsetLocation, offsets.compute || zero);
+                if (this._scrollLock) gl.uniform4fv(this.scrollLockLocation, this._scrollLock);
+                gl.uniform1i(this.scrollLockCountLocation, this._scrollLockCount || 0);
 
                 gl.uniform2f(this.resolutionLocation, width, height);
                 gl.uniform2f(this.mouseLocation, mouseX, mouseY);

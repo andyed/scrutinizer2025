@@ -5,7 +5,10 @@ const {
     registrationOffsetDip,
     rowSignature,
     estimateVerticalShift,
-    FrameScrollRegistrar
+    FrameScrollRegistrar,
+    MAX_SCROLL_LOCK_RECTS,
+    scrollLockUvRects,
+    inScrollLock
 } = require('../../shared/scroll-registration');
 
 // Synthetic text page: 18 px line pitch, blank leading between lines, a
@@ -316,5 +319,56 @@ describe('FrameScrollRegistrar', () => {
         reg.register(frameAt(100, 100, 100));
         const resized = { ...frameAt(120, 117, 110), height: H - 40, buffer: crop(page, W, 240, H - 40) };
         expect(reg.register(resized).method).toBe('stamp');
+    });
+});
+
+describe('scrollLockUvRects', () => {
+    it('converts viewport DIP rects to UV over the view', () => {
+        // Wikipedia's stuck TOC column at 1920x1012.
+        const uv = scrollLockUvRects([{ x: 202, y: 24, w: 260, h: 421 }], 1920, 1012);
+        expect(uv).toHaveLength(1);
+        expect(uv[0][0]).toBeCloseTo(202 / 1920, 9);
+        expect(uv[0][1]).toBeCloseTo(24 / 1012, 9);
+        expect(uv[0][2]).toBeCloseTo(462 / 1920, 9);
+        expect(uv[0][3]).toBeCloseTo(445 / 1012, 9);
+    });
+
+    it('clips to the view and drops empty or malformed rects', () => {
+        const uv = scrollLockUvRects([
+            { x: -50, y: 900, w: 200, h: 300 },
+            { x: 10, y: 10, w: 0, h: 50 },
+            { x: 2000, y: 0, w: 40, h: 40 },
+            null,
+            { x: NaN, y: 0, w: 10, h: 10 }
+        ], 1000, 1000);
+        expect(uv).toEqual([[0, 0.9, 0.15, 1], [0, 0, 0.01, 0.01]]);
+    });
+
+    it('drops boxes nested in a kept box and keeps the largest past the cap', () => {
+        expect(scrollLockUvRects([
+            { x: 0, y: 0, w: 100, h: 50 },
+            { x: 10, y: 10, w: 20, h: 20 }
+        ], 100, 100)).toEqual([[0, 0, 1, 0.5]]);
+        const many = Array.from({ length: 40 }, (_, i) => ({ x: i * 10, y: 0, w: 5, h: 1 + i }));
+        const kept = scrollLockUvRects(many, 1000, 1000);
+        expect(kept).toHaveLength(MAX_SCROLL_LOCK_RECTS);
+        expect(kept[0][3]).toBeCloseTo(40 / 1000, 9);
+    });
+
+    it('returns no rects without a view size', () => {
+        expect(scrollLockUvRects([{ x: 0, y: 0, w: 10, h: 10 }], 0, 100)).toEqual([]);
+        expect(scrollLockUvRects(undefined, 100, 100)).toEqual([]);
+    });
+});
+
+describe('inScrollLock', () => {
+    it('includes the min edge and excludes the max edge, as the shader does', () => {
+        const rects = [[0.25, 0.5, 0.75, 1]];
+        expect(inScrollLock(rects, 0.25, 0.5)).toBe(true);
+        expect(inScrollLock(rects, 0.5, 0.75)).toBe(true);
+        expect(inScrollLock(rects, 0.75, 0.75)).toBe(false);
+        expect(inScrollLock(rects, 0.5, 0.49)).toBe(false);
+        expect(inScrollLock([], 0.5, 0.5)).toBe(false);
+        expect(inScrollLock(null, 0.5, 0.5)).toBe(false);
     });
 });

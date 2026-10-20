@@ -9,6 +9,7 @@
 //
 //   registrationOffsetDip()  live scroll minus source scroll, in DIP
 //   FrameScrollRegistrar     which scroll position a captured frame shows
+//   scrollLockUvRects()      fixed/stuck-sticky boxes, which do not scroll
 //
 // The registrar exists because a timestamp cannot name a frame's scroll.
 // capturePage copies whatever compositor frame viz aggregates next, and the
@@ -459,11 +460,54 @@ class FrameScrollRegistrar {
     }
 }
 
+// The shader's u_scroll_lock array length (renderer/shaders/peripheral.frag).
+const MAX_SCROLL_LOCK_RECTS = 16;
+
+/**
+ * Scroll-locked boxes as UV rects for the shader. Position-fixed boxes, and
+ * sticky ones while stuck, keep their screen position while the page scrolls,
+ * so the HUD must not shift the frame inside them. The DOM scan reports them
+ * as viewport DIP rects {x, y, w, h}; this clips them to a cssW x cssH DIP
+ * view and returns [x0, y0, x1, y1] in UV (0..1, y down). Rects inside a
+ * larger kept rect are dropped, and past `max` the largest win.
+ *
+ * @returns {Array<number[]>}
+ */
+function scrollLockUvRects(rects, cssW, cssH, max = MAX_SCROLL_LOCK_RECTS) {
+    if (!Array.isArray(rects) || !(cssW > 0) || !(cssH > 0)) return [];
+    const uv = [];
+    for (const r of rects) {
+        if (!r) continue;
+        const x0 = Math.max(0, finite(r.x) / cssW);
+        const y0 = Math.max(0, finite(r.y) / cssH);
+        const x1 = Math.min(1, (finite(r.x) + finite(r.w)) / cssW);
+        const y1 = Math.min(1, (finite(r.y) + finite(r.h)) / cssH);
+        if (x1 > x0 && y1 > y0) uv.push([x0, y0, x1, y1]);
+    }
+    uv.sort((a, b) => (b[2] - b[0]) * (b[3] - b[1]) - (a[2] - a[0]) * (a[3] - a[1]));
+    const kept = [];
+    for (const r of uv) {
+        if (kept.length >= max) break;
+        const inside = kept.some(k => r[0] >= k[0] && r[1] >= k[1] && r[2] <= k[2] && r[3] <= k[3]);
+        if (!inside) kept.push(r);
+    }
+    return kept;
+}
+
+/** Whether UV point (u, v) falls in a lock rect; edges as in the shader. */
+function inScrollLock(uvRects, u, v) {
+    if (!Array.isArray(uvRects)) return false;
+    return uvRects.some(r => u >= r[0] && v >= r[1] && u < r[2] && v < r[3]);
+}
+
 module.exports = {
     scrollZoom,
     scrollToDip,
     registrationOffsetDip,
     rowSignature,
     estimateVerticalShift,
-    FrameScrollRegistrar
+    FrameScrollRegistrar,
+    MAX_SCROLL_LOCK_RECTS,
+    scrollLockUvRects,
+    inScrollLock
 };

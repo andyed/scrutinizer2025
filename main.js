@@ -826,12 +826,12 @@ ipcMain.on('browser:scroll', (event, x, y, zoom) => {
 });
 
 // Forward structure map updates from content to HUD
-ipcMain.on('structure-update', (event, blocks, trigger, scanScroll) => {
+ipcMain.on('structure-update', (event, blocks, trigger, scanScroll, scrollLocked) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
     if (win && win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
         console.log(`[Main] Forwarding ${blocks.length} structure blocks to HUD (${trigger || 'unknown'})`);
-        win.scrutinizerHud.webContents.send('structure-update', blocks, trigger, scanScroll);
+        win.scrutinizerHud.webContents.send('structure-update', blocks, trigger, scanScroll, scrollLocked);
     }
 });
 

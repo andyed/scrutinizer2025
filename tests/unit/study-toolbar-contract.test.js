@@ -64,9 +64,9 @@ describe('Study toolbar contract', () => {
     it('registers the visualization with native page scrolling', () => {
         // Scroll carries the page zoom; DOM scans carry the scroll they measured at.
         expect(preload).toContain("ipcRenderer.send('browser:scroll', pos.x, pos.y, pos.zoom)");
-        expect(preload).toContain("ipcRenderer.send('structure-update', blocks, lastScanTrigger, currentScroll())");
+        expect(preload).toContain("ipcRenderer.send('structure-update', blocks, lastScanTrigger, currentScroll(), scrollLocked)");
         expect(main).toContain("ipcMain.on('browser:scroll', (event, x, y, zoom)");
-        expect(main).toContain("webContents.send('structure-update', blocks, trigger, scanScroll)");
+        expect(main).toContain("webContents.send('structure-update', blocks, trigger, scanScroll, scrollLocked)");
         // Stamps bracket the capture: one read before capturePage, one after.
         const captureAt = main.indexOf('await Promise.race([capturePromise, timeoutPromise])');
         expect(main.indexOf('const scrollBeforeCapture = win.latestBrowserScroll')).toBeLessThan(captureAt);
@@ -85,11 +85,30 @@ describe('Study toolbar contract', () => {
         for (const u of ['u_frame_offset', 'u_structure_offset', 'u_saliency_offset', 'u_congestion_offset', 'u_compute_offset']) {
             expect(frag).toContain(`uniform vec2 ${u};`);
         }
-        // Every lookup of a content-locked texture is shifted; none samples raw uv.
+        // Every lookup of a content-locked texture is shifted by its
+        // per-fragment offset; none samples raw uv or the uniform directly.
         const code = frag.split('\n').filter(line => !line.trim().startsWith('//')).join('\n');
         const calls = code.match(/\b(?:texture|textureLod|textureGrad)\(u_(?:texture|structureMap|primitiveMap|primitiveMeta|saliencyMap|congestionMap|computeStatTexture), [^,)]*/g);
         expect(calls.length).toBeGreaterThan(90);
-        expect(calls.filter(c => !/, u_\w+_offset \+ /.test(c))).toEqual([]);
+        expect(calls.filter(c => !/, (?:frame|structure|saliency|congestion|compute|cursor_structure)_offset \+ /.test(c))).toEqual([]);
+    });
+
+    it('holds fixed and stuck-sticky boxes still while the page scrolls', () => {
+        // The DOM scan reports scroll-locked boxes with every structure update.
+        expect(preload).toContain('scanScrollLocked(refreshCandidates)');
+        expect(preload).toContain("domAdapter.scanScrollLocked(lastScanTrigger !== 'scroll')");
+        expect(scrutinizer).toContain('this._scrollLockRects = Array.isArray(scrollLocked) ? scrollLocked : []');
+        expect(scrutinizer).toContain('this.renderer.setScrollLock(scrollReg.lock)');
+        expect(webgl).toContain('"u_scroll_lock"');
+        // The shader array matches the JS cap.
+        const { MAX_SCROLL_LOCK_RECTS } = require('../../shared/scroll-registration');
+        expect(frag).toContain(`uniform vec4 u_scroll_lock[${MAX_SCROLL_LOCK_RECTS}];`);
+        expect(frag).toContain(`for (int i = 0; i < ${MAX_SCROLL_LOCK_RECTS}; i++)`);
+        // Each per-fragment offset is its uniform, zeroed inside a locked box.
+        for (const k of ['frame', 'structure', 'saliency', 'congestion', 'compute']) {
+            expect(frag).toContain(`${k}_offset = u_${k}_offset * follow;`);
+        }
+        expect(frag).toContain('float follow = inScrollLock(uv) ? 0.0 : 1.0;');
     });
 
     it('shows session progress and falls back to the static label for single tasks', () => {

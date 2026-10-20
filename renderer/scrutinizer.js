@@ -27,7 +27,7 @@
     const { WebGPUCrowdingCompute } = require('./webgpu-crowding-compute');
     const { WebGPUPyramidCompute } = require('./webgpu-pyramid-compute');
     const { FOVEA_ASPECT_RATIO_DEFAULT, DEFAULT_SETTINGS } = require('./config');
-    const { registrationOffsetDip, scrollZoom } = require('../shared/scroll-registration');
+    const { registrationOffsetDip, scrollZoom, scrollLockUvRects, inScrollLock } = require('../shared/scroll-registration');
     const CONGESTION_COOLDOWN_MS = DEFAULT_SETTINGS.congestionRecomputeCooldownMs;
     const METAMER_CONTENT_REFRESH_MS = DEFAULT_SETTINGS.metamerContentRefreshMs;
     const HEATMAP_STUCK_TIMEOUT_MS = DEFAULT_SETTINGS.congestionHeatmapStuckTimeoutMs;
@@ -125,6 +125,9 @@
             this._liveScroll = null;
             this._scrollSources = { frame: null, structure: null, saliency: null, congestion: null, compute: null };
             this._scrollRegistration = null;
+            // Fixed and stuck-sticky boxes from the latest DOM scan (viewport
+            // DIP). They do not scroll, so the shader leaves them unshifted.
+            this._scrollLockRects = [];
 
             // ── WebGPU Compute (Tier 2.5) ──────────────────────────────
             this.webgpuCompute = null;
@@ -278,12 +281,13 @@
             // Structure updates from DOM analysis (via IPC)
             // Fires on scroll, resize, and DOM mutations.
             // trigger: 'scroll' | 'mutation' — controls congestion recompute urgency.
-            ipcRenderer.on('structure-update', (event, blocks, trigger, scanScroll) => {
+            ipcRenderer.on('structure-update', (event, blocks, trigger, scanScroll, scrollLocked) => {
                 this.contentAnalysis.handleStructureUpdate(blocks, this.renderer);
                 // Block rects were measured at scanScroll. When the blocks
                 // were unchanged and no redraw happened, the map is valid at
                 // this scroll too (nothing moved in the viewport).
                 this._scrollSources.structure = scanScroll || null;
+                this._scrollLockRects = Array.isArray(scrollLocked) ? scrollLocked : [];
 
                 // When congestion report or congestion-gated pooling is active,
                 // viewport changes may invalidate stats.
@@ -572,6 +576,7 @@
             for (const key of Object.keys(this._scrollSources)) this._scrollSources[key] = null;
             this.contentAnalysis.resetScrollStamps();
             this._scrollRegistration = null;
+            this._scrollLockRects = [];
         }
 
         /** @private canvas px per DIP on each axis */
@@ -584,7 +589,9 @@
         /**
          * Per-texture offsets for this render: DIP the live page has scrolled
          * past each source, as UV (fraction of the canvas). Also keeps the
-         * frame offset in canvas px for compute dispatch and probes.
+         * frame offset in canvas px for compute dispatch and probes, and the
+         * scroll-locked boxes as UV rects (the shader zeroes every offset
+         * inside them).
          * @private
          */
         _updateScrollRegistration() {
@@ -603,6 +610,7 @@
             const zoom = scrollZoom(live);
             this._scrollRegistration = {
                 uv,
+                lock: scrollLockUvRects(this._scrollLockRects, cssW, cssH),
                 frameOffsetPx: { x: frameDip.x * px.x, y: frameDip.y * px.y },
                 frameOffsetCss: { x: frameDip.x / zoom, y: frameDip.y / zoom }
             };
@@ -611,14 +619,15 @@
 
         /**
          * Current registration state, for probes and tests.
-         * @returns {{liveScroll:Object|null, frameScroll:Object|null, frameOffsetCss:{x:number,y:number}}}
+         * @returns {{liveScroll:Object|null, frameScroll:Object|null, frameOffsetCss:{x:number,y:number}, lock:Array<number[]>}}
          */
         scrollRegistration() {
             const reg = this._scrollRegistration;
             return {
                 liveScroll: this._liveScroll,
                 frameScroll: this._scrollSources.frame,
-                frameOffsetCss: reg ? reg.frameOffsetCss : { x: 0, y: 0 }
+                frameOffsetCss: reg ? reg.frameOffsetCss : { x: 0, y: 0 },
+                lock: reg ? reg.lock : []
             };
         }
 
@@ -664,6 +673,7 @@
             // screen space; only where content is sampled moves.
             const scrollReg = this._updateScrollRegistration();
             this.renderer.setContentOffsets(scrollReg.uv);
+            this.renderer.setScrollLock(scrollReg.lock);
 
             // 2. Determine effective foveal radius
             const effectiveRadius = this.enabled ? this.config.fovealRadius : 5000.0;
@@ -808,8 +818,10 @@
                 // Gaze is in canvas space — scale to frame space for compute.
                 // Canvas may be taller than frame (toolbar chrome). While the
                 // page scrolls ahead of the frame, the content under the gaze
-                // sits frameOffsetPx further along in the frame.
-                const frameOffsetPx = scrollReg.frameOffsetPx;
+                // sits frameOffsetPx further along in the frame, unless the
+                // gaze is on a fixed/sticky box, which has not moved.
+                const gazeLocked = inScrollLock(scrollReg.lock, gaze.x / this.canvas.width, gaze.y / this.canvas.height);
+                const frameOffsetPx = gazeLocked ? { x: 0, y: 0 } : scrollReg.frameOffsetPx;
                 const gazeFrameX = (gaze.x + frameOffsetPx.x) * (frameW / this.canvas.width);
                 const gazeFrameY = (gaze.y + frameOffsetPx.y) * (frameH / this.canvas.height);
 

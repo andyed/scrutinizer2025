@@ -339,6 +339,110 @@ class DomAdapter {
 
         return blocks;
     }
+
+    /**
+     * Boxes that hold still on screen while the window scrolls: position
+     * fixed, and position sticky while stuck to the viewport. The HUD shifts
+     * its last captured frame with the page between captures; inside these
+     * boxes it samples the frame unshifted. Rects are viewport DIP, like
+     * scan() blocks.
+     *
+     * Finding candidates needs computed style on every element, so the walk
+     * runs only when asked (non-scroll scans) or when the viewport size
+     * changed. Scroll scans re-measure the cached candidates.
+     *
+     * @param {boolean} refreshCandidates - re-walk the DOM for candidates
+     * @returns {Array<{x:number, y:number, w:number, h:number}>}
+     */
+    scanScrollLocked(refreshCandidates) {
+        const docEl = document.documentElement;
+        const vw = docEl.clientWidth;
+        const vh = docEl.clientHeight;
+        if (refreshCandidates || !this._lockCandidates ||
+            this._lockViewport !== `${vw}x${vh}`) {
+            this._lockCandidates = this._findScrollLockCandidates();
+            this._lockViewport = `${vw}x${vh}`;
+        }
+
+        const zoom = webFrame.getZoomFactor();
+        const rects = [];
+        for (const c of this._lockCandidates) {
+            if (!c.el.isConnected) continue;
+            const style = window.getComputedStyle(c.el);
+            if (style.position !== 'fixed' && style.position !== 'sticky') continue;
+            const rect = c.el.getBoundingClientRect();
+            if (style.position === 'sticky' &&
+                !(c.sticksToViewport && this._isStuck(style, rect, vw, vh))) continue;
+            this._collectLockRects(c.el, style, rect, vw, vh, 0, rects);
+            if (rects.length >= 32) break;
+        }
+        return rects.map(r => ({
+            x: r.left * zoom, y: r.top * zoom, w: r.width * zoom, h: r.height * zoom
+        }));
+    }
+
+    /** @private document-order fixed/sticky elements, outermost first */
+    _findScrollLockCandidates() {
+        const out = [];
+        for (const el of document.body.getElementsByTagName('*')) {
+            const pos = window.getComputedStyle(el).position;
+            if (pos !== 'fixed' && pos !== 'sticky') continue;
+            // A sticky box sticks within its nearest scroll container. Only
+            // one with no scroll container below the document holds still
+            // under window scroll; one inside an inner scroller moves with it.
+            let sticksToViewport = pos === 'sticky';
+            for (let a = el.parentElement; sticksToViewport && a &&
+                a !== document.body && a !== document.documentElement; a = a.parentElement) {
+                const s = window.getComputedStyle(a);
+                if ((s.overflowX !== 'visible' && s.overflowX !== 'clip') ||
+                    (s.overflowY !== 'visible' && s.overflowY !== 'clip')) sticksToViewport = false;
+            }
+            out.push({ el, sticksToViewport });
+        }
+        return out;
+    }
+
+    /** @private sticky box sits at one of its insets, i.e. it is stuck */
+    _isStuck(style, rect, vw, vh) {
+        const near = (a, b) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= 1;
+        return near(rect.top, parseFloat(style.top)) ||
+            near(rect.bottom, vh - parseFloat(style.bottom)) ||
+            near(rect.left, parseFloat(style.left)) ||
+            near(rect.right, vw - parseFloat(style.right));
+    }
+
+    /**
+     * @private Push the viewport-clipped rect of a scroll-locked element. A
+     * transparent wrapper with no area, or one covering most of the viewport
+     * (toast and portal roots), paints nothing itself: its children are the
+     * locked content, so recurse into them instead. Locking the whole
+     * wrapper would stop the page under it from following the scroll.
+     */
+    _collectLockRects(el, style, rect, vw, vh, depth, out) {
+        if (typeof el.checkVisibility === 'function' &&
+            !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return;
+        const left = Math.max(0, rect.left);
+        const top = Math.max(0, rect.top);
+        const right = Math.min(vw, rect.right);
+        const bottom = Math.min(vh, rect.bottom);
+        const area = Math.max(0, right - left) * Math.max(0, bottom - top);
+        const paintless = style.backgroundImage === 'none' &&
+            style.boxShadow === 'none' &&
+            /^(transparent|rgba\(.*,\s*0\))$/.test(style.backgroundColor) &&
+            !(parseFloat(style.borderTopWidth) || parseFloat(style.borderBottomWidth) ||
+              parseFloat(style.borderLeftWidth) || parseFloat(style.borderRightWidth));
+        if (paintless && (area === 0 || area > 0.5 * vw * vh)) {
+            if (depth >= 3) return;
+            for (const child of el.children) {
+                if (out.length >= 32) return;
+                this._collectLockRects(child, window.getComputedStyle(child),
+                    child.getBoundingClientRect(), vw, vh, depth + 1, out);
+            }
+            return;
+        }
+        if (area === 0) return;
+        out.push({ left, top, width: right - left, height: bottom - top });
+    }
 }
 // --- END INLINED DomAdapter ---
 
@@ -416,9 +520,12 @@ window.addEventListener('DOMContentLoaded', () => {
     const performScan = () => {
         try {
             const blocks = domAdapter.scan(document.body);
+            // Fixed/sticky boxes don't scroll; the HUD leaves them unshifted.
+            // Scroll scans reuse the candidate list from the last full walk.
+            const scrollLocked = domAdapter.scanScrollLocked(lastScanTrigger !== 'scroll');
             // Block rects are viewport-relative, so the HUD needs the scroll
             // they were measured at to keep the maps on the moving page.
-            ipcRenderer.send('structure-update', blocks, lastScanTrigger, currentScroll());
+            ipcRenderer.send('structure-update', blocks, lastScanTrigger, currentScroll(), scrollLocked);
         } catch (err) {
             console.error('[Preload] Scan failed:', err);
         }
