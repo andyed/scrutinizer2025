@@ -18,9 +18,15 @@ artifacts. The full workflow is documented in the skill itself. Don't duplicate 
 
 ## Deploy surfaces (one release cycle touches all of these)
 
-- **macOS DMG:** signed + notarized via `npm run build`. Output: `dist/`.
-- **GitHub release:** `gh release create vX.Y.Z ./dist/Scrutinizer-X.Y.Z.dmg`
-  with release notes.
+- **macOS DMG + ZIP:** signed + notarized via `npm run build`. Output: `dist/`
+  (`Scrutinizer-X.Y.Z-arm64.dmg`, `Scrutinizer-X.Y.Z-arm64-mac.zip`,
+  `latest-mac.yml`).
+- **GitHub release:** attach all three:
+  `gh release create vX.Y.Z dist/Scrutinizer-X.Y.Z-arm64.dmg dist/Scrutinizer-X.Y.Z-arm64-mac.zip dist/latest-mac.yml`
+  with release notes. electron-updater installs from the ZIP via
+  `latest-mac.yml` on the latest release; a DMG-only release makes every
+  installed copy's update check fail with a 404 (v2.7.1 and v2.7.2 shipped
+  this way).
 - **Blog post (major releases only):** new file in `../scrutinizer-www/src/blog/`.
   Deploy via the scrutinizer-www repo's own pipeline (see `../scrutinizer-www/DEPLOY.md`).
 - **Homepage screenshots:** updated in `../scrutinizer-www/` if captures differ
