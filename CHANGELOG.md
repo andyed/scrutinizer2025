@@ -1,10 +1,13 @@
 # Changelog
 
-## [Unreleased]: 2.8.1
+## [2.8.0] - 2026-10-19
+
+First public release since v2.7.2. It includes the v2.7.3 changes, which were tagged but never published, and the 2.8.0 work built on 2026-07-11 (below), which was never published on its own.
 
 ### Added: usability-study launch workflow
 
 - **Study Links:** Packaged builds register the versioned `scrutinizer://v1/task/start` URL route so a researcher can launch a web task from an ordinary browser instruction sheet with validated, temporary settings such as foveal radius, rendering mode, Comfort Mode, and Visual Memory.
+- **Multi-task sessions and session capture:** `scrutinizer://v1/session/start` runs an ordered list of tasks with per-task condition overrides and a Done-advance interstitial. Each session writes a versioned capture envelope (`scrutinizer-session-capture/1`, a superset of the `scrutinizer-session-summary/1` record) with per-task timing, capture metadata, and pointer trails from the vendored evtrack tracker. `shared/session-measures.js` derives ISO 9241-11 effectiveness and efficiency measures (task success, time on task, mouse distance, click and key counts) from the envelope; missing data yields null, not zero.
 - **Study toolbar:** During a launched task, the normal URL controls are replaced with persistent task instructions, compressed destination-origin visibility, a read-only full-URL toggle, and a Done action. Study settings do not overwrite the user's saved preferences.
 - **Consent and debrief screens:** Every multi-task session link now opens on an in-app consent screen that states what Scrutinizer records during tasks, collects the participant code when the link has none, and captures or writes nothing unless the participant agrees. Declining shows "Nothing was recorded." After the last task a debrief screen shows the participant code and the saved session folder. The capture envelope gains an optional, versioned `consent` record (`scrutinizer-consent/1`). The consent and debrief templates no longer claim that Scrutinizer stores no session data.
 - **Practitioner guide:** Added a task-oriented guide for using the scientifically motivated peripheral view to support emulated gaze shifts, control visual access, and reveal participants' functional focus. The guide distinguishes that operational signal from physiological gaze measurement.
@@ -32,11 +35,9 @@
 - **Deep-link launch race:** a valid link arriving after app-ready but before the window existed was silently dropped; window re-activation now also consumes a buffered link instead of relaunching a stale study.
 - **Error-dialog echo capped:** unknown deep-link parameter names truncate at 64 characters before reaching the native dialog.
 
-> macOS implementation and unsigned package metadata have been verified. Signed/notarized browser handoff remains a release check for 2.8.1. Study Links are macOS-only: Windows deep-link delivery (single-instance lock, argv handling) is not yet implemented and is tracked as follow-up work.
+> The signed, notarized 2.8.0 package registers the `scrutinizer` URL scheme. Study Links are macOS-only: Windows deep-link delivery (single-instance lock, argv handling) is not yet implemented and is tracked as follow-up work.
 
-## [2.8.0] - 2026-07-11
-
-*(Note 2026-10-01: v2.8.0 was never tagged or published as a GitHub release.)*
+**Built 2026-07-11 as 2.8.0, first published in this release:**
 
 ### Added: Mode 17 (Structural Chrome Suppression) + static stimulus foveation
 
@@ -69,7 +70,7 @@
 
 ## [2.7.3] - 2026-04-26
 
-*(Note 2026-10-01: v2.7.3 exists only as a git tag. It was never published as a GitHub release.)*
+*(Note 2026-10-01: v2.7.3 exists only as a git tag. It was never published as a GitHub release; its changes first shipped publicly in v2.8.0.)*
 
 ### Labeling-accuracy pass: `acuity_loss` / `cortical_pooling` mode taxonomy
 

@@ -112,6 +112,15 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 
 ## Release history
 
+### v2.8.0: Study Links & FOVI Default Restored (2026-10-19)
+- Study Links (macOS): `scrutinizer://v1/task/start` and `scrutinizer://v1/session/start` launch single tasks and ordered multi-task sessions from a browser instruction sheet, with in-app consent, a study toolbar, debrief, and a versioned session-capture envelope
+- Default mode restored to 12 (FOVI Cortical Grid); modes 14 and 15 moved to research
+- Reading span now shifts the foveal protection zone ahead of the reading direction (it shifted backward from v2.4.0)
+- Mode 17 (Structural Chrome Suppression): V1 end-stopping-style suppression of long edges
+- Cortical pooling (modes 14/15) requests the adapter's full storage-buffer limit instead of silently falling back to MIP/DoG
+- Spurious peripheral structure removed: rod grain gated by local contrast, far-field DoG fragments washed toward the local mean
+- Includes v2.7.3 (tagged, never published): `acuity_loss` / `cortical_pooling` mode taxonomy, `dog_e2` 0.15 → 0.10 in the `acuity_loss` family
+
 ### v2.7.2: Visual Memory Init Fix (2026-04-06)
 - Fix visual memory silently activating on launch when set to Off (`0 || 20` falsy bug)
 
