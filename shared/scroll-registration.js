@@ -182,7 +182,8 @@ function bandShifts(prev, next, lo, hi, opts) {
         // Survivors: anything within reach of the coarse best, plus their
         // neighbours so the rival check sees adjacent shifts too.
         const keep = coarseBest * 0.5;
-        let best = -1;
+        // Shifts can be negative (upward scroll), so "none yet" is null.
+        let best = null;
         for (let d = lo; d <= hi; d++) {
             const i = d - lo;
             const near = coarse[i] >= keep ||
@@ -190,9 +191,9 @@ function bandShifts(prev, next, lo, hi, opts) {
             if (!near) { scores[i] = 0; votes[i] = 0; continue; }
             scores[i] = score(count, fullStride, d, minVoters);
             votes[i] = scores[i] > 0 ? lastMatches : 0;
-            if (best < 0 || scores[i] > scores[best - lo]) best = d;
+            if (best === null || scores[i] > scores[best - lo]) best = d;
         }
-        if (best < 0) { results.push(null); continue; }
+        if (best === null) { results.push(null); continue; }
         let rival = 0;
         for (let d = lo; d <= hi; d++) {
             if (Math.abs(d - best) >= 2) rival = Math.max(rival, scores[d - lo]);
@@ -427,12 +428,12 @@ class FrameScrollRegistrar {
         this.suspect = null;
 
         // The stamps trail the pixels: the request-time read was never ahead
-        // of the frame in any measured run, and the post-capture read was at
-        // most a step either side. So the window opens a full slack only in
-        // the direction of motion and a 2 px margin behind. That keeps the
-        // reference's own position (shift 0, where sticky columns vote) out
-        // of the window once the page has moved away from it. A stall keeps
-        // the last direction.
+        // of the frame in any measured run, scrolling down or up, and the
+        // post-capture read was at most a step either side. So the window
+        // opens a full slack only in the direction of motion and a 2 px
+        // margin behind. That keeps the reference's own position (shift 0,
+        // where sticky columns vote) out of the window once the page has
+        // moved away from it. A stall keeps the last direction.
         const dir = Math.sign(stampY - beforeY) || Math.sign(stampY - prevStampY) || this.direction;
         if (dir) this.direction = dir;
         const slack = Math.max(4, 2 * this.motionPeak);

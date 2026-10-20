@@ -125,6 +125,24 @@ describe('vertical shift estimate', () => {
         expect(est.bands.filter(b => b && b.confident && b.shift === 0).length).toBeGreaterThan(0);
     });
 
+    it('recovers a negative (upward) row shift', () => {
+        const prev = rowSignature(crop(page, W, 337, H), W, H);
+        const next = rowSignature(crop(page, W, 300, H), W, H);
+        const est = estimateVerticalShift(prev, next, -80, 0);
+        expect(est.confident).toBe(true);
+        expect(est.shift).toBe(-37);
+        // A window that also holds 0 and a few positive shifts finds it too.
+        expect(estimateVerticalShift(prev, next, -80, 4).shift).toBe(-37);
+    });
+
+    it('follows the article column past a sticky sidebar going up', () => {
+        const prev = rowSignature(crop(page, W, 324, H, 0, [0, 120]), W, H);
+        const next = rowSignature(crop(page, W, 300, H, 0, [0, 120]), W, H);
+        const est = estimateVerticalShift(prev, next, -50, 10);
+        expect(est.confident).toBe(true);
+        expect(est.shift).toBe(-24);
+    });
+
     it('declines to pick among periodic matches', () => {
         const stripes = makeStripes(W, 2400);
         const prev = rowSignature(crop(stripes, W, 300, H), W, H);
@@ -319,6 +337,85 @@ describe('FrameScrollRegistrar', () => {
         reg.register(frameAt(100, 100, 100));
         const resized = { ...frameAt(120, 117, 110), height: H - 40, buffer: crop(page, W, 240, H - 40) };
         expect(reg.register(resized).method).toBe('stamp');
+    });
+
+    describe('scrolling up', () => {
+        // Going up the shifts are negative and the stamps trail *above* the
+        // pixels: the request-time read is a capture behind (larger y).
+        const runUp = (startY, step, frames) => {
+            const reg = new FrameScrollRegistrar();
+            reg.register(frameAt(startY, startY, startY));
+            reg.register(frameAt(startY, startY, startY));
+            // Onset: the page moved, main has not heard yet.
+            reg.register(frameAt(startY - step, startY, startY));
+            const out = [];
+            for (let k = 2; k < frames; k++) {
+                const trueY = startY - step * k;
+                // Post-capture read alternates between the pixels and a step behind.
+                const after = k % 2 ? trueY : trueY + step;
+                out.push({ trueY, r: reg.register(frameAt(trueY, after, trueY + step)) });
+            }
+            return out;
+        };
+
+        it.each([8, 40])('names the true scroll at %i px per capture', (step) => {
+            const frames = runUp(1600, step, 10);
+            for (const { trueY, r } of frames) {
+                expect(r.method).toBe('image');
+                expect(r.trusted).toBe(true);
+                expect(r.y).toBe(trueY);
+            }
+        });
+
+        it('keeps tracking when the scroll event stalls', () => {
+            const reg = new FrameScrollRegistrar();
+            reg.register(frameAt(1000, 1000, 1000));
+            expect(reg.register(frameAt(984, 992, 1000)).y).toBe(984);
+            const stalled = reg.register(frameAt(976, 992, 992));
+            expect(stalled.method).toBe('image');
+            expect(stalled.y).toBe(976);
+            expect(reg.register(frameAt(960, 968, 976)).y).toBe(960);
+        });
+
+        it('corrects the onset frame label once the scroll reaches the HUD', () => {
+            const reg = new FrameScrollRegistrar();
+            reg.register(frameAt(1000, 1000, 1000));
+            reg.register(frameAt(1000, 1000, 1000));
+            const onset = reg.register(frameAt(992, 1000, 1000));
+            expect(onset.y).toBe(1000);
+            expect(reg.reviseForScroll({ y: 984, zoom: 1 })).toBe(true);
+            expect(onset.y).toBe(992);
+            expect(onset.method).toBe('revised');
+            expect(reg.register(frameAt(976, 976, 984)).y).toBe(976);
+        });
+
+        it('follows a reversal from down to up', () => {
+            const reg = new FrameScrollRegistrar();
+            reg.register(frameAt(1000, 1000, 1000));
+            reg.register(frameAt(1000, 1000, 1000));
+            const path = [1008, 1016, 1024, 1032, 1040, 1032, 1024, 1016, 1008, 1000];
+            let prev = 1000;
+            for (const trueY of path) {
+                // Post-capture read at the pixels, request-time read a capture behind.
+                const r = reg.register(frameAt(trueY, trueY, prev));
+                prev = trueY;
+                if (trueY === 1008 && r.method !== 'image') continue; // onset, drawn from its stamp
+                expect(r.method).toBe('image');
+                expect(r.y).toBe(trueY);
+            }
+        });
+
+        it('keeps the reference position out of the window once the page moved away', () => {
+            // Mirror of the downward case: frozen pixels, stamps 1800 -> 1560.
+            const reg = new FrameScrollRegistrar();
+            const frozen = (stampY, beforeY) => ({ ...frameAt(0, stampY, beforeY), buffer: crop(page, W, 0, H) });
+            reg.register(frozen(1800, 1800));
+            reg.register(frozen(1800, 1800));
+            reg.register(frozen(1680, 1760));
+            const r = reg.register(frozen(1560, 1600));
+            expect(r.method).not.toBe('image');
+            expect(r.y).toBeLessThanOrEqual(1602);
+        });
     });
 });
 
