@@ -660,7 +660,11 @@ ipcMain.on('hud:capture:request', async (event) => {
         try {
             const frameSequence = (win.captureFrameSequence || 0) + 1;
             win.captureFrameSequence = frameSequence;
-            const capturedScroll = win.latestBrowserScroll || { x: 0, y: 0 };
+            // Scroll is read on both sides of the capture. Neither read names
+            // the pixels exactly (the page reports scroll a frame or more after
+            // painting it), so the HUD takes the pair as a window and registers
+            // the frame against the previous one (shared/scroll-registration.js).
+            const scrollBeforeCapture = win.latestBrowserScroll || { x: 0, y: 0, zoom: 1 };
             // Performance Optimization: 1:1 Capture Fidelity
             // Explicitly specify capture bounds to ensure 1:1 pixel mapping
             // This eliminates scaling artifacts and improves text clarity
@@ -684,6 +688,7 @@ ipcMain.on('hud:capture:request', async (event) => {
                 image = await win.capturePage(captureRect);
             }
 
+            const capturedScroll = win.latestBrowserScroll || scrollBeforeCapture;
             const buffer = image.toBitmap();
             const size = image.getSize();
 
@@ -698,8 +703,13 @@ ipcMain.on('hud:capture:request', async (event) => {
                 width: size.width,
                 height: size.height,
                 frameSequence,
+                viewWidth: bounds.width,
+                viewHeight: bounds.height,
                 scrollX: capturedScroll.x,
-                scrollY: capturedScroll.y
+                scrollY: capturedScroll.y,
+                scrollZoom: capturedScroll.zoom || 1,
+                scrollBeforeX: scrollBeforeCapture.x,
+                scrollBeforeY: scrollBeforeCapture.y
             });
         } catch (err) {
             console.error('[Main] Capture error:', err);
@@ -797,16 +807,17 @@ ipcMain.on('browser:zoom-changed', (event, zoom) => {
     }
 });
 
-// Keep the visualization synchronized with native BrowserView scrolling. The
-// HUD uses this immediately to suppress stale captured pixels until a frame at
-// the settled scroll position arrives.
-ipcMain.on('browser:scroll', (event, x, y) => {
+// Keep the visualization registered with native BrowserView scrolling. The
+// HUD shifts its last captured frame by how far the page has scrolled since,
+// and main stamps each capture with this position (see hud:capture:request).
+ipcMain.on('browser:scroll', (event, x, y, zoom) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
     if (!win) return;
     const position = {
         x: Number.isFinite(x) ? x : 0,
-        y: Number.isFinite(y) ? y : 0
+        y: Number.isFinite(y) ? y : 0,
+        zoom: Number.isFinite(zoom) && zoom > 0 ? zoom : 1
     };
     win.latestBrowserScroll = position;
     if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
@@ -815,12 +826,12 @@ ipcMain.on('browser:scroll', (event, x, y) => {
 });
 
 // Forward structure map updates from content to HUD
-ipcMain.on('structure-update', (event, blocks, trigger) => {
+ipcMain.on('structure-update', (event, blocks, trigger, scanScroll) => {
     const windows = BrowserWindow.getAllWindows();
     const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
     if (win && win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
         console.log(`[Main] Forwarding ${blocks.length} structure blocks to HUD (${trigger || 'unknown'})`);
-        win.scrutinizerHud.webContents.send('structure-update', blocks, trigger);
+        win.scrutinizerHud.webContents.send('structure-update', blocks, trigger, scanScroll);
     }
 });
 

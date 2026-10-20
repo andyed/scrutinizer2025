@@ -27,6 +27,7 @@
     const { WebGPUCrowdingCompute } = require('./webgpu-crowding-compute');
     const { WebGPUPyramidCompute } = require('./webgpu-pyramid-compute');
     const { FOVEA_ASPECT_RATIO_DEFAULT, DEFAULT_SETTINGS } = require('./config');
+    const { registrationOffsetDip, scrollZoom } = require('../shared/scroll-registration');
     const CONGESTION_COOLDOWN_MS = DEFAULT_SETTINGS.congestionRecomputeCooldownMs;
     const METAMER_CONTENT_REFRESH_MS = DEFAULT_SETTINGS.metamerContentRefreshMs;
     const HEATMAP_STUCK_TIMEOUT_MS = DEFAULT_SETTINGS.congestionHeatmapStuckTimeoutMs;
@@ -115,6 +116,15 @@
             this._lastCongestionResultTime = 0;
             this._heatmapPendingRestore = false;
             this._comfortMode = false;
+
+            // ── Scroll registration ─────────────────────────────────
+            // The page position ({x, y, zoom}, CSS px) each content-locked
+            // texture was made at, plus the live page position. render()
+            // turns the differences into per-texture UV offsets so the HUD
+            // stays on the natively scrolling page between captures.
+            this._liveScroll = null;
+            this._scrollSources = { frame: null, structure: null, saliency: null, congestion: null, compute: null };
+            this._scrollRegistration = null;
 
             // ── WebGPU Compute (Tier 2.5) ──────────────────────────────
             this.webgpuCompute = null;
@@ -268,8 +278,12 @@
             // Structure updates from DOM analysis (via IPC)
             // Fires on scroll, resize, and DOM mutations.
             // trigger: 'scroll' | 'mutation' — controls congestion recompute urgency.
-            ipcRenderer.on('structure-update', (event, blocks, trigger) => {
+            ipcRenderer.on('structure-update', (event, blocks, trigger, scanScroll) => {
                 this.contentAnalysis.handleStructureUpdate(blocks, this.renderer);
+                // Block rects were measured at scanScroll. When the blocks
+                // were unchanged and no redraw happened, the map is valid at
+                // this scroll too (nothing moved in the viewport).
+                this._scrollSources.structure = scanScroll || null;
 
                 // When congestion report or congestion-gated pooling is active,
                 // viewport changes may invalidate stats.
@@ -482,7 +496,14 @@
 
         // ── Frame Processing ─────────────────────────────────────────
 
-        processFrame(buffer, width, height) {
+        /**
+         * @param {Uint8Array} buffer - BGRA frame pixels
+         * @param {number} width
+         * @param {number} height
+         * @param {{x:number, y:number, zoom:number}} [frameScroll] - page
+         *   scroll the frame shows (shared/scroll-registration.js)
+         */
+        processFrame(buffer, width, height, frameScroll = null) {
             if (!this.renderer || !this.enabled) return;
 
             // Track saccade state for metamer freeze *before* the early return,
@@ -512,9 +533,10 @@
 
             // Upload frame texture to GPU
             this.renderer.uploadTexture(this.imageData);
+            this._scrollSources.frame = frameScroll;
 
             // Submit for saliency analysis (internally throttled)
-            this.contentAnalysis.submitFrameForSaliency(this.imageDataBuffer, width, height);
+            this.contentAnalysis.submitFrameForSaliency(this.imageDataBuffer, width, height, frameScroll);
 
             // Logging
             if (!this.frameUploadCount) {
@@ -525,6 +547,79 @@
             if (this.frameUploadCount % 60 === 0) {
                 Logger.log(`[Scrutinizer] Uploaded frame ${this.frameUploadCount} to WebGL (${width}x${height})`);
             }
+        }
+
+        // ── Scroll Registration ──────────────────────────────────────
+
+        /**
+         * Live page scroll from the content view ({x, y, zoom}, CSS px).
+         * Remembered fixations move with it: they mark the content that was
+         * under the gaze, not a screen location.
+         */
+        setLiveScroll(position) {
+            if (!position) return;
+            const prev = this._liveScroll;
+            this._liveScroll = position;
+            if (prev && this.visualMemory.isActive()) {
+                const d = registrationOffsetDip(prev, position);
+                const px = this._canvasPxPerDip();
+                if (d.x || d.y) this.visualMemory.shiftBy(-d.x * px.x, -d.y * px.y);
+            }
+        }
+
+        /** Forget all source positions (navigation, capture restart). */
+        resetScrollRegistration() {
+            for (const key of Object.keys(this._scrollSources)) this._scrollSources[key] = null;
+            this.contentAnalysis.resetScrollStamps();
+            this._scrollRegistration = null;
+        }
+
+        /** @private canvas px per DIP on each axis */
+        _canvasPxPerDip() {
+            const cssW = parseFloat(this.canvas.style.width) || window.innerWidth || 1;
+            const cssH = parseFloat(this.canvas.style.height) || window.innerHeight || 1;
+            return { x: this.canvas.width / cssW, y: this.canvas.height / cssH };
+        }
+
+        /**
+         * Per-texture offsets for this render: DIP the live page has scrolled
+         * past each source, as UV (fraction of the canvas). Also keeps the
+         * frame offset in canvas px for compute dispatch and probes.
+         * @private
+         */
+        _updateScrollRegistration() {
+            this._scrollSources.saliency = this.contentAnalysis.saliencyScroll || null;
+            this._scrollSources.congestion = this.contentAnalysis.congestionScroll || null;
+            const live = this._liveScroll;
+            const px = this._canvasPxPerDip();
+            const cssW = this.canvas.width / px.x;
+            const cssH = this.canvas.height / px.y;
+            const uv = {};
+            for (const key of Object.keys(this._scrollSources)) {
+                const d = registrationOffsetDip(this._scrollSources[key], live);
+                uv[key] = { x: d.x / cssW, y: d.y / cssH };
+            }
+            const frameDip = registrationOffsetDip(this._scrollSources.frame, live);
+            const zoom = scrollZoom(live);
+            this._scrollRegistration = {
+                uv,
+                frameOffsetPx: { x: frameDip.x * px.x, y: frameDip.y * px.y },
+                frameOffsetCss: { x: frameDip.x / zoom, y: frameDip.y / zoom }
+            };
+            return this._scrollRegistration;
+        }
+
+        /**
+         * Current registration state, for probes and tests.
+         * @returns {{liveScroll:Object|null, frameScroll:Object|null, frameOffsetCss:{x:number,y:number}}}
+         */
+        scrollRegistration() {
+            const reg = this._scrollRegistration;
+            return {
+                liveScroll: this._liveScroll,
+                frameScroll: this._scrollSources.frame,
+                frameOffsetCss: reg ? reg.frameOffsetCss : { x: 0, y: 0 }
+            };
         }
 
         // ── Render Loop ──────────────────────────────────────────────
@@ -563,6 +658,12 @@
             const gaze = this.gazeModel.getPosition();
             const velocity = this.gazeModel.getVelocity();
             if (this.frameTimer) this.frameTimer.mark('gaze');
+
+            // 1b. Scroll registration: shift each content texture onto the
+            // live page. Gaze, velocity and the pooling geometry stay in
+            // screen space; only where content is sampled moves.
+            const scrollReg = this._updateScrollRegistration();
+            this.renderer.setContentOffsets(scrollReg.uv);
 
             // 2. Determine effective foveal radius
             const effectiveRadius = this.enabled ? this.config.fovealRadius : 5000.0;
@@ -705,9 +806,12 @@
                 }
 
                 // Gaze is in canvas space — scale to frame space for compute.
-                // Canvas may be taller than frame (toolbar chrome).
-                const gazeFrameX = gaze.x * (frameW / this.canvas.width);
-                const gazeFrameY = gaze.y * (frameH / this.canvas.height);
+                // Canvas may be taller than frame (toolbar chrome). While the
+                // page scrolls ahead of the frame, the content under the gaze
+                // sits frameOffsetPx further along in the frame.
+                const frameOffsetPx = scrollReg.frameOffsetPx;
+                const gazeFrameX = (gaze.x + frameOffsetPx.x) * (frameW / this.canvas.width);
+                const gazeFrameY = (gaze.y + frameOffsetPx.y) * (frameH / this.canvas.height);
 
                 // Velocity-gated metamer freeze: don't resynthesize during fixation/pursuit.
                 // Peripheral representation is stable during these states (Sperry 1950, Burr 1994).
@@ -797,6 +901,7 @@
                     // Periodic refresh on stationary gaze is driven by the
                     // refreshTimeout gate above, not by blanket per-upload reset.
                     const cw = this.canvas.width, ch = this.canvas.height;
+                    const computeSourceScroll = this._scrollSources.frame;
                     const isPyramidCompute = typeof this.webgpuCompute.readbackOutput === 'function';
                     const readbackFn = isPyramidCompute
                         ? this.webgpuCompute.readbackOutput()
@@ -804,6 +909,7 @@
                     readbackFn.then((data) => {
                         if (data && this.renderer) {
                             this.renderer.uploadComputeTexture(data, halfW, halfH, cw, ch);
+                            this._scrollSources.compute = computeSourceScroll;
                         }
                     });
                 }
@@ -1177,7 +1283,8 @@
                     this.imageDataBuffer,
                     this.imageData.width,
                     this.imageData.height,
-                    force
+                    force,
+                    this._scrollSources.frame
                 );
                 ipcRenderer.send('overlay:congestion-processing', true);
             }

@@ -101,6 +101,15 @@
             this._lastCongestionChecksum = -1;
             this._saliencySkipCount = 0;
 
+            // Page scroll ({x, y, zoom}) of the frame each map was computed
+            // from, so the renderer can register the maps with the live page.
+            // Saliency jobs can overlap, so their source positions are keyed
+            // by job id.
+            this.saliencyScroll = null;
+            this.congestionScroll = null;
+            this._saliencyScrollById = new Map();
+            this._congestionPendingScroll = null;
+
             // ── Debug / Visualization ────────────────────────────────
             this.showStructureMap = false;
             this.showSaliencyMap = false;
@@ -125,8 +134,13 @@
             };
 
             this.saliencyWorker.onmessage = (e) => {
-                const { imageData, congestionStats, edgeDensityStats } = e.data;
+                const { imageData, congestionStats, edgeDensityStats, id } = e.data;
+                const sourceScroll = this._saliencyScrollById.get(id);
+                for (const key of this._saliencyScrollById.keys()) {
+                    if (key <= id) this._saliencyScrollById.delete(key);
+                }
                 if (!imageData) return;
+                this.saliencyScroll = sourceScroll || null;
 
                 // Store low-res stats from saliency worker
                 this._saliencyCongestionStats = congestionStats || null;
@@ -182,6 +196,7 @@
                 this._congestionWorkerBusy = false;
 
                 if (!imageData) return;
+                this.congestionScroll = this._congestionPendingScroll;
 
                 // Store high-res stats (these override saliency worker stats for HUD)
                 this._hiResCongestionStats = congestionStats || null;
@@ -224,8 +239,9 @@
          * @param {number} width
          * @param {number} height
          * @param {boolean} [force=false] - Bypass dirty check (scroll/mutation/navigation)
+         * @param {Object} [sourceScroll] - page scroll the frame shows
          */
-        submitForCongestion(imageDataBuffer, width, height, force = false) {
+        submitForCongestion(imageDataBuffer, width, height, force = false, sourceScroll = null) {
             if (!this.congestionWorker || this._congestionWorkerBusy || width <= 0 || height <= 0) return;
 
             // Dirty check: skip if frame content hasn't changed (unless forced)
@@ -234,6 +250,7 @@
             this._lastCongestionChecksum = congestionChecksum;
 
             this._congestionWorkerBusy = true;
+            this._congestionPendingScroll = sourceScroll;
 
             // BGRA→RGBA swap (same as saliency path)
             const rgbaBuffer = new Uint8ClampedArray(imageDataBuffer);
@@ -340,8 +357,9 @@
          * @param {Uint8ClampedArray} imageDataBuffer - Raw BGRA pixel buffer
          * @param {number} width
          * @param {number} height
+         * @param {Object} [sourceScroll] - page scroll the frame shows
          */
-        submitFrameForSaliency(imageDataBuffer, width, height) {
+        submitFrameForSaliency(imageDataBuffer, width, height, sourceScroll = null) {
             if (!this.saliencyWorker || width <= 0 || height <= 0) return;
 
             this.saliencyFrameCounter++;
@@ -376,6 +394,7 @@
             const saliencyImageData = new ImageData(rgbaBuffer, width, height);
 
             createImageBitmap(saliencyImageData).then(bitmap => {
+                this._saliencyScrollById.set(this.saliencyFrameCounter, sourceScroll);
                 this.saliencyWorker.postMessage({
                     imageBitmap: bitmap,
                     id: this.saliencyFrameCounter,
@@ -688,6 +707,12 @@
         resetDirtyChecks() {
             this._lastSaliencyChecksum = -1;
             this._lastCongestionChecksum = -1;
+        }
+
+        /** Forget map source positions (navigation). */
+        resetScrollStamps() {
+            this.saliencyScroll = null;
+            this.congestionScroll = null;
         }
 
         /**

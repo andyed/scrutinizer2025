@@ -10,6 +10,9 @@ const js = fs.readFileSync(path.join(ROOT, 'renderer/toolbar.js'), 'utf8');
 const main = fs.readFileSync(path.join(ROOT, 'main.js'), 'utf8');
 const preload = fs.readFileSync(path.join(ROOT, 'renderer/preload.js'), 'utf8');
 const overlay = fs.readFileSync(path.join(ROOT, 'renderer/overlay.js'), 'utf8');
+const scrutinizer = fs.readFileSync(path.join(ROOT, 'renderer/scrutinizer.js'), 'utf8');
+const webgl = fs.readFileSync(path.join(ROOT, 'renderer/webgl-renderer.js'), 'utf8');
+const frag = fs.readFileSync(path.join(ROOT, 'renderer/shaders/peripheral.frag'), 'utf8');
 
 describe('Study toolbar contract', () => {
     it('contains dedicated Back, task instruction, origin, and Done controls', () => {
@@ -56,6 +59,37 @@ describe('Study toolbar contract', () => {
         expect(overlay).toContain("require('../shared/scroll-freshness')");
         expect(overlay).toContain("overlayCanvas.style.visibility = hasFrame ? 'visible' : 'hidden'");
         expect(overlay).not.toContain("overlayCanvas.style.visibility = present ? 'visible' : 'hidden'");
+    });
+
+    it('registers the visualization with native page scrolling', () => {
+        // Scroll carries the page zoom; DOM scans carry the scroll they measured at.
+        expect(preload).toContain("ipcRenderer.send('browser:scroll', pos.x, pos.y, pos.zoom)");
+        expect(preload).toContain("ipcRenderer.send('structure-update', blocks, lastScanTrigger, currentScroll())");
+        expect(main).toContain("ipcMain.on('browser:scroll', (event, x, y, zoom)");
+        expect(main).toContain("webContents.send('structure-update', blocks, trigger, scanScroll)");
+        // Stamps bracket the capture: one read before capturePage, one after.
+        const captureAt = main.indexOf('await Promise.race([capturePromise, timeoutPromise])');
+        expect(main.indexOf('const scrollBeforeCapture = win.latestBrowserScroll')).toBeLessThan(captureAt);
+        expect(main.indexOf('const capturedScroll = win.latestBrowserScroll || scrollBeforeCapture')).toBeGreaterThan(captureAt);
+        expect(main).toContain('scrollBeforeY: scrollBeforeCapture.y');
+        expect(main).toContain('viewWidth: bounds.width');
+        // The HUD names each frame's scroll from its pixels and follows the live scroll.
+        expect(overlay).toContain("require('../shared/scroll-registration')");
+        expect(overlay).toContain('frameRegistrar.register({');
+        expect(overlay).toContain('scrutinizer.setLiveScroll(currentScroll)');
+        expect(overlay).toContain('frameRegistrar.reviseForScroll(currentScroll)');
+        expect(overlay).toContain('scrutinizer.processFrame(buffer, data.width, data.height, frameScroll)');
+        expect(overlay).toContain('if (registered.trusted) {');
+        expect(scrutinizer).toContain('this.renderer.setContentOffsets(scrollReg.uv)');
+        expect(webgl).toContain('"u_frame_offset"');
+        for (const u of ['u_frame_offset', 'u_structure_offset', 'u_saliency_offset', 'u_congestion_offset', 'u_compute_offset']) {
+            expect(frag).toContain(`uniform vec2 ${u};`);
+        }
+        // Every lookup of a content-locked texture is shifted; none samples raw uv.
+        const code = frag.split('\n').filter(line => !line.trim().startsWith('//')).join('\n');
+        const calls = code.match(/\b(?:texture|textureLod|textureGrad)\(u_(?:texture|structureMap|primitiveMap|primitiveMeta|saliencyMap|congestionMap|computeStatTexture), [^,)]*/g);
+        expect(calls.length).toBeGreaterThan(90);
+        expect(calls.filter(c => !/, u_\w+_offset \+ /.test(c))).toEqual([]);
     });
 
     it('shows session progress and falls back to the static label for single tasks', () => {

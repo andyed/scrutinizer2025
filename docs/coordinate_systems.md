@@ -88,6 +88,23 @@ flowchart TB
 
 3. **Scanpath replay → canvas** has dataset-specific conversions on top of the above. See `renderer/scanpath/coordinate-utils.js` for three space conversions (`normalizedToPixels`, `stimulusToCanvas`, `degreesToPixels`). The AdSERP page-space ↔ screen-space conversion is in `renderer/scanpath/importers/adserp-importer.js`.
 
+### Scroll registration
+
+The content view scrolls natively under the HUD, so every content-locked texture is a snapshot of the page at some earlier scroll position. The renderer samples each one shifted by how far the live page has scrolled since (`shared/scroll-registration.js`, `Scrutinizer._updateScrollRegistration`).
+
+| Texture | Source position | Stamped in |
+|---|---|---|
+| `u_texture` (frame) | scroll the captured pixels show | `FrameScrollRegistrar.register` (overlay.js) |
+| `u_structureMap`, `u_primitiveMap`, `u_primitiveMeta` | scroll at DOM scan | preload `performScan` → `structure-update` |
+| `u_saliencyMap`, `u_congestionMap` | the submitted frame's position | `ContentAnalysis` job stamps |
+| `u_computeStatTexture` | the dispatched frame's position | compute readback in `render()` |
+
+- **Units.** Scroll arrives in CSS px with the page zoom factor (`browser:scroll` x, y, zoom). Offsets are computed in DIP (CSS × zoom), divided by the canvas CSS size to give UV. A zoom mismatch between source and live yields offset 0: the page reflowed and no translation maps one layout onto the other.
+- **What moves and what doesn't.** Only texture lookups shift (`u_*_offset + uv` at every sample). Eccentricity (uv vs `u_mouse`), the V1 noise and cell fields, and `u_maskTexture` stay screen-locked, so the fovea stays on the cursor and pooling geometry stays retinotopic. Visual-memory points are moved in canvas px on each live scroll (`VisualMemory.shiftBy`), so the mask follows the content it remembers. Gaze velocity stays screen-relative.
+- **The frame's scroll comes from its pixels, not a timestamp.** main.js reads `latestBrowserScroll` before and after `capturePage`, and neither read names the pixels: the page reports a scroll a frame or more after painting it. The registrar takes the two reads as a search window and matches the new frame's banded row signatures against the last registered frame. Sticky columns vote for shift 0 and lose to the scrolling column. An unmatched frame falls back to the post-capture read but does not become the reference.
+- **Exposed strip.** While the page runs ahead of the newest frame, `frameUV = uv + u_frame_offset` leaves [0, 1] at the leading edge. Those fragments get a LOD-5 extension of the frame's edge rows, not the live page.
+- **Known limit.** The frame translates as a whole, so `position: fixed`/`sticky` elements move with it between captures and return when the next frame lands.
+
 ### Diagnostic recipe
 
 If something looks misaligned in production:

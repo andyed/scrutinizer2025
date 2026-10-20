@@ -148,12 +148,26 @@ uniform float u_compute_tier; // 0.0=disabled, 2.5=active
 uniform float u_v4_eccentricity_source; // 0.0=v1_coupled (legacy), 1.0=eccentricity (Tier 3)
 uniform vec2 u_compute_frame_scale; // frame/canvas ratio for UV correction (1.0 if same)
 
+// === SCROLL REGISTRATION (UV units) ===
+// The content view scrolls natively under the HUD, and each content-locked
+// texture was made at an earlier scroll position: the frame at capture, the
+// structure maps at DOM scan, saliency/congestion/compute at their source
+// frame. Every sample of those textures adds its offset so the content sits
+// where the live page has it. Everything computed from uv itself stays
+// screen-locked: eccentricity from u_mouse, the V1 noise and cell fields,
+// the visual-memory mask (which the JS side moves with the page).
+uniform vec2 u_frame_offset;      // u_texture
+uniform vec2 u_structure_offset;  // u_structureMap, u_primitiveMap, u_primitiveMeta
+uniform vec2 u_saliency_offset;   // u_saliencyMap
+uniform vec2 u_congestion_offset; // u_congestionMap
+uniform vec2 u_compute_offset;    // u_computeStatTexture
+
 in vec2 v_texCoord;
 out vec4 fragColor;
 
 // === HELPER: SOURCE SAMPLER (The "True View") ===
 vec4 sampleSource(vec2 uv) {
-    vec4 col = textureLod(u_texture, uv, 0.0);
+    vec4 col = textureLod(u_texture, u_frame_offset + uv, 0.0);
     float temp = col.r;
     col.r = col.b;
     col.b = temp;
@@ -162,7 +176,7 @@ vec4 sampleSource(vec2 uv) {
 
 // === GRADIENT-AWARE SAMPLER (Mipmap Collapse Fix) ===
 vec4 sampleSourceGrad(vec2 distortedUV, vec2 duvdx, vec2 duvdy) {
-    vec4 col = textureGrad(u_texture, distortedUV, duvdx, duvdy);
+    vec4 col = textureGrad(u_texture, u_frame_offset + distortedUV, duvdx, duvdy);
     float temp = col.r;
     col.r = col.b;
     col.b = temp;
@@ -174,7 +188,7 @@ vec4 sampleSourceGrad(vec2 distortedUV, vec2 duvdx, vec2 duvdy) {
 // Used by polar pooling to average across the sector area instead of
 // point-sampling the center (which misses thin features like toolbars).
 vec4 sampleSourceLod(vec2 uv, float lod) {
-    vec4 col = textureLod(u_texture, uv, lod);
+    vec4 col = textureLod(u_texture, u_frame_offset + uv, lod);
     float temp = col.r;
     col.r = col.b;
     col.b = temp;
@@ -231,10 +245,10 @@ float computeLengthSuppress(vec2 uv, float eccentricity, float fovea_radius) {
     vec2 px = 2.0 / u_resolution;
     // PRE-SWAP luma weights per the channel-order contract at the top of file.
     vec3 lumaW = vec3(0.114, 0.587, 0.299);
-    float lum_r = dot(textureLod(u_texture, uv + vec2(px.x, 0.0), 1.0).rgb, lumaW);
-    float lum_l = dot(textureLod(u_texture, uv - vec2(px.x, 0.0), 1.0).rgb, lumaW);
-    float lum_t = dot(textureLod(u_texture, uv + vec2(0.0, px.y), 1.0).rgb, lumaW);
-    float lum_b = dot(textureLod(u_texture, uv - vec2(0.0, px.y), 1.0).rgb, lumaW);
+    float lum_r = dot(textureLod(u_texture, u_frame_offset + uv + vec2(px.x, 0.0), 1.0).rgb, lumaW);
+    float lum_l = dot(textureLod(u_texture, u_frame_offset + uv - vec2(px.x, 0.0), 1.0).rgb, lumaW);
+    float lum_t = dot(textureLod(u_texture, u_frame_offset + uv + vec2(0.0, px.y), 1.0).rgb, lumaW);
+    float lum_b = dot(textureLod(u_texture, u_frame_offset + uv - vec2(0.0, px.y), 1.0).rgb, lumaW);
     float gx = lum_r - lum_l;
     float gy = lum_t - lum_b;
     float g2 = gx * gx + gy * gy;
@@ -250,17 +264,17 @@ float computeLengthSuppress(vec2 uv, float eccentricity, float fovea_radius) {
         float fk = float(k);
         vec2 off_p = tan_step * fk;
         vec2 off_n = -tan_step * fk;
-        float lp_r = dot(textureLod(u_texture, uv + off_p + vec2(px.x, 0.0), 1.0).rgb, lumaW);
-        float lp_l = dot(textureLod(u_texture, uv + off_p - vec2(px.x, 0.0), 1.0).rgb, lumaW);
-        float lp_t = dot(textureLod(u_texture, uv + off_p + vec2(0.0, px.y), 1.0).rgb, lumaW);
-        float lp_b = dot(textureLod(u_texture, uv + off_p - vec2(0.0, px.y), 1.0).rgb, lumaW);
+        float lp_r = dot(textureLod(u_texture, u_frame_offset + uv + off_p + vec2(px.x, 0.0), 1.0).rgb, lumaW);
+        float lp_l = dot(textureLod(u_texture, u_frame_offset + uv + off_p - vec2(px.x, 0.0), 1.0).rgb, lumaW);
+        float lp_t = dot(textureLod(u_texture, u_frame_offset + uv + off_p + vec2(0.0, px.y), 1.0).rgb, lumaW);
+        float lp_b = dot(textureLod(u_texture, u_frame_offset + uv + off_p - vec2(0.0, px.y), 1.0).rgb, lumaW);
         float gxp = lp_r - lp_l;
         float gyp = lp_t - lp_b;
         float g2p = gxp * gxp + gyp * gyp;
-        float ln_r = dot(textureLod(u_texture, uv + off_n + vec2(px.x, 0.0), 1.0).rgb, lumaW);
-        float ln_l = dot(textureLod(u_texture, uv + off_n - vec2(px.x, 0.0), 1.0).rgb, lumaW);
-        float ln_t = dot(textureLod(u_texture, uv + off_n + vec2(0.0, px.y), 1.0).rgb, lumaW);
-        float ln_b = dot(textureLod(u_texture, uv + off_n - vec2(0.0, px.y), 1.0).rgb, lumaW);
+        float ln_r = dot(textureLod(u_texture, u_frame_offset + uv + off_n + vec2(px.x, 0.0), 1.0).rgb, lumaW);
+        float ln_l = dot(textureLod(u_texture, u_frame_offset + uv + off_n - vec2(px.x, 0.0), 1.0).rgb, lumaW);
+        float ln_t = dot(textureLod(u_texture, u_frame_offset + uv + off_n + vec2(0.0, px.y), 1.0).rgb, lumaW);
+        float ln_b = dot(textureLod(u_texture, u_frame_offset + uv + off_n - vec2(0.0, px.y), 1.0).rgb, lumaW);
         float gxn = ln_r - ln_l;
         float gyn = ln_t - ln_b;
         float g2n = gxn * gxn + gyn * gyn;
@@ -301,10 +315,10 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
         // PRE-SWAP regime: raw u_texture reads return (B, G, R). Swapped weights
         // are required — see the channel-order contract at the top of the file.
         vec3 lumaW = vec3(0.114, 0.587, 0.299);
-        float lum_r = dot(textureLod(u_texture, undistortedUV + vec2(px.x, 0.0), 1.0).rgb, lumaW);
-        float lum_l = dot(textureLod(u_texture, undistortedUV - vec2(px.x, 0.0), 1.0).rgb, lumaW);
-        float lum_t = dot(textureLod(u_texture, undistortedUV + vec2(0.0, px.y), 1.0).rgb, lumaW);
-        float lum_b = dot(textureLod(u_texture, undistortedUV - vec2(0.0, px.y), 1.0).rgb, lumaW);
+        float lum_r = dot(textureLod(u_texture, u_frame_offset + undistortedUV + vec2(px.x, 0.0), 1.0).rgb, lumaW);
+        float lum_l = dot(textureLod(u_texture, u_frame_offset + undistortedUV - vec2(px.x, 0.0), 1.0).rgb, lumaW);
+        float lum_t = dot(textureLod(u_texture, u_frame_offset + undistortedUV + vec2(0.0, px.y), 1.0).rgb, lumaW);
+        float lum_b = dot(textureLod(u_texture, u_frame_offset + undistortedUV - vec2(0.0, px.y), 1.0).rgb, lumaW);
 
         float gx = lum_r - lum_l;
         float gy = lum_t - lum_b;
@@ -365,18 +379,18 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
                 vec2 off_p = tan_step * fk;
                 vec2 off_n = -tan_step * fk;
                 // +k local gradient
-                float lp_r = dot(textureLod(u_texture, undistortedUV + off_p + vec2(px.x, 0.0), 1.0).rgb, lumaW);
-                float lp_l = dot(textureLod(u_texture, undistortedUV + off_p - vec2(px.x, 0.0), 1.0).rgb, lumaW);
-                float lp_t = dot(textureLod(u_texture, undistortedUV + off_p + vec2(0.0, px.y), 1.0).rgb, lumaW);
-                float lp_b = dot(textureLod(u_texture, undistortedUV + off_p - vec2(0.0, px.y), 1.0).rgb, lumaW);
+                float lp_r = dot(textureLod(u_texture, u_frame_offset + undistortedUV + off_p + vec2(px.x, 0.0), 1.0).rgb, lumaW);
+                float lp_l = dot(textureLod(u_texture, u_frame_offset + undistortedUV + off_p - vec2(px.x, 0.0), 1.0).rgb, lumaW);
+                float lp_t = dot(textureLod(u_texture, u_frame_offset + undistortedUV + off_p + vec2(0.0, px.y), 1.0).rgb, lumaW);
+                float lp_b = dot(textureLod(u_texture, u_frame_offset + undistortedUV + off_p - vec2(0.0, px.y), 1.0).rgb, lumaW);
                 float gxp = lp_r - lp_l;
                 float gyp = lp_t - lp_b;
                 float g2p = gxp * gxp + gyp * gyp;
                 // -k local gradient
-                float ln_r = dot(textureLod(u_texture, undistortedUV + off_n + vec2(px.x, 0.0), 1.0).rgb, lumaW);
-                float ln_l = dot(textureLod(u_texture, undistortedUV + off_n - vec2(px.x, 0.0), 1.0).rgb, lumaW);
-                float ln_t = dot(textureLod(u_texture, undistortedUV + off_n + vec2(0.0, px.y), 1.0).rgb, lumaW);
-                float ln_b = dot(textureLod(u_texture, undistortedUV + off_n - vec2(0.0, px.y), 1.0).rgb, lumaW);
+                float ln_r = dot(textureLod(u_texture, u_frame_offset + undistortedUV + off_n + vec2(px.x, 0.0), 1.0).rgb, lumaW);
+                float ln_l = dot(textureLod(u_texture, u_frame_offset + undistortedUV + off_n - vec2(px.x, 0.0), 1.0).rgb, lumaW);
+                float ln_t = dot(textureLod(u_texture, u_frame_offset + undistortedUV + off_n + vec2(0.0, px.y), 1.0).rgb, lumaW);
+                float ln_b = dot(textureLod(u_texture, u_frame_offset + undistortedUV + off_n - vec2(0.0, px.y), 1.0).rgb, lumaW);
                 float gxn = ln_r - ln_l;
                 float gyn = ln_t - ln_b;
                 float g2n = gxn * gxn + gyn * gyn;
@@ -434,19 +448,19 @@ vec4 sampleDoGReconstructed(vec2 uv, float eccentricity, float fovea_radius,
     // half-octave Gaussian. 13 samples = 19 bilinear lookups (7 integer + 6 x 2 half-integer).
     // MIP 5-6 textures are tiny (60×33, 30×16 for 1920×1080) — reads are cache-free.
     vec4 mip[13];
-    mip[0]  = textureLod(u_texture, uv, 0.0);
-    mip[1]  = textureLod(u_texture, uv, 0.5);
-    mip[2]  = textureLod(u_texture, uv, 1.0);
-    mip[3]  = textureLod(u_texture, uv, 1.5);
-    mip[4]  = textureLod(u_texture, uv, 2.0);
-    mip[5]  = textureLod(u_texture, uv, 2.5);
-    mip[6]  = textureLod(u_texture, uv, 3.0);
-    mip[7]  = textureLod(u_texture, uv, 3.5);
-    mip[8]  = textureLod(u_texture, uv, 4.0);
-    mip[9]  = textureLod(u_texture, uv, 4.5);
-    mip[10] = textureLod(u_texture, uv, 5.0);
-    mip[11] = textureLod(u_texture, uv, 5.5);
-    mip[12] = textureLod(u_texture, uv, 6.0);
+    mip[0]  = textureLod(u_texture, u_frame_offset + uv, 0.0);
+    mip[1]  = textureLod(u_texture, u_frame_offset + uv, 0.5);
+    mip[2]  = textureLod(u_texture, u_frame_offset + uv, 1.0);
+    mip[3]  = textureLod(u_texture, u_frame_offset + uv, 1.5);
+    mip[4]  = textureLod(u_texture, u_frame_offset + uv, 2.0);
+    mip[5]  = textureLod(u_texture, u_frame_offset + uv, 2.5);
+    mip[6]  = textureLod(u_texture, u_frame_offset + uv, 3.0);
+    mip[7]  = textureLod(u_texture, u_frame_offset + uv, 3.5);
+    mip[8]  = textureLod(u_texture, u_frame_offset + uv, 4.0);
+    mip[9]  = textureLod(u_texture, u_frame_offset + uv, 4.5);
+    mip[10] = textureLod(u_texture, u_frame_offset + uv, 5.0);
+    mip[11] = textureLod(u_texture, u_frame_offset + uv, 5.5);
+    mip[12] = textureLod(u_texture, u_frame_offset + uv, 6.0);
 
     // 12 half-octave DoG bands — geometric sqrt(2) spacing
     // Odd-indexed cutoffs match old 4-band anchors exactly.
@@ -683,10 +697,10 @@ float sampleBoumaEdgeDensity(float dist, float fovea_radius, vec2 uv) {
     float boumaLOD = clamp(log2(max(1.0, 2.0 * boumaRadiusTexels)), 0.0, 5.0);
 
     if (u_hasCongestionMap > 0.5) {
-        return textureLod(u_congestionMap, uv, boumaLOD).g;
+        return textureLod(u_congestionMap, u_congestion_offset + uv, boumaLOD).g;
     } else {
         // Fallback: saliency map edge density (B channel), coarser but functional
-        return textureLod(u_saliencyMap, uv, min(boumaLOD, 3.0)).b;
+        return textureLod(u_saliencyMap, u_saliency_offset + uv, min(boumaLOD, 3.0)).b;
     }
 }
 
@@ -695,8 +709,8 @@ float sampleBoumaEdgeDensity(float dist, float fovea_radius, vec2 uv) {
 // (B, coarse σ=5.0) based on eccentricity. The visual system pools features
 // at coarser scales in the periphery — fine-grained clutter is invisible there.
 float sampleEccentricityCongestion(float ecc_deg, vec2 uv) {
-    float fovealCong = texture(u_congestionMap, uv).r;
-    float periphCong = texture(u_congestionMap, uv).b;
+    float fovealCong = texture(u_congestionMap, u_congestion_offset + uv).r;
+    float periphCong = texture(u_congestionMap, u_congestion_offset + uv).b;
     // Foveal: 0-3° (pure R), parafoveal: 3-8° (blend), peripheral: 8°+ (pure B)
     float t = smoothstep(3.0, 8.0, ecc_deg);
     return mix(fovealCong, periphCong, t);
@@ -785,7 +799,7 @@ PolarSector computePolarSector(vec2 uv, float parafovea_radius) {
 vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
     float mipLevel = computeMipLevel(eccentricity, fovea_radius);
 
-    vec4 col = textureLod(u_texture, uv, mipLevel);
+    vec4 col = textureLod(u_texture, u_frame_offset + uv, mipLevel);
 
     float temp = col.r;
     col.r = col.b;
@@ -798,7 +812,7 @@ vec4 sampleMIPPooled(vec2 uv, float eccentricity, float fovea_radius) {
 vec4 sampleMIPPooledGrad(vec2 uv, vec2 duvdx, vec2 duvdy, float eccentricity, float fovea_radius) {
     float mipLevel = computeMipLevel(eccentricity, fovea_radius);
 
-    vec4 col = textureGrad(u_texture, uv, duvdx * pow(2.0, mipLevel), duvdy * pow(2.0, mipLevel));
+    vec4 col = textureGrad(u_texture, u_frame_offset + uv, duvdx * pow(2.0, mipLevel), duvdy * pow(2.0, mipLevel));
 
     float temp = col.r;
     col.r = col.b;
@@ -838,14 +852,14 @@ float snoise(vec2 v){
 // === EDGE DETECTION HELPERS ===
 float sobel(vec2 uv) {
     vec2 pixelSize = 1.0 / u_resolution;
-    float t = texture(u_texture, uv + vec2(0.0, -pixelSize.y)).r;
-    float b = texture(u_texture, uv + vec2(0.0, pixelSize.y)).r;
-    float l = texture(u_texture, uv + vec2(-pixelSize.x, 0.0)).r;
-    float r = texture(u_texture, uv + vec2(pixelSize.x, 0.0)).r;
-    float tl = texture(u_texture, uv + vec2(-pixelSize.x, -pixelSize.y)).r;
-    float tr = texture(u_texture, uv + vec2(pixelSize.x, -pixelSize.y)).r;
-    float bl = texture(u_texture, uv + vec2(-pixelSize.x, pixelSize.y)).r;
-    float br = texture(u_texture, uv + vec2(pixelSize.x, pixelSize.y)).r;
+    float t = texture(u_texture, u_frame_offset + uv + vec2(0.0, -pixelSize.y)).r;
+    float b = texture(u_texture, u_frame_offset + uv + vec2(0.0, pixelSize.y)).r;
+    float l = texture(u_texture, u_frame_offset + uv + vec2(-pixelSize.x, 0.0)).r;
+    float r = texture(u_texture, u_frame_offset + uv + vec2(pixelSize.x, 0.0)).r;
+    float tl = texture(u_texture, u_frame_offset + uv + vec2(-pixelSize.x, -pixelSize.y)).r;
+    float tr = texture(u_texture, u_frame_offset + uv + vec2(pixelSize.x, -pixelSize.y)).r;
+    float bl = texture(u_texture, u_frame_offset + uv + vec2(-pixelSize.x, pixelSize.y)).r;
+    float br = texture(u_texture, u_frame_offset + uv + vec2(pixelSize.x, pixelSize.y)).r;
     
     float gx = (tl + 2.0*l + bl) - (tr + 2.0*r + br);
     float gy = (tl + 2.0*t + tr) - (bl + 2.0*b + br);
@@ -1017,8 +1031,8 @@ LGN_Signal processLGN(vec2 uv, ModeConfig config, float dist, float fovea_radius
     // Ratio reconstruction: sharp LOD 0 for type/density, blurred LOD 4 for rhythm.
     // Rhythm = R/G at low resolution recovers the DOM rhythm signal that cliff-edges
     // destroy at full res (R and G both drop at boundaries, but their ratio is stable).
-    vec4 structureSharp = textureLod(u_structureMap, uv, 0.0);
-    vec4 structureBlur  = textureLod(u_structureMap, uv, 4.0);
+    vec4 structureSharp = textureLod(u_structureMap, u_structure_offset + uv, 0.0);
+    vec4 structureBlur  = textureLod(u_structureMap, u_structure_offset + uv, 4.0);
     signal.type    = structureSharp.b;
     signal.density = structureSharp.g;
     float rawRhythm = structureBlur.r / max(structureBlur.g, 0.0005);
@@ -1028,7 +1042,7 @@ LGN_Signal processLGN(vec2 uv, ModeConfig config, float dist, float fovea_radius
     signal.softDensity = structureBlur.g;
 
     // Saliency texture: R=saliency, G=feature congestion, B=edge density
-    vec4 salTex = texture(u_saliencyMap, uv);
+    vec4 salTex = texture(u_saliencyMap, u_saliency_offset + uv);
     // Resolution-gated saliency: peripheral features must be proportionally MORE
     // salient to earn protection. Acuity decay follows Strasburger et al. (2011).
     float sal_ppd = max(fovea_radius, 1.0);
@@ -1038,7 +1052,7 @@ LGN_Signal processLGN(vec2 uv, ModeConfig config, float dist, float fovea_radius
 
     // Congestion + edge density: prefer high-res dedicated worker when available
     if (u_hasCongestionMap > 0.5) {
-        vec4 congTex = texture(u_congestionMap, uv);
+        vec4 congTex = texture(u_congestionMap, u_congestion_offset + uv);
         signal.congestion  = congTex.r;
         signal.edgeDensity = congTex.g;
     } else {
@@ -1436,7 +1450,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         float cong_ecc_deg = max(0.0, dist - fovea_radius) / cong_ppd;
         float eccCong = (u_hasCongestionMap > 0.5)
             ? sampleEccentricityCongestion(cong_ecc_deg, uv)
-            : texture(u_saliencyMap, uv).g;
+            : texture(u_saliencyMap, u_saliency_offset + uv).g;
         // Blend edge density (spatial packing) with congestion (visual complexity)
         float congestionBoost = 1.0 + (boumaEdge * 0.5 + eccCong * 0.5);
         coupledEccentricity *= congestionBoost;
@@ -1455,7 +1469,7 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         // Map canvas UV to frame UV: the compute texture covers the frame area,
         // which may be smaller than the canvas (e.g. toolbar chrome).
         vec2 computeUV = uv * u_compute_frame_scale;
-        vec4 computeSample = texture(u_computeStatTexture, computeUV);
+        vec4 computeSample = texture(u_computeStatTexture, u_compute_offset + computeUV);
         computeAlpha = computeSample.a;
 
         // Foveal protection: the compute texture is half-res and bilinear
@@ -1692,8 +1706,8 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
             // (undistorted). Flat field → ~0 → grain off; text/noise → ≈1 → unchanged,
             // so the uniform-noise monotonic and OCR gates don't regress.
             vec3 grainLumaW = vec3(0.114, 0.587, 0.299); // PRE-SWAP (BGRA) weights
-            float srcFine = dot(textureLod(u_texture, uv, 1.0).rgb, grainLumaW);
-            float srcCoarse = dot(textureLod(u_texture, uv, 5.0).rgb, grainLumaW);
+            float srcFine = dot(textureLod(u_texture, u_frame_offset + uv, 1.0).rgb, grainLumaW);
+            float srcCoarse = dot(textureLod(u_texture, u_frame_offset + uv, 5.0).rgb, grainLumaW);
             float grainStructureGate = smoothstep(0.002, 0.02, abs(srcFine - srcCoarse));
             rodColor += noiseVal * 0.08 * grainStructureGate;
             rodColor = clamp(rodColor, 0.0, 1.0);
@@ -1728,32 +1742,32 @@ vec3 processV4(vec2 uv, V1_Signal v1, LGN_Signal lgn, ModeConfig config, float d
         return mix(col, frosted, effectFactor * 0.7 * colorEffects);
         
     } else if (config.v4_style_id == 3) { // Blueprint (ARIA Wireframe)
-        vec4 structure = texture(u_structureMap, v1.distortedUV);
+        vec4 structure = texture(u_structureMap, u_structure_offset + v1.distortedUV);
         float type = structure.b;
         float density = structure.g;
         float roleEncoded = structure.a;
         int roleId = int(roleEncoded * 12.0 + 0.5);
 
-        vec4 salTex = texture(u_saliencyMap, v1.distortedUV);
+        vec4 salTex = texture(u_saliencyMap, u_saliency_offset + v1.distortedUV);
         float saliency = salTex.r;
         float congestion = (u_hasCongestionMap > 0.5)
-            ? texture(u_congestionMap, v1.distortedUV).r
+            ? texture(u_congestionMap, u_congestion_offset + v1.distortedUV).r
             : salTex.g;
 
         bool hasStructure = (density > 0.05 || type < 0.95);
 
         // Edge detection on structure map for bounding box outlines
         vec2 ps = 1.0 / u_resolution;
-        float dL = texture(u_structureMap, v1.distortedUV + vec2(-ps.x, 0.0)).g;
-        float dR = texture(u_structureMap, v1.distortedUV + vec2( ps.x, 0.0)).g;
-        float dT = texture(u_structureMap, v1.distortedUV + vec2(0.0, -ps.y)).g;
-        float dB = texture(u_structureMap, v1.distortedUV + vec2(0.0,  ps.y)).g;
+        float dL = texture(u_structureMap, u_structure_offset + v1.distortedUV + vec2(-ps.x, 0.0)).g;
+        float dR = texture(u_structureMap, u_structure_offset + v1.distortedUV + vec2( ps.x, 0.0)).g;
+        float dT = texture(u_structureMap, u_structure_offset + v1.distortedUV + vec2(0.0, -ps.y)).g;
+        float dB = texture(u_structureMap, u_structure_offset + v1.distortedUV + vec2(0.0,  ps.y)).g;
         float structEdge = abs(dL - dR) + abs(dT - dB);
 
-        float tL = texture(u_structureMap, v1.distortedUV + vec2(-ps.x, 0.0)).b;
-        float tR = texture(u_structureMap, v1.distortedUV + vec2( ps.x, 0.0)).b;
-        float tT = texture(u_structureMap, v1.distortedUV + vec2(0.0, -ps.y)).b;
-        float tB = texture(u_structureMap, v1.distortedUV + vec2(0.0,  ps.y)).b;
+        float tL = texture(u_structureMap, u_structure_offset + v1.distortedUV + vec2(-ps.x, 0.0)).b;
+        float tR = texture(u_structureMap, u_structure_offset + v1.distortedUV + vec2( ps.x, 0.0)).b;
+        float tT = texture(u_structureMap, u_structure_offset + v1.distortedUV + vec2(0.0, -ps.y)).b;
+        float tB = texture(u_structureMap, u_structure_offset + v1.distortedUV + vec2(0.0,  ps.y)).b;
         float typeEdge = abs(tL - tR) + abs(tT - tB);
 
         float isEdge = smoothstep(0.02, 0.08, max(structEdge, typeEdge));
@@ -2127,7 +2141,7 @@ vec3 applyChromaticEccentricityDecay(vec3 rgb, float ecc_deg) {
 //   horizontal envelope at x-height period × vertical stroke texture
 //   at x-height/3 period
 vec3 sampleDomAwarePrimitive(vec3 L_background, vec2 uv) {
-    vec4 pm = texture(u_primitiveMap, uv);
+    vec4 pm = texture(u_primitiveMap, u_structure_offset + uv);
     int typeId = int(pm.r * 255.0 + 0.5);
     if (typeId == 0) {
         return L_background; // ui_surface / non-primitive → baseline
@@ -2140,7 +2154,7 @@ vec3 sampleDomAwarePrimitive(vec3 L_background, vec2 uv) {
     float ecc_deg = ecc_px / ppd;
 
     // --- Primitive geometry ---
-    vec4 pmeta = texture(u_primitiveMeta, uv);
+    vec4 pmeta = texture(u_primitiveMeta, u_structure_offset + uv);
     float xHeightPx = pmeta.r * 255.0;
     float xHeightDeg = xHeightPx / ppd;
     float spacingDeg = xHeightDeg * 0.5; // approximate inter-letter spacing
@@ -2204,10 +2218,10 @@ vec3 sampleDomAwarePrimitive(vec3 L_background, vec2 uv) {
     // periphery where the eccentricity fallback was fading to smooth blur.
     if (xHeightPx <= 0.0 && typeId != 0) {
         vec2 ts = 1.0 / vec2(textureSize(u_primitiveMap, 0));
-        int id_n = int(texture(u_primitiveMap, uv + vec2(0.0, ts.y)).r * 255.0 + 0.5);
-        int id_s = int(texture(u_primitiveMap, uv - vec2(0.0, ts.y)).r * 255.0 + 0.5);
-        int id_e = int(texture(u_primitiveMap, uv + vec2(ts.x, 0.0)).r * 255.0 + 0.5);
-        int id_w = int(texture(u_primitiveMap, uv - vec2(ts.x, 0.0)).r * 255.0 + 0.5);
+        int id_n = int(texture(u_primitiveMap, u_structure_offset + uv + vec2(0.0, ts.y)).r * 255.0 + 0.5);
+        int id_s = int(texture(u_primitiveMap, u_structure_offset + uv - vec2(0.0, ts.y)).r * 255.0 + 0.5);
+        int id_e = int(texture(u_primitiveMap, u_structure_offset + uv + vec2(ts.x, 0.0)).r * 255.0 + 0.5);
+        int id_w = int(texture(u_primitiveMap, u_structure_offset + uv - vec2(ts.x, 0.0)).r * 255.0 + 0.5);
         bool isEdge = (id_n != typeId) || (id_s != typeId) ||
                       (id_e != typeId) || (id_w != typeId);
         // sampleSourceLod returns true RGBA (BGRA→RGBA swap applied) so both
@@ -2266,7 +2280,7 @@ vec3 sampleDomAwarePrimitive(vec3 L_background, vec2 uv) {
     // L_blob: mean luminance × line-rhythm modulation. MIP LOD 5 ≈ mean over
     // ~32-texel pooling region — the scale at which "text-ness" survives as a
     // blob under TTM-style pooling.
-    vec3 L_blob = textureLod(u_texture, uv, 5.0).rgb;
+    vec3 L_blob = textureLod(u_texture, u_frame_offset + uv, 5.0).rgb;
     if (xHeightPx > 1.0) {
         float yPx = fragPx.y;
         float rhythm = 0.5 + 0.5 * sin(yPx * 3.14159265 / max(xHeightPx * 2.0, 1.0));
@@ -2286,6 +2300,17 @@ vec3 sampleDomAwarePrimitive(vec3 L_background, vec2 uv) {
 void main() {
     float aspect = u_resolution.x / u_resolution.y;
     vec2 uv = v_texCoord;
+
+    // Newly exposed strip: while a scroll runs ahead of the newest capture,
+    // the leading edge shows page the frame does not contain yet. Fill it
+    // with a coarse-MIP extension of the frame's edge rows (local colour, no
+    // glyph structure) rather than the live page, which would leak
+    // unfoveated content, or a clamp smear. The next capture replaces it.
+    vec2 frameUV = uv + u_frame_offset;
+    if (frameUV.x < 0.0 || frameUV.x > 1.0 || frameUV.y < 0.0 || frameUV.y > 1.0) {
+        fragColor = vec4(sampleSourceLod(clamp(frameUV, 0.0, 1.0) - u_frame_offset, 5.0).rgb, 1.0);
+        return;
+    }
     vec2 uv_corrected = vec2(uv.x * aspect, uv.y);
     
     vec2 mouse_uv = u_mouse / u_resolution;
@@ -2317,7 +2342,7 @@ void main() {
 
         // Gate: text content under cursor (structure map B channel)
         vec2 cursorUV = u_mouse / u_resolution;
-        float textGate = smoothstep(0.3, 0.6, textureLod(u_structureMap, cursorUV, 2.0).b);
+        float textGate = smoothstep(0.3, 0.6, textureLod(u_structureMap, u_structure_offset + cursorUV, 2.0).b);
 
         // Combined activation
         float readingActivation = readingGate * textGate * u_reading_span_strength;
@@ -2459,10 +2484,10 @@ void main() {
         // 4-channel orientation energy (same computation as in sampleDoGReconstructed)
         vec2 px_dbg = 2.0 / u_resolution;
         vec3 lumaW_dbg = vec3(0.114, 0.587, 0.299); // BGRA-corrected luminance weights
-        float lr = dot(textureLod(u_texture, uv + vec2(px_dbg.x, 0.0), 1.0).rgb, lumaW_dbg);
-        float ll = dot(textureLod(u_texture, uv - vec2(px_dbg.x, 0.0), 1.0).rgb, lumaW_dbg);
-        float lt = dot(textureLod(u_texture, uv + vec2(0.0, px_dbg.y), 1.0).rgb, lumaW_dbg);
-        float lb = dot(textureLod(u_texture, uv - vec2(0.0, px_dbg.y), 1.0).rgb, lumaW_dbg);
+        float lr = dot(textureLod(u_texture, u_frame_offset + uv + vec2(px_dbg.x, 0.0), 1.0).rgb, lumaW_dbg);
+        float ll = dot(textureLod(u_texture, u_frame_offset + uv - vec2(px_dbg.x, 0.0), 1.0).rgb, lumaW_dbg);
+        float lt = dot(textureLod(u_texture, u_frame_offset + uv + vec2(0.0, px_dbg.y), 1.0).rgb, lumaW_dbg);
+        float lb = dot(textureLod(u_texture, u_frame_offset + uv - vec2(0.0, px_dbg.y), 1.0).rgb, lumaW_dbg);
         float gx_d = lr - ll; float gy_d = lt - lb;
         float g2_d = gx_d*gx_d + gy_d*gy_d;
         float e_h = gy_d*gy_d; float e_v = gx_d*gx_d;
@@ -2482,10 +2507,10 @@ void main() {
         // R = horizontal edges, G = vertical edges, B = diagonal (45°+135°)
         vec2 px_dbg4 = 2.0 / u_resolution;
         vec3 lumaW4 = vec3(0.114, 0.587, 0.299);
-        float lr4 = dot(textureLod(u_texture, uv + vec2(px_dbg4.x, 0.0), 1.0).rgb, lumaW4);
-        float ll4 = dot(textureLod(u_texture, uv - vec2(px_dbg4.x, 0.0), 1.0).rgb, lumaW4);
-        float lt4 = dot(textureLod(u_texture, uv + vec2(0.0, px_dbg4.y), 1.0).rgb, lumaW4);
-        float lb4 = dot(textureLod(u_texture, uv - vec2(0.0, px_dbg4.y), 1.0).rgb, lumaW4);
+        float lr4 = dot(textureLod(u_texture, u_frame_offset + uv + vec2(px_dbg4.x, 0.0), 1.0).rgb, lumaW4);
+        float ll4 = dot(textureLod(u_texture, u_frame_offset + uv - vec2(px_dbg4.x, 0.0), 1.0).rgb, lumaW4);
+        float lt4 = dot(textureLod(u_texture, u_frame_offset + uv + vec2(0.0, px_dbg4.y), 1.0).rgb, lumaW4);
+        float lb4 = dot(textureLod(u_texture, u_frame_offset + uv - vec2(0.0, px_dbg4.y), 1.0).rgb, lumaW4);
         float gx4 = lr4 - ll4; float gy4 = lt4 - lb4;
         float mag4 = sqrt(gx4*gx4 + gy4*gy4);
         // 4-channel energy
@@ -2504,10 +2529,10 @@ void main() {
         float mask = texture(u_maskTexture, v_texCoord).r;
         color.rgb = vec3(mask);
     } else if (debugLevel > 1.5) {
-        float s = texture(u_saliencyMap, v_texCoord).r;
+        float s = texture(u_saliencyMap, u_saliency_offset + v_texCoord).r;
         color.rgb = vec3(s);
     } else if (debugLevel > 0.5) {
-        float rawDensity = texture(u_structureMap, v_texCoord).g;
+        float rawDensity = texture(u_structureMap, u_structure_offset + v_texCoord).g;
         if (rawDensity > 0.0) {
             color.rgb = mix(color.rgb, vec3(1.0, 0.0, 0.0), 0.5 * rawDensity);
         }
@@ -2590,9 +2615,9 @@ void main() {
         // Full-screen congestion heatmap overlay
         float congestion = 0.0;
         if (u_hasCongestionMap > 0.5) {
-            congestion = texture(u_congestionMap, v_texCoord).r;
+            congestion = texture(u_congestionMap, u_congestion_offset + v_texCoord).r;
         } else {
-            congestion = texture(u_saliencyMap, v_texCoord).g;
+            congestion = texture(u_saliencyMap, u_saliency_offset + v_texCoord).g;
         }
         vec3 heatmapColor = congestionHeatmap(congestion);
         vec3 src = sampleSource(uv).rgb;
@@ -2610,15 +2635,15 @@ void main() {
             color.rgb = vec3(1.0);
         } else if (v_texCoord.x < midpoint) {
             // Left half: saliency (cool purple palette)
-            float sal = texture(u_saliencyMap, v_texCoord).r;
+            float sal = texture(u_saliencyMap, u_saliency_offset + v_texCoord).r;
             color.rgb = mix(src, saliencyHeatmap(sal), 0.85);
         } else {
             // Right half: congestion (warm blue→yellow→red palette)
             float cong = 0.0;
             if (u_hasCongestionMap > 0.5) {
-                cong = texture(u_congestionMap, v_texCoord).r;
+                cong = texture(u_congestionMap, u_congestion_offset + v_texCoord).r;
             } else {
-                cong = texture(u_saliencyMap, v_texCoord).g;
+                cong = texture(u_saliencyMap, u_saliency_offset + v_texCoord).g;
             }
             color.rgb = mix(src, congestionHeatmap(cong), 0.85);
         }

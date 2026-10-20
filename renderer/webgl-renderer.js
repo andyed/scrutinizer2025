@@ -340,6 +340,12 @@
                 this.computeFrameScaleLocation = gl.getUniformLocation(this.program, "u_compute_frame_scale");
                 // Option A: V4 eccentricity source (0.0=v1_coupled, 1.0=eccentricity)
                 this.v4EccentricitySourceLocation = gl.getUniformLocation(this.program, "u_v4_eccentricity_source");
+                // Scroll registration offsets (see setContentOffsets)
+                this.frameOffsetLocation = gl.getUniformLocation(this.program, "u_frame_offset");
+                this.structureOffsetLocation = gl.getUniformLocation(this.program, "u_structure_offset");
+                this.saliencyOffsetLocation = gl.getUniformLocation(this.program, "u_saliency_offset");
+                this.congestionOffsetLocation = gl.getUniformLocation(this.program, "u_congestion_offset");
+                this.computeOffsetLocation = gl.getUniformLocation(this.program, "u_compute_offset");
 
                 // Create buffers
                 this.positionBuffer = gl.createBuffer();
@@ -602,6 +608,25 @@
                 // and are stretched by the GPU to fill the canvas quad identically.
                 // No UV correction needed — 1:1 mapping.
                 this._computeFrameScale = [1.0, 1.0];
+            }
+
+            /**
+             * Per-texture scroll registration offsets in UV units: how far the
+             * live page has scrolled past the position each texture was made
+             * at, as a fraction of the canvas. Keys: frame, structure,
+             * saliency, congestion, compute. Missing keys keep their value.
+             * @param {Object<string, {x:number, y:number}>} offsets
+             */
+            setContentOffsets(offsets) {
+                if (!this._contentOffsets) this._contentOffsets = {};
+                for (const key of ['frame', 'structure', 'saliency', 'congestion', 'compute']) {
+                    const o = offsets && offsets[key];
+                    if (!o) continue;
+                    this._contentOffsets[key] = [
+                        Number.isFinite(o.x) ? o.x : 0,
+                        Number.isFinite(o.y) ? o.y : 0
+                    ];
+                }
             }
 
             /**
@@ -874,6 +899,14 @@
                 gl.uniform1f(this.computeTierLocation, effectiveTier);
                 gl.uniform2f(this.computeFrameScaleLocation, this._computeFrameScale[0], this._computeFrameScale[1]);
                 gl.uniform1f(this.v4EccentricitySourceLocation, this.config.v4_eccentricity_source || 0.0);
+
+                const offsets = this._contentOffsets || {};
+                const zero = [0, 0];
+                gl.uniform2fv(this.frameOffsetLocation, offsets.frame || zero);
+                gl.uniform2fv(this.structureOffsetLocation, offsets.structure || zero);
+                gl.uniform2fv(this.saliencyOffsetLocation, offsets.saliency || zero);
+                gl.uniform2fv(this.congestionOffsetLocation, offsets.congestion || zero);
+                gl.uniform2fv(this.computeOffsetLocation, offsets.compute || zero);
 
                 gl.uniform2f(this.resolutionLocation, width, height);
                 gl.uniform2f(this.mouseLocation, mouseX, mouseY);

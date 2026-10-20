@@ -9,6 +9,7 @@
         normalizeScrollPosition,
         isFrameAtScrollPosition
     } = require('../shared/scroll-freshness');
+    const { FrameScrollRegistrar, scrollZoom } = require('../shared/scroll-registration');
 
     const SCROLL_IDLE_MS = 90;
 
@@ -82,12 +83,15 @@
         let scrollIdleTimer = null;
         let lastFrameSequence = 0;
         const overlayCanvas = document.getElementById('overlay-canvas');
+        // Names the page scroll each captured frame shows; the renderer
+        // shifts the frame by the live scroll minus that position.
+        const frameRegistrar = new FrameScrollRegistrar();
 
         // Hide the canvas only until this page's first frame arrives. While the
-        // page scrolls, keep the last frame up: it trails the page by one
-        // capture, but hiding it exposes the unfoveated page underneath the
-        // transparent HUD for the whole scroll. scrollFreshness stays as a
-        // diagnostic ('stale' while a scroll is ahead of the newest frame).
+        // page scrolls, the renderer keeps the last frame registered with the
+        // live scroll (scrutinizer.setLiveScroll); hiding it would expose the
+        // unfoveated page underneath the transparent HUD. scrollFreshness stays
+        // as a diagnostic ('stale' while a scroll is ahead of the newest frame).
         const updateScrollFreshness = () => {
             if (!overlayCanvas || !isCapturing) return;
             const hasFrame = frameScroll !== null;
@@ -98,7 +102,10 @@
         };
 
         const handleBrowserScroll = (position) => {
-            currentScroll = normalizeScrollPosition(position);
+            currentScroll = { ...normalizeScrollPosition(position), zoom: scrollZoom(position) };
+            // The first frame of a scroll was labelled before main heard of it.
+            frameRegistrar.reviseForScroll(currentScroll);
+            if (scrutinizer) scrutinizer.setLiveScroll(currentScroll);
             scrollIdle = false;
             updateScrollFreshness();
             if (scrollIdleTimer) clearTimeout(scrollIdleTimer);
@@ -124,6 +131,7 @@
             isCapturing = true;
             isWaitingForFrame = false;
             frameScroll = null;
+            frameRegistrar.reset();
             if (overlayCanvas) {
                 overlayCanvas.style.visibility = 'hidden';
                 overlayCanvas.dataset.scrollFreshness = 'waiting';
@@ -140,6 +148,7 @@
             scrollIdleTimer = null;
             scrollIdle = true;
             frameScroll = null;
+            frameRegistrar.reset();
             if (overlayCanvas) {
                 overlayCanvas.style.visibility = 'visible';
                 overlayCanvas.dataset.scrollFreshness = 'inactive';
@@ -162,15 +171,32 @@
                 return;
             }
             lastFrameSequence = frameSequence;
-            frameScroll = normalizeScrollPosition(data);
+            const buffer = data.width > 0 && data.height > 0 ? new Uint8Array(data.buffer) : null;
+            const zoom = scrollZoom({ zoom: data.scrollZoom });
+            const registered = frameRegistrar.register({
+                buffer,
+                width: data.width,
+                height: data.height,
+                viewWidth: data.viewWidth || window.innerWidth,
+                stamp: { ...normalizeScrollPosition(data), zoom },
+                stampBefore: {
+                    ...normalizeScrollPosition({ x: data.scrollBeforeX, y: data.scrollBeforeY }),
+                    zoom
+                }
+            });
 
             if (Math.random() < 0.05) {
                 log(`[Overlay] Received frame: ${data.width}x${data.height}`);
             }
 
-            if (scrutinizer && data.width > 0 && data.height > 0) {
-                const buffer = new Uint8Array(data.buffer);
-                scrutinizer.processFrame(buffer, data.width, data.height);
+            // A frame whose scroll could not be registered mid-scroll would be
+            // drawn a scroll step off. Keep the registered frame up instead (the
+            // live offset keeps it on the page) and use the next capture.
+            if (registered.trusted) {
+                frameScroll = registered;
+                if (scrutinizer && buffer) {
+                    scrutinizer.processFrame(buffer, data.width, data.height, frameScroll);
+                }
             }
             updateScrollFreshness();
 
@@ -228,6 +254,8 @@
         ipcRenderer.on('browser:did-start-loading', () => {
             log('[Overlay] Page loading started');
             frameScroll = null;
+            frameRegistrar.reset();
+            if (scrutinizer) scrutinizer.resetScrollRegistration();
             updateScrollFreshness();
         });
 

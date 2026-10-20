@@ -407,10 +407,18 @@ window.addEventListener('DOMContentLoaded', () => {
     // Track whether current scan was triggered by scroll or DOM mutation
     let lastScanTrigger = 'mutation';
 
+    const currentScroll = () => ({
+        x: window.scrollX || 0,
+        y: window.scrollY || 0,
+        zoom: webFrame.getZoomFactor()
+    });
+
     const performScan = () => {
         try {
             const blocks = domAdapter.scan(document.body);
-            ipcRenderer.send('structure-update', blocks, lastScanTrigger);
+            // Block rects are viewport-relative, so the HUD needs the scroll
+            // they were measured at to keep the maps on the moving page.
+            ipcRenderer.send('structure-update', blocks, lastScanTrigger, currentScroll());
         } catch (err) {
             console.error('[Preload] Scan failed:', err);
         }
@@ -438,8 +446,10 @@ window.addEventListener('DOMContentLoaded', () => {
         }, 100); // Wait 100ms after last scroll event
     };
 
+    // Zoom rides along so the HUD can convert CSS px of scroll to DIP.
     const sendScrollPosition = () => {
-        ipcRenderer.send('browser:scroll', window.scrollX || 0, window.scrollY || 0);
+        const pos = currentScroll();
+        ipcRenderer.send('browser:scroll', pos.x, pos.y, pos.zoom);
     };
     // The native BrowserView scrolls independently of the captured HUD. Send
     // its position on every document even if DOM analysis failed to start.
@@ -515,6 +525,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // Track zoom/resize changes
     window.addEventListener('resize', () => {
         ipcRenderer.send('browser:zoom-changed', webFrame.getZoomFactor());
+        sendScrollPosition();
     });
 
     // Forced Scan (e.g. from Main Process on navigation finish)

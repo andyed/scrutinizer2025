@@ -42,7 +42,14 @@ const FRAG_PATH = path.join(REPO_ROOT, 'renderer/shaders/peripheral.frag');
 // SHA moved -> pooled_stat_path.file_blob_sha refreshed -> the config's own hash moved. Arm-0
 // runs mode 16 with reading_span false, so its pipeline is unaffected; sampleDoGReconstructed
 // still lives at the pinned line 283; validate() and validateLive() pass.
-const EXPECTED_HASH_PREFIX = '1f0a5e627538';
+// Refreshed 2026-10-20 (scroll registration): peripheral.frag gained per-texture scroll
+// offset uniforms added at every content-texture lookup, plus an exposed-strip fill that only
+// triggers when the frame offset is nonzero. Its blob SHA moved and the 14-line uniform block
+// moved sampleDoGReconstructed from line 283 to 297 -> both pooled_stat_path pins refreshed ->
+// the config's own hash moved. Arm-0 captures at rest, where every offset is 0. Measured: an
+// at-rest mode-16 HUD capture (1920x1012) differed from v2.8.0 in 2 of 7.8M bytes, each by one
+// level, against 0 between repeat captures of either build. validate() and validateLive() pass.
+const EXPECTED_HASH_PREFIX = '7c4729d066e7';
 
 describe('Mind2Web Arm-0 config hash', () => {
     let cfg;

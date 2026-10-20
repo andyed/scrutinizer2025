@@ -110,6 +110,23 @@
         }
 
         /**
+         * Move every remembered point by (dx, dy) canvas px. Called when the
+         * page scrolls: a fixation remembers the content under it, so the
+         * point travels with that content. Points scrolled out of view stay
+         * in the buffer and return if the page scrolls back.
+         * @param {number} dx
+         * @param {number} dy
+         */
+        shiftBy(dx, dy) {
+            if (!Number.isFinite(dx) || !Number.isFinite(dy) || (dx === 0 && dy === 0)) return;
+            for (const point of this.buffer) {
+                point.x += dx;
+                point.y += dy;
+            }
+            this.maskDirty = true;
+        }
+
+        /**
          * @returns {boolean} Whether visual memory is active (limit != 0)
          */
         isActive() {
