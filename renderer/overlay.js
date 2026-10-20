@@ -83,13 +83,18 @@
         let lastFrameSequence = 0;
         const overlayCanvas = document.getElementById('overlay-canvas');
 
+        // Hide the canvas only until this page's first frame arrives. While the
+        // page scrolls, keep the last frame up: it trails the page by one
+        // capture, but hiding it exposes the unfoveated page underneath the
+        // transparent HUD for the whole scroll. scrollFreshness stays as a
+        // diagnostic ('stale' while a scroll is ahead of the newest frame).
         const updateScrollFreshness = () => {
             if (!overlayCanvas || !isCapturing) return;
-            const fresh = frameScroll !== null &&
+            const hasFrame = frameScroll !== null;
+            const fresh = hasFrame && scrollIdle &&
                 isFrameAtScrollPosition(frameScroll, currentScroll);
-            const present = scrollIdle && fresh;
-            overlayCanvas.style.visibility = present ? 'visible' : 'hidden';
-            overlayCanvas.dataset.scrollFreshness = present ? 'fresh' : 'waiting';
+            overlayCanvas.style.visibility = hasFrame ? 'visible' : 'hidden';
+            overlayCanvas.dataset.scrollFreshness = !hasFrame ? 'waiting' : (fresh ? 'fresh' : 'stale');
         };
 
         const handleBrowserScroll = (position) => {

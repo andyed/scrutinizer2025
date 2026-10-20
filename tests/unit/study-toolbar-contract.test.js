@@ -47,14 +47,15 @@ describe('Study toolbar contract', () => {
         expect(main).toContain("toolbar:update-nav-state', toolbarNavigationState(win)");
     });
 
-    it('suppresses stale visualization frames during native page scrolling', () => {
+    it('keeps the last visualization frame up during native page scrolling', () => {
         expect(preload).toContain("ipcRenderer.send('browser:scroll'");
         expect(main).toContain("ipcMain.on('browser:scroll'");
         expect(main).toContain('frameSequence');
         expect(main).toContain('scrollX: capturedScroll.x');
         expect(main).toContain('scrollY: capturedScroll.y');
         expect(overlay).toContain("require('../shared/scroll-freshness')");
-        expect(overlay).toContain("overlayCanvas.dataset.scrollFreshness = present ? 'fresh' : 'waiting'");
+        expect(overlay).toContain("overlayCanvas.style.visibility = hasFrame ? 'visible' : 'hidden'");
+        expect(overlay).not.toContain("overlayCanvas.style.visibility = present ? 'visible' : 'hidden'");
     });
 
     it('shows session progress and falls back to the static label for single tasks', () => {
