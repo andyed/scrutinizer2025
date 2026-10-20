@@ -665,6 +665,8 @@ ipcMain.on('hud:capture:request', async (event) => {
             // painting it), so the HUD takes the pair as a window and registers
             // the frame against the previous one (shared/scroll-registration.js).
             const scrollBeforeCapture = win.latestBrowserScroll || { x: 0, y: 0, zoom: 1 };
+            // Same for the page's inner scroller, when it reports one.
+            const paneBeforeCapture = win.latestInnerScroll || null;
             // Performance Optimization: 1:1 Capture Fidelity
             // Explicitly specify capture bounds to ensure 1:1 pixel mapping
             // This eliminates scaling artifacts and improves text clarity
@@ -689,6 +691,7 @@ ipcMain.on('hud:capture:request', async (event) => {
             }
 
             const capturedScroll = win.latestBrowserScroll || scrollBeforeCapture;
+            const capturedPane = win.latestInnerScroll || null;
             const buffer = image.toBitmap();
             const size = image.getSize();
 
@@ -709,7 +712,9 @@ ipcMain.on('hud:capture:request', async (event) => {
                 scrollY: capturedScroll.y,
                 scrollZoom: capturedScroll.zoom || 1,
                 scrollBeforeX: scrollBeforeCapture.x,
-                scrollBeforeY: scrollBeforeCapture.y
+                scrollBeforeY: scrollBeforeCapture.y,
+                pane: capturedPane,
+                paneBefore: paneBeforeCapture
             });
         } catch (err) {
             console.error('[Main] Capture error:', err);
@@ -822,6 +827,33 @@ ipcMain.on('browser:scroll', (event, x, y, zoom) => {
     win.latestBrowserScroll = position;
     if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
         win.scrutinizerHud.webContents.send('browser:scroll', position);
+    }
+});
+
+// The page's inner scroller (an overflow:auto pane), or null: {id, x, y, zoom,
+// rect} with rect in viewport DIP. Stamped on captures like the window scroll
+// and forwarded so the HUD shifts the pane's region with it.
+function sanitizePaneState(pane) {
+    if (!pane || typeof pane !== 'object' || !pane.rect) return null;
+    const num = (v) => (Number.isFinite(v) ? v : 0);
+    const r = pane.rect;
+    if (!(r.width > 0) || !(r.height > 0)) return null;
+    return {
+        id: Number.isFinite(pane.id) ? pane.id : 0,
+        x: num(pane.x),
+        y: num(pane.y),
+        zoom: Number.isFinite(pane.zoom) && pane.zoom > 0 ? pane.zoom : 1,
+        rect: { x: num(r.x), y: num(r.y), width: r.width, height: r.height }
+    };
+}
+
+ipcMain.on('browser:inner-scroll', (event, pane) => {
+    const windows = BrowserWindow.getAllWindows();
+    const win = windows.find(w => w.scrutinizerView && w.scrutinizerView.webContents === event.sender);
+    if (!win) return;
+    win.latestInnerScroll = sanitizePaneState(pane);
+    if (win.scrutinizerHud && !win.scrutinizerHud.isDestroyed()) {
+        win.scrutinizerHud.webContents.send('browser:inner-scroll', win.latestInnerScroll);
     }
 });
 
@@ -1115,6 +1147,7 @@ function createScrutinizerWindow(startUrl, options = {}) {
     win.toolbarReady = false;
     win.hudReady = false;
     win.latestBrowserScroll = { x: 0, y: 0 };
+    win.latestInnerScroll = null;
     win.captureFrameSequence = 0;
     win.studyHistoryFloorIndex = null;
     win.studyHistoryFloorPending = false;
@@ -1397,6 +1430,7 @@ function createScrutinizerWindow(startUrl, options = {}) {
         if (isMainFrame && !isInPlace) {
             console.log('[Main] Navigation started:', url);
             win.latestBrowserScroll = { x: 0, y: 0 };
+            win.latestInnerScroll = null;
             if (isStudyWindow(win)) {
                 const record = openTaskRecord();
                 closeOpenPageVisit(record);
@@ -1411,6 +1445,7 @@ function createScrutinizerWindow(startUrl, options = {}) {
             }
             if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
                 hudWindow.webContents.send('browser:scroll', win.latestBrowserScroll);
+                hudWindow.webContents.send('browser:inner-scroll', null);
                 hudWindow.webContents.send('hud:reset-visual-memory');
             }
         } else {
@@ -1533,6 +1568,7 @@ function createScrutinizerWindow(startUrl, options = {}) {
         if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
             console.log('[Main] HUD loaded. Sending init-state.');
             hudWindow.webContents.send('browser:scroll', win.latestBrowserScroll);
+            hudWindow.webContents.send('browser:inner-scroll', win.latestInnerScroll || null);
             hudWindow.webContents.send('hud:settings:radius-options', RADIUS_OPTIONS);
             hudWindow.webContents.send('settings:radius-options', RADIUS_OPTIONS); // Legacy
 

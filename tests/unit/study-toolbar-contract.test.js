@@ -79,12 +79,16 @@ describe('Study toolbar contract', () => {
         expect(overlay).toContain('scrutinizer.setLiveScroll(currentScroll)');
         expect(overlay).toContain('frameRegistrar.reviseForScroll(currentScroll)');
         expect(overlay).toContain('scrutinizer.processFrame(buffer, data.width, data.height, frameScroll)');
-        expect(overlay).toContain('if (registered.trusted) {');
+        expect(overlay).toContain('if (registered.trusted && (!registered.pane || registered.pane.trusted)) {');
         expect(scrutinizer).toContain('this.renderer.setContentOffsets(scrollReg.uv)');
         expect(webgl).toContain('"u_frame_offset"');
-        for (const u of ['u_frame_offset', 'u_structure_offset', 'u_saliency_offset', 'u_congestion_offset', 'u_compute_offset']) {
-            expect(frag).toContain(`uniform vec2 ${u};`);
+        const keys = ['frame', 'structure', 'saliency', 'congestion', 'compute'];
+        for (const key of keys) {
+            expect(frag).toContain(`uniform vec2 u_${key}_offset;`);
+            expect(frag).toContain(`uniform vec2 u_${key}_pane_offset;`);
+            expect(webgl).toContain(`"u_${key}_pane_offset"`);
         }
+        expect(frag).toContain('uniform vec4 u_pane_rect;');
         // Every lookup of a content-locked texture is shifted by its
         // per-fragment offset; none samples raw uv or the uniform directly.
         const code = frag.split('\n').filter(line => !line.trim().startsWith('//')).join('\n');
@@ -109,6 +113,43 @@ describe('Study toolbar contract', () => {
             expect(frag).toContain(`${k}_offset = u_${k}_offset * follow;`);
         }
         expect(frag).toContain('float follow = inScrollLock(uv) ? 0.0 : 1.0;');
+    });
+
+    it('registers an inner scroller pane with its own scroll', () => {
+        // Preload reports the pane that scrolled (capture phase), with its
+        // scroll and its viewport rect; DOM scans carry it too.
+        expect(preload).toContain("document.addEventListener('scroll', (e) => {");
+        expect(preload).toContain('{ capture: true, passive: true }');
+        expect(preload).toContain("ipcRenderer.send('browser:inner-scroll', paneState())");
+        expect(preload).toContain('pane: paneState()');
+        // Main stamps the pane on both sides of the capture and forwards it live.
+        const captureAt = main.indexOf('await Promise.race([capturePromise, timeoutPromise])');
+        expect(main.indexOf('const paneBeforeCapture = win.latestInnerScroll || null')).toBeLessThan(captureAt);
+        expect(main.indexOf('const capturedPane = win.latestInnerScroll || null')).toBeGreaterThan(captureAt);
+        expect(main).toContain('paneBefore: paneBeforeCapture');
+        expect(main).toContain("ipcMain.on('browser:inner-scroll', (event, pane)");
+        // The HUD registers the pane's rows, follows its live scroll, and
+        // hands the shader its rect and offsets.
+        expect(overlay).toContain('registered.pane = paneRegistrar.register({');
+        expect(overlay).toContain('paneRegistrar.reviseForScroll(pane)');
+        expect(overlay).toContain('scrutinizer.setLivePane(pane || null)');
+        expect(overlay).toContain('if (registered.trusted && (!registered.pane || registered.pane.trusted)) {');
+        expect(scrutinizer).toContain('this.renderer.setPaneRegistration(scrollReg.paneRectUv, scrollReg.paneUv)');
+        // Inside the pane each per-fragment offset also carries the pane's
+        // offset. A locked box that holds the pane does not stop it; one over
+        // part of the pane does (shader inPaneLock, JS paneLockUvRects).
+        for (const k of ['frame', 'structure', 'saliency', 'congestion', 'compute']) {
+            expect(frag).toContain(`if (any(notEqual(u_${k}_pane_offset, none))) ${k}_offset += u_${k}_pane_offset * paneFollow;`);
+        }
+        expect(frag).toContain('bool paneFragment = inPane(uv);');
+        expect(frag).toContain('float paneFollow = inPaneLock(uv) ? 0.0 : 1.0;');
+        // A pane's exposed strip, and content landing under a locked box over a
+        // fixed pane, get the LOD-5 fill.
+        expect(frag).toContain('vec4 paneBox = u_pane_rect + window_frame_offset.xyxy;');
+        expect(frag).toContain('if (paneFragment && follow == 0.0 && any(notEqual(frame_offset, vec2(0.0))) && inPaneLock(frameUV)) {');
+        const { PANE_LOCK_SLACK } = require('../../shared/scroll-registration');
+        expect(frag).toContain(`vec4 slack = vec4(${PANE_LOCK_SLACK}, ${PANE_LOCK_SLACK}, -${PANE_LOCK_SLACK}, -${PANE_LOCK_SLACK});`);
+        expect(scrutinizer).toContain('!inScrollLock(paneLockUvRects(reg.lock, reg.paneRectUv), u, v)');
     });
 
     it('shows session progress and falls back to the static label for single tasks', () => {

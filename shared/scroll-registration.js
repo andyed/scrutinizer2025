@@ -72,23 +72,31 @@ const DEFAULT_BANDS = 8;
  * half-sums per band make a coincidental match between different rows much
  * rarer than one sum.
  *
+ * With `crop` ({x, y, width, height}, device px) only that rectangle is
+ * read: row 0 of the signature is buffer row crop.y, and the bands split the
+ * crop's width. An inner scroller's pane registers this way.
+ *
  * @returns {{data: Int32Array, height: number, bands: number, samples: number}}
  *   data is laid out [row][band][even, odd]
  */
-function rowSignature(buffer, width, height, columns = DEFAULT_COLUMNS, bands = DEFAULT_BANDS) {
-    const nb = Math.max(1, Math.min(bands, Math.floor(width / 2)));
+function rowSignature(buffer, width, height, columns = DEFAULT_COLUMNS, bands = DEFAULT_BANDS, crop = null) {
+    const cx = crop ? crop.x : 0;
+    const cy = crop ? crop.y : 0;
+    const cw = crop ? crop.width : width;
+    const rows = crop ? crop.height : height;
+    const nb = Math.max(1, Math.min(bands, Math.floor(cw / 2)));
     const perBand = Math.max(2, Math.floor(columns / nb));
-    const data = new Int32Array(height * nb * 2);
+    const data = new Int32Array(rows * nb * 2);
     const xs = new Int32Array(nb * perBand);
     for (let b = 0; b < nb; b++) {
-        const x0 = b * width / nb;
-        const bw = width / nb;
+        const x0 = cx + b * cw / nb;
+        const bw = cw / nb;
         for (let k = 0; k < perBand; k++) {
-            xs[b * perBand + k] = Math.min(width - 1, Math.floor(x0 + (k + 0.5) * bw / perBand)) * 4;
+            xs[b * perBand + k] = Math.min(cx + cw - 1, Math.floor(x0 + (k + 0.5) * bw / perBand)) * 4;
         }
     }
-    for (let r = 0; r < height; r++) {
-        const base = r * width * 4;
+    for (let r = 0; r < rows; r++) {
+        const base = (cy + r) * width * 4;
         for (let b = 0; b < nb; b++) {
             let even = 0;
             let odd = 0;
@@ -102,7 +110,7 @@ function rowSignature(buffer, width, height, columns = DEFAULT_COLUMNS, bands = 
             data[o + 1] = odd;
         }
     }
-    return { data, height, bands: nb, samples: perBand };
+    return { data, height: rows, bands: nb, samples: perBand };
 }
 
 /**
@@ -269,6 +277,26 @@ function estimateVerticalShift(prev, next, dMin, dMax, options = {}) {
 }
 
 /**
+ * Integer crop inside a width x height frame, or null when too small to
+ * register (a pane under 16 px wide or 32 px tall has too few rows to vote).
+ * @private
+ */
+function clipCrop(crop, width, height) {
+    const x0 = Math.max(0, Math.ceil(finite(crop.x)));
+    const y0 = Math.max(0, Math.ceil(finite(crop.y)));
+    const x1 = Math.min(width, Math.floor(finite(crop.x) + finite(crop.width)));
+    const y1 = Math.min(height, Math.floor(finite(crop.y) + finite(crop.height)));
+    if (x1 - x0 < 16 || y1 - y0 < 32) return null;
+    return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+}
+
+/** @private */
+function sameCrop(a, b) {
+    if (!a || !b) return !a && !b;
+    return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
+
+/**
  * Names the page scroll position each captured frame shows.
  *
  * Feed it every frame in arrival order. Two regimes:
@@ -324,6 +352,14 @@ class FrameScrollRegistrar {
     }
 
     /**
+     * Whether the scroll this registrar tracks has moved in recent captures
+     * (the decaying motion estimate is at least 1 CSS px per capture).
+     */
+    get moving() {
+        return this.motionPeak >= 1;
+    }
+
+    /**
      * The live scroll moved. If the frame on screen is an idle frame whose
      * pixels had moved (likely the first frame of this scroll, labelled with
      * the stamp from before it), register it against the reference now that
@@ -351,7 +387,7 @@ class FrameScrollRegistrar {
         if (!est || !est.confident || est.shift === 0) return false;
         suspect.result.y = ref.y + est.shift / ref.scale;
         suspect.result.method = 'revised';
-        this.ref = { sig: suspect.sig, width: ref.width, height: ref.height, zoom: ref.zoom, scale: ref.scale, y: suspect.result.y };
+        this.ref = { ...ref, sig: suspect.sig, y: suspect.result.y };
         this.imageStep = Math.abs(suspect.result.y - ref.y);
         return true;
     }
@@ -364,6 +400,9 @@ class FrameScrollRegistrar {
      * @param {number} frame.viewWidth    DIP width the capture covers
      * @param {Object} frame.stamp        {x, y, zoom} read after capture
      * @param {Object} [frame.stampBefore] {x, y, zoom} read at capture request
+     * @param {Object} [frame.crop]       {x, y, width, height} device px: register
+     *   only this region (an inner scroller's pane); frames register against
+     *   each other only when their crops match
      * @returns {{x:number, y:number, zoom:number, method:string, trusted:boolean}}
      */
     register(frame) {
@@ -382,16 +421,23 @@ class FrameScrollRegistrar {
             this.lastMethod = result.method;
             return result;
         }
+        const crop = frame.crop ? clipCrop(frame.crop, width, height) : null;
+        if (frame.crop && !crop) {
+            this.reset();
+            this.lastMethod = result.method;
+            return result;
+        }
         // Device px per CSS px of page scroll.
         const scale = (width / viewWidth) * zoom;
-        const sig = rowSignature(frame.buffer, width, height, this.columns, this.bands);
+        const sig = rowSignature(frame.buffer, width, height, this.columns, this.bands, crop);
         const ref = this.ref;
         const comparable = ref && ref.width === width && ref.height === height &&
+            sameCrop(ref.crop, crop) &&
             Math.abs(ref.zoom - zoom) < 1e-3 && Math.abs(ref.scale - scale) < 1e-6;
         const prevStampY = this.lastStampY === null ? stampY : this.lastStampY;
         this.lastStampY = stampY;
         const anchor = (y, step) => {
-            this.ref = { sig, width, height, zoom, scale, y };
+            this.ref = { sig, width, height, crop, zoom, scale, y };
             this.imageStep = step;
             this.misses = 0;
         };
@@ -470,11 +516,14 @@ const MAX_SCROLL_LOCK_RECTS = 16;
  * so the HUD must not shift the frame inside them. The DOM scan reports them
  * as viewport DIP rects {x, y, w, h}; this clips them to a cssW x cssH DIP
  * view and returns [x0, y0, x1, y1] in UV (0..1, y down). Rects inside a
- * larger kept rect are dropped, and past `max` the largest win.
+ * larger kept rect are dropped, and past `max` the largest win. With an inner
+ * scroller (`paneRectUv`), a rect that holds the pane does not absorb the
+ * rects inside it: a box floating over the pane must hold still against the
+ * pane's scroll, which the pane's own lock rect does not (paneLockUvRects).
  *
  * @returns {Array<number[]>}
  */
-function scrollLockUvRects(rects, cssW, cssH, max = MAX_SCROLL_LOCK_RECTS) {
+function scrollLockUvRects(rects, cssW, cssH, max = MAX_SCROLL_LOCK_RECTS, paneRectUv = null) {
     if (!Array.isArray(rects) || !(cssW > 0) || !(cssH > 0)) return [];
     const uv = [];
     for (const r of rects) {
@@ -489,7 +538,8 @@ function scrollLockUvRects(rects, cssW, cssH, max = MAX_SCROLL_LOCK_RECTS) {
     const kept = [];
     for (const r of uv) {
         if (kept.length >= max) break;
-        const inside = kept.some(k => r[0] >= k[0] && r[1] >= k[1] && r[2] <= k[2] && r[3] <= k[3]);
+        const inside = kept.some(k => !holdsPane(k, paneRectUv) &&
+            r[0] >= k[0] && r[1] >= k[1] && r[2] <= k[2] && r[3] <= k[3]);
         if (!inside) kept.push(r);
     }
     return kept;
@@ -501,14 +551,158 @@ function inScrollLock(uvRects, u, v) {
     return uvRects.some(r => u >= r[0] && v >= r[1] && u < r[2] && v < r[3]);
 }
 
+// UV slack for "this locked box holds the pane": a border between a locked
+// box and the scrollport inside it. The shader's inPaneLock() uses the same.
+const PANE_LOCK_SLACK = 0.002;
+
+/** Whether UV lock rect `r` holds the pane rect (false without a pane). */
+function holdsPane(r, paneRectUv) {
+    if (!paneRectUv) return false;
+    const s = PANE_LOCK_SLACK;
+    return r[0] - s <= paneRectUv[0] && r[1] - s <= paneRectUv[1] &&
+        r[2] + s >= paneRectUv[2] && r[3] + s >= paneRectUv[3];
+}
+
+/**
+ * The lock rects that hold still against an inner scroller's own scroll: those
+ * over part of the pane. A locked box that holds the pane (the pane itself
+ * when it is position: fixed, or a fixed app shell around it) stays put
+ * against the window, but the pane's content still scrolls inside it.
+ * @param {Array<number[]>} uvRects - scrollLockUvRects output
+ * @param {number[]|null} paneRectUv - [x0, y0, x1, y1]
+ * @returns {Array<number[]>}
+ */
+function paneLockUvRects(uvRects, paneRectUv) {
+    if (!Array.isArray(uvRects)) return [];
+    return uvRects.filter(r => !holdsPane(r, paneRectUv));
+}
+
+// ── Inner scrollers ─────────────────────────────────────────────────
+//
+// Many pages scroll an element instead of the window (mail and chat lists,
+// document viewers). The content view reports one such element, the pane
+// that scrolled most recently (renderer/preload.js), as
+//   {id, x, y, zoom, rect: {x, y, width, height}}
+// where id names the element for this document, x/y are its scrollLeft and
+// scrollTop in CSS px, and rect is its scrollport in viewport DIP. Each
+// content texture's source position carries the pane state it was made at
+// (source.pane), and the HUD shifts samples inside the pane's live rect by
+// the pane's own scroll since then, on top of the window offset.
+
+/**
+ * How far (DIP) the pane has scrolled past the state a texture was made at.
+ * Zero unless both states name the same element at the same zoom.
+ */
+function paneOffsetDip(sourcePane, livePane) {
+    if (!sourcePane || !livePane || sourcePane.id !== livePane.id) return { x: 0, y: 0 };
+    return registrationOffsetDip(sourcePane, livePane);
+}
+
+/** @private */
+function sameRect(a, b) {
+    if (!a || !b) return false;
+    return Math.abs(a.x - b.x) < 0.01 && Math.abs(a.y - b.y) < 0.01 &&
+        Math.abs(a.width - b.width) < 0.01 && Math.abs(a.height - b.height) < 0.01;
+}
+
+/**
+ * Names the pane scroll each captured frame shows, by running a
+ * FrameScrollRegistrar over the pane's rows only. Same regimes as the window:
+ * a pane that is not scrolling is drawn from its stamp, a scrolling pane is
+ * matched against the last registered pane crop, and an unmatched scrolling
+ * frame comes back untrusted.
+ *
+ * Registration runs only while the pane holds still in the frame: both stamps
+ * name the same element at the same rect and the window is not scrolling. A
+ * window scroll moves the pane's rows through the frame by an amount the
+ * pane's stamps cannot see, so then the stamp stands and the chain restarts.
+ */
+class PaneScrollRegistrar {
+    constructor(options = {}) {
+        this.registrar = new FrameScrollRegistrar(options);
+        this.id = null;
+    }
+
+    reset() {
+        this.registrar.reset();
+        this.id = null;
+    }
+
+    /**
+     * @param {Object} frame - as FrameScrollRegistrar.register, plus
+     * @param {Object} [frame.pane]       pane state read after capture
+     * @param {Object} [frame.paneBefore] pane state read at capture request
+     * @param {boolean} [windowMoving]    the window registrar is in motion
+     * @returns {{id:number, rect:Object, x:number, y:number, zoom:number,
+     *   method:string, trusted:boolean}|null} null when no pane is reported
+     */
+    register(frame, windowMoving = false) {
+        const after = frame && frame.pane;
+        if (!after || after.id === undefined || after.id === null) {
+            this.reset();
+            return null;
+        }
+        const before = frame.paneBefore || after;
+        const zoom = scrollZoom(after);
+        const stamp = { x: finite(after.x), y: finite(after.y), zoom };
+        const fromStamp = () => {
+            this.reset();
+            return { ...stamp, id: after.id, rect: after.rect, method: 'stamp', trusted: true };
+        };
+        const viewWidth = finite(frame.viewWidth);
+        if (windowMoving || before.id !== after.id || !sameRect(before.rect, after.rect) ||
+            Math.abs(scrollZoom(before) - zoom) > 1e-3 || !(viewWidth > 0) || !frame.width) {
+            return fromStamp();
+        }
+        const s = frame.width / viewWidth;  // device px per DIP
+        const crop = {
+            x: after.rect.x * s,
+            y: after.rect.y * s,
+            width: after.rect.width * s,
+            height: after.rect.height * s
+        };
+        if (!clipCrop(crop, frame.width | 0, frame.height | 0)) return fromStamp();
+        if (this.id !== after.id) this.registrar.reset();
+        this.id = after.id;
+        const result = this.registrar.register({
+            buffer: frame.buffer,
+            width: frame.width,
+            height: frame.height,
+            viewWidth,
+            crop,
+            stamp,
+            stampBefore: { x: finite(before.x), y: finite(before.y), zoom }
+        });
+        // Same object the registrar may revise in place (reviseForScroll).
+        result.id = after.id;
+        result.rect = after.rect;
+        return result;
+    }
+
+    /**
+     * The live pane scrolled: re-register the pane's scroll-onset frame, as
+     * FrameScrollRegistrar.reviseForScroll does for the window.
+     * @param {{id:number, y:number, zoom?:number}} livePane
+     * @returns {boolean} whether a label changed
+     */
+    reviseForScroll(livePane) {
+        if (!livePane || livePane.id !== this.id) return false;
+        return this.registrar.reviseForScroll(livePane);
+    }
+}
+
 module.exports = {
     scrollZoom,
     scrollToDip,
     registrationOffsetDip,
+    paneOffsetDip,
     rowSignature,
     estimateVerticalShift,
     FrameScrollRegistrar,
+    PaneScrollRegistrar,
     MAX_SCROLL_LOCK_RECTS,
     scrollLockUvRects,
-    inScrollLock
+    inScrollLock,
+    PANE_LOCK_SLACK,
+    paneLockUvRects
 };

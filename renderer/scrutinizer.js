@@ -27,7 +27,7 @@
     const { WebGPUCrowdingCompute } = require('./webgpu-crowding-compute');
     const { WebGPUPyramidCompute } = require('./webgpu-pyramid-compute');
     const { FOVEA_ASPECT_RATIO_DEFAULT, DEFAULT_SETTINGS } = require('./config');
-    const { registrationOffsetDip, scrollZoom, scrollLockUvRects, inScrollLock } = require('../shared/scroll-registration');
+    const { registrationOffsetDip, paneOffsetDip, scrollZoom, scrollLockUvRects, inScrollLock, paneLockUvRects } = require('../shared/scroll-registration');
     const CONGESTION_COOLDOWN_MS = DEFAULT_SETTINGS.congestionRecomputeCooldownMs;
     const METAMER_CONTENT_REFRESH_MS = DEFAULT_SETTINGS.metamerContentRefreshMs;
     const HEATMAP_STUCK_TIMEOUT_MS = DEFAULT_SETTINGS.congestionHeatmapStuckTimeoutMs;
@@ -122,7 +122,11 @@
             // texture was made at, plus the live page position. render()
             // turns the differences into per-texture UV offsets so the HUD
             // stays on the natively scrolling page between captures.
+            // A source may also carry .pane, the state of the page's inner
+            // scroller ({id, x, y, zoom, rect}) when it was made; _livePane
+            // is that scroller now (shared/scroll-registration.js).
             this._liveScroll = null;
+            this._livePane = null;
             this._scrollSources = { frame: null, structure: null, saliency: null, congestion: null, compute: null };
             this._scrollRegistration = null;
             // Fixed and stuck-sticky boxes from the latest DOM scan (viewport
@@ -571,9 +575,31 @@
             }
         }
 
+        /**
+         * Live state of the page's inner scroller ({id, x, y, zoom, rect},
+         * rect in viewport DIP), or null when none is reported. Remembered
+         * fixations inside the pane move with its content.
+         */
+        setLivePane(pane) {
+            const prev = this._livePane;
+            this._livePane = pane || null;
+            if (pane && pane.rect && prev && this.visualMemory.isActive()) {
+                const d = paneOffsetDip(prev, pane);
+                const px = this._canvasPxPerDip();
+                const r = pane.rect;
+                if (d.x || d.y) {
+                    this.visualMemory.shiftBy(-d.x * px.x, -d.y * px.y, {
+                        x0: r.x * px.x, y0: r.y * px.y,
+                        x1: (r.x + r.width) * px.x, y1: (r.y + r.height) * px.y
+                    });
+                }
+            }
+        }
+
         /** Forget all source positions (navigation, capture restart). */
         resetScrollRegistration() {
             for (const key of Object.keys(this._scrollSources)) this._scrollSources[key] = null;
+            this._livePane = null;
             this.contentAnalysis.resetScrollStamps();
             this._scrollRegistration = null;
             this._scrollLockRects = [];
@@ -608,26 +634,81 @@
             }
             const frameDip = registrationOffsetDip(this._scrollSources.frame, live);
             const zoom = scrollZoom(live);
+
+            // Inner scroller: inside its live rect, each texture also shifts by
+            // the pane's scroll since that texture was made.
+            const pane = this._livePane;
+            const rect = pane && pane.rect;
+            let paneRectUv = null;
+            let paneRectPx = null;
+            const paneUv = {};
+            let framePaneDip = { x: 0, y: 0 };
+            if (rect && rect.width > 0 && rect.height > 0) {
+                paneRectUv = [rect.x / cssW, rect.y / cssH, (rect.x + rect.width) / cssW, (rect.y + rect.height) / cssH];
+                paneRectPx = { x0: rect.x * px.x, y0: rect.y * px.y, x1: (rect.x + rect.width) * px.x, y1: (rect.y + rect.height) * px.y };
+                for (const key of Object.keys(this._scrollSources)) {
+                    const source = this._scrollSources[key];
+                    const d = paneOffsetDip(source && source.pane, pane);
+                    paneUv[key] = { x: d.x / cssW, y: d.y / cssH };
+                }
+                const frame = this._scrollSources.frame;
+                framePaneDip = paneOffsetDip(frame && frame.pane, pane);
+            }
+            const paneZoom = scrollZoom(pane);
             this._scrollRegistration = {
                 uv,
-                lock: scrollLockUvRects(this._scrollLockRects, cssW, cssH),
+                lock: scrollLockUvRects(this._scrollLockRects, cssW, cssH, undefined, paneRectUv),
+                paneRectUv,
+                paneUv,
                 frameOffsetPx: { x: frameDip.x * px.x, y: frameDip.y * px.y },
-                frameOffsetCss: { x: frameDip.x / zoom, y: frameDip.y / zoom }
+                frameOffsetCss: { x: frameDip.x / zoom, y: frameDip.y / zoom },
+                paneRectPx,
+                framePaneOffsetPx: { x: framePaneDip.x * px.x, y: framePaneDip.y * px.y },
+                framePaneOffsetCss: { x: framePaneDip.x / paneZoom, y: framePaneDip.y / paneZoom }
             };
             return this._scrollRegistration;
         }
 
         /**
-         * Current registration state, for probes and tests.
-         * @returns {{liveScroll:Object|null, frameScroll:Object|null, frameOffsetCss:{x:number,y:number}, lock:Array<number[]>}}
+         * Frame offset (canvas px) at a canvas point, as the shader computes
+         * it: the window offset unless the point is on a locked box, plus the
+         * pane's offset inside the pane unless a locked box over the pane
+         * covers the point.
+         * @private
+         */
+        _frameOffsetPxAt(x, y) {
+            const reg = this._scrollRegistration;
+            if (!reg) return { x: 0, y: 0 };
+            const u = x / this.canvas.width;
+            const v = y / this.canvas.height;
+            const windowHeld = inScrollLock(reg.lock, u, v);
+            const r = reg.paneRectPx;
+            const inPane = r && x >= r.x0 && x < r.x1 && y >= r.y0 && y < r.y1 &&
+                !inScrollLock(paneLockUvRects(reg.lock, reg.paneRectUv), u, v);
+            return {
+                x: (windowHeld ? 0 : reg.frameOffsetPx.x) + (inPane ? reg.framePaneOffsetPx.x : 0),
+                y: (windowHeld ? 0 : reg.frameOffsetPx.y) + (inPane ? reg.framePaneOffsetPx.y : 0)
+            };
+        }
+
+        /**
+         * Current registration state, for probes and tests. The pane fields
+         * describe the inner scroller: its live state, the pane state the
+         * frame on screen shows, and the frame's pane offset (CSS px).
+         * @returns {{liveScroll:Object|null, frameScroll:Object|null, frameOffsetCss:{x:number,y:number},
+         *   lock:Array<number[]>, livePane:Object|null, framePane:Object|null, paneOffsetCss:{x:number,y:number}}}
          */
         scrollRegistration() {
             const reg = this._scrollRegistration;
+            const frame = this._scrollSources.frame;
             return {
                 liveScroll: this._liveScroll,
-                frameScroll: this._scrollSources.frame,
+                frameScroll: frame,
                 frameOffsetCss: reg ? reg.frameOffsetCss : { x: 0, y: 0 },
-                lock: reg ? reg.lock : []
+                lock: reg ? reg.lock : [],
+                livePane: this._livePane,
+                framePane: (frame && frame.pane) || null,
+                paneOffsetCss: reg ? reg.framePaneOffsetCss : { x: 0, y: 0 }
             };
         }
 
@@ -674,6 +755,7 @@
             const scrollReg = this._updateScrollRegistration();
             this.renderer.setContentOffsets(scrollReg.uv);
             this.renderer.setScrollLock(scrollReg.lock);
+            this.renderer.setPaneRegistration(scrollReg.paneRectUv, scrollReg.paneUv);
 
             // 2. Determine effective foveal radius
             const effectiveRadius = this.enabled ? this.config.fovealRadius : 5000.0;
@@ -818,10 +900,10 @@
                 // Gaze is in canvas space — scale to frame space for compute.
                 // Canvas may be taller than frame (toolbar chrome). While the
                 // page scrolls ahead of the frame, the content under the gaze
-                // sits frameOffsetPx further along in the frame, unless the
-                // gaze is on a fixed/sticky box, which has not moved.
-                const gazeLocked = inScrollLock(scrollReg.lock, gaze.x / this.canvas.width, gaze.y / this.canvas.height);
-                const frameOffsetPx = gazeLocked ? { x: 0, y: 0 } : scrollReg.frameOffsetPx;
+                // sits frameOffsetPx further along in the frame (plus the
+                // pane's own offset when the gaze is inside a scrolled pane),
+                // with the scroll lock applied as the shader applies it.
+                const frameOffsetPx = this._frameOffsetPxAt(gaze.x, gaze.y);
                 const gazeFrameX = (gaze.x + frameOffsetPx.x) * (frameW / this.canvas.width);
                 const gazeFrameY = (gaze.y + frameOffsetPx.y) * (frameH / this.canvas.height);
 

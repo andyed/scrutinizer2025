@@ -57,7 +57,18 @@ const FRAG_PATH = path.join(REPO_ROOT, 'renderer/shaders/peripheral.frag');
 // Wikipedia Fovea_centralis in modes 16 and 20) are byte-identical to v2.8.0. The uniform-offset
 // form pinned above differed from v2.8.0 on that Wikipedia page in ~8.7k pixels, by one level.
 // validate() and validateLive() pass.
-const EXPECTED_HASH_PREFIX = '62d2d25dca97';
+// Refreshed 2026-10-20 (inner-scroller registration): peripheral.frag gained a pane rect and
+// per-texture pane offsets; a fragment inside an overflow:auto pane adds the pane's nonzero
+// offsets to its per-fragment offsets (a locked box over the pane holds still against them), and
+// a pane's newly exposed strip gets the LOD-5 fill. The 34 added lines moved
+// sampleDoGReconstructed from line 323 to 357 and the blob SHA moved -> both pooled_stat_path
+// pins refreshed -> the config's own hash moved. Measured at rest (1920x1012, fresh launch per
+// build): the encoded page in mode 16 is byte-identical to v2.8.0 and to the scroll-lock build.
+// On a page with a registered idle pane, the pane's pixels match the scroll-lock build once both
+// have rescanned the DOM. Wikipedia captures of the same build differ from launch to launch
+// (~8.7k pixels by one level), and a paired capture of this build and the scroll-lock build
+// matched byte for byte. validate() and validateLive() pass.
+const EXPECTED_HASH_PREFIX = 'f06461883849';
 
 describe('Mind2Web Arm-0 config hash', () => {
     let cfg;

@@ -169,8 +169,9 @@ uniform vec2 u_compute_offset;    // u_computeStatTexture
 uniform vec4 u_scroll_lock[16];
 uniform int u_scroll_lock_count;
 
-// This fragment's offsets: the u_*_offset uniforms, or zero inside a
-// scroll-locked box. Set once at the top of main(); every content-texture
+// This fragment's offsets: the u_*_offset uniforms (plus the pane's own
+// offset inside an inner scroller), or zero inside a scroll-locked box. Set
+// once at the top of main(); every content-texture
 // lookup adds one of these. Default precision on purpose: at rest the output
 // matches v2.8.0 byte for byte, and highp moved ~8.7k pixels by one level.
 vec2 frame_offset;
@@ -184,6 +185,39 @@ bool inScrollLock(vec2 p) {
         if (i >= u_scroll_lock_count) break;
         vec4 r = u_scroll_lock[i];
         if (p.x >= r.x && p.y >= r.y && p.x < r.z && p.y < r.w) return true;
+    }
+    return false;
+}
+
+// Inner scroller: a page that scrolls an element (overflow:auto pane: a mail
+// or chat list, a document viewer) instead of the window. Inside the pane's
+// live viewport rect, each texture also shifts by the pane's own scroll since
+// that texture was made; main() adds these to this fragment's offsets.
+// Outside the rect nothing changes.
+uniform vec4 u_pane_rect;               // x0, y0, x1, y1 (UV); zero area = no pane
+uniform vec2 u_frame_pane_offset;       // per texture, as the u_*_offset uniforms
+uniform vec2 u_structure_pane_offset;
+uniform vec2 u_saliency_pane_offset;
+uniform vec2 u_congestion_pane_offset;
+uniform vec2 u_compute_pane_offset;
+
+bool inPane(vec2 p) {
+    return p.x >= u_pane_rect.x && p.y >= u_pane_rect.y && p.x < u_pane_rect.z && p.y < u_pane_rect.w;
+}
+
+// A locked box that holds the pane (the pane itself when it is fixed, or a
+// fixed app shell around it) stays put against the window, but the pane's
+// content still scrolls inside it. Only a locked box over part of the pane (a
+// floating toolbar) holds still against the pane's scroll too. The slack
+// (PANE_LOCK_SLACK in shared/scroll-registration.js) absorbs a border between
+// a locked box and the scrollport inside it, at default precision.
+bool inPaneLock(vec2 p) {
+    for (int i = 0; i < 16; i++) {
+        if (i >= u_scroll_lock_count) break;
+        vec4 r = u_scroll_lock[i];
+        vec4 slack = vec4(0.002, 0.002, -0.002, -0.002);
+        bool holdsPane = all(lessThanEqual(r.xy - slack.xy, u_pane_rect.xy)) && all(greaterThanEqual(r.zw - slack.zw, u_pane_rect.zw));
+        if (!holdsPane && p.x >= r.x && p.y >= r.y && p.x < r.z && p.y < r.w) return true;
     }
     return false;
 }
@@ -2335,6 +2369,22 @@ void main() {
     saliency_offset = u_saliency_offset * follow;
     congestion_offset = u_congestion_offset * follow;
     compute_offset = u_compute_offset * follow;
+    // Inner scroller: inside the pane, add its own scroll, unless a locked
+    // box over the pane covers this fragment (inPaneLock). The window part is
+    // kept for the pane's position in the frame. Each offset is touched only
+    // when its pane offset is nonzero, so a pane at rest runs exactly the
+    // offsets above.
+    vec2 window_frame_offset = frame_offset;
+    bool paneFragment = inPane(uv);
+    if (paneFragment) {
+        float paneFollow = inPaneLock(uv) ? 0.0 : 1.0;
+        vec2 none = vec2(0.0);
+        if (any(notEqual(u_frame_pane_offset, none))) frame_offset += u_frame_pane_offset * paneFollow;
+        if (any(notEqual(u_structure_pane_offset, none))) structure_offset += u_structure_pane_offset * paneFollow;
+        if (any(notEqual(u_saliency_pane_offset, none))) saliency_offset += u_saliency_pane_offset * paneFollow;
+        if (any(notEqual(u_congestion_pane_offset, none))) congestion_offset += u_congestion_pane_offset * paneFollow;
+        if (any(notEqual(u_compute_pane_offset, none))) compute_offset += u_compute_pane_offset * paneFollow;
+    }
 
     // Newly exposed strip: while a scroll runs ahead of the newest capture,
     // the leading edge shows page the frame does not contain yet. Fill it
@@ -2346,11 +2396,27 @@ void main() {
         fragColor = vec4(sampleSourceLod(clamp(frameUV, 0.0, 1.0) - frame_offset, 5.0).rgb, 1.0);
         return;
     }
+    // A scrolling pane exposes its own strip at the pane's edge: past it the
+    // frame holds whatever surrounded the pane. Extend the pane's edge rows.
+    if (paneFragment) {
+        vec4 paneBox = u_pane_rect + window_frame_offset.xyxy;
+        if (frameUV.x < paneBox.x || frameUV.x > paneBox.z || frameUV.y < paneBox.y || frameUV.y > paneBox.w) {
+            fragColor = vec4(sampleSourceLod(clamp(frameUV, paneBox.xy, paneBox.zw) - frame_offset, 5.0).rgb, 1.0);
+            return;
+        }
+    }
     // The same holds where the content's frame position lies under a locked
     // box (a scroll back up uncovers a strip below a sticky header): the
     // frame has the box there, not the content. Fill with the frame's local
     // colour at this screen position instead of repeating the box.
     if (follow > 0.0 && any(notEqual(frame_offset, vec2(0.0))) && inScrollLock(frameUV)) {
+        fragColor = vec4(sampleSourceLod(uv - frame_offset, 5.0).rgb, 1.0);
+        return;
+    }
+    // Inside a pane held by a locked box (follow = 0, e.g. a fixed pane) only
+    // the pane offset moves the sample; the same fill applies where it lands
+    // under a locked box over the pane.
+    if (paneFragment && follow == 0.0 && any(notEqual(frame_offset, vec2(0.0))) && inPaneLock(frameUV)) {
         fragColor = vec4(sampleSourceLod(uv - frame_offset, 5.0).rgb, 1.0);
         return;
     }
@@ -2384,10 +2450,13 @@ void main() {
         float readingGate = horizontality * speedGate;
 
         // Gate: text content under cursor (structure map B channel)
-        // Sampled at the cursor, so it takes the cursor's lock state, not this
-        // fragment's: every fragment must agree on the gate.
+        // Sampled at the cursor, so it takes the cursor's lock and pane state,
+        // not this fragment's: every fragment must agree on the gate.
         vec2 cursorUV = u_mouse / u_resolution;
         vec2 cursor_structure_offset = inScrollLock(cursorUV) ? vec2(0.0) : u_structure_offset;
+        if (inPane(cursorUV) && !inPaneLock(cursorUV) && any(notEqual(u_structure_pane_offset, vec2(0.0)))) {
+            cursor_structure_offset += u_structure_pane_offset;
+        }
         float textGate = smoothstep(0.3, 0.6, textureLod(u_structureMap, cursor_structure_offset + cursorUV, 2.0).b);
 
         // Combined activation

@@ -349,6 +349,15 @@
                 this.computeOffsetLocation = gl.getUniformLocation(this.program, "u_compute_offset");
                 this.scrollLockLocation = gl.getUniformLocation(this.program, "u_scroll_lock");
                 this.scrollLockCountLocation = gl.getUniformLocation(this.program, "u_scroll_lock_count");
+                // Inner-scroller pane: its rect and per-texture offsets (see setPaneRegistration)
+                this.paneRectLocation = gl.getUniformLocation(this.program, "u_pane_rect");
+                this.paneOffsetLocations = {
+                    frame: gl.getUniformLocation(this.program, "u_frame_pane_offset"),
+                    structure: gl.getUniformLocation(this.program, "u_structure_pane_offset"),
+                    saliency: gl.getUniformLocation(this.program, "u_saliency_pane_offset"),
+                    congestion: gl.getUniformLocation(this.program, "u_congestion_pane_offset"),
+                    compute: gl.getUniformLocation(this.program, "u_compute_pane_offset")
+                };
 
                 // Create buffers
                 this.positionBuffer = gl.createBuffer();
@@ -646,6 +655,27 @@
             }
 
             /**
+             * Inner-scroller registration: the pane's live viewport rect in UV
+             * ([x0, y0, x1, y1]; null = no pane) and, per texture, how far the
+             * pane has scrolled past the state that texture was made at (UV).
+             * Samples inside the rect shift by the pane offset on top of the
+             * window offset (setContentOffsets).
+             * @param {number[]|null} rect
+             * @param {Object<string, {x:number, y:number}>} [offsets]
+             */
+            setPaneRegistration(rect, offsets) {
+                const ok = Array.isArray(rect) && rect.length === 4 && rect.every(Number.isFinite);
+                this._paneRect = ok ? rect.slice() : [0, 0, 0, 0];
+                this._paneOffsets = {};
+                for (const key of ['frame', 'structure', 'saliency', 'congestion', 'compute']) {
+                    const o = ok && offsets && offsets[key];
+                    this._paneOffsets[key] = o
+                        ? [Number.isFinite(o.x) ? o.x : 0, Number.isFinite(o.y) ? o.y : 0]
+                        : [0, 0];
+                }
+            }
+
+            /**
              * Set the compute tier level (0 = disabled, 2.5 = active).
              */
             setComputeTier(tier) {
@@ -925,6 +955,11 @@
                 gl.uniform2fv(this.computeOffsetLocation, offsets.compute || zero);
                 if (this._scrollLock) gl.uniform4fv(this.scrollLockLocation, this._scrollLock);
                 gl.uniform1i(this.scrollLockCountLocation, this._scrollLockCount || 0);
+                gl.uniform4fv(this.paneRectLocation, this._paneRect || [0, 0, 0, 0]);
+                const paneOffsets = this._paneOffsets || {};
+                for (const key of Object.keys(this.paneOffsetLocations || {})) {
+                    gl.uniform2fv(this.paneOffsetLocations[key], paneOffsets[key] || zero);
+                }
 
                 gl.uniform2f(this.resolutionLocation, width, height);
                 gl.uniform2f(this.mouseLocation, mouseX, mouseY);

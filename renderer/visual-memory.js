@@ -113,13 +113,18 @@
          * Move every remembered point by (dx, dy) canvas px. Called when the
          * page scrolls: a fixation remembers the content under it, so the
          * point travels with that content. Points scrolled out of view stay
-         * in the buffer and return if the page scrolls back.
+         * in the buffer and return if the page scrolls back. With `region`
+         * ({x0, y0, x1, y1} canvas px) only points inside it move: an inner
+         * scroller carries the fixations on its own content.
          * @param {number} dx
          * @param {number} dy
+         * @param {Object} [region]
          */
-        shiftBy(dx, dy) {
+        shiftBy(dx, dy, region = null) {
             if (!Number.isFinite(dx) || !Number.isFinite(dy) || (dx === 0 && dy === 0)) return;
             for (const point of this.buffer) {
+                if (region && !(point.x >= region.x0 && point.x < region.x1 &&
+                    point.y >= region.y0 && point.y < region.y1)) continue;
                 point.x += dx;
                 point.y += dy;
             }

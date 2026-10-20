@@ -54,8 +54,8 @@
     "file": "renderer/shaders/peripheral.frag",
     "function": "sampleDoGReconstructed",
     "signature_prefix": "vec4 sampleDoGReconstructed(",
-    "line": 323,
-    "file_blob_sha": "3b7fddf8f2862335c258d2b5645722158a2e409e",
+    "line": 357,
+    "file_blob_sha": "0090654819d24dba3200d8e1338072f49a30d22c",
     "note": "DoG-reconstructed sampling path. Not the MIP fallback (sampleMIPPooled at line 628). file_blob_sha is the git blob SHA (git hash-object) — any edit to the file invalidates it. signature_prefix is grepped from the live file at the pinned line to catch function renames and signature changes. Step 3 wires the capability-detect branch to throw if MIP fallback is silently substituted at runtime."
   },
 

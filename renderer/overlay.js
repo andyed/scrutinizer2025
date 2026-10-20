@@ -9,7 +9,7 @@
         normalizeScrollPosition,
         isFrameAtScrollPosition
     } = require('../shared/scroll-freshness');
-    const { FrameScrollRegistrar, scrollZoom } = require('../shared/scroll-registration');
+    const { FrameScrollRegistrar, PaneScrollRegistrar, scrollZoom } = require('../shared/scroll-registration');
 
     const SCROLL_IDLE_MS = 90;
 
@@ -86,6 +86,9 @@
         // Names the page scroll each captured frame shows; the renderer
         // shifts the frame by the live scroll minus that position.
         const frameRegistrar = new FrameScrollRegistrar();
+        // The same for the page's inner scroller (overflow:auto pane), whose
+        // region shifts by its own scroll.
+        const paneRegistrar = new PaneScrollRegistrar();
 
         // Hide the canvas only until this page's first frame arrives. While the
         // page scrolls, the renderer keeps the last frame registered with the
@@ -132,6 +135,7 @@
             isWaitingForFrame = false;
             frameScroll = null;
             frameRegistrar.reset();
+            paneRegistrar.reset();
             if (overlayCanvas) {
                 overlayCanvas.style.visibility = 'hidden';
                 overlayCanvas.dataset.scrollFreshness = 'waiting';
@@ -149,11 +153,18 @@
             scrollIdle = true;
             frameScroll = null;
             frameRegistrar.reset();
+            paneRegistrar.reset();
             if (overlayCanvas) {
                 overlayCanvas.style.visibility = 'visible';
                 overlayCanvas.dataset.scrollFreshness = 'inactive';
             }
         };
+
+        ipcRenderer.on('browser:inner-scroll', (event, pane) => {
+            // The pane's scroll-onset frame was labelled before main heard of it.
+            if (pane) paneRegistrar.reviseForScroll(pane);
+            if (scrutinizer) scrutinizer.setLivePane(pane || null);
+        });
 
         ipcRenderer.on('browser:scroll', (event, position) => {
             handleBrowserScroll(position);
@@ -185,14 +196,26 @@
                 }
             });
 
+            // The pane's scroll registers over the pane's rows; while the window
+            // itself scrolls, the pane's stamp stands.
+            registered.pane = paneRegistrar.register({
+                buffer,
+                width: data.width,
+                height: data.height,
+                viewWidth: data.viewWidth || window.innerWidth,
+                pane: data.pane,
+                paneBefore: data.paneBefore
+            }, frameRegistrar.moving);
+
             if (Math.random() < 0.05) {
                 log(`[Overlay] Received frame: ${data.width}x${data.height}`);
             }
 
-            // A frame whose scroll could not be registered mid-scroll would be
-            // drawn a scroll step off. Keep the registered frame up instead (the
-            // live offset keeps it on the page) and use the next capture.
-            if (registered.trusted) {
+            // A frame whose scroll (window or pane) could not be registered
+            // mid-scroll would be drawn a scroll step off. Keep the registered
+            // frame up instead (the live offsets keep it on the page) and use
+            // the next capture.
+            if (registered.trusted && (!registered.pane || registered.pane.trusted)) {
                 frameScroll = registered;
                 if (scrutinizer && buffer) {
                     scrutinizer.processFrame(buffer, data.width, data.height, frameScroll);
@@ -255,6 +278,7 @@
             log('[Overlay] Page loading started');
             frameScroll = null;
             frameRegistrar.reset();
+            paneRegistrar.reset();
             if (scrutinizer) scrutinizer.resetScrollRegistration();
             updateScrollFreshness();
         });

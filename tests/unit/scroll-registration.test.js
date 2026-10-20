@@ -3,12 +3,15 @@
 const {
     scrollToDip,
     registrationOffsetDip,
+    paneOffsetDip,
     rowSignature,
     estimateVerticalShift,
     FrameScrollRegistrar,
+    PaneScrollRegistrar,
     MAX_SCROLL_LOCK_RECTS,
     scrollLockUvRects,
-    inScrollLock
+    inScrollLock,
+    paneLockUvRects
 } = require('../../shared/scroll-registration');
 
 // Synthetic text page: 18 px line pitch, blank leading between lines, a
@@ -467,5 +470,156 @@ describe('inScrollLock', () => {
         expect(inScrollLock(rects, 0.5, 0.49)).toBe(false);
         expect(inScrollLock([], 0.5, 0.5)).toBe(false);
         expect(inScrollLock(null, 0.5, 0.5)).toBe(false);
+    });
+});
+
+describe('paneLockUvRects', () => {
+    it('keeps locked boxes over the pane and drops those that hold it', () => {
+        const pane = [0.1, 0.1, 0.9, 0.9];
+        const fixedPane = [0.099, 0.099, 0.901, 0.901];   // the pane itself, with a border
+        const shell = [0, 0, 1, 1];                        // a fixed app shell around it
+        const toolbar = [0.5, 0.1, 0.9, 0.2];              // floating over part of the pane
+        expect(paneLockUvRects([fixedPane, shell, toolbar], pane)).toEqual([toolbar]);
+        // Without a pane every lock rect stays.
+        expect(paneLockUvRects([fixedPane, toolbar], null)).toEqual([fixedPane, toolbar]);
+        expect(paneLockUvRects(undefined, pane)).toEqual([]);
+    });
+
+    it('keeps a box nested in the pane\'s own lock rect when a pane is registered', () => {
+        // A fixed pane (lock rect) with a fixed toolbar floating over it, 1000x1000 view.
+        const rects = [{ x: 99, y: 99, w: 802, h: 802 }, { x: 500, y: 100, w: 400, h: 100 }];
+        expect(scrollLockUvRects(rects, 1000, 1000)).toHaveLength(1);
+        const kept = scrollLockUvRects(rects, 1000, 1000, undefined, [0.1, 0.1, 0.9, 0.9]);
+        expect(kept).toHaveLength(2);
+        expect(paneLockUvRects(kept, [0.1, 0.1, 0.9, 0.9])).toEqual([[0.5, 0.1, 0.9, 0.2]]);
+    });
+});
+
+describe('inner-scroller pane registration', () => {
+    // 320x240 device px at 2x (160 DIP wide). The window holds still at 0;
+    // a pane at DIP (60, 20) 90x90 (device (120, 40) 180x180) scrolls its
+    // own content, a second page.
+    const W = 320, H = 240, outer = makePage(W, 4000), inner = makePage(W, 4000, 23);
+    const RECT = { x: 60, y: 20, width: 90, height: 90 };
+    const paneFrame = (trueY, stampY, beforeY, opts = {}) => {
+        const id = opts.id || 1;
+        const rect = opts.rect || RECT;
+        const out = crop(outer, W, 0, H);
+        const top = Math.round(trueY * 2);
+        for (let y = rect.y * 2; y < (rect.y + rect.height) * 2; y++) {
+            const src = (top + y - rect.y * 2) * W * 4;
+            const dst = y * W * 4;
+            out.set(inner.subarray(src + rect.x * 2 * 4, src + (rect.x + rect.width) * 2 * 4), dst + rect.x * 2 * 4);
+        }
+        return {
+            buffer: out, width: W, height: H, viewWidth: W / 2,
+            stamp: { x: 0, y: 0, zoom: 1 }, stampBefore: { x: 0, y: 0, zoom: 1 },
+            pane: { id, x: 0, y: stampY, zoom: 1, rect },
+            paneBefore: { id, x: 0, y: beforeY, zoom: 1, rect: opts.beforeRect || rect }
+        };
+    };
+
+    it('crops the row signature to a region', () => {
+        const frame = paneFrame(100, 100, 100);
+        const c = { x: 120, y: 40, width: 180, height: 180 };
+        const cropped = new Uint8Array(c.width * c.height * 4);
+        for (let y = 0; y < c.height; y++) {
+            const src = ((c.y + y) * W + c.x) * 4;
+            cropped.set(frame.buffer.subarray(src, src + c.width * 4), y * c.width * 4);
+        }
+        const a = rowSignature(frame.buffer, W, H, 256, 8, c);
+        const b = rowSignature(cropped, c.width, c.height, 256, 8);
+        expect(a.height).toBe(180);
+        expect(Array.from(a.data)).toEqual(Array.from(b.data));
+    });
+
+    it('names the true pane scroll when the stamps are a frame off', () => {
+        const reg = new PaneScrollRegistrar();
+        expect(reg.register(paneFrame(100, 100, 100)).y).toBe(100);
+        const second = reg.register(paneFrame(111, 103, 95));
+        expect(second.method).toBe('image');
+        expect(second.y).toBe(111);
+        const third = reg.register(paneFrame(126.5, 134, 118));
+        expect(third.method).toBe('image');
+        expect(third.y).toBe(126.5);
+        expect(third.id).toBe(1);
+        expect(third.rect).toEqual(RECT);
+    });
+
+    it('leaves the window at its stamp while the pane scrolls', () => {
+        const windowReg = new FrameScrollRegistrar();
+        const paneReg = new PaneScrollRegistrar();
+        for (let k = 0; k < 8; k++) {
+            const frame = paneFrame(100 + 8 * k, 100 + 8 * Math.max(0, k - 1), 100 + 8 * Math.max(0, k - 2));
+            const win = windowReg.register(frame);
+            expect(win.y).toBe(0);
+            expect(win.trusted).toBe(true);
+            const pane = paneReg.register(frame, windowReg.moving);
+            if (k >= 2) expect(pane.y).toBe(100 + 8 * k);
+        }
+        expect(windowReg.moving).toBe(false);
+    });
+
+    it('names the true pane scroll on an upward scroll', () => {
+        const reg = new PaneScrollRegistrar();
+        reg.register(paneFrame(500, 500, 500));
+        reg.register(paneFrame(500, 500, 500));
+        const onset = reg.register(paneFrame(492, 500, 500));
+        expect(reg.reviseForScroll({ id: 1, y: 484, zoom: 1 })).toBe(true);
+        expect(onset.y).toBe(492);
+        for (let k = 2; k < 6; k++) {
+            const r = reg.register(paneFrame(500 - 8 * k, 500 - 8 * (k - 1), 500 - 8 * (k - 2)));
+            expect(r.method).toBe('image');
+            expect(r.y).toBe(500 - 8 * k);
+        }
+    });
+
+    it('keeps the pane stamp while the window scrolls', () => {
+        const reg = new PaneScrollRegistrar();
+        reg.register(paneFrame(100, 100, 100));
+        const r = reg.register(paneFrame(111, 103, 95), true);
+        expect(r.method).toBe('stamp');
+        expect(r.y).toBe(103);
+        expect(r.trusted).toBe(true);
+    });
+
+    it('starts over when another pane reports or the rect moves', () => {
+        const reg = new PaneScrollRegistrar();
+        reg.register(paneFrame(100, 100, 100));
+        expect(reg.register(paneFrame(111, 103, 95, { id: 2 })).method).toBe('stamp');
+        const moved = { ...RECT, y: 24 };
+        expect(reg.register(paneFrame(111, 103, 95, { id: 2, rect: moved, beforeRect: RECT })).method).toBe('stamp');
+    });
+
+    it('corrects the pane onset frame once the pane scroll reaches the HUD', () => {
+        const reg = new PaneScrollRegistrar();
+        reg.register(paneFrame(100, 100, 100));
+        reg.register(paneFrame(100, 100, 100));
+        const onset = reg.register(paneFrame(108, 100, 100));
+        expect(onset.y).toBe(100);
+        expect(onset.trusted).toBe(true);
+        // A different pane's scroll revises nothing.
+        expect(reg.reviseForScroll({ id: 2, y: 116, zoom: 1 })).toBe(false);
+        reg.register(paneFrame(100, 100, 100));
+        reg.register(paneFrame(100, 100, 100));
+        const onset2 = reg.register(paneFrame(108, 100, 100));
+        expect(reg.reviseForScroll({ id: 1, y: 116, zoom: 1 })).toBe(true);
+        expect(onset2.y).toBe(108);
+        expect(onset2.method).toBe('revised');
+        expect(reg.register(paneFrame(124, 124, 116)).y).toBe(124);
+    });
+
+    it('reports no pane when none is stamped', () => {
+        const reg = new PaneScrollRegistrar();
+        const frame = paneFrame(100, 100, 100);
+        expect(reg.register({ ...frame, pane: null, paneBefore: null })).toBeNull();
+    });
+
+    it('offsets only between states of the same pane', () => {
+        const a = { id: 3, x: 0, y: 100, zoom: 1.5 };
+        expect(paneOffsetDip(a, { id: 3, x: 0, y: 120, zoom: 1.5 })).toEqual({ x: 0, y: 30 });
+        expect(paneOffsetDip(a, { id: 4, x: 0, y: 120, zoom: 1.5 })).toEqual({ x: 0, y: 0 });
+        expect(paneOffsetDip(a, { id: 3, x: 0, y: 120, zoom: 1 })).toEqual({ x: 0, y: 0 });
+        expect(paneOffsetDip(null, a)).toEqual({ x: 0, y: 0 });
     });
 });

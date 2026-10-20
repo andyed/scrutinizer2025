@@ -511,10 +511,71 @@ window.addEventListener('DOMContentLoaded', () => {
     // Track whether current scan was triggered by scroll or DOM mutation
     let lastScanTrigger = 'mutation';
 
+    // ── Inner scroller ──────────────────────────────────────────────
+    // Many pages scroll an element (an overflow:auto pane) instead of the
+    // window. The HUD registers one such pane: the element that scrolled
+    // most recently, unless a larger pane is still scrolling (nested
+    // scrollers chain into each other). It is reported as {id, x, y, zoom,
+    // rect}: scrollLeft/scrollTop in CSS px and the visible scrollport in
+    // viewport DIP. Panes too small to read are ignored.
+    const PANE_MIN_CSS_PX = 64;
+    const PANE_HOLD_MS = 300;
+    const paneIds = new WeakMap();
+    let nextPaneId = 1;
+    let activePane = null;
+    let activePaneScrolledAt = 0;
+
+    // Visible scrollport (inside borders and scrollbars), clipped to the
+    // viewport, in CSS px; null when it is too small or not visible.
+    const paneViewportRect = (el) => {
+        const box = el.getBoundingClientRect();
+        const x0 = Math.max(0, box.left + el.clientLeft);
+        const y0 = Math.max(0, box.top + el.clientTop);
+        const x1 = Math.min(window.innerWidth, box.left + el.clientLeft + el.clientWidth);
+        const y1 = Math.min(window.innerHeight, box.top + el.clientTop + el.clientHeight);
+        if (x1 - x0 < PANE_MIN_CSS_PX || y1 - y0 < PANE_MIN_CSS_PX) return null;
+        return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+    };
+
+    const paneState = () => {
+        if (!activePane || !activePane.isConnected) return null;
+        const rect = paneViewportRect(activePane);
+        if (!rect) return null;
+        const zoom = webFrame.getZoomFactor();
+        return {
+            id: paneIds.get(activePane),
+            x: activePane.scrollLeft || 0,
+            y: activePane.scrollTop || 0,
+            zoom,
+            rect: { x: rect.x * zoom, y: rect.y * zoom, width: rect.width * zoom, height: rect.height * zoom }
+        };
+    };
+
+    // Returns whether `el` is (now) the registered pane.
+    const choosePane = (el) => {
+        const rect = paneViewportRect(el);
+        if (!rect) return false;
+        const now = performance.now();
+        if (el !== activePane && activePane && activePane.isConnected &&
+            now - activePaneScrolledAt < PANE_HOLD_MS) {
+            const held = paneViewportRect(activePane);
+            if (held && held.width * held.height >= rect.width * rect.height) return false;
+        }
+        if (!paneIds.has(el)) paneIds.set(el, nextPaneId++);
+        activePane = el;
+        activePaneScrolledAt = now;
+        return true;
+    };
+
+    const sendPaneState = () => {
+        ipcRenderer.send('browser:inner-scroll', paneState());
+    };
+
     const currentScroll = () => ({
         x: window.scrollX || 0,
         y: window.scrollY || 0,
-        zoom: webFrame.getZoomFactor()
+        zoom: webFrame.getZoomFactor(),
+        pane: paneState()
     });
 
     const performScan = () => {
@@ -562,12 +623,26 @@ window.addEventListener('DOMContentLoaded', () => {
     // its position on every document even if DOM analysis failed to start.
     window.addEventListener('scroll', () => {
         sendScrollPosition();
+        // A window scroll moves the pane's rect with the page.
+        if (activePane) sendPaneState();
         if (domAdapter) {
             scanAndSend(true); // Immediate throttled scan
             scheduleFinalScan(); // Schedule debounced final scan
         }
     }, { passive: true });
     sendScrollPosition();
+
+    // Element scroll events do not bubble; the capture phase sees them all.
+    // The document's own scroll (target document) is the window listener's.
+    document.addEventListener('scroll', (e) => {
+        const el = e.target;
+        if (!(el instanceof Element) || el === document.scrollingElement ||
+            el === document.documentElement || el === document.body) return;
+        if (!choosePane(el)) return;
+        sendPaneState();
+        // Block rects inside the pane moved: refresh the maps once it stops.
+        if (domAdapter) scheduleFinalScan();
+    }, { capture: true, passive: true });
 
     // Trigger scans on relevant events
     if (domAdapter) {
@@ -633,6 +708,7 @@ window.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', () => {
         ipcRenderer.send('browser:zoom-changed', webFrame.getZoomFactor());
         sendScrollPosition();
+        if (activePane) sendPaneState();
     });
 
     // Forced Scan (e.g. from Main Process on navigation finish)
