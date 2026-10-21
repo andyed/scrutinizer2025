@@ -98,18 +98,15 @@ git tag -a vX.Y.Z -m "vX.Y.Z"
 
 ```bash
 npm test                                   # unit, visual, memory, integration
-if node -e 'process.exit(require("./package.json").scripts["check:scroll"] ? 0 : 1)'; then
-  npm run check:scroll
-else
-  echo "check:scroll is not in package.json yet; skipped"
-fi
+npm run check:scroll                       # continuous-scroll HUD gate (launches the app)
 node scripts/validate-color-search.js
 git diff --stat tests/validation/reports/color-search-report.md
 ```
 
 - `npm test` must pass.
-- `npm run check:scroll` is the continuous-scroll gate. Another session is adding it. Once the script exists it must pass, and a failure stops the release.
+- `npm run check:scroll` must exit 0. It is the only check that watches the HUD while the page moves, and a failure stops the release.
 - `validate-color-search`: if Tier 1 fails, tell Andy. It is a warning, not a stop.
+- **An ALL PASS from it can be empty.** When the rendered captures in `tests/golden-captures/validation/color-search/` (gitignored) are missing, it skips every rendered check and still prints ALL PASS. Tier 1 then reports 5 checks instead of 9. Report that as "model-only; rendered checks skipped", never as a pass. The last real rendered result (April 2026) had Tier 2 rendered-vs-model at 10/20 FAIL.
 - **Restore the color-search report** with `git restore tests/validation/reports/color-search-report.md` unless you mean to update it. The script rewrites this tracked report and drops its hand-written correction notes.
 - Record the tested sha with `git rev-parse HEAD`. Steps 6 and 7 must use the same sha. If anything is committed after this point, rerun this step.
 
