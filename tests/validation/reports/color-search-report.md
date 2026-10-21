@@ -36,4 +36,4 @@ Geometry: fovea_radius=45px, ppd=45
 |------|--------|-------|--------|
 | Tier 1 (must) | 9 | 9 | ALL PASS |
 | Tier 2 (should) | 2 | 3 | 2 pass |
-| Tier 3 (stretch) | 3 | 3 | ALL PASS |
+| Tier 3 (stretch) | 1 | 1 | ALL PASS |
