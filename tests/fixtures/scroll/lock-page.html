@@ -1,0 +1,62 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>scroll-lock probe page</title>
+<style>
+  /* Gray-code gutters: four base-16 gray digits, one 6px column per digit.
+     #code (article, x 0-24) encodes absolute page y, so a bitmap names the
+     window scroll it shows. #hcode (fixed header, its x 40-64) and #scode
+     (sticky section header, its x 8-32) encode y inside their box, so a
+     bitmap names where it drew that box. Both boxes must hold still on the
+     HUD while the window scrolls. */
+  body { margin: 0; font: 16px/1.5 Georgia, serif; background: #fff; color: #222; }
+  canvas.code { position: absolute; top: 0; width: 24px; image-rendering: pixelated; pointer-events: none; }
+  #code { left: 0; }
+  #hcode { left: 40px; }
+  #scode { left: 8px; }
+  #hdr { position: fixed; top: 0; left: 0; right: 0; height: 60px; background: #234; color: #fff; z-index: 10; font: 20px/60px sans-serif; padding-left: 400px; }
+  /* A transparent full-viewport root holding a toast: the lock scan should
+     report the toast, not the root. */
+  #toasts { position: fixed; inset: 16px; pointer-events: none; z-index: 20; }
+  #toast { position: absolute; right: 0; bottom: 0; width: 280px; height: 70px; background: #fe8; }
+  main { margin: 80px 0 0 320px; width: 900px; }
+  .sec { position: sticky; top: 60px; background: #ddd; height: 40px; z-index: 5; padding-left: 48px; }
+  /* A sticky box inside an overflow:auto pane is not stuck to the viewport
+     and must not be locked. */
+  #inner { height: 300px; overflow: auto; border: 1px solid #999; margin: 20px 0; }
+  #inner h3 { position: sticky; top: 0; background: #cdf; margin: 0; }
+  p { margin: 0 0 1em; }
+</style></head>
+<body>
+<canvas id="code" class="code"></canvas>
+<div id="hdr"><canvas id="hcode" class="code"></canvas>Fixed header</div>
+<div id="toasts"><div id="toast">Toast</div></div>
+<main>
+  <div class="sec" id="sec"><canvas id="scode" class="code"></canvas>Sticky section header</div>
+  <div id="a"></div>
+  <div id="inner"><h3>Inner sticky</h3><div id="b"></div></div>
+  <div id="c"></div>
+</main>
+<script>
+  const gutter = (c, H) => {
+    c.width = 4; c.height = H; c.style.height = H + 'px';
+    const ctx = c.getContext('2d');
+    const img = ctx.createImageData(4, H);
+    for (let y = 0; y < H; y++) {
+      for (let d = 0; d < 4; d++) {
+        const v = ((y >> (4 * (3 - d))) & 15) * 17;
+        const i = (y * 4 + d) * 4;
+        img.data[i] = v; img.data[i + 1] = v; img.data[i + 2] = v; img.data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  };
+  const words = 'the fovea centralis is a small central pit composed of closely packed cones in the eye located in the center of the macula lutea of the retina'.split(' ');
+  let n = 7;
+  const para = () => { let s = ''; for (let i = 0; i < 60; i++) { n = (n * 16807) % 2147483647; s += words[n % words.length] + ' '; } return '<p>' + s + '</p>'; };
+  document.getElementById('a').innerHTML = Array.from({ length: 12 }, para).join('');
+  document.getElementById('b').innerHTML = Array.from({ length: 12 }, para).join('');
+  document.getElementById('c').innerHTML = Array.from({ length: 160 }, para).join('');
+  gutter(document.getElementById('hcode'), 60);
+  gutter(document.getElementById('scode'), 40);
+  gutter(document.getElementById('code'), Math.min(32000, document.documentElement.scrollHeight));
+</script>
+</body></html>
