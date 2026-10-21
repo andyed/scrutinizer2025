@@ -4,17 +4,20 @@ Releases go through the `/release` Claude Code skill.
 
 ## Canonical procedure
 
-The **`/release`** skill's source is at
-`~/.claude/skills/release/SKILL.md` on the maintainer's machine (not in this
-repo; the tracked `.claude/skills/release/SKILL.md` is an older variant).
+The **`/release`** skill at `.claude/skills/release/SKILL.md` in this repo is
+the one release procedure. The full workflow lives there; don't duplicate it here.
+`docs/release-process.md` is a pointer to it.
 
 ```
-/release              # Release current version from package.json
-/release 2.7.1        # Release specific version (bumps package.json)
+/release X.Y.Z        # set package.json to X.Y.Z and release it
+/release patch|minor  # next patch / minor version
+/release silent       # rebuild and re-upload the current version
 ```
 
-The skill detects major (`x.Y.0`) vs dot (`x.y.Z`) releases and adjusts
-artifacts. The full workflow is documented in the skill itself. Don't duplicate it here.
+Personal skills outrank project skills of the same name, so the maintainer's
+`~/.claude/skills/release/SKILL.md` must stay a short pointer to the repo
+copy. A session started outside this repo also reaches the procedure
+through that pointer.
 
 ## Deploy surfaces (one release cycle touches all of these)
 
@@ -28,10 +31,14 @@ artifacts. The full workflow is documented in the skill itself. Don't duplicate 
   `latest-mac.yml` on the latest release; a DMG-only release makes every
   installed copy's update check fail with a 404 (v2.7.1 and v2.7.2 shipped
   this way).
+- **Homepage download links (every release):** `../scrutinizer-www/src/index.html`
+  links a specific DMG, so dot releases update it too.
 - **Blog post (major releases only):** new file in `../scrutinizer-www/src/blog/`.
-  Deploy via the scrutinizer-www repo's own pipeline (see `../scrutinizer-www/DEPLOY.md`).
-- **Homepage screenshots:** updated in `../scrutinizer-www/` if captures differ
-  from current site images.
+  Dot releases update the parent post's Download section instead. Deploy via the
+  scrutinizer-www repo's own pipeline (see `../scrutinizer-www/DEPLOY.md`).
+- **Homepage screenshots:** replaced in `../scrutinizer-www/` only from hermetic
+  golden captures. Captures still inherit saved prefs and the display's DPR, so
+  none qualify yet (the skill's step 5).
 - **README download link:** updated in the main repo's README.md.
 
 ## Minimal-change protocol
@@ -48,7 +55,7 @@ through a different pipeline (scrutinizer session telemetry).
 
 ## See also
 
-- `~/.claude/skills/release/SKILL.md`: full release workflow (maintainer-only)
+- `.claude/skills/release/SKILL.md`: full release workflow
 - `../scrutinizer-www/DEPLOY.md`: for web-only patches
 - `CHANGELOG.md`, `ROADMAP.md`
 - `tests/golden-captures/`: visual regression captures per release

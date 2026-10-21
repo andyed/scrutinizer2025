@@ -24,7 +24,7 @@ Background install on macOS needs a signed, notarized app:
 *   **Code Signing**: The app must be signed with a valid Apple Developer ID Certificate ($99/yr).
 *   **Notarization**: The app must be sent to Apple for notarization to be trusted by Gatekeeper.
 
-Without these, a background update would likely result in a "Damaged" app error or be blocked by macOS security. `npm run build` produces a signed, notarized build (see `docs/release-process.md` §8). The mac build targets include the `.zip` that electron-updater's macOS installer (Squirrel.Mac) requires alongside the `.dmg`.
+Without these, a background update would likely result in a "Damaged" app error or be blocked by macOS security. `npm run build` produces a signed, notarized build (see the `/release` skill, `.claude/skills/release/SKILL.md`, step 6). The mac build targets include the `.zip` that electron-updater's macOS installer (Squirrel.Mac) requires alongside the `.dmg`.
 
 ### Configuration (`main.js`)
 ```javascript
