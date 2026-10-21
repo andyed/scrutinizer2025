@@ -1,6 +1,6 @@
 # Scrutinizer Roadmap
 
-Last updated: 2026-10-01 (v2.8.1 in progress)
+Last updated: 2026-10-20 (v2.8.1 released)
 
 ## What's implemented
 
@@ -44,12 +44,12 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 | [wave6_coco_periph_validation.md](docs/specs/implemented/wave6_coco_periph_validation.md) | Scaffolding (v2.4) |
 | [linguistic_priming.md](docs/specs/linguistic_priming.md) | **Planned**: information scent via goal embeddings |
 | [metamer_mode.md](docs/specs/metamer_mode.md) | **Planned**: summary-statistic pooling |
-| [scanpath-replay-spec.md](docs/specs/scanpath-replay-spec.md) | **Planned**: replay recorded mouse/gaze data |
+| [scanpath-replay-spec.md](docs/specs/scanpath-replay-spec.md) | **Replay shipped** (v2.7.1): ScanpathPlayer with UEyes and COCO-Search18 importers, AdSERP added 2026-04; the spec's validation experiments (A–D) and CI audit are not built |
 | [human_subjects_data_collection.md](docs/specs/human_subjects_data_collection.md) | **Planned** |
 | [brown_dataflow_integration.md](docs/specs/implemented/brown_dataflow_integration.md) | Reference: Brown et al. 2023 dataflow architecture |
 | [halverson_hornof_validation.md](docs/specs/implemented/halverson_hornof_validation.md) | In progress |
 | [continuous_chromatic_mip.md](docs/specs/implemented/continuous_chromatic_mip.md) | In progress |
-| [usability-study-deep-links.md](docs/specs/usability-study-deep-links.md) | **macOS implementation complete** (target: v2.8.1); Windows deep-link delivery not yet implemented |
+| [usability-study-deep-links.md](docs/specs/usability-study-deep-links.md) | **Shipped** (v2.8.0, macOS); Windows deep-link delivery not yet implemented |
 
 <details>
 <summary>Completed / shipped specs</summary>
@@ -82,7 +82,7 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 
 **Gaze-cursor coordination as cognitive signal.** Recent work (Stone & Chapman 2023, Zhu et al. 2023) finds more signal in the relationship between gaze and cursor than in either alone: coordination breakdown indicates UX friction, and cross-modal fusion improves activity classification by 7.4%. Eye-tracker integration via the gaze-input branch point would let Scrutinizer capture this coordination signal alongside the peripheral rendering.
 
-**Scanpath replay.** Replay recorded mouse or gaze data through the pipeline for offline analysis. mouseview.js records position data but has no replay capability. Spec: [`scanpath-replay-spec.md`](docs/specs/scanpath-replay-spec.md).
+**Scanpath validation experiments.** Scanpath replay shipped in v2.7.1 (see Release history). The spec's four validation experiments (DoG vs Gaussian structure preservation, chromatic pooling, congestion gating, saliency prediction against fixation locations) and its CI attention audit are not built. Spec: [`scanpath-replay-spec.md`](docs/specs/scanpath-replay-spec.md).
 
 ### Integration
 

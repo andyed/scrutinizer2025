@@ -43,7 +43,7 @@ The moderator moves through selected viewing locations while a participant or st
 
 ### Fixation-memory question
 
-A future workflow may expose a participant to a defined set of locations, preserve those regions in Visual Memory, and then ask, “After seeing this, where would you go to do X?” Version 2.8.1 does not yet launch pre-seeded fixation-memory sets or capture the answer automatically. You can explore the idea manually, but label it as a facilitated prototype procedure.
+A future workflow may expose a participant to a defined set of locations, preserve those regions in Visual Memory, and then ask, “After seeing this, where would you go to do X?” As of 2.8.1, Scrutinizer does not launch pre-seeded fixation-memory sets or capture the answer automatically. You can explore the idea manually, but label it as a facilitated prototype procedure.
 
 ## Prepare the study condition
 
@@ -107,7 +107,7 @@ Supported settings:
 | `comfort_mode` | `false` | Whether Comfort Mode begins enabled |
 | `visual_memory_limit` | `0`, `5`, `10`, `-1`, or `20` | Off, Limited, Extended, Infinite, or IOR |
 
-Query values containing URLs, spaces, punctuation, or other reserved characters must be percent-encoded. The easiest path is the hosted [Study Link Builder](https://scrutinizer.app/study-link-builder.html), which assembles and percent-encodes the link and validates it with a vendored copy of the app's current parser. A link that passes there will pass in an installed build with the same parser. Older builds can reject newer link types (session links need a build newer than 2.8.1), so confirm the link in the pilot. To generate links programmatically instead, use `URLSearchParams` in browser JavaScript:
+Query values containing URLs, spaces, punctuation, or other reserved characters must be percent-encoded. The easiest path is the hosted [Study Link Builder](https://andyed.github.io/scrutinizer-www/study-link-builder.html), which assembles and percent-encodes the link and validates it with a vendored copy of the app's current parser. A link that passes there will pass in an installed build with the same parser. Study Links and session links need Scrutinizer 2.8.0 or later, and an older build can reject a newer link type, so confirm the link in the pilot. To generate links programmatically instead, use `URLSearchParams` in browser JavaScript:
 
 ```html
 <a id="start-task" href="#">Start task in Scrutinizer</a>
@@ -136,7 +136,7 @@ Most moderated sessions run several tasks in order on the same participant. A **
 scrutinizer://v1/session/start?session_id=nav-study&participant_id=P04&mode=12&fovea_radius_px=45&t1.url=…&t1.instructions=…&t2.url=…&t2.instructions=…
 ```
 
-Build session links in the [Study Link Builder](https://scrutinizer.app/study-link-builder.html): choose **Multi-task session**, add task rows, and set the shared condition once; any task row can override it. The builder enforces the same limits the app does (2–8 tasks, 8192-character link cap) and validates with the app's own parser. Session links require a Scrutinizer build newer than 2.8.1; single-task links are unchanged.
+Build session links in the [Study Link Builder](https://andyed.github.io/scrutinizer-www/study-link-builder.html): choose **Multi-task session**, add task rows, and set the shared condition once; any task row can override it. The builder enforces the same limits the app does (2–8 tasks, 8192-character link cap) and validates with the app's own parser. Session links shipped with single-task links in 2.8.0 and need that build or later.
 
 What the participant experiences:
 
@@ -236,12 +236,13 @@ task goal. Record and adjudicate goal achievement separately using the study's
 outcome rubric. Everything runs locally in your browser; session data is never
 uploaded.
 
-Current status: the source build now records per-task input trails and full-page
-stimulus anchors, then publishes the complete Workbench session directory
-atomically. With these, the Workbench's motion measures and procedural replay
-work for source-built studies. A packaged macOS verification and release is still
-required before treating this as generally available in the distributed 2.8.x
-app. The Workbench and its file formats are ready now, and its bundled demo
+Current status: since 2.8.0, Scrutinizer records per-task input trails and
+full-page stimulus anchors, then publishes the complete Workbench session
+directory atomically. With these, the Workbench's motion measures and procedural
+replay work on sessions captured by 2.8.0 or later. No end-to-end check of a
+packaged-build session through the Workbench is recorded yet, so run one pilot
+session through it before a study. The Workbench and its file formats are ready
+now, and its bundled demo
 session shows the complete workflow. See the
 Workbench Guide (`scrutinizer-moderator/docs/workbench-guide.md`, sibling repo)
 for the roster, quality-control flags, and measure definitions.
@@ -276,7 +277,7 @@ Compare behavior within the same documented condition. If settings, display geom
 
 ### Windows
 
-Windows packaging is configured, but the 2.8.1 Study Link installation and browser-handoff procedure is awaiting platform verification. Do not publish Windows participant instructions until the installer registers `scrutinizer://`, cold and warm launches pass, and uninstall behavior has been checked.
+Windows packaging is configured, but Windows Study Link delivery (single-instance lock, argv handling) is not yet implemented; Study Links are macOS-only as of 2.8.1. Do not publish Windows participant instructions until the installer registers `scrutinizer://`, cold and warm launches pass, and uninstall behavior has been checked.
 
 ### During a session
 

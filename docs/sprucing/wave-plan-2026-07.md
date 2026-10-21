@@ -2,7 +2,7 @@
 
 Sequencing plan from the 2026-07-16 four-track audit (usability-readiness, docs
 roadmap, competitive landscape, brand positioning). Organizing goal: **from
-"launcher shipped" (v2.8.1 Study Links) to "first real study run cleanly,
+"launcher shipped" (v2.8.0 Study Links) to "first real study run cleanly,
 producing artifacts, with the public story matching the product."**
 
 This plan amends the phase docs in this directory, which stay in effect. Phase numbering
@@ -17,7 +17,7 @@ below refers to `phase-2-automation-ergonomics.md` / `phase-3-usability-foundati
 - [x] Unknown-parameter echo capped at 64 chars in `shared/study-deep-link.js`
 - [x] Release notes now state that Windows deep links are unimplemented (they had said "being verified")
 
-Exit: v2.8.1 release notes updated; release itself gated on Wave 1 verification.
+Exit: Study Links release notes updated; release itself gated on Wave 1 verification. Study Links shipped in v2.8.0 (2026-10-19).
 
 ## Wave 1: Verify the delivery path, build the study kit, run the pilot (1–2 days)
 
