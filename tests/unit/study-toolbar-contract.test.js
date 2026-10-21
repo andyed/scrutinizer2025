@@ -50,16 +50,12 @@ describe('Study toolbar contract', () => {
         expect(main).toContain("toolbar:update-nav-state', toolbarNavigationState(win)");
     });
 
-    it('keeps the last visualization frame up during native page scrolling', () => {
-        expect(preload).toContain("ipcRenderer.send('browser:scroll'");
-        expect(main).toContain("ipcMain.on('browser:scroll'");
-        expect(main).toContain('frameSequence');
-        expect(main).toContain('scrollX: capturedScroll.x');
-        expect(main).toContain('scrollY: capturedScroll.y');
-        expect(overlay).toContain("require('../shared/scroll-freshness')");
-        expect(overlay).toContain("overlayCanvas.style.visibility = hasFrame ? 'visible' : 'hidden'");
-        expect(overlay).not.toContain("overlayCanvas.style.visibility = present ? 'visible' : 'hidden'");
-    });
+    // Whether the HUD stays up and on the page while it scrolls is behavior,
+    // not source text: `npm run check:scroll` (scripts/check-scroll-hud.mjs)
+    // scrolls fixtures in the running app and fails on any hidden time,
+    // misregistered frame, backward step, or drifting fixed/sticky box. It
+    // needs a display and GPU, so it runs before release builds (DEPLOY.md),
+    // not in CI.
 
     it('registers the visualization with native page scrolling', () => {
         // Scroll carries the page zoom; DOM scans carry the scroll they measured at.
@@ -72,6 +68,9 @@ describe('Study toolbar contract', () => {
         expect(main.indexOf('const scrollBeforeCapture = win.latestBrowserScroll')).toBeLessThan(captureAt);
         expect(main.indexOf('const capturedScroll = win.latestBrowserScroll || scrollBeforeCapture')).toBeGreaterThan(captureAt);
         expect(main).toContain('scrollBeforeY: scrollBeforeCapture.y');
+        expect(main).toContain('scrollX: capturedScroll.x');
+        expect(main).toContain('scrollY: capturedScroll.y');
+        expect(main).toContain('frameSequence');
         expect(main).toContain('viewWidth: bounds.width');
         // The HUD names each frame's scroll from its pixels and follows the live scroll.
         expect(overlay).toContain("require('../shared/scroll-registration')");
