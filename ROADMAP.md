@@ -112,6 +112,10 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 
 ## Release history
 
+### v2.8.1: Scrolling (2026-10-20)
+- The foveated view stays up during native scroll; between captures the last frame moves with the page and the fovea stays on the pointer
+- Fixed and sticky boxes hold still under the scroll offset; the most recently scrolled `overflow: auto` pane is registered too
+
 ### v2.8.0: Study Links & FOVI Default Restored (2026-10-19)
 - Study Links (macOS): `scrutinizer://v1/task/start` and `scrutinizer://v1/session/start` launch single tasks and ordered multi-task sessions from a browser instruction sheet, with in-app consent, a study toolbar, debrief, and a versioned session-capture envelope
 - Default mode restored to 12 (FOVI Cortical Grid); modes 14 and 15 moved to research

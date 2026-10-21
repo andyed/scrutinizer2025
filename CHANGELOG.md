@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.8.1] - 2026-10-20
+
+### Fixed
+
+- The foveated view no longer drops out while a page scrolls.
+
+### Changed: scrolling
+
+- **The view stays aligned with the page during scroll.** Between asynchronous captures, the last frame moves with the page, and the fovea stays on the pointer. Each texture records the scroll it was captured at, and the shader offsets its content lookups by the difference from the live scroll. `shared/scroll-registration.js` names a frame's true scroll by matching row signatures against the previous frame, because the scroll read around `capturePage` does not name the pixels. The newly uncovered edge strip shows a blurred extension of the frame until the next capture.
+- **Fixed and sticky elements hold still.** Preload reports viewport-pinned boxes, and the shader samples them without the scroll offset.
+- **Scrolling panes are registered too.** The most recently scrolled `overflow: auto` pane gets its own offset inside its scrollport.
+- Arm-0 config-hash pins refreshed for the `peripheral.frag` changes. The offsets are zero when nothing is scrolling.
+
 ## [2.8.0] - 2026-10-19
 
 First public release since v2.7.2. It includes the v2.7.3 changes, which were tagged but never published, and the 2.8.0 work built on 2026-07-11 (below), which was never published on its own.
