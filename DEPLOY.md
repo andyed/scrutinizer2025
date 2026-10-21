@@ -18,6 +18,7 @@ artifacts. The full workflow is documented in the skill itself. Don't duplicate 
 
 ## Deploy surfaces (one release cycle touches all of these)
 
+- **Scroll gate, before building:** `npm run check:scroll` must exit 0. It launches the app, so it runs locally (display and GPU), not in CI; see `scripts/check-scroll-hud.mjs`.
 - **macOS DMG + ZIP:** signed + notarized via `npm run build`. Output: `dist/`
   (`Scrutinizer-X.Y.Z-arm64.dmg`, `Scrutinizer-X.Y.Z-arm64-mac.zip`,
   `latest-mac.yml`).
