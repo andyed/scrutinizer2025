@@ -10,7 +10,7 @@
 
 ## Popup Windows Don't Inherit Foveal Effect
 
-**Status**: Known Issue - Deferred to v2.0  
+**Status**: Historical. Recorded against v1.4.2 and deferred to v2.0 at the time; not re-verified in any v2.x release (see the status note above)  
 **Severity**: Medium  
 **Workaround**: Press ESC in popup window to manually toggle foveal mode
 

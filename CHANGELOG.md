@@ -188,7 +188,7 @@ Per `docs/next-steps-2026-04.md:38–42`, modes that claim peripheral pooling fi
 - **OCR Baseline Stale**: Re-frozen OCR baseline at 1x DPR (1920×944) after mode 12 graduation changed capture geometry. Previous baseline was frozen at 2x DPR (3840×1888), causing foveal radius mismatch.
 
 ### Validation
-- **OCR Profile (Mode 12)**: _[Corrected 2026-06-05]_ The figures previously stated here (Fovea 84% / Parafovea 60% / Near 62% / Far 52%, "monotonically declining") were never machine-generated and were inaccurate: parafovea→near rises (60→62), so the profile is not monotonic. The peripheral-OCR gate that should have produced these numbers was in fact dead (see [Unreleased]); it has been revived to emit real per-eccentricity curves as data to `tests/validation/ocr-accuracy-curve.json` under a declining-trend predicate.
+- **OCR Profile (Mode 12)**: _[Corrected 2026-06-05]_ The figures previously stated here (Fovea 84% / Parafovea 60% / Near 62% / Far 52%, "monotonically declining") were never machine-generated and were inaccurate: parafovea→near rises (60→62), so the profile is not monotonic. The peripheral-OCR gate that should have produced these numbers was in fact dead (see [2.8.0: peripheral-OCR readability gate revived](#fixed-peripheral-ocr-readability-gate-revived-audit-2026-06-05-b4)); it has been revived to emit real per-eccentricity curves as data to `tests/validation/ocr-accuracy-curve.json` under a declining-trend predicate.
 - **OCR Profile (Mode 0, reference)**: Fovea 100% | Parafovea 67% | Near 44% | Far 31%. Overall 40%.
 
 ## [2.5.0] - 2026-03-16

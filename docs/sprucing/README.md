@@ -42,7 +42,7 @@ Phase 3's controlled studies need Phase 2's per-trial condition-toggle API → c
 
 Check boxes in each phase file as tickets land. When a whole phase is green, add a dated line here:
 
-- [~] Phase 0 (2026-07-11): P0-1..P0-4 done, P0-5 done except the `v2.8.0` tag (v2.6.1 is tagged; `package.json` is 2.8.0 since `6e3f827` with no matching tag). Unit suite green (562 pass). The crowding gate fails by design as a diagnostic; the mode-12 radial non-monotonicity was resolved as content-driven (phase-0 P0-2).
+- [x] Phase 0 (2026-07-11; closed 2026-10-19): P0-1..P0-5 done. The last P0-5 item, the `v2.8.0` tag, landed 2026-10-19 at the release commit `f8a5d2c` (v2.6.1 was tagged 2026-07-11). Unit suite green (562 pass). The crowding gate fails by design as a diagnostic; the mode-12 radial non-monotonicity was resolved as content-driven (phase-0 P0-2).
 - [x] Phase 1 (2026-07-11): all 7 tickets. CI workflow, clean-clone-safe suite, tessdata provenance, validator exit codes, hygiene, and compute-tier stamping + `--require-tier` (P1-5, verified with a real capture). Two small deferrals noted in-ticket (OCR RC-2.x warnings→failures; HUD pooling badge). Unit suite green (562 pass). P1-5 found that the default mode 12 renders Tier 2.5 while requesting 2.75 on this GPU (chip spawned).
 - [ ] Phase 2 complete (date pending)
 - [ ] Phase 3 complete (date pending)
