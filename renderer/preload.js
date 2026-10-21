@@ -461,11 +461,30 @@ window.addEventListener('DOMContentLoaded', () => {
     let isScanning = false;
     let scrollDebounceTimer = null;
     let typingDebounceTimer = null;
+    // A scroll scan asked for while another scan holds the throttle waits
+    // for it instead of being dropped. A jump scroll that lands inside a
+    // mutation scan's idle wait or 300 ms throttle would otherwise leave the
+    // HUD's maps and lock list at the old position until the next scroll or
+    // mutation, which may never come.
+    let scrollScanPending = false;
+
+    const releaseScanThrottle = (ms) => {
+        setTimeout(() => {
+            isScanning = false;
+            if (scrollScanPending) {
+                scrollScanPending = false;
+                scanAndSend(true);
+            }
+        }, ms);
+    };
 
     // Throttled scan function with differentiated handling for scroll vs mutations
-    // Throttled scan function with differentiated handling for scroll vs mutations
     const scanAndSend = (isScrollEvent = false) => {
-        if (!domAdapter || isScanning) return;
+        if (!domAdapter) return;
+        if (isScanning) {
+            if (isScrollEvent) scrollScanPending = true;
+            return;
+        }
 
         // Strategy: 
         // Scroll = High Priority (RAF) -> 16ms throttle
@@ -476,7 +495,7 @@ window.addEventListener('DOMContentLoaded', () => {
             isScanning = true;
             requestAnimationFrame(() => {
                 performScan();
-                setTimeout(() => { isScanning = false; }, 16);
+                releaseScanThrottle(16);
             });
         } else {
             lastScanTrigger = 'mutation';
@@ -503,7 +522,7 @@ window.addEventListener('DOMContentLoaded', () => {
             window.requestIdleCallback(() => {
                 performScan();
                 // Relaxed throttle for mutations
-                setTimeout(() => { isScanning = false; }, 300);
+                releaseScanThrottle(300);
             }, { timeout: 1000 });
         }
     };
