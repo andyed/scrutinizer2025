@@ -21,7 +21,7 @@ through that pointer.
 
 ## Deploy surfaces (one release cycle touches all of these)
 
-- **Scroll gate, before building:** `npm run check:scroll` must exit 0. It launches the app, so it runs locally (display and GPU), not in CI; see `scripts/check-scroll-hud.mjs`.
+- **Scroll gate, before building:** `npm run check:scroll` must exit 0. It scrolls three fixtures and runs six pointer and keyboard interactions on a results-page fixture, and fails if the HUD ever lets the unfoveated page show through. It launches the app, so it runs locally (display and GPU), not in CI; see `scripts/check-scroll-hud.mjs`. `npm run check:interact` runs the interaction half alone.
 - **macOS DMG + ZIP:** signed + notarized via `npm run build`. Output: `dist/`
   (`Scrutinizer-X.Y.Z-arm64.dmg`, `Scrutinizer-X.Y.Z-arm64-mac.zip`,
   `latest-mac.yml`).

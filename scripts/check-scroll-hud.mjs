@@ -28,20 +28,32 @@
  *      content position. On the lock page it reads the HUD's own output
  *      (readPixels, fovea widened to the whole canvas) at the article
  *      gutter and at both boxes.
+ *   4. Interaction runs (serp-page.html, a results page that changes under
+ *      the pointer): hover cards, iframe previews, an accordion, pushState
+ *      tabs, typing into a suggestion box, and links to the next page. Each
+ *      drives CDP mouse and key input for about 1.5 s with the page still,
+ *      and samples canvas visibility and the alpha of the HUD's output
+ *      (three rows and three columns per render). The HUD window is
+ *      transparent, so a hidden canvas or a pixel with alpha below 255
+ *      shows the unfoveated page.
  *
  * Fails (exit 1) when any run shows:
- *   - the overlay canvas hidden for any part of the scroll (> 0%);
+ *   - the overlay canvas hidden for any part of the scroll or interaction
+ *     (> 0%), or, on an interaction run, any probed output pixel with
+ *     alpha below 255;
  *   - registered - true scroll above 0 px on a frame the HUD registered
  *     (gutters decode whole CSS px, so "0" means |error| <= 0.5 px);
  *   - a backward step: displayed content moving against the scroll;
  *   - a fixed or sticky box drifting from its rest position, or drawn
  *     somewhere other than where the DOM puts it;
- *   - too little data to judge (no scroll, too few frames or renders), or
- *     a scroll that reached the end of its fixture;
+ *   - too little data to judge (no scroll, too few frames or renders, an
+ *     interaction whose page events did not happen), or a scroll that
+ *     reached the end of its fixture;
  *   - a run that cannot reach its settled start state.
  * Exit 2: the harness itself could not run (no free port, no app).
  *
- * usage: npm run check:scroll [-- --only=window,lock,pane] [--port=9350]
+ * usage: npm run check:scroll [-- --only=window,lock,pane,interact]
+ *        [--interact=hover,iframe,expand,tabs,type,navigate] [--port=9350]
  *        [--ms=1500] [--json=report.json] [--raw=dir] [--keep]
  *   --json writes the per-run metrics, --raw each run's sample logs.
  *   --keep leaves the app running and its profile on disk when done.
@@ -66,13 +78,13 @@ const flags = Object.fromEntries(process.argv.slice(2).map(a => {
     return [k, v === undefined ? true : v];
 }));
 const DURATION = Number(flags.ms || 1500);
-const ONLY = flags.only ? String(flags.only).split(',') : ['window', 'lock', 'pane'];
+const ONLY = flags.only ? String(flags.only).split(',') : ['window', 'lock', 'pane', 'interact'];
 
 // Below these counts a run cannot judge anything: a HUD that stopped
 // rendering would otherwise pass every check vacuously. The 4 ms visibility
 // poll slows to about 16 ms while the lock runs read pixels on every
 // render; the MutationObserver still sees every change.
-const MIN = { visSamples: 60, frames: 10, renders: 30, boxRenders: 10, scrollSteps: 30 };
+const MIN = { visSamples: 60, frames: 10, renders: 30, boxRenders: 10, scrollSteps: 30, alphaProbes: 20 };
 // Gutters decode whole CSS px.
 const TOL = 0.5;
 
@@ -116,7 +128,8 @@ const FIXTURE = {
 
 const RUNS = [];
 for (const fixture of ONLY) {
-    if (!FIXTURE[fixture]) throw new Error(`unknown fixture '${fixture}' (window, lock, pane)`);
+    if (fixture === 'interact') continue;
+    if (!FIXTURE[fixture]) throw new Error(`unknown fixture '${fixture}' (window, lock, pane, interact)`);
     for (const driver of ['raf', 'wheel']) {
         for (const dir of [1, -1]) {
             for (const step of [8, 40]) RUNS.push({ fixture, driver, dir, step });
@@ -124,6 +137,28 @@ for (const fixture of ONLY) {
     }
 }
 const runLabel = (r) => `${r.fixture} ${r.driver === 'raf' ? 'scrollBy' : 'wheel'} ${r.dir > 0 ? 'down' : 'up'} ${r.step}px`;
+
+// Interaction runs on serp-page.html. `min` is the page events a run must
+// produce to count (serp-page's own counters; navigate counts loads).
+// navigate leaves the page on another URL, so it runs last.
+const SERP = 'serp-page.html';
+const INTERACT = {
+    hover: { counter: 'cards', min: 6 },
+    iframe: { counter: 'frames', min: 4 },
+    expand: { counter: 'toggles', min: 6 },
+    tabs: { counter: 'tabs', min: 6 },
+    type: { counter: 'suggests', min: 10 },
+    navigate: { counter: 'loads', min: 2 }
+};
+const ASKED = flags.interact ? String(flags.interact).split(',') : Object.keys(INTERACT);
+for (const name of ASKED) {
+    if (!INTERACT[name]) throw new Error(`unknown interaction '${name}' (${Object.keys(INTERACT).join(', ')})`);
+}
+// In INTERACT's order whatever the flag's, so navigate stays last.
+const INTERACT_RUNS = !ONLY.includes('interact') ? [] : Object.keys(INTERACT).filter(k => ASKED.includes(k));
+// Effects trail their input (a load or scan answers a click a few frames
+// later), so an interaction run is judged until this long after its input.
+const INTERACT_TAIL = 500;
 
 // ── App lifecycle ───────────────────────────────────────────────────
 
@@ -431,6 +466,72 @@ function installHudRecorder(cfg) {
         R.savedRadius = s.config.fovealRadius;
         s.config.fovealRadius = 5000;
     }
+    // Output alpha (cfg.alpha): three full rows and three full columns per
+    // render. The context has alpha and preserveDrawingBuffer, and the HUD
+    // window is transparent, so alpha below 255 lets the page show through.
+    // A synchronous readPixels waits for the whole render on the GPU and
+    // starves the capture loop, so each probe reads into a pixel buffer and
+    // is decoded on a later render, once its fence has passed.
+    const alphaLines = [];
+    let alphaBytes = 0;
+    if (cfg.alpha) {
+        for (const f of [0.2, 0.5, 0.8]) {
+            for (const l of [{ x: 0, y: Math.round(f * H), w: s.canvas.width, h: 1 },
+                { x: Math.round(f * s.canvas.width), y: 0, w: 1, h: H }]) {
+                alphaLines.push({ ...l, offset: alphaBytes });
+                alphaBytes += l.w * l.h * 4;
+            }
+        }
+    }
+    R.alphaPool = alphaLines.length ? Array.from({ length: 8 }, () => {
+        const pbo = gl.createBuffer();
+        const prev = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+        gl.bufferData(gl.PIXEL_PACK_BUFFER, alphaBytes, gl.STREAM_READ);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, prev);
+        return pbo;
+    }) : [];
+    R.alphaPending = [];
+    const alphaHost = new Uint8Array(alphaBytes);
+    const decodeAlpha = (p) => {
+        const prev = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, p.pbo);
+        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, alphaHost);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, prev);
+        gl.deleteSync(p.sync);
+        R.alphaPool.push(p.pbo);
+        let clear = 0, min = 255, n = 0;
+        for (let i = 3; i < alphaHost.length; i += 4) {
+            const a = alphaHost[i];
+            if (a < 255) clear++;
+            if (a < min) min = a;
+            n++;
+        }
+        p.rec.alpha = { clear, min, n };
+    };
+    // wait: block on the fence (end of the run) instead of skipping.
+    R.drainAlpha = (wait) => {
+        while (R.alphaPending.length) {
+            const p = R.alphaPending[0];
+            const st = gl.clientWaitSync(p.sync, 0, 0);
+            if (!wait && st !== gl.ALREADY_SIGNALED && st !== gl.CONDITION_SATISFIED) break;
+            if (wait) gl.finish();
+            R.alphaPending.shift();
+            decodeAlpha(p);
+        }
+    };
+    const probeAlpha = (rec) => {
+        R.drainAlpha(false);
+        // Pool empty: this render goes unprobed rather than stalling.
+        const pbo = R.alphaPool.pop();
+        if (!pbo) return;
+        const prev = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+        for (const l of alphaLines) gl.readPixels(l.x, l.y, l.w, l.h, gl.RGBA, gl.UNSIGNED_BYTE, l.offset);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, prev);
+        R.alphaPending.push({ pbo, rec, sync: gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0) });
+        gl.flush();
+    };
 
     // The constructor binds render onto the instance; wrap that and put it
     // back afterwards.
@@ -469,6 +570,7 @@ function installHudRecorder(cfg) {
                 return agreed(tops);
             });
         }
+        if (alphaLines.length) probeAlpha(rec);
         R.renders.push(rec);
     };
     return true;
@@ -482,6 +584,8 @@ function collectHudRecorder() {
     R.observer.disconnect();
     require('electron').ipcRenderer.removeListener('hud:frame-captured', R.onFrame);
     s.render = R.ownRender;
+    R.drainAlpha(true);
+    for (const pbo of R.alphaPool) s.renderer.gl.deleteBuffer(pbo);
     if (R.savedRadius !== undefined) s.config.fovealRadius = R.savedRadius;
     // Labels can be revised after arrival (scroll-onset frames): read them now.
     R.frames.forEach((f, i) => {
@@ -562,6 +666,96 @@ function boxGeometry(boxes) {
     });
 }
 
+// ── Interaction drivers (CDP input, serp-page.html) ─────────────────
+
+const mouse = (page, type, x, y, extra = {}) =>
+    page.send('Input.dispatchMouseEvent', { type, x, y, ...extra });
+
+async function click(page, x, y) {
+    await mouse(page, 'mouseMoved', x, y);
+    await mouse(page, 'mousePressed', x, y, { button: 'left', clickCount: 1 });
+    await mouse(page, 'mouseReleased', x, y, { button: 'left', clickCount: 1 });
+}
+
+const serpGeometry = (page) => page.evaluate('window.__serpGeometry()');
+const serpCounters = async (page) => JSON.parse(await page.evaluate('JSON.stringify(window.__serp)'));
+
+/** One mouse move per display frame through `points`, in turn, for ms. */
+async function sweep(page, points, ms) {
+    const t0 = Date.now();
+    for (let i = 0; Date.now() - t0 < ms; i++) {
+        const p = points[i % points.length];
+        await mouse(page, 'mouseMoved', p.x, p.y);
+        await sleep(16);
+    }
+}
+
+/** Each returns the page events it caused when the page cannot count them. */
+const DRIVE = {
+    // Across each result on screen, entering a new one every 64 ms.
+    async hover(page) {
+        const g = await serpGeometry(page);
+        const pts = g.results.filter(r => r.bottom < g.vh).flatMap(r =>
+            [40, 200, 400, r.right - r.left - 40].map(dx => ({ x: Math.round(r.left + dx), y: r.y })));
+        await sweep(page, pts, DURATION);
+    },
+    // Round each thumbnail, about 100 ms per preview.
+    async iframe(page) {
+        const g = await serpGeometry(page);
+        const ring = [[-40, -20], [0, -20], [40, -20], [40, 20], [0, 20], [-40, 20]];
+        const pts = g.videos.flatMap(v => ring.map(([dx, dy]) => ({ x: v.x + dx, y: v.y + dy })));
+        await sweep(page, pts, DURATION);
+    },
+    // Open and close the questions in turn; answers move the ones below.
+    async expand(page) {
+        const t0 = Date.now();
+        for (let i = 0; Date.now() - t0 < DURATION; i++) {
+            const g = await serpGeometry(page);
+            const q = g.questions.filter(b => b.bottom < g.vh);
+            const b = q[i % q.length];
+            await click(page, b.x, b.y);
+            await sleep(100);
+        }
+    },
+    async tabs(page) {
+        const g = await serpGeometry(page);
+        const t0 = Date.now();
+        for (let i = 0; Date.now() - t0 < DURATION; i++) {
+            const b = g.tabs[i % g.tabs.length];
+            await click(page, b.x, b.y);
+            await sleep(100);
+        }
+    },
+    async type(page) {
+        const g = await serpGeometry(page);
+        await click(page, g.query.x, g.query.y);
+        const text = ' crowding acuity eccentricity pooling saccade';
+        const t0 = Date.now();
+        for (let i = 0; Date.now() - t0 < DURATION; i++) {
+            await page.send('Input.insertText', { text: text[i % text.length] });
+            await sleep(40);
+        }
+    },
+    // Follow "Next page" three times, each once the HUD has frames of the
+    // page it landed on.
+    async navigate(page, hud) {
+        let loads = 0;
+        const t0 = Date.now();
+        while (loads < 3 && Date.now() - t0 < 8000) {
+            const g = await serpGeometry(page);
+            const from = await page.evaluate('location.href');
+            await click(page, g.next.x, g.next.y);
+            await waitFor('the next results page', () => page.evaluate(
+                `location.href !== ${JSON.stringify(from)} && document.readyState === 'complete' && !!window.__serpGeometry`), 5000, 20);
+            loads++;
+            const up = (await hud.call(hudState)).uploads;
+            await waitFor('frames from the next results page',
+                async () => (await hud.call(hudState)).uploads > up + 2, 5000, 20);
+        }
+        return loads;
+    }
+};
+
 // ── One run ─────────────────────────────────────────────────────────
 
 async function runOne(run, { hud, page }) {
@@ -632,6 +826,38 @@ async function runOne(run, { hud, page }) {
             JSON.stringify({ run, geo, boxes, pageLog, hudLog }));
     }
     return analyze(run, pageLog, hudLog, boxes);
+}
+
+async function runInteraction(name, { hud, page }) {
+    // Settle: page back to its load-time state, pointer off every target,
+    // DOM scans quiet, the canvas up and frames arriving.
+    await page.evaluate('window.__serpReset()');
+    const g = await serpGeometry(page);
+    await mouse(page, 'mouseMoved', g.rest.x, g.rest.y);
+    const up = (await hud.call(hudState)).uploads;
+    await waitFor(`the HUD to settle on ${SERP}`, async () => {
+        const st = await hud.call(hudState);
+        const quiet = await hud.call(msSinceScan);
+        return st.visible && st.uploads > up + 3 && quiet > 800 ? st : { ok: false, ...st, quiet };
+    }, 15000);
+
+    const before = await serpCounters(page);
+    await hud.call(installHudRecorder, { winRows: [], alpha: true });
+    await sleep(300);
+    // HUD samples carry timeOrigin + now(), wall-clock ms like Date.now().
+    const start = Date.now();
+    const counted = await DRIVE[name](page, hud);
+    const end = Date.now();
+    await sleep(INTERACT_TAIL + 200);
+    const hudLog = JSON.parse(await hud.call(collectHudRecorder));
+    const key = INTERACT[name].counter;
+    const events = counted !== undefined ? counted : (await serpCounters(page))[key] - before[key];
+    if (flags.raw) {
+        fs.mkdirSync(String(flags.raw), { recursive: true });
+        fs.writeFileSync(path.join(String(flags.raw), `interact-${name}.json`),
+            JSON.stringify({ name, start, end, events, hudLog }));
+    }
+    return analyzeInteraction(name, start, end, events, hudLog);
 }
 
 // ── Analysis ────────────────────────────────────────────────────────
@@ -762,6 +988,82 @@ function analyze(run, pageLog, hudLog, boxes) {
     return m;
 }
 
+/** Hidden stretches inside [start, end]: how many, and the longest in ms. */
+function hiddenSpans(vis, start, end) {
+    const pts = vis.slice().sort((a, b) => a[0] - b[0]);
+    const spans = [];
+    let from = null;
+    for (const [t, v] of pts) {
+        if (!v && from === null) from = Math.max(t, start);
+        if (v && from !== null) { spans.push(Math.min(t, end) - from); from = null; }
+    }
+    if (from !== null) spans.push(end - from);
+    const inside = spans.filter(d => d > 0);
+    return { count: inside.length, longest: inside.length ? Math.max(...inside) : 0 };
+}
+
+function analyzeInteraction(name, start, end, events, hudLog) {
+    const fails = [];
+    const until = end + INTERACT_TAIL;
+    const spec = INTERACT[name];
+    const m = { label: `interact ${name}`, interaction: name, events };
+
+    // Data sufficiency: the page really changed.
+    if (!(events >= spec.min)) {
+        fails.push(`only ${events} ${spec.counter} on the page (need ${spec.min}): the interaction did not happen`);
+    }
+
+    // 1. Visibility, through the tail.
+    const vis = hiddenTime(hudLog.vis, start, until);
+    const spans = hiddenSpans(hudLog.vis, start, until);
+    m.hiddenMs = vis.hidden;
+    m.hiddenFraction = vis.hidden / Math.max(1, until - start);
+    m.hiddenSpans = spans.count;
+    m.hiddenLongest = spans.longest;
+    m.visSamples = vis.samples;
+    if (vis.samples < MIN.visSamples) fails.push(`only ${vis.samples} visibility samples during the interaction`);
+    if (vis.hidden > 0 || vis.hiddenSamples > 0) {
+        fails.push(`overlay canvas hidden ${(100 * m.hiddenFraction).toFixed(1)}% of the interaction: ${spans.count} times, longest ${spans.longest.toFixed(0)} ms (${vis.hiddenSamples}/${vis.samples} samples)`);
+    }
+
+    // 2. Output alpha on every render.
+    const renders = hudLog.renders.filter(r => r.t >= start && r.t <= until);
+    const probed = renders.filter(r => r.alpha);
+    const clear = probed.filter(r => r.alpha.clear > 0);
+    m.renders = renders.length;
+    m.alphaProbed = probed.length;
+    m.seeThrough = clear.length;
+    m.alphaMin = probed.reduce((a, r) => Math.min(a, r.alpha.min), 255);
+    if (renders.length < MIN.renders) fails.push(`only ${renders.length} renders during the interaction`);
+    if (probed.length < MIN.alphaProbes) fails.push(`output alpha read on only ${probed.length} renders`);
+    if (clear.length) {
+        const worst = clear.reduce((a, r) => Math.max(a, r.alpha.clear), 0);
+        fails.push(`output alpha below 255 on ${clear.length}/${probed.length} renders (min ${m.alphaMin}; up to ${worst} of ${probed[0].alpha.n} probed pixels)`);
+    }
+
+    // 3. The capture loop kept running. Uploads are reported, not judged:
+    // saccadic suppression skips them while the pointer jumps between
+    // targets, and the HUD holds its last frame meanwhile.
+    const frames = hudLog.frames.filter(f => f.t >= start && f.t <= until);
+    m.framesReceived = frames.length;
+    m.framesUploaded = frames.filter(f => f.uploaded).length;
+    if (m.framesReceived < MIN.frames) fails.push(`only ${m.framesReceived} frames received during the interaction`);
+
+    m.fails = fails;
+    m.pass = fails.length === 0;
+    return m;
+}
+
+function summarizeInteraction(m) {
+    const parts = [
+        `hidden ${(100 * m.hiddenFraction).toFixed(1)}% (${m.hiddenSpans}x, longest ${m.hiddenLongest.toFixed(0)} ms)`,
+        `see-through ${m.seeThrough}/${m.alphaProbed} probed`,
+        `${m.events} ${INTERACT[m.interaction].counter}`,
+        `frames ${m.framesUploaded}/${m.framesReceived} uploaded`
+    ];
+    return `${m.pass ? 'PASS' : 'FAIL'}  ${m.label.padEnd(26)} ${parts.join('  ')}`;
+}
+
 function summarize(m) {
     const parts = [
         `hidden ${(100 * m.hiddenFraction).toFixed(1)}%`,
@@ -774,6 +1076,27 @@ function summarize(m) {
 }
 
 // ── Main ────────────────────────────────────────────────────────────
+
+/** Load a fixture and wait until the HUD is taking frames of it. */
+async function openFixture(file, { hud, page }) {
+    const url = fixtureUrl(file);
+    await page.send('Page.navigate', { url });
+    await waitFor(`${file} to load`, () => page.evaluate(
+        `document.readyState === 'complete' && location.href === ${JSON.stringify(url)}`), 20000);
+    // Frames from the new page flowing again.
+    const before = (await hud.call(hudState)).uploads;
+    await waitFor(`frames from ${file}`, async () => (await hud.call(hudState)).uploads > before + 3, 20000);
+    // Start from a quiet page: load-time DOM scans still arriving would
+    // change the lock list and structure maps under the first run.
+    await waitFor(`DOM scans on ${file} to go quiet`,
+        async () => (await hud.call(msSinceScan)) > 1500, 20000);
+}
+
+function report(m) {
+    if (m.hiddenFraction === undefined) console.log(`FAIL  ${m.label}`);
+    else console.log(m.interaction ? summarizeInteraction(m) : summarize(m));
+    for (const f of m.fails) console.log(`        - ${f}`);
+}
 
 async function main() {
     const port = await findFreePort(Number(flags.port || 9350));
@@ -796,25 +1119,14 @@ async function main() {
         }
         st = await waitFor('foveation on, frames uploading, canvas visible',
             async () => { const s = await hud.call(hudState); return s.enabled && s.uploads > 3 && s.visible ? s : { ok: false, ...s }; }, 30000);
-        console.log(`[check:scroll] HUD ${st.w}x${st.h} @${st.dpr}x, canvas ${st.canvasW}x${st.canvasH}; ${RUNS.length} runs of ${DURATION} ms`);
+        console.log(`[check:scroll] HUD ${st.w}x${st.h} @${st.dpr}x, canvas ${st.canvasW}x${st.canvasH}; ` +
+            `${RUNS.length} scroll and ${INTERACT_RUNS.length} interaction runs of ${DURATION} ms`);
 
         let current = null;
         for (const run of RUNS) {
             const fx = FIXTURE[run.fixture];
             if (current !== run.fixture) {
-                const url = fixtureUrl(fx.file);
-                await page.send('Page.navigate', { url });
-                await waitFor(`${fx.file} to load`, () => page.evaluate(
-                    `document.readyState === 'complete' && location.href === ${JSON.stringify(url)}`), 20000);
-                // Frames from the new page flowing again.
-                const before = (await hud.call(hudState)).uploads;
-                await waitFor(`frames from ${fx.file}`, async () => (await hud.call(hudState)).uploads > before + 3, 20000);
-                // Let the load-time DOM scans finish first. preload drops a
-                // scroll scan that lands while a mutation scan is pending,
-                // and nothing rescans until the next scroll, so a jump to the
-                // run's start position would leave a stale lock list behind.
-                await waitFor(`DOM scans on ${fx.file} to go quiet`,
-                    async () => (await hud.call(msSinceScan)) > 1500, 20000);
+                await openFixture(fx.file, conn);
                 current = run.fixture;
             }
             let m;
@@ -828,8 +1140,23 @@ async function main() {
                 }
             }
             results.push(m);
-            console.log(m.hiddenFraction === undefined ? `FAIL  ${m.label}` : summarize(m));
-            for (const f of m.fails) console.log(`        - ${f}`);
+            report(m);
+        }
+
+        if (INTERACT_RUNS.length) await openFixture(SERP, conn);
+        for (const name of INTERACT_RUNS) {
+            let m;
+            try {
+                m = await runInteraction(name, conn);
+            } catch (e) {
+                if (e instanceof HarnessError) {
+                    m = { label: `interact ${name}`, interaction: name, pass: false, fails: [e.message] };
+                } else {
+                    throw e;
+                }
+            }
+            results.push(m);
+            report(m);
         }
     } catch (e) {
         harnessError = e;
@@ -853,7 +1180,11 @@ async function main() {
     console.log(failed.length
         ? `[check:scroll] FAIL: ${failed.length}/${results.length} runs failed`
         : `[check:scroll] PASS: ${results.length}/${results.length} runs`);
-    if (flags.keep) console.log(`[check:scroll] app left running (pid ${app.child.pid}), profile ${app.userData}`);
+    if (flags.keep) {
+        // Let this script exit while the app stays up.
+        app.child.unref();
+        console.log(`[check:scroll] app left running (pid ${app.child.pid}), profile ${app.userData}`);
+    }
     return failed.length ? 1 : 0;
 }
 

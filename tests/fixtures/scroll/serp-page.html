@@ -1,0 +1,150 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>serp interaction probe page</title>
+<style>
+  /* A results page that changes under the pointer the way a search page
+     does: hover cards, iframe previews, an accordion, pushState tabs, a
+     suggestion list and a link to the next page. No network. */
+  html, body { margin: 0; padding: 0; background: #fff; color: #202124; font: 14px/1.45 Arial, sans-serif; }
+  header { position: relative; padding: 16px 40px 0; height: 96px; box-sizing: border-box; border-bottom: 1px solid #dadce0; }
+  #q { width: 560px; height: 36px; padding: 0 14px; border: 1px solid #dfe1e5; border-radius: 18px; font: 16px Arial, sans-serif; }
+  #suggest { position: absolute; left: 40px; top: 54px; width: 588px; margin: 0; padding: 4px 0; list-style: none;
+             background: #fff; border: 1px solid #dfe1e5; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(32,33,36,.28); z-index: 5; }
+  #suggest li { padding: 5px 14px; }
+  nav { position: absolute; left: 40px; bottom: 6px; display: flex; gap: 24px; }
+  nav a, #next { color: #1a0dab; text-decoration: none; }
+  nav a.on { border-bottom: 3px solid #1a0dab; }
+  #next { position: absolute; right: 40px; bottom: 6px; }
+  main { width: 640px; padding: 8px 40px; }
+  .r { height: 78px; padding: 6px 0; }
+  .r a { display: block; font-size: 18px; color: #1a0dab; text-decoration: none; }
+  .r:hover a { text-decoration: underline; }
+  .r cite { display: block; font-style: normal; color: #4d5156; font-size: 12px; }
+  .r p { margin: 2px 0 0; }
+  .card { position: absolute; width: 300px; padding: 12px; background: #fff; border: 1px solid #dadce0;
+          border-radius: 8px; box-shadow: 0 2px 8px rgba(60,64,67,.3); z-index: 4; }
+  .paa { border: 1px solid #dadce0; border-radius: 8px; margin: 6px 0; }
+  .paa div.q { height: 36px; line-height: 36px; padding: 0 14px; border-top: 1px solid #ebebeb; cursor: pointer; }
+  .paa div.q:first-child { border-top: 0; }
+  .paa div.a { padding: 6px 14px 10px; }
+  .vids { display: flex; gap: 10px; height: 96px; margin: 8px 0; }
+  .vid { position: relative; width: 150px; height: 90px; border-radius: 8px; background: #5f6368; color: #fff; overflow: hidden; }
+  .vid span { position: absolute; left: 8px; bottom: 6px; font-size: 12px; }
+  /* The pointer stays with the page, so leaving a thumbnail removes its preview. */
+  .vid iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+</style></head>
+<body>
+<header>
+  <input id="q" autocomplete="off" value="peripheral vision">
+  <nav id="tabs"><a href="?tab=all" class="on">All</a><a href="?tab=images">Images</a><a href="?tab=videos">Videos</a><a href="?tab=news">News</a><a href="?tab=books">Books</a></nav>
+  <a id="next" href="">Next page</a>
+</header>
+<main id="main"></main>
+<script>
+  // Counters the gate reads to confirm each interaction really happened.
+  const C = window.__serp = { cards: 0, frames: 0, toggles: 0, tabs: 0, suggests: 0 };
+  const words = 'foveal cortical magnification crowding periphery saccade fixation reading span acuity pooling eccentricity contrast texture summary statistics scene gist attention'.split(' ');
+  let seed = 11;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const text = (n) => { let t = ''; for (let i = 0; i < n; i++) t += words[Math.floor(rnd() * words.length)] + ' '; return t; };
+  const page = Number(new URLSearchParams(location.search).get('page') || 1);
+  document.getElementById('next').href = '?page=' + (page + 1);
+
+  const result = (k) => '<div class="r"><cite>example.org/' + k + '</cite><a href="#r' + k + '">' +
+    text(6) + '</a><p>' + text(24) + '</p></div>';
+  const render = (tab) => {
+    let html = '';
+    for (let k = 1; k <= 3; k++) html += result(tab + k);
+    html += '<div class="paa">';
+    for (let k = 1; k <= 4; k++) html += '<div class="q">' + text(7) + '?</div>';
+    html += '</div><div class="vids">';
+    for (let k = 1; k <= 4; k++) html += '<div class="vid"><span>' + text(2) + '</span></div>';
+    html += '</div>';
+    for (let k = 4; k <= 6; k++) html += result(tab + k);
+    document.getElementById('main').innerHTML = html;
+  };
+  render('all');
+
+  const main = document.getElementById('main');
+  // Hover card beside a result, like an "about this result" panel.
+  main.addEventListener('mouseover', (e) => {
+    const r = e.target.closest('.r');
+    if (r && !r.__card) {
+      const b = r.getBoundingClientRect();
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.left = (b.right + 24) + 'px';
+      card.style.top = (b.top + scrollY) + 'px';
+      card.innerHTML = '<b>' + text(4) + '</b><p>' + text(30) + '</p>';
+      document.body.appendChild(card);
+      r.__card = card;
+      C.cards++;
+    }
+    // Video preview: a subframe that loads a document of its own.
+    const v = e.target.closest('.vid');
+    if (v && !v.querySelector('iframe')) {
+      const f = document.createElement('iframe');
+      f.onload = () => { C.frames++; };
+      f.src = 'serp-frame.html?n=' + (C.frames + 1) + '-' + Date.now();
+      v.appendChild(f);
+    }
+  });
+  main.addEventListener('mouseout', (e) => {
+    const r = e.target.closest('.r');
+    if (r && r.__card && !r.contains(e.relatedTarget)) { r.__card.remove(); r.__card = null; }
+    const v = e.target.closest('.vid');
+    if (v && !v.contains(e.relatedTarget)) { const f = v.querySelector('iframe'); if (f) f.remove(); }
+  });
+  // Accordion: each question opens an answer and pushes the page down.
+  main.addEventListener('click', (e) => {
+    const q = e.target.closest('.q');
+    if (!q) return;
+    const open = q.nextElementSibling && q.nextElementSibling.classList.contains('a');
+    if (open) q.nextElementSibling.remove();
+    else q.insertAdjacentHTML('afterend', '<div class="a">' + text(40) + '</div>');
+    C.toggles++;
+  });
+  // Tabs swap the results in place and push a history entry, no load.
+  document.getElementById('tabs').addEventListener('click', (e) => {
+    const a = e.target.closest('a');
+    if (!a) return;
+    e.preventDefault();
+    for (const t of document.querySelectorAll('#tabs a')) t.classList.toggle('on', t === a);
+    history.pushState(null, '', a.getAttribute('href'));
+    render(a.textContent.toLowerCase());
+    C.tabs++;
+  });
+  // Suggestion list under the query box, rebuilt on every keystroke.
+  const q = document.getElementById('q');
+  q.addEventListener('input', () => {
+    let ul = document.getElementById('suggest');
+    if (!ul) { ul = document.createElement('ul'); ul.id = 'suggest'; document.querySelector('header').appendChild(ul); }
+    let html = '';
+    for (let k = 0; k < 8; k++) html += '<li>' + q.value + ' ' + text(2) + '</li>';
+    ul.innerHTML = html;
+    C.suggests++;
+  });
+
+  // Gate helpers: element centers in viewport CSS px, and a reset to the
+  // load-time state between runs.
+  window.__serpGeometry = () => {
+    const c = (el) => { const b = el.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2), top: b.top, bottom: b.bottom, left: b.left, right: b.right }; };
+    return {
+      vw: innerWidth, vh: innerHeight,
+      results: [...document.querySelectorAll('.r')].map(c),
+      questions: [...document.querySelectorAll('.q')].map(c),
+      videos: [...document.querySelectorAll('.vid')].map(c),
+      tabs: [...document.querySelectorAll('#tabs a')].map(c),
+      query: c(q),
+      next: c(document.getElementById('next')),
+      rest: { x: 1100, y: Math.round(innerHeight - 40) }
+    };
+  };
+  window.__serpReset = () => {
+    for (const el of document.querySelectorAll('.card, #suggest, .vid iframe, .paa .a')) el.remove();
+    for (const r of document.querySelectorAll('.r')) r.__card = null;
+    q.value = 'peripheral vision';
+    q.blur();
+    return true;
+  };
+</script>
+</body></html>
