@@ -335,6 +335,41 @@ describe('FrameScrollRegistrar', () => {
         expect(trust).toEqual([false, false, false, true, false]);
     });
 
+    it('goes idle once the page holds still, however slowly frames arrive', () => {
+        // Decay alone would call the page moving for 17 more captures after
+        // this 40 px jump: 3 s on a busy HUD capturing 5-6 times a second.
+        const reg = new FrameScrollRegistrar();
+        reg.register(frameAt(0, 0, 0));
+        expect(reg.register(frameAt(40, 40, 40)).y).toBe(40);
+        expect(reg.moving).toBe(true);
+        const stills = [0, 1].map(() => reg.register(frameAt(40, 40, 40)));
+        expect(stills.map(r => r.method)).toEqual(['still', 'still']);
+        expect(reg.moving).toBe(false);
+        expect(reg.register(frameAt(40, 40, 40)).method).toBe('still');
+    });
+
+    it('keeps tracking a scroll too fast for the full stall slack', () => {
+        // A slow HUD: about 35 px a capture, so the stamps plus the slack
+        // (twice that) outgrow an 80 CSS px search. The slack is trimmed, the
+        // pixels (between the stamps) are found, and the chain stays exact.
+        const reg = new FrameScrollRegistrar({ maxSearchPx: 160 });
+        reg.register(frameAt(100, 100, 100));
+        const second = reg.register(frameAt(130, 135, 125));
+        expect(second.method).toBe('image');
+        expect(second.y).toBe(130);
+        expect(reg.register(frameAt(160, 165, 155)).y).toBe(160);
+    });
+
+    it('trusts the stamp for a jump longer than the search', () => {
+        // Page Down: the stamps alone span more than the search allows.
+        const reg = new FrameScrollRegistrar({ maxSearchPx: 160 });
+        reg.register(frameAt(100, 100, 100));
+        const jump = reg.register(frameAt(200, 200, 100));
+        expect(jump.method).toBe('stamp');
+        expect(jump.y).toBe(200);
+        expect(jump.trusted).toBe(true);
+    });
+
     it('starts over after a resize', () => {
         const reg = new FrameScrollRegistrar();
         reg.register(frameAt(100, 100, 100));
@@ -504,7 +539,9 @@ describe('inner-scroller pane registration', () => {
     const paneFrame = (trueY, stampY, beforeY, opts = {}) => {
         const id = opts.id || 1;
         const rect = opts.rect || RECT;
-        const out = crop(outer, W, 0, H);
+        // Window scroll (CSS px); the pane is position: fixed and stays put.
+        const windowY = opts.windowY || 0;
+        const out = crop(outer, W, windowY * 2, H);
         const top = Math.round(trueY * 2);
         for (let y = rect.y * 2; y < (rect.y + rect.height) * 2; y++) {
             const src = (top + y - rect.y * 2) * W * 4;
@@ -513,7 +550,7 @@ describe('inner-scroller pane registration', () => {
         }
         return {
             buffer: out, width: W, height: H, viewWidth: W / 2,
-            stamp: { x: 0, y: 0, zoom: 1 }, stampBefore: { x: 0, y: 0, zoom: 1 },
+            stamp: { x: 0, y: windowY, zoom: 1 }, stampBefore: { x: 0, y: windowY, zoom: 1 },
             pane: { id, x: 0, y: stampY, zoom: 1, rect },
             paneBefore: { id, x: 0, y: beforeY, zoom: 1, rect: opts.beforeRect || rect }
         };
@@ -571,6 +608,31 @@ describe('inner-scroller pane registration', () => {
             const r = reg.register(paneFrame(500 - 8 * k, 500 - 8 * (k - 1), 500 - 8 * (k - 2)));
             expect(r.method).toBe('image');
             expect(r.y).toBe(500 - 8 * k);
+        }
+    });
+
+    it('registers the pane two captures after the window stops', () => {
+        // check:scroll on a busy machine: the page is positioned (a window
+        // jump), holds still for a few slow captures, then the pane scrolls
+        // with its post-capture stamp a step ahead of the pixels. The pane
+        // must register by image, not take that stamp.
+        const windowReg = new FrameScrollRegistrar();
+        const paneReg = new PaneScrollRegistrar();
+        const both = (frame) => {
+            const win = windowReg.register(frame);
+            return { win, pane: paneReg.register(frame, windowReg.moving) };
+        };
+        both(paneFrame(100, 100, 100));
+        both(paneFrame(100, 100, 100, { windowY: 40 }));
+        both(paneFrame(100, 100, 100, { windowY: 40 }));
+        both(paneFrame(100, 100, 100, { windowY: 40 }));
+        expect(windowReg.moving).toBe(false);
+        both(paneFrame(100, 100, 100, { windowY: 40 }));
+        for (let k = 1; k <= 5; k++) {
+            const { win, pane } = both(paneFrame(100 + 16 * k, 108 + 16 * k, 92 + 16 * k, { windowY: 40 }));
+            expect(win.y).toBe(40);
+            expect(pane.method).toBe('image');
+            expect(pane.y).toBe(100 + 16 * k);
         }
     });
 

@@ -323,6 +323,14 @@ function sameCrop(a, b) {
  * settled: during a wheel scroll the scroll event can stall for two captures
  * while the page keeps painting.
  *
+ * The registrar returns to idle when its decaying motion estimate runs out,
+ * or sooner, after STILLS_TO_IDLE settled frames in a row. Decay alone counts
+ * captures, not time: a busy HUD captures 5-10 times a second, and a 400 px
+ * jump then held the registrar "moving" for 3-5 s after the page stopped.
+ * Meanwhile it booked an inner pane's scroll as window scroll, and
+ * PaneScrollRegistrar, which waits for the window to hold still, fell back to
+ * the post-capture pane stamp, which runs ahead of the pixels under load.
+ *
  * A scrolling frame that cannot be matched gets its post-capture stamp, which
  * can be a scroll step off, and comes back `trusted: false`: the caller should
  * keep the registered frame it has (the live offset keeps it on the page)
@@ -330,6 +338,8 @@ function sameCrop(a, b) {
  * the stamps have settled, for a jump too long to search (Page Down, Home),
  * or after maxMisses misses in a row, so the HUD never waits long.
  */
+const STILLS_TO_IDLE = 2;
+
 class FrameScrollRegistrar {
     constructor(options = {}) {
         this.columns = options.columns || DEFAULT_COLUMNS;
@@ -348,6 +358,7 @@ class FrameScrollRegistrar {
         this.idlePrev = null;
         this.suspect = null;
         this.misses = 0;
+        this.stills = 0;
         this.lastMethod = 'none';
     }
 
@@ -457,6 +468,7 @@ class FrameScrollRegistrar {
         this.motionPeak = Math.max(stampMotion, this.imageStep, this.motionPeak * 0.8);
 
         if (this.motionPeak < 1) {
+            this.stills = 0;
             const prev = this.idlePrev;
             this.idlePrev = { sig, y: result.y };
             const est = prev && prev.y === result.y
@@ -484,11 +496,23 @@ class FrameScrollRegistrar {
         if (dir) this.direction = dir;
         const slack = Math.max(4, 2 * this.motionPeak);
         const margin = 2;
-        const lo = Math.min(beforeY, stampY) - (dir > 0 ? margin : slack);
-        const hi = Math.max(beforeY, stampY) + (dir < 0 ? margin : slack);
+        let lo = Math.min(beforeY, stampY) - (dir > 0 ? margin : slack);
+        let hi = Math.max(beforeY, stampY) + (dir < 0 ? margin : slack);
+        // The slack past the stamps covers a stall; on a slow HUD a fast
+        // scroll moves hundreds of px a capture and the slack outgrows the
+        // search. Trim it to fit rather than fall back to the post-capture
+        // stamp, which then runs ahead of the pixels and would anchor the
+        // chain a step off for the rest of the scroll. Only stamps that
+        // alone span more than the search (Page Down, Home) are unsearchable.
+        const reach = this.maxSearchPx / scale;
+        if (hi - lo > reach && dir) {
+            if (dir > 0) hi = Math.max(Math.max(beforeY, stampY), lo + reach);
+            else lo = Math.min(Math.min(beforeY, stampY), hi - reach);
+        }
         const dMin = (lo - ref.y) * scale;
         const dMax = (hi - ref.y) * scale;
-        const searchable = dMax - dMin <= this.maxSearchPx;
+        // Tolerance for a window trimmed to exactly maxSearchPx.
+        const searchable = dMax - dMin <= this.maxSearchPx + 1e-6;
         const est = searchable ? estimateVerticalShift(ref.sig, sig, dMin, dMax) : null;
         if (est && est.confident) {
             if (est.shift === 0 && settled) {
@@ -502,6 +526,17 @@ class FrameScrollRegistrar {
             anchor(result.y, 0);
         } else {
             result.trusted = false;
+        }
+        // Pixels and stamps held still against the reference on consecutive
+        // captures: the scroll has stopped, whatever the decay says. Two in a
+        // row, so one capture that lands between two paints of a scroll
+        // still in progress does not end it. The next frame registers idle,
+        // against this one.
+        this.stills = result.method === 'still' ? this.stills + 1 : 0;
+        if (this.stills >= STILLS_TO_IDLE) {
+            this.motionPeak = 0;
+            this.stills = 0;
+            this.idlePrev = { sig, y: result.y };
         }
         return done();
     }
