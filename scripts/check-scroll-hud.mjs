@@ -26,8 +26,8 @@
  *      MutationObserver), each received frame's registered scroll against
  *      the scroll its pixels show, and, on every render, the displayed
  *      content position. On the lock page it reads the HUD's own output
- *      (readPixels, fovea widened to the whole canvas) at the article
- *      gutter and at both boxes.
+ *      (readPixels, with a radius that makes every pixel foveal; see
+ *      installHudRecorder) at the article gutter and at both boxes.
  *   4. Interaction runs (serp-page.html, a results page that changes under
  *      the pointer): hover cards, iframe previews, an accordion, pushState
  *      tabs, typing into a suggestion box, and links to the next page. Each
@@ -82,8 +82,10 @@ const ONLY = flags.only ? String(flags.only).split(',') : ['window', 'lock', 'pa
 
 // Below these counts a run cannot judge anything: a HUD that stopped
 // rendering would otherwise pass every check vacuously. The 4 ms visibility
-// poll slows to about 16 ms while the lock runs read pixels on every
-// render; the MutationObserver still sees every change.
+// poll gives about 200 samples a run at 2x, more at 1x, provided nothing
+// blocks the HUD's main thread (the lock and interaction runs read pixels
+// asynchronously for that reason); the MutationObserver still sees every
+// change.
 const MIN = { visSamples: 60, frames: 10, renders: 30, boxRenders: 10, scrollSteps: 30, alphaProbes: 20 };
 // Gutters decode whole CSS px.
 const TOL = 0.5;
@@ -420,20 +422,36 @@ function installHudRecorder(cfg) {
     };
     ipcRenderer.on('hud:frame-captured', R.onFrame);
 
-    // HUD output decode (cfg.pixels): read 24 CSS px wide strips at each
-    // gutter right after the render, before compositing clears the buffer.
+    // HUD output decode (cfg.pixels): 24 CSS px wide strips at the article
+    // gutter and at each box's gutter, read right after the render, before
+    // compositing clears the buffer. A synchronous readPixels waits for the
+    // whole render on the GPU; on a 2x canvas that cut the HUD from about
+    // 120 to 25-55 renders/s and starved the visibility poll and the
+    // capture loop. Each render's strips go into a pixel buffer instead and are
+    // decoded on a later render, once its fence has passed.
     const gl = s.renderer.gl;
     const scale = s.canvas.width / innerWidth;
     const H = s.canvas.height;
-    const strips = new Map();
-    const readStrip = (x0) => {
-        const x = Math.round(x0 * scale);
-        const w = Math.ceil(24 * scale) + 1;
-        let st = strips.get(x0);
-        if (!st) { st = { x, w, buf: new Uint8Array(w * H * 4) }; strips.set(x0, st); }
-        gl.readPixels(x, 0, w, H, gl.RGBA, gl.UNSIGNED_BYTE, st.buf);
-        return st;
-    };
+    const strips = [];
+    let stripBytes = 0;
+    if (cfg.pixels) {
+        for (const x0 of [0, ...cfg.pixels.boxes.map(b => b.x)]) {
+            const w = Math.ceil(24 * scale) + 1;
+            strips.push({ x: Math.round(x0 * scale), w, offset: stripBytes });
+            stripBytes += w * H * 4;
+        }
+    }
+    const pixelHost = new Uint8Array(stripBytes);
+    for (const st of strips) st.buf = pixelHost.subarray(st.offset, st.offset + st.w * H * 4);
+    R.pixelPool = strips.length ? Array.from({ length: 16 }, () => {
+        const pbo = gl.createBuffer();
+        const prev = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+        gl.bufferData(gl.PIXEL_PACK_BUFFER, stripBytes, gl.STREAM_READ);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, prev);
+        return pbo;
+    }) : [];
+    R.pixelPending = [];
     const decodeOut = (st, x0, cssRow) => {
         // The device row under the CSS row's center.
         const r = Math.floor((cssRow + 0.5) * scale);
@@ -461,10 +479,67 @@ function installHudRecorder(cfg) {
         if (m === null) return null;
         return a.filter(v => Math.abs(v - m) <= 1).length >= 0.6 * a.length ? m : null;
     };
+    const decodePixels = (p) => {
+        const prev = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, p.pbo);
+        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, pixelHost);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, prev);
+        gl.deleteSync(p.sync);
+        R.pixelPool.push(p.pbo);
+        // Article: viewport row - page y.
+        const art = [];
+        for (let k = cfg.pixels.artTop; k < innerHeight - cfg.pixels.artBottom; k += 5) {
+            const v = decodeOut(strips[0], 0, k);
+            if (v !== null) art.push(v - k);
+        }
+        p.rec.art = median(art);
+        // Boxes: the viewport row where the box's local 0 is drawn.
+        p.rec.boxes = cfg.pixels.boxes.map((b, i) => {
+            const tops = [];
+            for (let k = Math.ceil(b.top) + 4; k < b.top + b.height - 4; k += 2) {
+                const v = decodeOut(strips[i + 1], b.x, k);
+                if (v !== null) tops.push(k - v);
+            }
+            return agreed(tops);
+        });
+    };
+    // wait: block on the fence (end of the run) instead of skipping.
+    R.drainPixels = (wait) => {
+        while (R.pixelPending.length) {
+            const p = R.pixelPending[0];
+            const st = gl.clientWaitSync(p.sync, 0, 0);
+            if (!wait && st !== gl.ALREADY_SIGNALED && st !== gl.CONDITION_SATISFIED) break;
+            if (wait) gl.finish();
+            R.pixelPending.shift();
+            decodePixels(p);
+        }
+    };
+    const probePixels = (rec) => {
+        R.drainPixels(false);
+        // Pool empty: this render goes unprobed (no art or boxes) rather
+        // than stalling.
+        const pbo = R.pixelPool.pop();
+        if (!pbo) return;
+        const prev = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+        for (const st of strips) gl.readPixels(st.x, 0, st.w, H, gl.RGBA, gl.UNSIGNED_BYTE, st.offset);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, prev);
+        R.pixelPending.push({ pbo, rec, sync: gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0) });
+        gl.flush();
+    };
     if (cfg.pixels) {
-        // Every pixel the source sample: no blur or pooling over the gutters.
+        // Every pixel the source sample: no blur, pooling or scramble over
+        // the gutters. A wide fovea is not enough on its own. In the cortical
+        // (CMF) modes, the default 12 among them, the radius only converts px
+        // to degrees, and V1's scramble starts at a fixed fraction of the
+        // viewport's eccentricity extent, at any radius. The shader drops to
+        // a fixed 25 deg extent, which puts every fragment near 0 deg, only
+        // when the whole viewport spans under ~0.29 deg (u_cortical_max <=
+        // 0.1): radius > half-diagonal / 0.29. A fixed 5000 px cleared that
+        // on a 1x canvas (half-diagonal 753 px) but not on a 2x one (1505 px),
+        // so the radius scales with the canvas, 100x past that threshold.
         R.savedRadius = s.config.fovealRadius;
-        s.config.fovealRadius = 5000;
+        s.config.fovealRadius = 100 * Math.hypot(s.canvas.width, s.canvas.height) / 2 / 0.29;
     }
     // Output alpha (cfg.alpha): three full rows and three full columns per
     // render. The context has alpha and preserveDrawingBuffer, and the HUD
@@ -550,26 +625,7 @@ function installHudRecorder(cfg) {
             shownTruePane: R.shownTruePane,
             nlock: reg.lock.length
         };
-        if (cfg.pixels) {
-            // Article: viewport row - page y.
-            const a = readStrip(0);
-            const art = [];
-            for (let k = cfg.pixels.artTop; k < innerHeight - cfg.pixels.artBottom; k += 5) {
-                const v = decodeOut(a, 0, k);
-                if (v !== null) art.push(v - k);
-            }
-            rec.art = median(art);
-            // Boxes: the viewport row where the box's local 0 is drawn.
-            rec.boxes = cfg.pixels.boxes.map((b) => {
-                const st = readStrip(b.x);
-                const tops = [];
-                for (let k = Math.ceil(b.top) + 4; k < b.top + b.height - 4; k += 2) {
-                    const v = decodeOut(st, b.x, k);
-                    if (v !== null) tops.push(k - v);
-                }
-                return agreed(tops);
-            });
-        }
+        if (cfg.pixels) probePixels(rec);
         if (alphaLines.length) probeAlpha(rec);
         R.renders.push(rec);
     };
@@ -584,6 +640,8 @@ function collectHudRecorder() {
     R.observer.disconnect();
     require('electron').ipcRenderer.removeListener('hud:frame-captured', R.onFrame);
     s.render = R.ownRender;
+    R.drainPixels(true);
+    for (const pbo of R.pixelPool) s.renderer.gl.deleteBuffer(pbo);
     R.drainAlpha(true);
     for (const pbo of R.alphaPool) s.renderer.gl.deleteBuffer(pbo);
     if (R.savedRadius !== undefined) s.config.fovealRadius = R.savedRadius;
@@ -933,9 +991,13 @@ function analyze(run, pageLog, hudLog, boxes) {
     // 3. Backward steps in the displayed content.
     const renders = hudLog.renders.filter(r => inScroll(r.t));
     m.renders = renders.length;
+    // Lock runs judge only renders whose output was read back (probePixels
+    // skips a render when its buffer pool is empty).
+    const probed = renders.filter(r => r.boxes !== undefined);
+    if (boxes) m.unprobed = renders.length - probed.length;
     let shown;
     if (run.fixture === 'lock') {
-        shown = renders.map(r => r.art).filter(v => v !== null);
+        shown = probed.map(r => r.art).filter(v => v !== null);
     } else if (isPane) {
         shown = renders.filter(r => r.shownTruePane !== null).map(r => r.shownTruePane + r.paneOff);
     } else {
@@ -956,17 +1018,17 @@ function analyze(run, pageLog, hudLog, boxes) {
     const known = isPane
         ? renders.filter(r => r.shownTruePane !== null && r.livePane !== null).map(r => r.shownTruePane + r.paneOff - r.livePane)
         : run.fixture === 'lock'
-            ? renders.filter(r => r.art !== null && r.live !== null).map(r => r.art - r.live)
+            ? probed.filter(r => r.art !== null && r.live !== null).map(r => r.art - r.live)
             : renders.filter(r => r.shownTrue !== null && r.live !== null).map(r => r.shownTrue + r.off - r.live);
     m.shownVsLiveMax = maxAbs(known);
 
     // 4. Fixed and sticky boxes hold still on the HUD's output.
     if (boxes) {
         m.boxes = boxes.map((b, i) => {
-            const rest = hudLog.renders.filter(r => r.t < start).map(r => r.boxes[i]).filter(v => v !== null);
+            const rest = hudLog.renders.filter(r => r.t < start && r.boxes !== undefined).map(r => r.boxes[i]).filter(v => v !== null);
             const ref = rest.length ? rest[rest.length - 1] : null;
-            const during = renders.map(r => r.boxes[i]).filter(v => v !== null);
-            const missing = renders.length - during.length;
+            const during = probed.map(r => r.boxes[i]).filter(v => v !== null);
+            const missing = probed.length - during.length;
             const drift = ref === null ? [] : during.map(v => v - ref);
             const out = { name: b.name, domTop: b.top, restTop: ref, renders: during.length, missing, driftMax: maxAbs(drift) };
             if (ref === null) {
@@ -976,7 +1038,7 @@ function analyze(run, pageLog, hudLog, boxes) {
             }
             if (during.length < MIN.boxRenders) fails.push(`${b.name}: decoded on only ${during.length} renders during the scroll`);
             // Off its rest position by more than its own gutter can show.
-            if (missing) fails.push(`${b.name}: not found at its rest position on ${missing}/${renders.length} renders`);
+            if (missing) fails.push(`${b.name}: not found at its rest position on ${missing}/${probed.length} renders`);
             const bad = drift.filter(d => Math.abs(d) > TOL);
             if (bad.length) fails.push(`${b.name}: drifted on ${bad.length}/${drift.length} renders (max ${out.driftMax.toFixed(1)} px)`);
             return out;
