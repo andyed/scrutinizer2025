@@ -360,6 +360,18 @@ describe('FrameScrollRegistrar', () => {
         expect(reg.register(frameAt(160, 165, 155)).y).toBe(160);
     });
 
+    it('falls back as before when the trimmed search finds nothing', () => {
+        // Same fast scroll, unmatchable frame: the stamp is trusted, as it
+        // was when the untrimmed window counted as too long to search.
+        const reg = new FrameScrollRegistrar({ maxSearchPx: 160 });
+        reg.register(frameAt(100, 100, 100));
+        const blank = { ...frameAt(130, 135, 125), buffer: new Uint8Array(W * H * 4).fill(255) };
+        const r = reg.register(blank);
+        expect(r.method).toBe('stamp');
+        expect(r.y).toBe(135);
+        expect(r.trusted).toBe(true);
+    });
+
     it('trusts the stamp for a jump longer than the search', () => {
         // Page Down: the stamps alone span more than the search allows.
         const reg = new FrameScrollRegistrar({ maxSearchPx: 160 });

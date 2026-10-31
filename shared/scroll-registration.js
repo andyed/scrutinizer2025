@@ -500,14 +500,17 @@ class FrameScrollRegistrar {
         let hi = Math.max(beforeY, stampY) + (dir < 0 ? margin : slack);
         // The slack past the stamps covers a stall; on a slow HUD a fast
         // scroll moves hundreds of px a capture and the slack outgrows the
-        // search. Trim it to fit rather than fall back to the post-capture
-        // stamp, which then runs ahead of the pixels and would anchor the
-        // chain a step off for the rest of the scroll. Only stamps that
-        // alone span more than the search (Page Down, Home) are unsearchable.
+        // search. Trim it to fit and look, rather than go straight to the
+        // post-capture stamp, which runs ahead of the pixels and anchors the
+        // chain off for the rest of the scroll. A trimmed search that finds
+        // nothing falls back as an untrimmed one would have. Stamps that
+        // alone span more than the search (Page Down, Home) are not searched.
         const reach = this.maxSearchPx / scale;
+        let trimmed = false;
         if (hi - lo > reach && dir) {
             if (dir > 0) hi = Math.max(Math.max(beforeY, stampY), lo + reach);
             else lo = Math.min(Math.min(beforeY, stampY), hi - reach);
+            trimmed = true;
         }
         const dMin = (lo - ref.y) * scale;
         const dMax = (hi - ref.y) * scale;
@@ -522,7 +525,7 @@ class FrameScrollRegistrar {
                 result.method = 'image';
             }
             anchor(result.y, Math.abs(result.y - ref.y) / (this.misses + 1));
-        } else if (settled || !searchable || ++this.misses > this.maxMisses) {
+        } else if (settled || !searchable || trimmed || ++this.misses > this.maxMisses) {
             anchor(result.y, 0);
         } else {
             result.trusted = false;
