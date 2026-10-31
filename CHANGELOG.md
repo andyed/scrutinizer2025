@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.8.2] - 2026-10-31
+
+### Fixed
+
+- The foveated view no longer drops out for a moment when a page loads, when part of a page loads on its own (such as a video preview on hover), or when a results tab is switched.
+- Scrolling panes stay aligned with the view when the computer is busy.
+- Fixed and sticky elements and the structure maps update after a jump scroll that lands while the page is changing.
+
+### Testing
+
+- `npm run check:scroll` also runs six interaction checks (hover, embedded frames, expanding sections, tabs, typing, navigation) and fails if the unfoveated page shows through the HUD at any point. `--throttle` slows the HUD on purpose to reproduce a busy machine.
+
 ## [2.8.1] - 2026-10-20
 
 ### Fixed

@@ -112,6 +112,10 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 
 ## Release history
 
+### v2.8.2: Page loads (2026-10-31)
+- The foveated view stays up through page loads, subframe loads and in-page navigation
+- Scrolling panes stay registered when captures slow down; `check:scroll` gains interaction runs
+
 ### v2.8.1: Scrolling (2026-10-20)
 - The foveated view stays up during native scroll; between captures the last frame moves with the page and the fovea stays on the pointer
 - Fixed and sticky boxes hold still under the scroll offset; the most recently scrolled `overflow: auto` pane is registered too
