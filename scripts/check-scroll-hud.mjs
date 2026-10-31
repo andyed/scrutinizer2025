@@ -410,7 +410,11 @@ function installHudRecorder(cfg) {
         }
         if (!vals.length) return null;
         vals.sort((a, b) => a - b);
-        return vals[Math.floor(vals.length / 2)];
+        const m = vals[Math.floor(vals.length / 2)];
+        // Most rows must agree. A capture taken mid-raster under GPU load has
+        // blank tiles over part of the gutter, and those rows decode to noise
+        // (a pane at 9280 read as 65367).
+        return vals.filter(v => Math.abs(v - m) <= 1).length >= 0.6 * vals.length ? m : null;
     };
 
     R.onFrame = (e, data) => {
@@ -498,13 +502,16 @@ function installHudRecorder(cfg) {
         gl.bindBuffer(gl.PIXEL_PACK_BUFFER, prev);
         gl.deleteSync(p.sync);
         R.pixelPool.push(p.pbo);
-        // Article: viewport row - page y.
+        // Article: viewport row - page y. Agreed, as for the boxes: when a
+        // wheel burst leaves the frame hundreds of px behind the live scroll,
+        // the exposed strip's fill decodes to noise (backward "steps" of
+        // 20000+ px with every frame registered exactly).
         const art = [];
         for (let k = cfg.pixels.artTop; k < innerHeight - cfg.pixels.artBottom; k += 5) {
             const v = decodeOut(strips[0], 0, k);
             if (v !== null) art.push(v - k);
         }
-        p.rec.art = median(art);
+        p.rec.art = agreed(art);
         // Boxes: the viewport row where the box's local 0 is drawn.
         p.rec.boxes = cfg.pixels.boxes.map((b, i) => {
             const tops = [];
