@@ -55,8 +55,13 @@
  * usage: npm run check:scroll [-- --only=window,lock,pane,interact]
  *        [--interact=hover,iframe,expand,tabs,type,navigate] [--port=9350]
  *        [--ms=1500] [--json=report.json] [--raw=dir] [--keep]
+ *        [--throttle=hud:2,page:2]
  *   --json writes the per-run metrics, --raw each run's sample logs.
  *   --keep leaves the app running and its profile on disk when done.
+ *   --throttle slows the HUD's or the page's main thread N times over CDP,
+ *     to rehearse a busy machine: hud:2 stretches captures from about 50 to
+ *     70 ms apart, hud:4 to 100-150 ms (as seen with Psychodeli+ running).
+ *     Twelve CPU-bound threads alone left the capture rate unchanged.
  *
  * Leave the app window alone while it runs (about two minutes): real mouse
  * and wheel input reach the page too.
@@ -416,7 +421,14 @@ function installHudRecorder(cfg) {
         R.lastSrc = src;
         const trueY = decodeFrame(data, 0, cfg.winRows, 0);
         const truePane = cfg.pane ? decodeFrame(data, cfg.pane.left, cfg.pane.rows, cfg.pane.top) : null;
-        R.frames.push({ t: now(), uploaded, trueY, truePane, stampY: data.scrollY });
+        // The pane's stamps from both sides of the capture, for --raw: a pane
+        // registered at paneStamp with method 'stamp' mid-scroll took the
+        // fallback rather than an image match.
+        R.frames.push({
+            t: now(), uploaded, trueY, truePane, stampY: data.scrollY,
+            paneStamp: data.pane ? data.pane.y : null,
+            paneStampBefore: data.paneBefore ? data.paneBefore.y : null
+        });
         R.srcs.push(uploaded ? src : null);
         if (uploaded) { R.shownTrue = trueY; R.shownTruePane = truePane; }
     };
@@ -651,6 +663,7 @@ function collectHudRecorder() {
         f.regY = src ? src.y : null;
         f.regPane = src && src.pane ? src.pane.y : null;
         f.method = src ? src.method : 'skipped';
+        f.paneMethod = src && src.pane ? src.pane.method : null;
     });
     delete window.__scrollGate;
     return JSON.stringify({ frames: R.frames, renders: R.renders, vis: R.vis });
@@ -1183,6 +1196,16 @@ async function main() {
             async () => { const s = await hud.call(hudState); return s.enabled && s.uploads > 3 && s.visible ? s : { ok: false, ...s }; }, 30000);
         console.log(`[check:scroll] HUD ${st.w}x${st.h} @${st.dpr}x, canvas ${st.canvasW}x${st.canvasH}; ` +
             `${RUNS.length} scroll and ${INTERACT_RUNS.length} interaction runs of ${DURATION} ms`);
+        // A busy machine on purpose (see --throttle in the header).
+        if (flags.throttle) {
+            for (const part of String(flags.throttle).split(',')) {
+                const [who, rate] = part.split(':');
+                const target = who === 'hud' ? hud : who === 'page' ? page : null;
+                if (!target || !(Number(rate) >= 1)) throw new Error(`bad --throttle part '${part}' (hud:N or page:N)`);
+                await target.send('Emulation.setCPUThrottlingRate', { rate: Number(rate) });
+            }
+            console.log(`[check:scroll] CPU throttle ${flags.throttle}`);
+        }
 
         let current = null;
         for (const run of RUNS) {
