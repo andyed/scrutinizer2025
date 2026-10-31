@@ -79,6 +79,9 @@
         let isWaitingForFrame = false;
         let currentScroll = { x: 0, y: 0 };
         let frameScroll = null;
+        // A frame has been drawn since capture started. Navigation clears
+        // frameScroll, not this: the last frame stays up until the next page's.
+        let frameShown = false;
         let scrollIdle = true;
         let scrollIdleTimer = null;
         let lastFrameSequence = 0;
@@ -90,17 +93,20 @@
         // region shifts by its own scroll.
         const paneRegistrar = new PaneScrollRegistrar();
 
-        // Hide the canvas only until this page's first frame arrives. While the
-        // page scrolls, the renderer keeps the last frame registered with the
-        // live scroll (scrutinizer.setLiveScroll); hiding it would expose the
-        // unfoveated page underneath the transparent HUD. scrollFreshness stays
-        // as a diagnostic ('stale' while a scroll is ahead of the newest frame).
+        // Hide the canvas only until the first frame after capture starts.
+        // While the page scrolls, the renderer keeps the last frame registered
+        // with the live scroll (scrutinizer.setLiveScroll), and across a
+        // navigation it keeps the old page's frame until the new page's
+        // arrives; hiding it would expose the unfoveated page underneath the
+        // transparent HUD. scrollFreshness stays as a diagnostic ('waiting'
+        // until this document's first frame, 'stale' while a scroll is ahead
+        // of the newest frame).
         const updateScrollFreshness = () => {
             if (!overlayCanvas || !isCapturing) return;
             const hasFrame = frameScroll !== null;
             const fresh = hasFrame && scrollIdle &&
                 isFrameAtScrollPosition(frameScroll, currentScroll);
-            overlayCanvas.style.visibility = hasFrame ? 'visible' : 'hidden';
+            overlayCanvas.style.visibility = frameShown ? 'visible' : 'hidden';
             overlayCanvas.dataset.scrollFreshness = !hasFrame ? 'waiting' : (fresh ? 'fresh' : 'stale');
         };
 
@@ -134,6 +140,7 @@
             isCapturing = true;
             isWaitingForFrame = false;
             frameScroll = null;
+            frameShown = false;
             frameRegistrar.reset();
             paneRegistrar.reset();
             if (overlayCanvas) {
@@ -217,6 +224,7 @@
             // the next capture.
             if (registered.trusted && (!registered.pane || registered.pane.trusted)) {
                 frameScroll = registered;
+                frameShown = true;
                 if (scrutinizer && buffer) {
                     scrutinizer.processFrame(buffer, data.width, data.height, frameScroll);
                 }
@@ -273,9 +281,11 @@
             }
         };
 
-        // Listen for page load events
-        ipcRenderer.on('browser:did-start-loading', () => {
-            log('[Overlay] Page loading started');
+        // A new document in the main frame (not a subframe load or pushState):
+        // the old page's scroll registration no longer applies. Its last frame
+        // stays up, drawn as captured, until the new page's first frame.
+        ipcRenderer.on('browser:new-document', () => {
+            log('[Overlay] New document');
             frameScroll = null;
             frameRegistrar.reset();
             paneRegistrar.reset();

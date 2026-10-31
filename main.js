@@ -1348,10 +1348,9 @@ function createScrutinizerWindow(startUrl, options = {}) {
             applyMobileEmulation(win, currentMobileEmulation);
         }
 
-        if (!hudWindow.isDestroyed() && hudWindow.webContents && !hudWindow.webContents.isDestroyed()) {
-            hudWindow.webContents.send('hud:browser:did-start-loading');
-            hudWindow.webContents.send('browser:did-start-loading'); // Legacy
-        }
+        // Not forwarded to the HUD: this also fires for subframe loads and
+        // pushState, which leave the page and its scroll in place. The HUD
+        // hears of a new document from did-start-navigation below.
         // Update Toolbar
         if (toolbarView.webContents && !toolbarView.webContents.isDestroyed()) {
             toolbarView.webContents.send('toolbar:update-loading', true);
@@ -1447,6 +1446,8 @@ function createScrutinizerWindow(startUrl, options = {}) {
                 hudWindow.webContents.send('browser:scroll', win.latestBrowserScroll);
                 hudWindow.webContents.send('browser:inner-scroll', null);
                 hudWindow.webContents.send('hud:reset-visual-memory');
+                // The old document's scroll registration ends here.
+                hudWindow.webContents.send('browser:new-document', url);
             }
         } else {
             console.log('[Main] In-page navigation (ignored for memory reset):', url);
