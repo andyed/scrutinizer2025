@@ -38,7 +38,7 @@ Run the steps in order and **stop on any failure**. Each push, tag push, `gh rel
 
 ## Fixed facts
 
-- **Checkout.** Release from the main checkout, `~/Documents/dev/scrutinizer-repo/scrutinizer2025`. `.env` is gitignored and exists only there; a worktree has no `.env`, so it can't sign or notarize.
+- **Checkout.** `.env` is gitignored and exists only in the main checkout, `~/Documents/dev/scrutinizer-repo/scrutinizer2025`. `npm run build` packages the working tree, not a commit. Release from the main checkout when nothing that ships is modified there; otherwise release from a worktree at `origin/main` with `.env` linked in (step 1b). v2.8.2 was released from a worktree.
 - **Branches.** The checkout lives on `agent/usability-study-links`. Local `main` is stale and unused. Don't check it out and don't `git push origin main`. Releases push the tested sha to both `refs/heads/main` and `refs/heads/agent/usability-study-links` (step 7).
 - **Shared tree.** Other sessions work in this checkout. Stage by explicit path, never `git add -A`, and never stash WIP you didn't write. As of 2026-10-20, `docs/specs/browser-features-and-extensions.md` holds another session's uncommitted notes.
 - **Build.** arm64 only, one `package.json` at the root. `npm run build` runs `scripts/build-signed.js`: electron-builder, Developer ID signing, then notarization through `scripts/notarize.js` (the `afterSign` hook, 5–15 min).
@@ -56,6 +56,7 @@ git branch --show-current            # expect agent/usability-study-links
 git fetch origin
 git merge-base --is-ancestor origin/main HEAD && echo "HEAD contains origin/main"
 git status --short                   # note anything that isn't yours; don't stage it
+git status --short -- main.js menu-template.js settings-manager.js shared renderer package.json   # what the build packages
 for k in APPLE_ID APPLE_ID_PASSWORD APPLE_TEAM_ID; do grep -q "^$k=." .env && echo "ok $k" || echo "MISSING $k"; done
 node -p 'require("./package.json").version'
 git describe --tags --abbrev=0       # previous release tag
@@ -63,11 +64,39 @@ git describe --tags --abbrev=0       # previous release tag
 ```
 
 - All three `.env` keys must print `ok`. Without them `npm run build` fails at notarization.
-- If HEAD doesn't contain `origin/main`, stop and ask. Something was pushed to `main` that this checkout doesn't have.
+- If HEAD doesn't contain `origin/main`, stop and ask. Something was pushed to `main` that this checkout doesn't have, and this file may be out of date too: read `git show origin/main:.claude/skills/release/SKILL.md`. If the checkout is only behind and holds someone else's WIP, don't pull or rebase it; use step 1b.
+- If the second `git status` lists a change that isn't part of this release, the build would package it. Don't build here; use step 1b.
 - Settle the target version and the release type with Andy.
 - List what ships: `git log vPREV..HEAD --oneline`.
 - **If `docs/release_notes_vX.Y.Z.md` already exists, read it before writing anything.** It may be a draft for other, unreleased work. v2.8.1 found an unreleased Study Links draft there. Move such a draft aside, e.g. to `docs/release_notes_<topic>_draft.md`, after Andy agrees.
 - Public prose announces only what Andy has cleared. As of 2026-10-20, Study Links aren't announced in release bodies or blog posts. A fixed bug gets one plain sentence, without before/after or mechanism.
+
+## 1b. Release from a worktree (when the main checkout isn't clean)
+
+```bash
+MAIN=~/Documents/dev/scrutinizer-repo/scrutinizer2025
+WT=~/Documents/dev/scrutinizer-repo/scrutinizer2025-release-X.Y.Z
+git -C "$MAIN" fetch origin
+git -C "$MAIN" worktree add -b release/vX.Y.Z "$WT" origin/main
+ln -s "$MAIN/.env" "$WT/.env"        # gitignored; signing and notarization read it through the link
+cd "$WT" && npm ci
+test -f node_modules/electron/path.txt && node_modules/.bin/electron --version || echo "ELECTRON NOT INSTALLED"
+```
+
+- Run the `.env` key check from step 1 again in `$WT`, then do every later step there. The release commit lands on `release/vX.Y.Z`; step 7 pushes the sha, so the branch name doesn't matter.
+- Leave the main checkout's branch and WIP alone. Whoever owns the WIP rebases onto the release commit.
+- **`npm ci` can leave Electron unextracted.** On 2026-10-31 (Electron 30.5.1, Node 26.8) it exited 0 with `node_modules/electron/dist` holding only `LICENSE`, `LICENSES.chromium.html` and `version`, and no `path.txt`. Rerunning `node node_modules/electron/install.js` did nothing, and `npm test` failed with "Electron failed to install correctly". Unpack the cached zip by hand, after its sha256 matches:
+
+```bash
+V=$(node -p 'require("./node_modules/electron/package.json").version')
+ZIP=$(ls ~/Library/Caches/electron/*/electron-v${V}-darwin-arm64.zip | head -1)
+if [ "$(shasum -a 256 "$ZIP" | cut -d' ' -f1)" = "$(node -p "require('./node_modules/electron/checksums.json')['electron-v${V}-darwin-arm64.zip']")" ]; then
+  ditto -x -k "$ZIP" node_modules/electron/dist && printf 'Electron.app/Contents/MacOS/Electron' > node_modules/electron/path.txt && node_modules/.bin/electron --version
+else echo "STOP: no cached zip, or its checksum doesn't match"; fi
+```
+
+  `npm run build` isn't affected: electron-builder downloads its own copy.
+- Once step 9 passes, remove the worktree with `git -C "$MAIN" worktree remove "$WT"`.
 
 For `silent`, skip to step 4.
 
@@ -235,6 +264,14 @@ If `latest-mac.yml` is missing, run `gh release upload vX.Y.Z dist/latest-mac.ym
 
 All in `~/Documents/dev/scrutinizer-repo/scrutinizer-www`, on `master`. Use `git -C`, or return to scrutinizer2025 afterwards.
 
+- **If the site checkout isn't clean** (another session's WIP, unpushed commits, or behind `origin/master`), make the edits in a detached worktree at `origin/master`, commit there, push that sha, and remove the worktree once the deploy is verified:
+
+```bash
+WWW=~/Documents/dev/scrutinizer-repo/scrutinizer-www
+git -C "$WWW" fetch origin && git -C "$WWW" status -sb | head -3
+git -C "$WWW" worktree add --detach "$WWW-release" origin/master   # then SITE="$WWW-release" in the push below
+```
+
 - **Homepage, every major and dot release.** In `src/index.html`, the homepage links a specific DMG, so update both:
   - the two download URLs, from `vPREV/Scrutinizer-PREV-arm64.dmg` to `vX.Y.Z/Scrutinizer-X.Y.Z-arm64.dmg`
   - the two version labels, from `vPREV` to `vX.Y.Z`
@@ -252,10 +289,11 @@ All in `~/Documents/dev/scrutinizer-repo/scrutinizer-www`, on `master`. Use `git
 - **Push**, after Andy's go-ahead:
 
 ```bash
-WSHA=$(git -C ~/Documents/dev/scrutinizer-repo/scrutinizer-www rev-parse HEAD)
+SITE=~/Documents/dev/scrutinizer-repo/scrutinizer-www   # or the worktree above
+WSHA=$(git -C "$SITE" rev-parse HEAD)
 dow=$(TZ=America/Los_Angeles date +%u); hr=$(TZ=America/Los_Angeles date +%H | sed 's/^0//'); \
 if [ "$dow" -le 5 ] && [ "$hr" -ge 10 ] && [ "$hr" -lt 15 ]; then echo "BLOCKED: weekday 10am-3pm PT"; \
-else git -C ~/Documents/dev/scrutinizer-repo/scrutinizer-www push origin "${WSHA}:refs/heads/master"; fi
+else git -C "$SITE" push origin "${WSHA}:refs/heads/master"; fi
 ```
 
 - **Verify the deploy**, about 2 minutes later:
