@@ -414,6 +414,9 @@ class FrameScrollRegistrar {
      * @param {Object} [frame.crop]       {x, y, width, height} device px: register
      *   only this region (an inner scroller's pane); frames register against
      *   each other only when their crops match
+     * @param {Object} [frame.signature]  rowSignature of the frame (or crop),
+     *   in place of the buffer: scripts/replay-scroll-registration.mjs feeds
+     *   recorded captures back this way
      * @returns {{x:number, y:number, zoom:number, method:string, trusted:boolean}}
      */
     register(frame) {
@@ -426,8 +429,9 @@ class FrameScrollRegistrar {
         const width = frame.width | 0;
         const height = frame.height | 0;
         const viewWidth = finite(frame.viewWidth);
-        if (!frame.buffer || width <= 0 || height <= 0 || viewWidth <= 0 ||
-            frame.buffer.length < width * height * 4) {
+        const pixels = frame.signature ||
+            (frame.buffer && frame.buffer.length >= width * height * 4);
+        if (!pixels || width <= 0 || height <= 0 || viewWidth <= 0) {
             this.reset();
             this.lastMethod = result.method;
             return result;
@@ -440,7 +444,8 @@ class FrameScrollRegistrar {
         }
         // Device px per CSS px of page scroll.
         const scale = (width / viewWidth) * zoom;
-        const sig = rowSignature(frame.buffer, width, height, this.columns, this.bands, crop);
+        const sig = frame.signature ||
+            rowSignature(frame.buffer, width, height, this.columns, this.bands, crop);
         const ref = this.ref;
         const comparable = ref && ref.width === width && ref.height === height &&
             sameCrop(ref.crop, crop) &&
@@ -670,6 +675,8 @@ class PaneScrollRegistrar {
      * @param {Object} frame - as FrameScrollRegistrar.register, plus
      * @param {Object} [frame.pane]       pane state read after capture
      * @param {Object} [frame.paneBefore] pane state read at capture request
+     * @param {Object} [frame.paneSignature] rowSignature of the pane's crop,
+     *   in place of the buffer (see FrameScrollRegistrar.register)
      * @param {boolean} [windowMoving]    the window registrar is in motion
      * @returns {{id:number, rect:Object, x:number, y:number, zoom:number,
      *   method:string, trusted:boolean}|null} null when no pane is reported
@@ -704,6 +711,7 @@ class PaneScrollRegistrar {
         this.id = after.id;
         const result = this.registrar.register({
             buffer: frame.buffer,
+            signature: frame.paneSignature,
             width: frame.width,
             height: frame.height,
             viewWidth,

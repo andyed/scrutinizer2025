@@ -382,6 +382,18 @@ describe('FrameScrollRegistrar', () => {
         expect(jump.trusted).toBe(true);
     });
 
+    it('registers from a precomputed signature as from the pixels', () => {
+        // scripts/replay-scroll-registration.mjs feeds recorded captures back
+        // this way.
+        const fromPixels = new FrameScrollRegistrar();
+        const fromSig = new FrameScrollRegistrar();
+        for (const [y, after, before] of [[100, 100, 100], [111, 103, 95], [126.5, 134, 118]]) {
+            const f = frameAt(y, after, before);
+            const signature = rowSignature(f.buffer, f.width, f.height);
+            expect(fromSig.register({ ...f, buffer: null, signature })).toEqual(fromPixels.register(f));
+        }
+    });
+
     it('starts over after a resize', () => {
         const reg = new FrameScrollRegistrar();
         reg.register(frameAt(100, 100, 100));
