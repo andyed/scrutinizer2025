@@ -334,9 +334,14 @@ function sameCrop(a, b) {
  * A scrolling frame that cannot be matched gets its post-capture stamp, which
  * can be a scroll step off, and comes back `trusted: false`: the caller should
  * keep the registered frame it has (the live offset keeps it on the page)
- * rather than draw this one off by a step. The stamp is trusted instead once
- * the stamps have settled, for a jump too long to search (Page Down, Home),
- * or after maxMisses misses in a row, so the HUD never waits long.
+ * rather than draw this one off by a step. So does a stale frame, one whose
+ * pixels are the reference's while both stamps have moved on: under GPU load
+ * the compositor can trail main by a whole wheel burst. The stamp is trusted
+ * instead once the stamps have settled, or for a jump too long to search
+ * (Page Down, Home). Misses that overlap each other can still place a frame
+ * exactly (placeMiss). After maxMisses misses in a row the frame anchors at
+ * its request stamp, the closer guess when captures run slow, so the HUD
+ * never waits long.
  */
 const STILLS_TO_IDLE = 2;
 
@@ -358,6 +363,7 @@ class FrameScrollRegistrar {
         this.idlePrev = null;
         this.suspect = null;
         this.misses = 0;
+        this.missed = null;
         this.stills = 0;
         this.lastMethod = 'none';
     }
@@ -456,6 +462,7 @@ class FrameScrollRegistrar {
             this.ref = { sig, width, height, crop, zoom, scale, y };
             this.imageStep = step;
             this.misses = 0;
+            this.missed = null;
         };
         const done = () => { this.lastMethod = result.method; return result; };
 
@@ -474,6 +481,7 @@ class FrameScrollRegistrar {
 
         if (this.motionPeak < 1) {
             this.stills = 0;
+            this.missed = null;
             const prev = this.idlePrev;
             this.idlePrev = { sig, y: result.y };
             const est = prev && prev.y === result.y
@@ -490,38 +498,64 @@ class FrameScrollRegistrar {
         this.idlePrev = null;
         this.suspect = null;
 
-        // The stamps trail the pixels: the request-time read was never ahead
-        // of the frame in any measured run, scrolling down or up, and the
-        // post-capture read was at most a step either side. So the window
-        // opens a full slack only in the direction of motion and a 2 px
-        // margin behind. That keeps the reference's own position (shift 0,
-        // where sticky columns vote) out of the window once the page has
-        // moved away from it. A stall keeps the last direction.
+        // The window. Its core runs from 2 px behind the request stamp to
+        // the post-capture stamp. On 1307 moving frames under GPU load the
+        // request-time read was exact on 71% and 9 px off on average, nearly
+        // always trailing the pixels; the post-capture read led them by 63
+        // px on average (unloaded, 17 and 13 px over 908 frames). Ahead of
+        // the core lies the stall slack, for a scroll event that stalls
+        // while the page keeps painting. Behind it lie pixels the compositor
+        // has not caught up on: the request stamp led them on 7 of those
+        // 1307 frames, by 40 px at most, and never unloaded. That region
+        // reaches back only as far as main's scroll moved since the last
+        // capture, which is what the compositor can still owe. Reaching
+        // further let a page that repeats itself match a copy of rows the
+        // frame does not share with the reference (the lock fixture's gutter
+        // recurs every 241 px). The reference's own position stays out:
+        // sticky columns vote shift 0 there, and a frame unchanged from it
+        // is weighed below. A stall keeps the last direction.
         const dir = Math.sign(stampY - beforeY) || Math.sign(stampY - prevStampY) || this.direction;
         if (dir) this.direction = dir;
         const slack = Math.max(4, 2 * this.motionPeak);
         const margin = 2;
-        let lo = Math.min(beforeY, stampY) - (dir > 0 ? margin : slack);
-        let hi = Math.max(beforeY, stampY) + (dir < 0 ? margin : slack);
-        // The slack past the stamps covers a stall; on a slow HUD a fast
-        // scroll moves hundreds of px a capture and the slack outgrows the
-        // search. Trim it to fit and look, rather than go straight to the
-        // post-capture stamp, which runs ahead of the pixels and anchors the
-        // chain off for the rest of the scroll. A trimmed search that finds
-        // nothing falls back as an untrimmed one would have. Stamps that
-        // alone span more than the search (Page Down, Home) are not searched.
-        const reach = this.maxSearchPx / scale;
-        let trimmed = false;
-        if (hi - lo > reach && dir) {
-            if (dir > 0) hi = Math.max(Math.max(beforeY, stampY), lo + reach);
-            else lo = Math.min(Math.min(beforeY, stampY), hi - reach);
-            trimmed = true;
+        const near = dir > 0 ? Math.min(beforeY, stampY) - margin : Math.max(beforeY, stampY) + margin;
+        const far = dir > 0 ? Math.max(beforeY, stampY) : Math.min(beforeY, stampY);
+        let lo = Math.min(beforeY, stampY) - slack;
+        let hi = Math.max(beforeY, stampY) + slack;
+        if (dir) {
+            // A slow HUD in a fast scroll moves hundreds of px a capture, and
+            // the window can outgrow the search: keep the core, then what
+            // lies behind it, then the slack. Stamps that alone span more
+            // than the search (Page Down, Home) are not searched.
+            const reach = this.maxSearchPx / scale;
+            const core = Math.abs(far - near);
+            const behind = Math.max(0, (near - (ref.y + dir * margin)) * dir);
+            const back = Math.min(behind, Math.abs(beforeY - prevStampY), Math.max(0, reach - core));
+            const ahead = Math.min(slack, Math.max(0, reach - core - back));
+            lo = dir > 0 ? near - back : far - ahead;
+            hi = dir > 0 ? far + ahead : near + back;
         }
         const dMin = (lo - ref.y) * scale;
         const dMax = (hi - ref.y) * scale;
         // Tolerance for a window trimmed to exactly maxSearchPx.
         const searchable = dMax - dMin <= this.maxSearchPx + 1e-6;
-        const est = searchable ? estimateVerticalShift(ref.sig, sig, dMin, dMax) : null;
+        let est = searchable ? estimateVerticalShift(ref.sig, sig, dMin, dMax) : null;
+        // Nothing matched: are the pixels the reference's? A long window can
+        // hold a rival for an unchanged frame (text repeats its line pitch),
+        // so ask over a pixel either side. If the request stamp still names
+        // the reference's position, the frame is there. If it has moved on,
+        // the frame is stale: main reports a scroll the compositor has not
+        // drawn (or the content does not scroll at all). Do not draw it, and
+        // do not anchor the chain at a stamp its pixels have not reached;
+        // wait for a frame that shows the scroll.
+        let stale = false;
+        if (!(est && est.confident) && dir) {
+            const unmoved = estimateVerticalShift(ref.sig, sig, -scale, scale);
+            if (unmoved && unmoved.confident && Math.abs(unmoved.shift) < 2) {
+                if ((near - ref.y) * dir <= 0) est = { ...unmoved, shift: 0 };
+                else stale = true;
+            }
+        }
         if (est && est.confident) {
             if (est.shift === 0 && settled) {
                 result.method = 'still';
@@ -530,10 +564,21 @@ class FrameScrollRegistrar {
                 result.method = 'image';
             }
             anchor(result.y, Math.abs(result.y - ref.y) / (this.misses + 1));
-        } else if (settled || !searchable || trimmed || ++this.misses > this.maxMisses) {
+        } else if (settled || (!searchable && !stale)) {
             anchor(result.y, 0);
         } else {
-            result.trusted = false;
+            const placed = stale ? null : this.placeMiss(sig, beforeY, stampY, scale);
+            if (placed !== null) {
+                result.y = placed;
+                result.method = 'bounds';
+                anchor(result.y, Math.abs(result.y - ref.y) / (this.misses + 1));
+            } else if (++this.misses > this.maxMisses) {
+                // The closer stamp; see the window above.
+                result.y = beforeY;
+                anchor(result.y, 0);
+            } else {
+                result.trusted = false;
+            }
         }
         // Pixels and stamps held still against the reference on consecutive
         // captures: the scroll has stopped, whatever the decay says. Two in a
@@ -547,6 +592,42 @@ class FrameScrollRegistrar {
             this.idlePrev = { sig, y: result.y };
         }
         return done();
+    }
+
+    /**
+     * The scroll of a missed frame, when the misses before it pin it down;
+     * otherwise null. A capture that moves past the reference has no rows in
+     * common with it, but consecutive misses usually do, and a frame's
+     * pixels usually lie between its two stamps (all but 7 of 1307 moving
+     * frames under GPU load, 4 of 908 without, each by 40 px or less).
+     * Chained by their row shifts, the misses' stamp intervals intersect,
+     * and when that leaves a single position the frame is there. Only then:
+     * the rule can break several captures running (a scroll whose pixels
+     * trailed the request stamp by 40 px three times in a row), and bounds
+     * that merely narrow would then move a good guess off.
+     * @private
+     */
+    placeMiss(sig, beforeY, stampY, scale) {
+        let lo = Math.min(beforeY, stampY);
+        let hi = Math.max(beforeY, stampY);
+        let linked = false;
+        const prev = this.missed;
+        if (prev) {
+            // Shift window from the two intervals, with the usual 2 px margin.
+            const dMin = (lo - prev.hi - 2) * scale;
+            const dMax = (hi - prev.lo + 2) * scale;
+            const link = dMax - dMin <= this.maxSearchPx
+                ? estimateVerticalShift(prev.sig, sig, dMin, dMax) : null;
+            if (link && link.confident) {
+                const d = link.shift / scale;
+                const l = Math.max(lo, prev.lo + d);
+                const h = Math.min(hi, prev.hi + d);
+                // Disjoint intervals: a frame broke the rule; start over here.
+                if (l <= h) { lo = l; hi = h; linked = true; }
+            }
+        }
+        this.missed = { sig, lo, hi };
+        return linked && (hi - lo) * scale < 1 ? lo : null;
     }
 }
 

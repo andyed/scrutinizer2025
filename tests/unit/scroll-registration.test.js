@@ -360,16 +360,17 @@ describe('FrameScrollRegistrar', () => {
         expect(reg.register(frameAt(160, 165, 155)).y).toBe(160);
     });
 
-    it('falls back as before when the trimmed search finds nothing', () => {
-        // Same fast scroll, unmatchable frame: the stamp is trusted, as it
-        // was when the untrimmed window counted as too long to search.
+    it('waits out a fast scroll it cannot match, then anchors at the request stamp', () => {
+        // Same fast scroll, unmatchable frames: kept off screen like any
+        // miss, then anchored at the request stamp, the closer of the two
+        // when captures lag main (the post-capture read runs ahead).
         const reg = new FrameScrollRegistrar({ maxSearchPx: 160 });
         reg.register(frameAt(100, 100, 100));
-        const blank = { ...frameAt(130, 135, 125), buffer: new Uint8Array(W * H * 4).fill(255) };
-        const r = reg.register(blank);
-        expect(r.method).toBe('stamp');
-        expect(r.y).toBe(135);
-        expect(r.trusted).toBe(true);
+        const blank = (y, after, before) => ({ ...frameAt(y, after, before), buffer: new Uint8Array(W * H * 4).fill(255) });
+        const r = [[130, 135, 125], [160, 165, 155], [190, 195, 185], [220, 225, 220]]
+            .map(([y, after, before]) => reg.register(blank(y, after, before)));
+        expect(r.map(x => x.trusted)).toEqual([false, false, false, true]);
+        expect(r[3].y).toBe(220);
     });
 
     it('trusts the stamp for a jump longer than the search', () => {
@@ -382,16 +383,67 @@ describe('FrameScrollRegistrar', () => {
         expect(jump.trusted).toBe(true);
     });
 
-    it('registers from a precomputed signature as from the pixels', () => {
-        // scripts/replay-scroll-registration.mjs feeds recorded captures back
-        // this way.
-        const fromPixels = new FrameScrollRegistrar();
-        const fromSig = new FrameScrollRegistrar();
-        for (const [y, after, before] of [[100, 100, 100], [111, 103, 95], [126.5, 134, 118]]) {
-            const f = frameAt(y, after, before);
-            const signature = rowSignature(f.buffer, f.width, f.height);
-            expect(fromSig.register({ ...f, buffer: null, signature })).toEqual(fromPixels.register(f));
-        }
+    it('waits for pixels the compositor has not drawn yet', () => {
+        // A wheel burst under GPU load: main already holds the new scroll,
+        // so both stamps read 140, while the capture still shows 100. The
+        // window opens 2 px behind the request stamp and its trimmed search
+        // finds nothing. The frame matches the reference unmoved, so it is
+        // not drawn and does not anchor the chain at 140.
+        const reg = new FrameScrollRegistrar({ maxSearchPx: 160 });
+        reg.register(frameAt(100, 100, 100));
+        reg.register(frameAt(100, 100, 100));
+        const stale = reg.register(frameAt(100, 140, 140));
+        expect(stale.trusted).toBe(false);
+        const drawn = reg.register(frameAt(140, 140, 140));
+        expect(drawn.method).toBe('image');
+        expect(drawn.y).toBe(140);
+    });
+
+    it('names an unchanged frame at the reference while the request stamp is there', () => {
+        // Text repeats its line pitch, so a long window holds rivals for an
+        // unmoved frame and finds nothing. The request stamp has not left
+        // the reference: the frame shows the reference's scroll, not the
+        // post-capture stamp's.
+        const stripes = makeStripes(W, H);
+        const striped = (stampY, beforeY) => ({ ...frameAt(0, stampY, beforeY), buffer: stripes });
+        const reg = new FrameScrollRegistrar({ maxSearchPx: 160 });
+        reg.register(striped(100, 100));
+        reg.register(striped(100, 100));
+        const r = reg.register(striped(140, 100));
+        expect(r.trusted).toBe(true);
+        expect(r.y).toBe(100);
+    });
+
+    it('places a capture past the reference from the misses before it', () => {
+        // A slow HUD: each capture lands more than a frame height past the
+        // reference, so neither matches it, but the two overlap each other.
+        // Pixels lie between each frame's stamps: 250-260 for the first,
+        // 300-320 for the second, which sits 40 below the first, so the
+        // first is at 260 and the second at 300.
+        const reg = new FrameScrollRegistrar();
+        reg.register(frameAt(100, 100, 100));
+        reg.register(frameAt(100, 100, 100));
+        const first = reg.register(frameAt(260, 260, 250));
+        expect(first.trusted).toBe(false);
+        const second = reg.register(frameAt(300, 320, 300));
+        expect(second.method).toBe('bounds');
+        expect(second.trusted).toBe(true);
+        expect(second.y).toBe(300);
+        expect(reg.register(frameAt(330, 340, 320)).y).toBe(330);
+    });
+
+    it('registers pixels a step behind the request stamp', () => {
+        // Under GPU load the compositor can trail main: the request stamp
+        // reads 160 while the capture shows 140. The window reaches back as
+        // far as main moved since the last capture (120 to 160).
+        const reg = new FrameScrollRegistrar();
+        reg.register(frameAt(100, 100, 100));
+        reg.register(frameAt(100, 100, 100));
+        expect(reg.register(frameAt(120, 120, 100)).y).toBe(120);
+        const lagging = reg.register(frameAt(140, 180, 160));
+        expect(lagging.method).toBe('image');
+        expect(lagging.y).toBe(140);
+        expect(reg.register(frameAt(180, 180, 180)).y).toBe(180);
     });
 
     it('starts over after a resize', () => {
