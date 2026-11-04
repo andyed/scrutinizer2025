@@ -176,10 +176,12 @@ spctl -a -vv "$APP" 2>&1 | head -2                           # source=Notarized 
 plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist"   # X.Y.Z
 head -1 dist/latest-mac.yml                                  # version: X.Y.Z
 grep -c -a '<marker>' "$APP/Contents/Resources/app.asar"      # must be >= 1
+npm run check:study -- --app="$APP" && npm run check:study -- --app="$APP" --dpr=1
 ```
 
 - All three assets must exist. The DMG should be over 50 MB.
 - **Marker check.** Choose a string that only this release's change introduces, such as a new function, class or identifier from the diff, and confirm the packaged `app.asar` contains it. A count of 0 means the build packaged older sources. Don't upload it.
+- **Study gate on the package.** Both `check:study --app` runs must exit 0. They run the recorded study in the signed build itself, which can differ from the tree step 4 tested: a file left out of `app.asar`, a path that resolves differently inside it, a signing or entitlement limit. The first output line names the bundle and version that ran. Launching the package registers it with macOS, so until `dist/` is removed (step 1b's worktree removal does it) it can answer `scrutinizer://` links in place of the installed copy. A package older than the latest release can also download that release during the run (the update check starts ten seconds in), so run it on the build you are about to upload. v2.9.0 was the first release checked this way.
 - Before a major release, open the DMG and smoke-test it:
   - it launches without a Gatekeeper warning
   - foveal mode toggles (Cmd+Shift+F)
@@ -310,7 +312,7 @@ End with:
 - the release URL
 - the three verification results from step 9
 - which golden captures changed, or why captures were skipped
-- whether `check:scroll` and `check:study` (both DPRs) ran
+- whether `check:scroll` and `check:study` (both DPRs, source and package) ran
 - what was left undone
 
 ## Files

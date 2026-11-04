@@ -2,19 +2,21 @@
 /**
  * check-study-capture.mjs: end-to-end gate for recorded studies.
  *
- * LOCAL ONLY. It launches the real Electron app from source with foveation
- * on, so it needs a display and a GPU, like check:scroll. It runs one
- * recorded two-task study the way a participant would, then puts the saved
- * session directory through the checks the Study Workbench runs before it
- * computes any measure. The Workbench vendors shared/session-capture.js
- * byte-identically, so passing here means the Workbench will admit it.
+ * LOCAL ONLY. It launches the real app (from source, or a built package
+ * with --app) with foveation on, so it needs a display and a GPU, like
+ * check:scroll. It runs one recorded two-task study the way a participant
+ * would, then puts the saved session directory through the checks the
+ * Study Workbench runs before it computes any measure. The Workbench
+ * vendors shared/session-capture.js byte-identically, so passing here
+ * means the Workbench will admit it.
  *
  * What it does:
  *   1. Serves tests/fixtures/study/ on 127.0.0.1 and builds a
  *      scrutinizer://v1/session/start link: two tasks, foveation enabled,
  *      participant code in the link.
- *   2. Launches `electron . --study-link=<link>` with a throwaway profile
- *      and --remote-debugging-port, then drives it over CDP:
+ *   2. Launches `electron . --study-link=<link>` (with --app, the
+ *      package's own executable) with a throwaway profile and
+ *      --remote-debugging-port, then drives it over CDP:
  *        consent  check the box, Agree
  *        task 1   Begin; pointer path; wheel and PageDown scrolling until
  *                 the delivery link is on screen; click it; pointer on the
@@ -39,12 +41,23 @@
  * Exit 0 when every check passes, 1 when any fails, 2 when the harness
  * itself could not run (no app, no free port, a step timed out).
  *
- * usage: npm run check:study [-- --dpr=1] [--port=9450] [--out=dir] [--json=report.json] [--keep]
+ * usage: npm run check:study [-- --dpr=1] [--app=dist/mac-arm64/Scrutinizer.app]
+ *                             [--port=9450] [--out=dir] [--json=report.json] [--keep]
  *   --dpr forces the device scale factor (run --dpr=1 and the native 2x on
  *   a Retina Mac to cover both); --out copies the saved session directory
  *   there (import it into the Workbench by hand); --json also records the
  *   app's anchor decisions; --keep leaves the app running and the profile
  *   on disk.
+ *   --app runs a built package instead of the source tree: its own
+ *   executable, with its pages loaded from Contents/Resources/app.asar. The
+ *   release runs it on the signed build before uploading (release skill,
+ *   step 6), because the package can differ from the tree it was built from:
+ *   files left out of app.asar, paths that resolve differently inside it,
+ *   signing and entitlement limits. Two side effects of launching a package:
+ *   its update check runs ten seconds in, so a package older than the
+ *   latest release can download that release and install it over itself
+ *   when the gate quits it; and macOS registers the bundle, so it can answer
+ *   scrutinizer:// links until it is deleted.
  *
  * The window opens at 40,40. If your own pointer moves over it during the
  * run, macOS delivers those moves to the page too and they enter the trail;
@@ -77,7 +90,21 @@ const flags = Object.fromEntries(process.argv.slice(2).map(a => {
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 class HarnessError extends Error {}
 
-const INTERSTITIAL = pathToFileURL(path.join(ROOT, 'renderer', 'study-interstitial.html')).href;
+// --app: the package's pages live in its app.asar, so every file:// URL the
+// harness waits for is rooted there instead of at the checkout.
+let PACKAGED = null;
+if (flags.app !== undefined) {
+    const { packagedApp } = require(path.join(ROOT, 'scripts', 'lib', 'packaged-app.js'));
+    try {
+        PACKAGED = packagedApp(flags.app === true ? '' : String(flags.app));
+    } catch (e) {
+        console.error(`[check:study] harness error: ${e.message}`);
+        process.exit(2);
+    }
+}
+const APP_ROOT = PACKAGED ? PACKAGED.appRoot : ROOT;
+
+const INTERSTITIAL = pathToFileURL(path.join(APP_ROOT, 'renderer', 'study-interstitial.html')).href;
 const PARTICIPANT = 'check-p01';
 const TASKS = [
     { id: 'find-delivery', page: 'shop.html', instructions: 'Find the delivery time for the island route. Then choose Done.' },
@@ -147,7 +174,7 @@ async function findFreePort(start) {
 }
 
 function launchApp(port, link) {
-    const electronBin = require('electron');
+    const electronBin = PACKAGED ? PACKAGED.binary : require('electron');
     const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'scrutinizer-study-gate-'));
     fs.writeFileSync(path.join(userData, 'settings.json'), JSON.stringify({
         showWelcomePopup: false,
@@ -161,7 +188,8 @@ function launchApp(port, link) {
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.TEST_MODE;
     const args = [
-        ROOT,
+        // Electron from source is told which app to run; a package runs its own.
+        ...(PACKAGED ? [] : [ROOT]),
         `--study-link=${link}`,
         `--remote-debugging-port=${port}`,
         `--user-data-dir=${userData}`,
@@ -398,7 +426,7 @@ async function runStudy(port, app, origin) {
         }
     };
     const toolbar = targetHandle(port, app, 'the Study toolbar',
-        t => t.url.startsWith(pathToFileURL(ROOT).href) && /renderer\/toolbar\.html/.test(t.url));
+        t => t.url.startsWith(pathToFileURL(APP_ROOT).href) && /renderer\/toolbar\.html/.test(t.url));
     const observed = {};
 
     // Consent. The participant code comes from the link, so the page shows
@@ -552,6 +580,8 @@ async function main() {
     const { server, origin } = await serveFixtures();
     const port = flags.port ? Number(flags.port) : await findFreePort(9450);
     const link = studyLink(origin);
+    const build = PACKAGED ? `package ${PACKAGED.bundle} (v${PACKAGED.version})` : `source tree ${ROOT}`;
+    console.log(`[check:study] running the ${build}`);
     const app = launchApp(port, link);
     let exitCode = 2;
     let keepProfile = !!flags.keep;
@@ -565,6 +595,7 @@ async function main() {
         const { checks, summary } = await checkSession(dir, observed);
         // The app's own account of each anchor it kept or discarded.
         summary.captureLog = tailLog(app, 5000).split('\n').filter(l => l.includes('[StudyCapture]'));
+        summary.build = PACKAGED ? { package: PACKAGED.bundle, version: PACKAGED.version } : { source: ROOT };
         for (const c of checks) console.log(`${c.ok ? 'PASS' : 'FAIL'}  ${c.name}${c.detail ? `  (${c.detail})` : ''}`);
         console.log(`[check:study] DPR ${summary.dpr}; stimuli ${summary.stimuli.join(', ')}; rows ${JSON.stringify(summary.rows)}`);
         if (flags.out) {
