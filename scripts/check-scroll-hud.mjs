@@ -55,8 +55,12 @@
  * usage: npm run check:scroll [-- --only=window,lock,pane,interact]
  *        [--interact=hover,iframe,expand,tabs,type,navigate] [--port=9350]
  *        [--ms=1500] [--json=report.json] [--raw=dir] [--keep]
- *        [--throttle=hud:2,page:2]
+ *        [--throttle=hud:2,page:2] [--sigs]
  *   --json writes the per-run metrics, --raw each run's sample logs.
+ *   --sigs (with --raw) also records each frame's row signatures and the
+ *     HUD's live-scroll messages, so scripts/replay-scroll-registration.mjs
+ *     can run the registrars over the same captures offline. It costs the
+ *     HUD two row signatures a frame and makes each run file 10-25 MB.
  *   --keep leaves the app running and its profile on disk when done.
  *   --throttle slows the HUD's or the page's main thread N times over CDP,
  *     to rehearse a busy machine: hud:2 stretches captures from about 50 to
@@ -374,9 +378,47 @@ function installHudRecorder(cfg) {
     const s = window._scrutinizer;
     const canvas = document.getElementById('overlay-canvas');
     const R = window.__scrollGate = {
-        cfg, frames: [], srcs: [], renders: [], vis: [],
+        cfg, frames: [], srcs: [], renders: [], vis: [], live: [], seq: 0,
         lastSrc: s._scrollSources.frame, shownTrue: null, shownTruePane: null
     };
+
+    // --sigs: what the overlay hands its registrars, in arrival order.
+    // Listeners added after the overlay's run after them for the same
+    // message, so the order matches what the registrars saw.
+    const registration = cfg.sigs ? require(cfg.sigs) : null;
+    const b64 = (sig) => ({ data: Buffer.from(sig.data.buffer).toString('base64'),
+        height: sig.height, bands: sig.bands, samples: sig.samples });
+    const replayInput = (data) => {
+        const buf = new Uint8Array(data.buffer);
+        const W = data.width, H = data.height;
+        const out = {
+            seq: R.seq++, frameSequence: data.frameSequence, width: W, height: H,
+            viewWidth: data.viewWidth || innerWidth, zoom: data.scrollZoom,
+            stamp: { x: data.scrollX, y: data.scrollY },
+            stampBefore: { x: data.scrollBeforeX, y: data.scrollBeforeY },
+            pane: data.pane || null, paneBefore: data.paneBefore || null,
+            sig: b64(registration.rowSignature(buf, W, H))
+        };
+        // The pane's crop, cut as PaneScrollRegistrar and clipCrop cut it.
+        const rect = data.pane && data.pane.rect;
+        if (rect) {
+            const k = W / out.viewWidth;
+            const x0 = Math.max(0, Math.ceil(rect.x * k)), y0 = Math.max(0, Math.ceil(rect.y * k));
+            const x1 = Math.min(W, Math.floor(rect.x * k + rect.width * k));
+            const y1 = Math.min(H, Math.floor(rect.y * k + rect.height * k));
+            if (x1 - x0 >= 16 && y1 - y0 >= 32) {
+                out.paneSig = b64(registration.rowSignature(buf, W, H, undefined, undefined,
+                    { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }));
+            }
+        }
+        return out;
+    };
+    if (registration) {
+        R.onScroll = (e, position) => R.live.push({ seq: R.seq++, kind: 'scroll', position });
+        R.onPane = (e, pane) => R.live.push({ seq: R.seq++, kind: 'pane', pane });
+        ipcRenderer.on('browser:scroll', R.onScroll);
+        ipcRenderer.on('browser:inner-scroll', R.onPane);
+    }
 
     // Any style/class change anywhere in the HUD, plus a 4 ms poll for
     // changes the observer cannot see.
@@ -425,14 +467,16 @@ function installHudRecorder(cfg) {
         R.lastSrc = src;
         const trueY = decodeFrame(data, 0, cfg.winRows, 0);
         const truePane = cfg.pane ? decodeFrame(data, cfg.pane.left, cfg.pane.rows, cfg.pane.top) : null;
-        // The pane's stamps from both sides of the capture, for --raw: a pane
-        // registered at paneStamp with method 'stamp' mid-scroll took the
-        // fallback rather than an image match.
-        R.frames.push({
-            t: now(), uploaded, trueY, truePane, stampY: data.scrollY,
+        // The stamps from both sides of the capture, for --raw: a frame or
+        // pane registered at its stamp with method 'stamp' mid-scroll took
+        // the fallback rather than an image match.
+        const rec = {
+            t: now(), uploaded, trueY, truePane, stampY: data.scrollY, stampBeforeY: data.scrollBeforeY,
             paneStamp: data.pane ? data.pane.y : null,
             paneStampBefore: data.paneBefore ? data.paneBefore.y : null
-        });
+        };
+        if (registration && data.width > 0 && data.height > 0) rec.replay = replayInput(data);
+        R.frames.push(rec);
         R.srcs.push(uploaded ? src : null);
         if (uploaded) { R.shownTrue = trueY; R.shownTruePane = truePane; }
     };
@@ -657,7 +701,10 @@ function collectHudRecorder() {
     const R = window.__scrollGate;
     clearInterval(R.timer);
     R.observer.disconnect();
-    require('electron').ipcRenderer.removeListener('hud:frame-captured', R.onFrame);
+    const { ipcRenderer } = require('electron');
+    ipcRenderer.removeListener('hud:frame-captured', R.onFrame);
+    if (R.onScroll) ipcRenderer.removeListener('browser:scroll', R.onScroll);
+    if (R.onPane) ipcRenderer.removeListener('browser:inner-scroll', R.onPane);
     s.render = R.ownRender;
     R.drainPixels(true);
     for (const pbo of R.pixelPool) s.renderer.gl.deleteBuffer(pbo);
@@ -673,7 +720,7 @@ function collectHudRecorder() {
         f.paneMethod = src && src.pane ? src.pane.method : null;
     });
     delete window.__scrollGate;
-    return JSON.stringify({ frames: R.frames, renders: R.renders, vis: R.vis });
+    return JSON.stringify({ frames: R.frames, renders: R.renders, vis: R.vis, live: R.live });
 }
 
 /** Page: sample scroll positions every rAF until done. */
@@ -861,7 +908,7 @@ async function runOne(run, { hud, page }) {
         return ok || { ok: false, ...r };
     }, 10000);
 
-    const cfg = { winRows: fx.winRows };
+    const cfg = { winRows: fx.winRows, sigs: flags.sigs ? path.join(ROOT, 'shared/scroll-registration.js') : null };
     let geo = null;
     if (isPane) {
         geo = await page.call(paneGeometry);
