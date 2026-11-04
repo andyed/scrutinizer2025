@@ -113,10 +113,26 @@ describe('stimulus PNG comparison worker', () => {
         });
     });
 
-    test('oversized PNG dimensions fail safe before decode allocation', async () => {
+    test('identical oversized captures are unchanged without a decode', async () => {
         const comparator = service({ maxPixels: 1_000 });
         const oversized = oversizedPngHeader(50_000, 50_000);
         const result = await comparator.compare(oversized, Buffer.from(oversized));
+
+        expect(result).toMatchObject({
+            material: false,
+            fallback: false,
+            reason: 'identical_bytes',
+            width: 50_000,
+            height: 50_000
+        });
+    });
+
+    test('oversized PNG dimensions fail safe before decode allocation', async () => {
+        const comparator = service({ maxPixels: 1_000 });
+        const oversized = oversizedPngHeader(50_000, 50_000);
+        // Same header, different bytes: the ceiling, not the byte check, decides.
+        const other = Buffer.concat([oversized, Buffer.from([0])]);
+        const result = await comparator.compare(oversized, other);
 
         expect(result).toMatchObject({
             material: true,
