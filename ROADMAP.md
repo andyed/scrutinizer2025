@@ -112,6 +112,10 @@ Active design documents in [`docs/specs/`](docs/specs/). Completed specs are in 
 
 ## Release history
 
+### v2.9.0: Capture fixes (2026-11-04)
+- Recorded sessions save every task on 2x displays, and saved evidence is checked before analysis; `check:study` gates releases at 2x and 1x
+- Scroll registration holds when the compositor falls behind under GPU load
+
 ### v2.8.2: Page loads (2026-10-31)
 - The foveated view stays up through page loads, subframe loads and in-page navigation
 - Scrolling panes stay registered when captures slow down; `check:scroll` gains interaction runs
