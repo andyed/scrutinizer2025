@@ -350,6 +350,50 @@ describe('scroll sampling', () => {
     });
 });
 
+describe('rows without a pointer position', () => {
+    it('carries the cursor through key, focus, change and submit rows instead of jumping to 0,0', () => {
+        const { tracker, win, capture } = harness();
+        capture.start();
+
+        tracker.sink(row({ xpos: 400, ypos: 1000, event: 'mousemove' }), { target: el('div') });
+        win.scrollY = 720;
+        // evtrack's getMousePos() gives 0,0 for events without pageX/clientX.
+        for (const event of ['keydown', 'keyup', 'focus', 'change', 'submit']) {
+            tracker.sink(row({ xpos: 0, ypos: 0, event }), { target: el('input') });
+        }
+
+        const data = capture.toScanpathData();
+        expect(data.mouseTimeline.map(m => [m.x, m.y])).toEqual(Array(6).fill([400, 1000]));
+    });
+
+    it('leaves a resize before any pointer movement out of the pointer trail', () => {
+        const { tracker, capture } = harness();
+        capture.start();
+
+        tracker.sink(row({ xpos: 0, ypos: 0, event: 'resize' }), { target: el('div') });
+        tracker.sink(row({ xpos: 300, ypos: 200, event: 'mousemove' }), { target: el('div') });
+
+        const data = capture.toScanpathData();
+        expect(data.mouseTimeline).toHaveLength(1);
+        expect(data.mouseTimeline[0]).toMatchObject({ x: 300, y: 200, event: 'mousemove' });
+        // The row itself is still sampled for scroll.
+        expect(data.scrollTimeline).toHaveLength(2);
+    });
+
+    it('treats a keyboard-activated click (detail 0) as having no position', () => {
+        const { tracker, capture } = harness();
+        capture.start();
+
+        tracker.sink(row({ xpos: 250, ypos: 150, event: 'mousemove' }), { target: el('div') });
+        tracker.sink(row({ xpos: 0, ypos: 0, event: 'click' }), { target: el('a'), detail: 0 });
+        tracker.sink(row({ xpos: 260, ypos: 155, event: 'click' }), { target: el('a'), detail: 1 });
+
+        const data = capture.toScanpathData();
+        expect(data.mouseTimeline.map(m => [m.x, m.y])).toEqual([[250, 150], [250, 150], [260, 155]]);
+        expect(data.events.filter(e => e.type === 'click')).toHaveLength(2);
+    });
+});
+
 describe('timestamp rebasing', () => {
     it('rebases row times to task start using the injected monotonic clock', () => {
         const tracker = makeTracker();
