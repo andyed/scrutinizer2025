@@ -52,6 +52,7 @@ function sampleStudy() {
             {
                 index: 1,
                 taskId: 'find-billing',
+                instructions: 'Find your billing address.',
                 targetUrl: 'https://example.com/',
                 finalUrl: 'https://example.com/account/billing',
                 startedAtMs: t0 + 1000,
@@ -98,6 +99,7 @@ describe('buildSessionSummary', () => {
         expect(summary.tasks[0]).toEqual({
             index: 1,
             taskId: 'find-billing',
+            instructions: 'Find your billing address.',
             targetUrl: 'https://example.com/',
             finalUrl: 'https://example.com/account/billing',
             startedAt: '2026-07-19T18:04:23.113Z',
@@ -119,6 +121,7 @@ describe('buildSessionSummary', () => {
         expect(summary.tasks[1]).toMatchObject({
             index: 2,
             taskId: null,
+            instructions: null,
             finalUrl: null,
             endedAt: null,
             durationMs: null,
