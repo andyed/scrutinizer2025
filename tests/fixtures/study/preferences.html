@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Newsletter preferences</title>
+<style>
+  /* check:study task 2. Typing into a field, a checkbox change and a submit
+     that changes the page without leaving the URL, so the Done anchor must
+     differ from the page's first anchor. */
+  html, body { margin: 0; background: #fff; color: #111; font: 17px/1.5 Georgia, serif; }
+  main { padding: 24px 48px; max-width: 640px; }
+  label { display: block; margin: 12px 0; }
+  input[type=text] { font: 17px Georgia, serif; padding: 6px 8px; width: 320px; border: 1px solid #111; }
+  button { font: 17px Georgia, serif; padding: 6px 18px; margin-top: 8px; background: #fff; color: #111; border: 2px solid #111; }
+  #status { margin-top: 20px; font-size: 21px; min-height: 32px; }
+</style></head>
+<body>
+<main>
+  <h1>Newsletter preferences</h1>
+  <form id="prefs">
+    <label>Name on the newsletter <input id="name" type="text" autocomplete="off"></label>
+    <label><input id="compact" type="checkbox"> Compact digest</label>
+    <button id="save" type="submit">Save preferences</button>
+  </form>
+  <p id="status" role="status"></p>
+</main>
+<script>
+  document.getElementById('prefs').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const compact = document.getElementById('compact').checked;
+    document.getElementById('status').textContent = compact ? 'Saved: compact digest' : 'Saved: full newsletter';
+    document.body.style.background = '#eef3ff';
+  });
+</script>
+</body></html>

@@ -2281,11 +2281,14 @@ async function captureFullPageStimulus(webContents, devicePixelRatio) {
             error.code = 'stimulus_too_large';
             throw error;
         }
+        // clip.scale multiplies on top of the device scale factor: the PNG is
+        // already in device pixels, so scale: dpr gave 4x CSS px on a 2x
+        // display and failed the size check below on every Retina Mac.
         const shot = await send('Page.captureScreenshot', {
             format: 'png',
             fromSurface: true,
             captureBeyondViewport: true,
-            clip: { x: 0, y: 0, width: cssWidth, height: cssHeight, scale: dpr }
+            clip: { x: 0, y: 0, width: cssWidth, height: cssHeight, scale: 1 }
         });
         const buffer = Buffer.from(shot.data, 'base64');
         const imageSize = pngDimensions(buffer);

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Island Goods</title>
+<style>
+  /* check:study task 1 start page. Long enough that the participant has to
+     scroll (wheel and keyboard) to reach the delivery link. No network. */
+  html, body { margin: 0; background: #fff; color: #111; font: 17px/1.5 Georgia, serif; }
+  header { padding: 20px 48px; border-bottom: 2px solid #111; }
+  h1 { margin: 0; font-size: 30px; }
+  main { padding: 0 48px 80px; max-width: 760px; }
+  section { min-height: 200px; padding: 18px 0; border-bottom: 1px solid #555; }
+  h2 { margin: 0 0 8px; font-size: 21px; }
+  p { margin: 0 0 8px; }
+  a { color: #00309a; }
+  footer { padding: 24px 48px 64px; border-top: 2px solid #111; }
+</style></head>
+<body>
+<header><h1>Island Goods</h1><p>Supplies shipped to the outer islands.</p></header>
+<main id="catalog"></main>
+<footer>
+  <p>Questions about shipping? See <a id="delivery-link" href="delivery.html">delivery times by route</a>.</p>
+</footer>
+<script>
+  // Twelve catalog sections push the footer link two to three screens down.
+  const items = ['Rope', 'Lamp oil', 'Canvas', 'Rain gear', 'Seed potatoes', 'Fishing line',
+                 'Batteries', 'Water filters', 'Tarps', 'First aid kits', 'Charts', 'Radios'];
+  const catalog = document.getElementById('catalog');
+  for (const [i, name] of items.entries()) {
+    const s = document.createElement('section');
+    s.innerHTML = `<h2>${name}</h2><p>Item ${i + 1} of ${items.length}. Ships on the weekly boat.</p>` +
+      '<p>Packed to stay dry in transit. Bulk orders go out on the first sailing of the month.</p>';
+    catalog.appendChild(s);
+  }
+</script>
+</body></html>
