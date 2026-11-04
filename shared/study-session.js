@@ -38,6 +38,7 @@ function buildSessionSummary(study, { endReason, endedAt, appVersion, platform }
             index: record.index,
             taskId: record.taskId,
             targetUrl: record.targetUrl,
+            instructions: typeof record.instructions === 'string' ? record.instructions : null,
             finalUrl: record.finalUrl !== undefined ? record.finalUrl : null,
             startedAt: new Date(record.startedAtMs).toISOString(),
             endedAt: record.endedAtMs !== undefined ? new Date(record.endedAtMs).toISOString() : null,

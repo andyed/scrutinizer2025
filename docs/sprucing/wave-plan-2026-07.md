@@ -70,6 +70,40 @@ Order deliberately inverts the P3 ticket numbering:
 P3-2/P3-3 are also the instrument for the human-subjects
 validation work (biological-plausibility roadmap in TODO.md).
 
+## Alpha gate (2026-11-03)
+
+**Alpha:** a UX researcher other than Andy, on a Mac, gets from the public
+site to analyzed sessions alone: install Scrutinizer, build a recorded-study
+link, run moderated sessions with consent, and import the session folders
+into the Workbench for roster, measures and replay. macOS only, labeled alpha.
+
+Done on `feat/recorded-study-admission` (not yet on main):
+
+- [x] Capture admission checks and recorded/walkthrough labels (the 2026-10-20
+      Codex work, 316fecc; Workbench e4459d2)
+- [x] Full-page stimuli at 2x (c8289c5). Recorded studies were broken on
+      every Retina Mac in 2.8.0–2.8.2: each one ended after its first task page
+      with a timing summary only.
+- [x] Key and form rows no longer move the cursor to (0, -scrollY) (19291a6)
+- [x] Unchanged tall pages at 2x no longer saved as changed anchors (acbc418)
+- [x] `npm run check:study` gate at 2x and 1x, in the release steps
+      (afbc2fe, dc1e020). The browser Workbench admits both sessions and replay
+      puts the DPR 2 click on the link it hit.
+
+Open:
+
+- [ ] Release the fixes (version to decide). Until then recorded studies
+      do not work on 2x displays.
+- [ ] Host the Workbench (`scrutinizer-moderator` has no remote; the spec
+      allows a GitHub Pages copy).
+- [ ] Site: land the builder's recorded-study default (Oct 20 work, still
+      uncommitted in the www checkout) with the new minimum version; an alpha
+      page linking install, builder, guide and Workbench.
+- [ ] Signed build: Safari and Chrome handoff, cold and warm launch.
+- [ ] Pilot: 2–3 moderated participants (Wave 1 exit), findings memo.
+- [ ] Known issues for the alpha: macOS only; pointer is not gaze; PNG
+      anchors are not video; 2x sessions from 2.8.0–2.8.2 are timing-only.
+
 ## Wave 4: Reach (backlog)
 
 jsPsych plugin (academic wedge vs MouseView.js) → scanpath replay

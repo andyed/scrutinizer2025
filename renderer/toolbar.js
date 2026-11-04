@@ -21,7 +21,8 @@ const viewState = {
     currentUrl: '',
     showingUrl: false,
     taskNumber: null,
-    taskCount: null
+    taskCount: null,
+    recordedStudy: false
 };
 
 function currentOrigin() {
@@ -43,7 +44,9 @@ function renderToolbar() {
     // Multi-task sessions show real progress; single-task links keep the
     // static label (spec: usability-study-multi-task-sessions.md §Toolbar).
     const inSession = Number.isInteger(viewState.taskNumber) && Number.isInteger(viewState.taskCount) && viewState.taskCount > 1;
-    studyLabel.textContent = inSession ? `Task ${viewState.taskNumber} of ${viewState.taskCount}` : 'Task';
+    studyLabel.textContent = viewState.recordedStudy
+        ? (inSession ? `Task ${viewState.taskNumber} of ${viewState.taskCount}` : 'Recorded study')
+        : 'Walkthrough · not recording';
     studyLabel.title = viewState.taskId ? `Task ID: ${viewState.taskId}` : 'Study task';
     studyInstructionLabel.textContent = viewState.showingUrl ? 'Task URL' : 'Instructions';
     studyInstruction.textContent = centerText;
@@ -86,6 +89,7 @@ ipcRenderer.on('toolbar:update-url', (event, url) => {
 
 ipcRenderer.on('toolbar:enter-study', (event, state) => {
     viewState.mode = 'study';
+    viewState.recordedStudy = state.recordedStudy === true;
     viewState.taskId = state.taskId || null;
     viewState.instructions = state.instructions || null;
     viewState.currentUrl = state.currentUrl || '';

@@ -51,6 +51,15 @@ const DISCRETE_EVENTS = [
 /** Upstream commit this adapter is written against. See vendor/evtrack/README.md. */
 const EVTRACK_COMMIT = 'cabb3b7ccfecee72a8970592642c86881a8fd437';
 
+/**
+ * Tracked events whose DOM event carries a pointer position. evtrack's
+ * getMousePos() returns 0,0 for every other event (keys, resize, focus,
+ * change, submit), and taking that as pageX/pageY put the cursor at
+ * (0, -scrollY) on every keystroke: replay jumped to the corner and the
+ * pointer-distance measure counted the jumps.
+ */
+const POINTER_EVENTS = new Set(['mousemove', 'mousedown', 'mouseup', 'click', 'dblclick', 'wheel', 'contextmenu']);
+
 const EDITABLE_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
 const KEY_EVENTS = new Set(['keydown', 'keyup', 'keypress']);
 
@@ -458,11 +467,17 @@ function createEventCapture(deps = {}) {
         const isScrollRow = eventName === 'scroll';
 
         // evtrack reports pageX/pageY; the trail is client-viewport CSS px.
-        // On scroll rows xpos/ypos hold the scroll offsets, not the cursor —
-        // the cursor did not move, so carry the last known position forward.
+        // On scroll rows xpos/ypos hold the scroll offsets, not the cursor,
+        // and non-pointer rows hold evtrack's 0,0 placeholder. The cursor did
+        // not move for either, so carry the last known position forward. A
+        // click with detail 0 came from the keyboard (Enter on a link or
+        // button) and has no position either.
+        const keyboardClick = (eventName === 'click' || eventName === 'dblclick') &&
+            domEvent && typeof domEvent === 'object' && domEvent.detail === 0;
+        const carriesPointer = POINTER_EVENTS.has(eventName) && !keyboardClick;
         let x = null;
         let y = null;
-        if (isScrollRow) {
+        if (isScrollRow || !carriesPointer) {
             x = lastX;
             y = lastY;
         } else {

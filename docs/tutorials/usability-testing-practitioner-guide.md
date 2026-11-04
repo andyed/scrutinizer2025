@@ -80,15 +80,19 @@ Keep the instruction short enough to remain readable in the Study toolbar. The c
 
 ## Create a Study Link
 
-A Study Link opens a packaged Scrutinizer build, loads one HTTP(S) page, applies temporary settings, and replaces normal browsing controls with the task instruction. Clicking **Done** restores the participant's previous runtime settings.
+Use the [Study Link Builder](https://andyed.github.io/scrutinizer-www/study-link-builder.html) and keep its default **Recorded study (2–8 tasks)** for Workbench analysis. This creates a `scrutinizer://v1/session/start` link: participants consent before capture begins, then complete tasks in sequence. The app saves local task timing, pointer and interaction trails, and page images for import into the Workbench. It does not record video or audio. See [Run a recorded study](#run-a-recorded-study) below.
 
-Minimal link:
+Choose **Walkthrough (one task, no recording)** only for an unrecorded demonstration or a separately documented observation. Its `scrutinizer://v1/task/start` route loads one HTTP(S) page, applies temporary settings, and replaces normal browsing controls with the task instruction. It has no study consent screen and saves no Workbench session or task recording. Clicking **Done** restores the participant's previous runtime settings.
+
+### Walkthrough links (no study recording)
+
+Minimal walkthrough link:
 
 ```text
 scrutinizer://v1/task/start?url=https%3A%2F%2Fexample.com
 ```
 
-Reproducible task example:
+Reproducible walkthrough condition:
 
 ```text
 scrutinizer://v1/task/start?url=https%3A%2F%2Fexample.com%2Faccount&task_id=billing-address&instructions=You%20have%20moved.%20Change%20the%20billing%20address%20on%20your%20account.&fovea_radius_px=45&mode=12&enabled=true&comfort_mode=false&visual_memory_limit=5
@@ -128,7 +132,7 @@ Query values containing URLs, spaces, punctuation, or other reserved characters 
 
 Scrutinizer rejects unknown, duplicate, or invalid parameters, so a malformed link never silently runs a different condition.
 
-## Run a multi-task session
+## Run a recorded study
 
 Most moderated sessions run several tasks in order on the same participant. A **session link** packages 2–8 tasks into one link so the moderator does not hand-fire a separate Study Link between tasks:
 
@@ -136,7 +140,7 @@ Most moderated sessions run several tasks in order on the same participant. A **
 scrutinizer://v1/session/start?session_id=nav-study&participant_id=P04&mode=12&fovea_radius_px=45&t1.url=…&t1.instructions=…&t2.url=…&t2.instructions=…
 ```
 
-Build session links in the [Study Link Builder](https://andyed.github.io/scrutinizer-www/study-link-builder.html): choose **Multi-task session**, add task rows, and set the shared condition once; any task row can override it. The builder enforces the same limits the app does (2–8 tasks, 8192-character link cap) and validates with the app's own parser. Session links shipped with single-task links in 2.8.0 and need that build or later.
+Build session links in the [Study Link Builder](https://andyed.github.io/scrutinizer-www/study-link-builder.html): keep **Recorded study (2–8 tasks)** selected, add task rows, and set the shared condition once; any task row can override it. The builder enforces the same limits the app does (2–8 tasks, 8192-character link cap) and validates with the app's own parser. Session links shipped with single-task links in 2.8.0 and need that build or later.
 
 What the participant experiences:
 
@@ -171,7 +175,7 @@ Session links present tasks in the order they appear in the link. To counterbala
 Tell participants what will happen before they click:
 
 1. The browser may ask permission to open Scrutinizer. Choose **Open Scrutinizer**.
-2. The task page will open in Study mode with the instruction at the top.
+2. A recorded study first shows consent, followed by a task introduction. Choose **Begin** when ready; the task page opens with the instruction at the top. A walkthrough skips consent and does not record study data.
 3. The clear region follows the pointer. This changes what is visually available around it.
 4. Work as naturally as possible and think aloud only if that is part of the study protocol.
 5. Select **Done** after completing the task or when the moderator asks you to stop.
@@ -239,11 +243,14 @@ uploaded.
 Current status: since 2.8.0, Scrutinizer records per-task input trails and
 full-page stimulus anchors, then publishes the complete Workbench session
 directory atomically. With these, the Workbench's motion measures and procedural
-replay work on sessions captured by 2.8.0 or later. No end-to-end check of a
-packaged-build session through the Workbench is recorded yet, so run one pilot
-session through it before a study. The Workbench and its file formats are ready
-now, and its bundled demo
-session shows the complete workflow. See the
+replay work on sessions captured by 2.8.0 or later. A local unsigned 2.8.1 WIP
+package completed a two-task technical rehearsal on 2026-10-20: Workbench
+admitted its 280 retained rows and four PNG anchors, including a changed
+same-URL state at Done. A corrupted-image control was rejected. See
+[the verification record](../assessments/2026-10-20-recorded-study-verification.md)
+for provenance and limits. This does not verify the distributed release or OS
+protocol dispatch; run a pilot with the exact package and conditions intended
+for the study. Its bundled fixture deliberately includes an empty trail to exercise rejection; it is not an example of a successfully admitted session. See the
 Workbench Guide (`scrutinizer-moderator/docs/workbench-guide.md`, sibling repo)
 for the roster, quality-control flags, and measure definitions.
 

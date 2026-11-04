@@ -43,7 +43,7 @@ const SUMMARY_KEYS = [
 /** Per-task keys the summary schema defines (buildSessionSummary task records). */
 const SUMMARY_TASK_KEYS = [
     'index', 'taskId', 'targetUrl', 'finalUrl', 'startedAt', 'endedAt',
-    'durationMs', 'outcome', 'settings'
+    'durationMs', 'outcome', 'settings', 'instructions'
 ];
 
 /** Task-level CIF events (spec §envelope.json: "Done / Quit / Comment"). */
@@ -211,6 +211,7 @@ function normalizeTask(task) {
         index: finite(source.index) ? source.index : null,
         taskId: source.taskId !== undefined ? source.taskId : null,
         targetUrl: source.targetUrl !== undefined ? source.targetUrl : null,
+        instructions: source.instructions !== undefined ? source.instructions : null,
         finalUrl: source.finalUrl !== undefined ? source.finalUrl : null,
         startedAt: source.startedAt !== undefined ? source.startedAt : null,
         endedAt: source.endedAt !== undefined ? source.endedAt : null,
@@ -425,7 +426,7 @@ function validateEnvelope(envelope) {
                 return;
             }
             for (const key of SUMMARY_TASK_KEYS) {
-                if (!Object.prototype.hasOwnProperty.call(task, key)) {
+                if (key !== 'instructions' && !Object.prototype.hasOwnProperty.call(task, key)) {
                     push(`tasks[${i}]: missing summary key ${key}`);
                 }
             }
@@ -578,8 +579,173 @@ function validateEnvelope(envelope) {
     return { ok: errors.length === 0, errors };
 }
 
+/** Validate retained evidence, beyond the envelope's structural schema.
+ * Older captures may omit health metadata. Present metadata must agree with
+ * the files: the adapter writes one scroll sample per raw input row, whereas
+ * mouseTimeline omits rows without usable pointer coordinates.
+ */
+function captureReadinessProblems(envelope, trailsByTaskId) {
+    const source = isPlainObject(envelope) ? envelope : {};
+    const capture = isPlainObject(source.capture) ? source.capture : {};
+    const trails = isPlainObject(trailsByTaskId) ? trailsByTaskId : {};
+    const tasks = Array.isArray(source.tasks) ? source.tasks : [];
+    const problems = [];
+    const healthFields = ['status', 'code', 'rowCount', 'deliveryFailureCount', 'taskId', 'pollMs'];
+    function checkHealth(health, label, expectedRows, taskId) {
+        if (health === null || health === undefined) return;
+        if (!isPlainObject(health)) { problems.push(`${label}: expected an object`); return; }
+        const code = nonEmptyString(health.code) ? ` (${health.code})` : '';
+        if (health.status === 'failed') problems.push(`${label}: capture failed${code}`);
+        else if (health.status === 'empty' || health.code === 'empty_trail') {
+            problems.push(`${label}: capture stopped empty${code}`);
+        } else if (health.status !== 'stopped') {
+            problems.push(`${label}: capture is not stopped (${String(health.status)})`);
+        }
+        if (health.code && health.code !== 'empty_trail' && health.status !== 'failed') {
+            problems.push(`${label}: capture reports error ${health.code}`);
+        }
+        if (!Number.isInteger(health.rowCount) || health.rowCount < 0) {
+            problems.push(`${label}.rowCount: expected a non-negative integer`);
+        } else if (expectedRows !== null && health.rowCount !== expectedRows) {
+            problems.push(`${label}.rowCount: ${health.rowCount} disagrees with ${expectedRows} retained rows`);
+        }
+        if (health.deliveryFailureCount !== undefined &&
+            (!Number.isInteger(health.deliveryFailureCount) || health.deliveryFailureCount < 0 ||
+                health.deliveryFailureCount > 0)) {
+            problems.push(`${label}: row delivery failures (${health.deliveryFailureCount})`);
+        }
+        if (taskId !== null && health.taskId !== null && health.taskId !== undefined && health.taskId !== taskId) {
+            problems.push(`${label}.taskId: disagrees with task "${taskId}"`);
+        }
+        if (health.pollMs !== null && health.pollMs !== undefined &&
+            (!finite(health.pollMs) || health.pollMs < 0 ||
+             (finite(capture.pollMs) && health.pollMs !== capture.pollMs))) {
+            problems.push(`${label}.pollMs: invalid or disagrees with capture.pollMs`);
+        }
+    }
+    function checkTimeline(rows, label, timeKey, checkRow, ordered = true) {
+        if (!Array.isArray(rows)) { problems.push(`${label}: expected an array`); return; }
+        let previous = -Infinity;
+        // Report the first malformed row per stream, so a corrupted file does
+        // not overwhelm the admission diagnostics with thousands of messages.
+        for (let i = 0; i < rows.length; i += 1) {
+            const row = rows[i];
+            if (!isPlainObject(row) || !finite(row[timeKey]) || row[timeKey] < 0 ||
+                (ordered && row[timeKey] < previous) || !checkRow(row)) {
+                problems.push(`${label}[${i}]: malformed row (check timestamps, order, coordinates and event type)`);
+                break;
+            }
+            previous = row[timeKey];
+        }
+    }
+    let totalRows = 0;
+    let allRowsKnown = tasks.length > 0;
+    const taskIds = new Set();
+    const fileNames = new Set();
+    for (const task of tasks) {
+        const taskId = task && typeof task.taskId === 'string' ? task.taskId : null;
+        if (taskId === null) { allRowsKnown = false; continue; }
+        const filename = trailFileName(taskId);
+        if (taskIds.has(taskId) || fileNames.has(filename)) {
+            problems.push(`task "${taskId}": duplicate task identity or trail filename`);
+        }
+        taskIds.add(taskId);
+        fileNames.add(filename);
+        const label = `trail for task "${taskId}"`;
+        const trail = trails[taskId];
+        if (!Object.prototype.hasOwnProperty.call(trails, taskId)) {
+            problems.push(`${label}: missing input trail`);
+            allRowsKnown = false;
+            checkHealth(task.captureHealth, `task "${taskId}".captureHealth`, null, taskId);
+            continue;
+        }
+        if (!isPlainObject(trail) || !Array.isArray(trail.mouseTimeline)) {
+            problems.push(`${label}: missing mouseTimeline array`);
+            allRowsKnown = false;
+            continue;
+        }
+        if (trail.mouseTimeline.length === 0) {
+            problems.push(`${label}: empty input trail — capture misconfigured`);
+        }
+        checkTimeline(trail.mouseTimeline, `${label}.mouseTimeline`, 't', row =>
+            finite(row.x) && finite(row.y) && nonEmptyString(row.event));
+        checkTimeline(trail.scrollTimeline, `${label}.scrollTimeline`, 't', row =>
+            finite(row.scrollY) && (row.scrollX === undefined || finite(row.scrollX)));
+        const eventTypes = ['click', 'scroll', 'key', 'submit', 'change', 'contextmenu', 'copy', 'paste'];
+        checkTimeline(trail.events, `${label}.events`, 'timestamp', row =>
+            eventTypes.includes(row.type) && isPlainObject(row.data) &&
+            ['x', 'y', 'scrollX', 'scrollY'].every(key =>
+                row.data[key] === undefined || row.data[key] === null || finite(row.data[key])), false);
+        const rowCount = Array.isArray(trail.scrollTimeline) ? trail.scrollTimeline.length : null;
+        if (rowCount === null) allRowsKnown = false;
+        else {
+            totalRows += rowCount;
+            // Legacy imports may use sparse scroll keyframes. Current capture
+            // health promises one scroll sample per raw row, so only those
+            // files can support this cross-stream cardinality check.
+            if ((task.captureHealth || (trail.meta && trail.meta.captureHealth)) &&
+                (trail.mouseTimeline.length > rowCount ||
+                 (Array.isArray(trail.events) && trail.events.length > rowCount))) {
+                problems.push(`${label}: pointer/event count exceeds retained rows`);
+            }
+        }
+        const meta = isPlainObject(trail.meta) ? trail.meta : {};
+        if (meta.taskId !== null && meta.taskId !== undefined && meta.taskId !== taskId) {
+            problems.push(`${label}.meta.taskId: disagrees with task identity`);
+        }
+        if (meta.pollMs !== undefined &&
+            (!finite(meta.pollMs) || meta.pollMs < 0 ||
+             (finite(capture.pollMs) && meta.pollMs !== capture.pollMs))) {
+            problems.push(`${label}.meta.pollMs: invalid or disagrees with capture.pollMs`);
+        }
+        checkHealth(task.captureHealth, `task "${taskId}".captureHealth`, rowCount, taskId);
+        checkHealth(meta.captureHealth, `${label}.meta.captureHealth`, rowCount, taskId);
+        if (isPlainObject(task.captureHealth) && isPlainObject(meta.captureHealth)) {
+            for (const field of healthFields) {
+                if (task.captureHealth[field] !== undefined && meta.captureHealth[field] !== undefined &&
+                    task.captureHealth[field] !== meta.captureHealth[field]) {
+                    problems.push(`${label}: task/trail capture health disagree on ${field}`);
+                }
+            }
+        }
+    }
+    checkHealth(capture.health, 'capture.health', allRowsKnown ? totalRows : null, null);
+    return problems;
+}
+
+/** Validate PNG bytes and decoded pixel dimensions through an injected decoder.
+ * Browser callers use createImageBitmap; tests can supply a real PNG decoder.
+ * Checking the magic bytes alone is insufficient: truncated/corrupt images
+ * must fail decoding before any measures or replay are admitted.
+ */
+async function validateStimulusImage(bytes, visit, decodeImage) {
+    const problems = [];
+    const label = visit && visit.screenshot || 'stimulus';
+    const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    const signature = [137, 80, 78, 71, 13, 10, 26, 10];
+    if (data.length < signature.length || !signature.every((byte, i) => data[i] === byte)) {
+        return [`${label}: not a PNG image`];
+    }
+    try {
+        const decoded = await decodeImage(data);
+        if (!decoded || !Number.isInteger(decoded.width) || decoded.width <= 0 ||
+            !Number.isInteger(decoded.height) || decoded.height <= 0) {
+            throw new Error('decoder returned invalid dimensions');
+        }
+        if (decoded.width !== visit.stimulusWidth || decoded.height !== visit.stimulusHeight) {
+            problems.push(`${label}: decoded ${decoded.width}×${decoded.height} pixels disagree with declared ` +
+                `${visit.stimulusWidth}×${visit.stimulusHeight}`);
+        }
+    } catch (error) {
+        problems.push(`${label}: PNG could not be decoded (${error.message})`);
+    }
+    return problems;
+}
+
 module.exports = {
     buildEnvelope,
+    captureReadinessProblems,
+    validateStimulusImage,
     envelopeFileName,
     validateEnvelope,
     toSummary,

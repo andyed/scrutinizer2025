@@ -76,6 +76,22 @@ function compare(message) {
     }
 
     const { width, height } = leftDimensions;
+    // Identical bytes need no decode, so they are settled before the pixel
+    // ceiling. A full-page capture at 2x passes 16 MP once the page is about
+    // 3100 CSS px tall, and checking the ceiling first kept every unchanged
+    // re-capture of such a page as a "changed" anchor.
+    if (left.equals(right)) {
+        return {
+            material: false,
+            fallback: false,
+            reason: 'identical_bytes',
+            width,
+            height,
+            pixelCount: width * height,
+            changedPixelCount: 0,
+            changedPixelRatio: 0
+        };
+    }
     if (exceedsPixelLimit(width, height, options.maxPixels)) {
         return {
             material: true,
@@ -88,18 +104,6 @@ function compare(message) {
     }
 
     const pixelCount = width * height;
-    if (left.equals(right)) {
-        return {
-            material: false,
-            fallback: false,
-            reason: 'identical_bytes',
-            width,
-            height,
-            pixelCount,
-            changedPixelCount: 0,
-            changedPixelRatio: 0
-        };
-    }
 
     let leftPng;
     let rightPng;

@@ -151,9 +151,9 @@ describe('Study toolbar contract', () => {
         expect(scrutinizer).toContain('!inScrollLock(paneLockUvRects(reg.lock, reg.paneRectUv), u, v)');
     });
 
-    it('shows session progress and falls back to the static label for single tasks', () => {
+    it('shows session progress and identifies unrecorded walkthroughs', () => {
         expect(js).toContain('`Task ${viewState.taskNumber} of ${viewState.taskCount}`');
-        expect(js).toContain("'Task'");
+        expect(js).toContain("'Walkthrough · not recording'");
         expect(js).toContain('taskNumber');
         expect(js).toContain('taskCount');
     });

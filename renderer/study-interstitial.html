@@ -264,6 +264,7 @@
                 <p>The recording is saved on this computer under participant code <code id="debrief-code"></code>. If you would like it deleted, tell the moderator now.</p>
             </div>
             <p id="saved-row" class="hint">For the moderator: saved as <code id="saved-name"></code> in the app's study-sessions folder.</p>
+            <p id="capture-status" class="hint" role="status"></p>
             <p id="unsaved-row" class="hint hidden">For the moderator: no session folder was written. Check the app log.</p>
             <p class="hint">You can hand the computer back to the moderator.</p>
         </section>
@@ -355,6 +356,12 @@
             const saved = params.get('saved');
             if (saved) {
                 byId('saved-name').textContent = saved;
+                const kind = params.get('saved_kind');
+                byId('capture-status').textContent = kind === 'summary'
+                    ? 'Only a timing summary was saved. Input trails and screenshots are incomplete; this file cannot be analyzed in the Workbench. Check the app log and repeat the technical check before continuing the study.'
+                    : kind === 'capture_failed'
+                        ? 'Capture reported a failure. Keep these files for diagnosis; the Workbench will exclude this session from analysis.'
+                        : 'Import the saved session directory in the Study Workbench. Its capture checks must pass before analysis.';
             } else {
                 byId('saved-row').classList.add('hidden');
                 show('unsaved-row');

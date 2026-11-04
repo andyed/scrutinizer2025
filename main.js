@@ -1915,6 +1915,7 @@ function sendStudyToolbarState(win) {
     else if (consenting) instructions = 'Read the information on this page, then choose whether to take part.';
     const showCounter = activeStudy.kind === 'session' && !consenting && !declined;
     win.toolbarView.webContents.send('toolbar:enter-study', {
+        recordedStudy: activeStudy.kind === 'session',
         taskId: task.id,
         instructions,
         currentUrl: liveUrl || task.targetUrl,
@@ -2006,6 +2007,7 @@ function studyInterstitialUrl(study, state = 'next') {
         url.searchParams.set('state', 'complete');
         if (study.session.participantId) url.searchParams.set('participant', study.session.participantId);
         if (study.savedName) url.searchParams.set('saved', study.savedName);
+        if (study.savedKind) url.searchParams.set('saved_kind', study.savedKind);
         return url.toString();
     }
     const task = study.tasks[study.taskIndex];
@@ -2279,11 +2281,14 @@ async function captureFullPageStimulus(webContents, devicePixelRatio) {
             error.code = 'stimulus_too_large';
             throw error;
         }
+        // clip.scale multiplies on top of the device scale factor: the PNG is
+        // already in device pixels, so scale: dpr gave 4x CSS px on a 2x
+        // display and failed the size check below on every Retina Mac.
         const shot = await send('Page.captureScreenshot', {
             format: 'png',
             fromSurface: true,
             captureBeyondViewport: true,
-            clip: { x: 0, y: 0, width: cssWidth, height: cssHeight, scale: dpr }
+            clip: { x: 0, y: 0, width: cssWidth, height: cssHeight, scale: 1 }
         });
         const buffer = Buffer.from(shot.data, 'base64');
         const imageSize = pngDimensions(buffer);
@@ -2674,7 +2679,7 @@ function buildTaskTrail(study, record) {
         stimulusWidth: firstVisit.stimulusWidth || null,
         stimulusHeight: firstVisit.stimulusHeight || null,
         taskId: record.taskId,
-        pollMs: meta.pollMs || 16,
+        pollMs: Number.isFinite(meta.pollMs) ? meta.pollMs : 16,
         devicePixelRatio: meta.devicePixelRatio || 1,
         startedAt: new Date(record.startedAtMs).toISOString(),
         captureHealth: record.captureHealth
@@ -2817,12 +2822,13 @@ function writeCompleteStudyCapture(study, summary) {
             }
         }
     }
-    return writeSessionDirectory({
+    const result = writeSessionDirectory({
         rootDir: path.join(app.getPath('userData'), 'study-sessions'),
         envelope,
         trailsByTaskId,
         stimuliByPageVisitId
     });
+    return { ...result, health: envelope.capture.health };
 }
 
 function failActiveStudyCapture(win, err) {
@@ -2898,6 +2904,8 @@ function writeSessionSummary(study, endReason) {
         try {
             const capture = writeCompleteStudyCapture(study, summary);
             study.savedName = path.basename(capture.directoryPath);
+            study.savedKind = study.captureFailed || !capture.health || capture.health.status !== 'stopped'
+                ? 'capture_failed' : 'capture';
             console.log(`[StudyCapture] Complete session directory written: ${capture.directoryPath}`);
         } catch (captureErr) {
             // A legacy summary preserves task timing, but it is intentionally
@@ -2907,6 +2915,7 @@ function writeSessionSummary(study, endReason) {
             const file = path.join(dir, summaryFileName(summary));
             fs.writeFileSync(file, JSON.stringify(summary, null, 2), { mode: 0o600 });
             study.savedName = path.basename(file);
+            study.savedKind = 'summary';
             console.warn('[StudyCapture] Complete capture unavailable; wrote timing summary only:',
                 captureErr && captureErr.message ? captureErr.message : captureErr);
             console.log(`[Study] Session summary written: ${file}`);
@@ -2985,6 +2994,7 @@ function beginCurrentSessionTask(win) {
         index: study.taskIndex + 1,
         taskId: task.id,
         targetUrl: task.targetUrl,
+        instructions: task.instructions,
         startedAtMs: Date.now(),
         outcome: null,
         runtimeState: study.runtimeState,
