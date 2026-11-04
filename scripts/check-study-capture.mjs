@@ -39,9 +39,16 @@
  * Exit 0 when every check passes, 1 when any fails, 2 when the harness
  * itself could not run (no app, no free port, a step timed out).
  *
- * usage: npm run check:study [-- --port=9450] [--out=dir] [--json=report.json] [--keep]
- *   --out copies the saved session directory there (import it into the
- *   Workbench by hand); --keep leaves the app running and the profile on disk.
+ * usage: npm run check:study [-- --dpr=1] [--port=9450] [--out=dir] [--json=report.json] [--keep]
+ *   --dpr forces the device scale factor (run --dpr=1 and the native 2x on
+ *   a Retina Mac to cover both); --out copies the saved session directory
+ *   there (import it into the Workbench by hand); --json also records the
+ *   app's anchor decisions; --keep leaves the app running and the profile
+ *   on disk.
+ *
+ * The window opens at 40,40. If your own pointer moves over it during the
+ * run, macOS delivers those moves to the page too and they enter the trail;
+ * the checks still pass, but the pointer-distance numbers include them.
  */
 
 import { spawn } from 'node:child_process';
