@@ -128,12 +128,14 @@ git tag -a vX.Y.Z -m "vX.Y.Z"
 ```bash
 npm test                                   # unit, visual, memory, integration
 npm run check:scroll                       # continuous-scroll HUD gate (launches the app)
+npm run check:study && npm run check:study -- --dpr=1   # recorded study end to end, at 2x and 1x
 node scripts/validate-color-search.js
 git diff --stat tests/validation/reports/color-search-report.md
 ```
 
 - `npm test` must pass.
 - `npm run check:scroll` must exit 0. It is the only check that watches the HUD while the page moves, and a failure stops the release.
+- `npm run check:study` must exit 0 at the display's own DPR and at `--dpr=1`. It runs a two-task recorded study in the app and admits the saved session with the Workbench's checks; a failure stops the release. Recorded studies were broken on 2x displays in 2.8.0 through 2.8.2 because the only end-to-end check ran at 1x.
 - `validate-color-search`: if Tier 1 fails, tell Andy. It is a warning, not a stop.
 - **An ALL PASS from it can be empty.** When the rendered captures in `tests/golden-captures/validation/color-search/` (gitignored) are missing, it skips every rendered check and still prints ALL PASS. Tier 1 then reports 5 checks instead of 9. Report that as "model-only; rendered checks skipped", never as a pass. The last real rendered result (April 2026) had Tier 2 rendered-vs-model at 10/20 FAIL.
 - **Restore the color-search report** with `git restore tests/validation/reports/color-search-report.md` unless you mean to update it. The script rewrites this tracked report and drops its hand-written correction notes.
@@ -308,7 +310,7 @@ End with:
 - the release URL
 - the three verification results from step 9
 - which golden captures changed, or why captures were skipped
-- whether `check:scroll` ran
+- whether `check:scroll` and `check:study` (both DPRs) ran
 - what was left undone
 
 ## Files
